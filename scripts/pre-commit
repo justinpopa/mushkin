@@ -1,0 +1,63 @@
+#!/bin/bash
+#
+# Pre-commit hook to check code formatting with clang-format
+#
+# To install this hook, run:
+#   cp scripts/pre-commit .git/hooks/pre-commit
+#   chmod +x .git/hooks/pre-commit
+#
+# Or use the install script:
+#   ./scripts/install-hooks.sh
+
+# Find clang-format (try Homebrew location first, then system)
+CLANG_FORMAT=""
+if [ -x "/opt/homebrew/opt/llvm/bin/clang-format" ]; then
+    CLANG_FORMAT="/opt/homebrew/opt/llvm/bin/clang-format"
+elif command -v clang-format &> /dev/null; then
+    CLANG_FORMAT="clang-format"
+else
+    echo "Warning: clang-format not found. Skipping format check."
+    echo "Install with: brew install llvm"
+    exit 0
+fi
+
+# Get list of staged C++ files
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(cpp|h)$')
+
+if [ -z "$STAGED_FILES" ]; then
+    # No C++ files staged, skip check
+    exit 0
+fi
+
+echo "Checking code formatting with clang-format..."
+
+# Check each staged file
+FORMAT_ISSUES=0
+for FILE in $STAGED_FILES; do
+    if [ -f "$FILE" ]; then
+        # Run clang-format in check mode
+        $CLANG_FORMAT --dry-run --Werror "$FILE" 2>&1 | grep -q "error:" && {
+            echo "❌ Format issues found in: $FILE"
+            FORMAT_ISSUES=1
+        }
+    fi
+done
+
+if [ $FORMAT_ISSUES -eq 1 ]; then
+    echo ""
+    echo "❌ Code formatting issues detected!"
+    echo ""
+    echo "To fix, run:"
+    echo "  git diff --cached --name-only --diff-filter=ACM | grep -E '\\.(cpp|h)\$' | xargs $CLANG_FORMAT -i"
+    echo ""
+    echo "Then stage the formatted files:"
+    echo "  git add <files>"
+    echo ""
+    echo "Or skip this check with:"
+    echo "  git commit --no-verify"
+    echo ""
+    exit 1
+fi
+
+echo "✓ Code formatting looks good"
+exit 0

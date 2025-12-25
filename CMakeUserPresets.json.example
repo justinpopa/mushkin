@@ -1,0 +1,12 @@
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "default",
+            "description": "User-specific Qt path configuration",
+            "cacheVariables": {
+                "CMAKE_PREFIX_PATH": "/path/to/your/Qt/6.9.3/macos"
+            }
+        }
+    ]
+}

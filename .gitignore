@@ -1,0 +1,85 @@
+# Build directories
+build/
+build-*/
+cmake-build-*/
+.cmake/
+.cache/
+tests/fixtures/*.state
+
+# CTest generated directories
+Testing/
+
+# CMake files (in case cmake is run in wrong directory)
+CMakeCache.txt
+CMakeFiles/
+CMakeUserPresets.json
+
+# vcpkg
+vcpkg_installed/
+
+# IDE files
+.vscode/
+.idea/
+*.user
+*.user.*
+.DS_Store
+
+# Qt generated files
+*.pro.user
+*.autosave
+moc_*.cpp
+ui_*.h
+qrc_*.cpp
+
+# Compiled files
+*.o
+*.obj
+*.so
+*.dylib
+*.dll
+*.exe
+*.app
+
+# Temporary files
+*~
+*.swp
+*.swo
+*.bak
+*.bak2
+*.backup
+.#*
+
+# Personal development tracking
+TODO.md
+
+# Database and runtime files
+*.sqlite
+*.db
+*.sqlite3
+
+# Archives (should not be in source control)
+*.tar.gz
+*.tgz
+*.zip
+*.rar
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Debug
+*.dSYM/
+
+# Generated documentation
+docs/api/html/
+docs/api/xml/
+docs/api/lua/
+docs/api/*.tag
+
+# User-specific directories (personal plugins)
+plugins/
+
+# Qt installations (from aqt)
+6.*/
+aqtinstall.log

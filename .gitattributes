@@ -1,0 +1,2 @@
+# Mark .h files as C++ for GitHub language statistics
+*.h linguist-language=C++

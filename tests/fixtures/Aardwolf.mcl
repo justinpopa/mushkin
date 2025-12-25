@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE muclient>
+<muclient>
+  <world
+    name="Aardwolf"
+    site="aardmud.org"
+    port="23"
+    player="TestPlayer"
+    password="VGVzdFBhc3N3b3JkMTIz"
+    id="e0eb198d8d5698e3b2f61483"
+    script_language="Lua"
+    utf_8="y"
+    wrap="y"
+    wrap_column="124"
+    enable_triggers="y"
+    enable_aliases="y"
+    output_font_name="Fira Code"
+    input_font_name="Fira Code"
+    terminal_identification="MUSHclient-Aard"
+    output_font_height="14"
+    input_font_height="14"
+    enable_timers="y"
+    enable_scripts="y"
+    enable_command_stack="y"
+    command_stack_character=";"
+    history_lines="1000"
+  >
+    <connect_text><![CDATA[]]></connect_text>
+    <notes><![CDATA[Test world file for Mushkin XML serialization tests.]]></notes>
+  </world>
+</muclient>
