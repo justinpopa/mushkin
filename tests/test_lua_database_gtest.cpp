@@ -564,6 +564,442 @@ TEST_F(LuaDatabaseTest, DatabaseColumnTypeReturnsCorrectType)
     EXPECT_EQ(type2, SQLITE_TEXT);
 }
 
+// Test 18: DatabaseColumnName returns column names
+TEST_F(LuaDatabaseTest, DatabaseColumnNameReturnsColumnName)
+{
+    // Open, create table, insert data
+    pushWorldFunction("DatabaseOpen");
+    lua_pushstring(L, "colname_test");
+    lua_pushstring(L, ":memory:");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    pushWorldFunction("DatabaseExec");
+    lua_pushstring(L, "colname_test");
+    lua_pushstring(L, "CREATE TABLE users (user_id INTEGER, user_name TEXT)");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    // Prepare query
+    pushWorldFunction("DatabasePrepare");
+    lua_pushstring(L, "colname_test");
+    lua_pushstring(L, "SELECT user_id, user_name FROM users");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    // Get column 1 name
+    pushWorldFunction("DatabaseColumnName");
+    lua_pushstring(L, "colname_test");
+    lua_pushinteger(L, 1);
+    lua_pcall(L, 2, 1, 0);
+
+    const char* name1 = lua_tostring(L, -1);
+    EXPECT_STREQ(name1, "user_id");
+    lua_pop(L, 1);
+
+    // Get column 2 name
+    pushWorldFunction("DatabaseColumnName");
+    lua_pushstring(L, "colname_test");
+    lua_pushinteger(L, 2);
+    lua_pcall(L, 2, 1, 0);
+
+    const char* name2 = lua_tostring(L, -1);
+    EXPECT_STREQ(name2, "user_name");
+    lua_pop(L, 1);
+}
+
+// Test 19: DatabaseColumnNames returns all column names
+TEST_F(LuaDatabaseTest, DatabaseColumnNamesReturnsAllNames)
+{
+    // Open, create table
+    pushWorldFunction("DatabaseOpen");
+    lua_pushstring(L, "colnames_test");
+    lua_pushstring(L, ":memory:");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    pushWorldFunction("DatabaseExec");
+    lua_pushstring(L, "colnames_test");
+    lua_pushstring(L, "CREATE TABLE items (id INTEGER, name TEXT, price REAL)");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    // Prepare query
+    pushWorldFunction("DatabasePrepare");
+    lua_pushstring(L, "colnames_test");
+    lua_pushstring(L, "SELECT id, name, price FROM items");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    // Get all column names
+    pushWorldFunction("DatabaseColumnNames");
+    lua_pushstring(L, "colnames_test");
+    lua_pcall(L, 1, 1, 0);
+
+    ASSERT_TRUE(lua_istable(L, -1)) << "DatabaseColumnNames should return a table";
+
+    // Check table length (lua_objlen for LuaJIT/Lua 5.1)
+    int len = static_cast<int>(lua_objlen(L, -1));
+    EXPECT_EQ(len, 3);
+
+    // Check first column name
+    lua_rawgeti(L, -1, 1);
+    EXPECT_STREQ(lua_tostring(L, -1), "id");
+    lua_pop(L, 1);
+
+    // Check second column name
+    lua_rawgeti(L, -1, 2);
+    EXPECT_STREQ(lua_tostring(L, -1), "name");
+    lua_pop(L, 1);
+
+    // Check third column name
+    lua_rawgeti(L, -1, 3);
+    EXPECT_STREQ(lua_tostring(L, -1), "price");
+    lua_pop(L, 2); // Pop name and table
+}
+
+// Test 20: DatabaseColumnText returns text value
+TEST_F(LuaDatabaseTest, DatabaseColumnTextReturnsText)
+{
+    // Open, create table, insert data
+    pushWorldFunction("DatabaseOpen");
+    lua_pushstring(L, "coltext_test");
+    lua_pushstring(L, ":memory:");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    pushWorldFunction("DatabaseExec");
+    lua_pushstring(L, "coltext_test");
+    lua_pushstring(L, "CREATE TABLE test (id INTEGER, msg TEXT)");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    pushWorldFunction("DatabaseExec");
+    lua_pushstring(L, "coltext_test");
+    lua_pushstring(L, "INSERT INTO test VALUES (1, 'Hello World')");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    // Prepare, step
+    pushWorldFunction("DatabasePrepare");
+    lua_pushstring(L, "coltext_test");
+    lua_pushstring(L, "SELECT id, msg FROM test");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    pushWorldFunction("DatabaseStep");
+    lua_pushstring(L, "coltext_test");
+    lua_pcall(L, 1, 1, 0);
+    expectError(SQLITE_ROW);
+
+    // Get text value of column 2
+    pushWorldFunction("DatabaseColumnText");
+    lua_pushstring(L, "coltext_test");
+    lua_pushinteger(L, 2);
+    lua_pcall(L, 2, 1, 0);
+
+    const char* text = lua_tostring(L, -1);
+    EXPECT_STREQ(text, "Hello World");
+    lua_pop(L, 1);
+}
+
+// Test 21: DatabaseColumnValue returns typed values
+TEST_F(LuaDatabaseTest, DatabaseColumnValueReturnsTypedValue)
+{
+    // Open, create table, insert data
+    pushWorldFunction("DatabaseOpen");
+    lua_pushstring(L, "colval_test");
+    lua_pushstring(L, ":memory:");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    pushWorldFunction("DatabaseExec");
+    lua_pushstring(L, "colval_test");
+    lua_pushstring(L, "CREATE TABLE test (i INTEGER, f REAL, t TEXT)");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    pushWorldFunction("DatabaseExec");
+    lua_pushstring(L, "colval_test");
+    lua_pushstring(L, "INSERT INTO test VALUES (42, 3.14, 'text')");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    // Prepare, step
+    pushWorldFunction("DatabasePrepare");
+    lua_pushstring(L, "colval_test");
+    lua_pushstring(L, "SELECT i, f, t FROM test");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    pushWorldFunction("DatabaseStep");
+    lua_pushstring(L, "colval_test");
+    lua_pcall(L, 1, 1, 0);
+    expectError(SQLITE_ROW);
+
+    // Get integer column
+    pushWorldFunction("DatabaseColumnValue");
+    lua_pushstring(L, "colval_test");
+    lua_pushinteger(L, 1);
+    lua_pcall(L, 2, 1, 0);
+
+    EXPECT_TRUE(lua_isnumber(L, -1));
+    EXPECT_EQ(lua_tointeger(L, -1), 42);
+    lua_pop(L, 1);
+
+    // Get float column
+    pushWorldFunction("DatabaseColumnValue");
+    lua_pushstring(L, "colval_test");
+    lua_pushinteger(L, 2);
+    lua_pcall(L, 2, 1, 0);
+
+    EXPECT_TRUE(lua_isnumber(L, -1));
+    EXPECT_DOUBLE_EQ(lua_tonumber(L, -1), 3.14);
+    lua_pop(L, 1);
+
+    // Get text column
+    pushWorldFunction("DatabaseColumnValue");
+    lua_pushstring(L, "colval_test");
+    lua_pushinteger(L, 3);
+    lua_pcall(L, 2, 1, 0);
+
+    EXPECT_TRUE(lua_isstring(L, -1));
+    EXPECT_STREQ(lua_tostring(L, -1), "text");
+    lua_pop(L, 1);
+}
+
+// Test 22: DatabaseColumnValues returns all values
+TEST_F(LuaDatabaseTest, DatabaseColumnValuesReturnsAllValues)
+{
+    // Open, create table, insert data
+    pushWorldFunction("DatabaseOpen");
+    lua_pushstring(L, "colvals_test");
+    lua_pushstring(L, ":memory:");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    pushWorldFunction("DatabaseExec");
+    lua_pushstring(L, "colvals_test");
+    lua_pushstring(L, "CREATE TABLE test (a INTEGER, b TEXT)");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    pushWorldFunction("DatabaseExec");
+    lua_pushstring(L, "colvals_test");
+    lua_pushstring(L, "INSERT INTO test VALUES (100, 'hundred')");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    // Prepare, step
+    pushWorldFunction("DatabasePrepare");
+    lua_pushstring(L, "colvals_test");
+    lua_pushstring(L, "SELECT a, b FROM test");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    pushWorldFunction("DatabaseStep");
+    lua_pushstring(L, "colvals_test");
+    lua_pcall(L, 1, 1, 0);
+    expectError(SQLITE_ROW);
+
+    // Get all values
+    pushWorldFunction("DatabaseColumnValues");
+    lua_pushstring(L, "colvals_test");
+    lua_pcall(L, 1, 1, 0);
+
+    ASSERT_TRUE(lua_istable(L, -1)) << "DatabaseColumnValues should return a table";
+
+    // Check table length (lua_objlen for LuaJIT/Lua 5.1)
+    int len = static_cast<int>(lua_objlen(L, -1));
+    EXPECT_EQ(len, 2);
+
+    // Check first value
+    lua_rawgeti(L, -1, 1);
+    EXPECT_EQ(lua_tointeger(L, -1), 100);
+    lua_pop(L, 1);
+
+    // Check second value
+    lua_rawgeti(L, -1, 2);
+    EXPECT_STREQ(lua_tostring(L, -1), "hundred");
+    lua_pop(L, 2);
+}
+
+// Test 23: DatabaseError returns error message
+TEST_F(LuaDatabaseTest, DatabaseErrorReturnsMessage)
+{
+    // Open database
+    pushWorldFunction("DatabaseOpen");
+    lua_pushstring(L, "error_test");
+    lua_pushstring(L, ":memory:");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    // Execute invalid SQL to trigger an error
+    pushWorldFunction("DatabaseExec");
+    lua_pushstring(L, "error_test");
+    lua_pushstring(L, "INVALID SQL SYNTAX HERE");
+    lua_pcall(L, 2, 1, 0);
+    // Ignore result (will be error code)
+    lua_pop(L, 1);
+
+    // Get error message
+    pushWorldFunction("DatabaseError");
+    lua_pushstring(L, "error_test");
+    lua_pcall(L, 1, 1, 0);
+
+    ASSERT_TRUE(lua_isstring(L, -1)) << "DatabaseError should return a string";
+    const char* errMsg = lua_tostring(L, -1);
+    EXPECT_TRUE(strlen(errMsg) > 0) << "Error message should not be empty";
+    lua_pop(L, 1);
+}
+
+// Test 24: DatabaseLastInsertRowid returns rowid
+TEST_F(LuaDatabaseTest, DatabaseLastInsertRowidReturnsRowid)
+{
+    // Open, create table
+    pushWorldFunction("DatabaseOpen");
+    lua_pushstring(L, "rowid_test");
+    lua_pushstring(L, ":memory:");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    pushWorldFunction("DatabaseExec");
+    lua_pushstring(L, "rowid_test");
+    lua_pushstring(L, "CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT)");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    // Insert first row
+    pushWorldFunction("DatabaseExec");
+    lua_pushstring(L, "rowid_test");
+    lua_pushstring(L, "INSERT INTO test (name) VALUES ('first')");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    // Get rowid
+    pushWorldFunction("DatabaseLastInsertRowid");
+    lua_pushstring(L, "rowid_test");
+    lua_pcall(L, 1, 1, 0);
+
+    lua_Integer rowid1 = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+    EXPECT_EQ(rowid1, 1);
+
+    // Insert second row
+    pushWorldFunction("DatabaseExec");
+    lua_pushstring(L, "rowid_test");
+    lua_pushstring(L, "INSERT INTO test (name) VALUES ('second')");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    // Get rowid again
+    pushWorldFunction("DatabaseLastInsertRowid");
+    lua_pushstring(L, "rowid_test");
+    lua_pcall(L, 1, 1, 0);
+
+    lua_Integer rowid2 = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+    EXPECT_EQ(rowid2, 2);
+}
+
+// Test 25: DatabaseList returns list of databases
+TEST_F(LuaDatabaseTest, DatabaseListReturnsDatabaseNames)
+{
+    // Open multiple databases
+    pushWorldFunction("DatabaseOpen");
+    lua_pushstring(L, "db_alpha");
+    lua_pushstring(L, ":memory:");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    pushWorldFunction("DatabaseOpen");
+    lua_pushstring(L, "db_beta");
+    lua_pushstring(L, ":memory:");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    // Get database list
+    pushWorldFunction("DatabaseList");
+    lua_pcall(L, 0, 1, 0);
+
+    ASSERT_TRUE(lua_istable(L, -1)) << "DatabaseList should return a table";
+
+    // Check table length (lua_objlen for LuaJIT/Lua 5.1)
+    int len = static_cast<int>(lua_objlen(L, -1));
+    EXPECT_EQ(len, 2);
+
+    // Verify names are in table (order may vary)
+    bool foundAlpha = false, foundBeta = false;
+    for (int i = 1; i <= 2; i++) {
+        lua_rawgeti(L, -1, i);
+        const char* name = lua_tostring(L, -1);
+        if (strcmp(name, "db_alpha") == 0)
+            foundAlpha = true;
+        if (strcmp(name, "db_beta") == 0)
+            foundBeta = true;
+        lua_pop(L, 1);
+    }
+    lua_pop(L, 1);
+
+    EXPECT_TRUE(foundAlpha) << "db_alpha should be in list";
+    EXPECT_TRUE(foundBeta) << "db_beta should be in list";
+}
+
+// Test 26: DatabaseGetField convenience function
+TEST_F(LuaDatabaseTest, DatabaseGetFieldReturnsFirstValue)
+{
+    // Open, create table, insert data
+    pushWorldFunction("DatabaseOpen");
+    lua_pushstring(L, "getfield_test");
+    lua_pushstring(L, ":memory:");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    pushWorldFunction("DatabaseExec");
+    lua_pushstring(L, "getfield_test");
+    lua_pushstring(L, "CREATE TABLE test (n INTEGER)");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    pushWorldFunction("DatabaseExec");
+    lua_pushstring(L, "getfield_test");
+    lua_pushstring(L, "INSERT INTO test VALUES (1), (2), (3)");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    // Use GetField to count rows
+    pushWorldFunction("DatabaseGetField");
+    lua_pushstring(L, "getfield_test");
+    lua_pushstring(L, "SELECT count(*) FROM test");
+    lua_pcall(L, 2, 1, 0);
+
+    lua_Integer count = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+    EXPECT_EQ(count, 3);
+
+    // Use GetField to get a text value
+    pushWorldFunction("DatabaseExec");
+    lua_pushstring(L, "getfield_test");
+    lua_pushstring(L, "CREATE TABLE names (name TEXT)");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    pushWorldFunction("DatabaseExec");
+    lua_pushstring(L, "getfield_test");
+    lua_pushstring(L, "INSERT INTO names VALUES ('Alice')");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    pushWorldFunction("DatabaseGetField");
+    lua_pushstring(L, "getfield_test");
+    lua_pushstring(L, "SELECT name FROM names LIMIT 1");
+    lua_pcall(L, 2, 1, 0);
+
+    const char* name = lua_tostring(L, -1);
+    EXPECT_STREQ(name, "Alice");
+    lua_pop(L, 1);
+}
+
 // GoogleTest main function
 int main(int argc, char** argv)
 {

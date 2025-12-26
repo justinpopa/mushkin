@@ -488,6 +488,13 @@ Plugin* WorldDocument::LoadPlugin(const QString& filepath, QString& errorMsg)
     // INITIALIZE SCRIPT ENGINE
     // ================================================================
 
+    // ================================================================
+    // Load plugin state BEFORE script initialization
+    // ================================================================
+    // This must happen before script parsing so that GetVariable() calls
+    // in the plugin's initialization code can access persisted variables
+    pluginPtr->LoadState();
+
     qCDebug(lcPlugin) << "Plugin script initialization:";
     qCDebug(lcPlugin) << "  Language:" << pluginPtr->m_strLanguage;
     qCDebug(lcPlugin) << "  Script length:" << pluginPtr->m_strScript.length();
@@ -518,12 +525,6 @@ Plugin* WorldDocument::LoadPlugin(const QString& filepath, QString& errorMsg)
         // Restore previous plugin context
         m_CurrentPlugin = savedPlugin;
     }
-
-    // ================================================================
-    // Load plugin state
-    // ================================================================
-
-    pluginPtr->LoadState();
 
     // ================================================================
     // SORT PLUGIN LIST BY SEQUENCE

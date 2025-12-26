@@ -105,9 +105,10 @@ static int L_utils_fontpicker(lua_State* L)
     }
     initialFont.setPointSize(fontsize);
 
-    // Show font dialog
+    // Show font dialog - use activeWindow as parent so it appears properly on macOS
     bool ok;
-    QFont selectedFont = QFontDialog::getFont(&ok, initialFont, nullptr, "Select Font");
+    QWidget* parent = QApplication::activeWindow();
+    QFont selectedFont = QFontDialog::getFont(&ok, initialFont, parent, "Select Font");
 
     if (!ok) {
         lua_pushnil(L);

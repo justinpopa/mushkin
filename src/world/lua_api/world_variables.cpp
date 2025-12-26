@@ -18,6 +18,7 @@ int L_GetVariable(lua_State* L)
 
     // Use plugin(L) to get the plugin from Lua registry
     Plugin* currentPlugin = plugin(L);
+    bool found = false;
     QString value;
 
     if (currentPlugin) {
@@ -25,14 +26,24 @@ int L_GetVariable(lua_State* L)
         auto it = currentPlugin->m_VariableMap.find(qName);
         if (it != currentPlugin->m_VariableMap.end()) {
             value = it->second->strContents;
+            found = true;
         }
     } else {
-        value = pDoc->getVariable(qName);
+        // For world variables, check the map directly to distinguish
+        // between "not found" and "empty string value"
+        QString lowerName = qName.toLower();
+        const VariableMap& varMap = pDoc->getVariableMap();
+        auto it = varMap.find(lowerName);
+        if (it != varMap.end()) {
+            value = it->second->strContents;
+            found = true;
+        }
     }
 
-    if (value.isEmpty()) {
+    if (!found) {
         lua_pushnil(L);
     } else {
+        // Return the value even if it's an empty string
         lua_pushstring(L, value.toUtf8().constData());
     }
 

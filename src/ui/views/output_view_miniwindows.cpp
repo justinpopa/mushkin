@@ -123,6 +123,10 @@ MiniWindow* OutputView::mouseOverMiniwindow(const QPoint& pos)
     if (!m_doc)
         return nullptr;
 
+    // Ensure miniwindow rectangles are up-to-date before checking
+    // This fixes a race condition where properties change but repaint hasn't happened yet
+    calculateMiniWindowRectangles(false); // Calculate on-top layer (the interactive ones)
+
     // Get list of miniwindows sorted by z-order
     QList<MiniWindow*> windows;
     for (auto it = m_doc->m_MiniWindowMap.cbegin(); it != m_doc->m_MiniWindowMap.cend(); ++it) {

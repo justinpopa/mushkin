@@ -5,6 +5,7 @@
 #include <QDebug>
 #include <QDir>
 #include <QFileInfo>
+#include <QRegularExpression>
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QStandardPaths>
@@ -332,7 +333,16 @@ bool Database::columnExists(const QString& tableName, const QString& columnName)
         return false;
     }
 
+    // Validate table name to prevent SQL injection
+    // Only allow alphanumeric characters and underscores
+    static QRegularExpression validIdentifier("^[a-zA-Z_][a-zA-Z0-9_]*$");
+    if (!validIdentifier.match(tableName).hasMatch()) {
+        qWarning() << "Invalid table name:" << tableName;
+        return false;
+    }
+
     QSqlQuery query(m_db);
+    // PRAGMA doesn't support parameter binding, so we validated tableName above
     query.prepare("PRAGMA table_info(" + tableName + ")");
 
     if (!query.exec()) {

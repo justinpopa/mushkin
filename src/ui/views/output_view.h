@@ -174,6 +174,23 @@ class OutputView : public QWidget {
     }
 
     /**
+     * getMaxScrollPosition - Get maximum scroll position in lines
+     *
+     * @return Maximum scroll position (totalLines - visibleLines), or 0 if all lines fit
+     */
+    int getMaxScrollPosition() const;
+
+    /**
+     * getVisibleLines - Get number of visible lines (page size)
+     *
+     * @return Number of lines that fit in the visible area
+     */
+    int getVisibleLines() const
+    {
+        return m_visibleLines;
+    }
+
+    /**
      * recalculateMetrics - Public method to trigger metrics recalculation
      *
      * Text Rectangle Architecture

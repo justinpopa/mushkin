@@ -65,6 +65,8 @@
 #include <QTimer>
 #include <QToolBar>
 #include <QVBoxLayout>
+#include <QHostInfo>
+#include <QNetworkInterface>
 #include <QPainter>
 #include <QStyleHints>
 #include <QSvgRenderer>
@@ -86,6 +88,14 @@ MainWindow::MainWindow(QWidget* parent)
     // Connect MDI area signals
     connect(m_mdiArea, &QMdiArea::subWindowActivated, this, &MainWindow::updateMenus);
 
+    // Initialize recent file actions BEFORE createMenus (so they can be added inline)
+    for (int i = 0; i < MaxRecentFiles; ++i) {
+        QAction* action = new QAction(this);
+        action->setVisible(false);
+        connect(action, &QAction::triggered, this, &MainWindow::openRecentFile);
+        m_recentFileActions.append(action);
+    }
+
     // Create UI components
     createMenus();
     createToolBars();
@@ -98,13 +108,7 @@ MainWindow::MainWindow(QWidget* parent)
     addDockWidget(Qt::RightDockWidgetArea, m_activityWindow);
     m_activityWindow->hide(); // Hidden by default, shown via menu
 
-    // Initialize recent file actions
-    for (int i = 0; i < MaxRecentFiles; ++i) {
-        QAction* action = new QAction(this);
-        action->setVisible(false);
-        connect(action, &QAction::triggered, this, &MainWindow::openRecentFile);
-        m_recentFileActions.append(action);
-    }
+    // Update recent files menu after it's created
     updateRecentFilesMenu();
 
     // Read saved window geometry
@@ -127,7 +131,7 @@ MainWindow::~MainWindow()
 
 void MainWindow::createMenus()
 {
-    // File Menu
+    // File Menu - matches original MUSHclient order
     m_fileMenu = menuBar()->addMenu("&File");
 
     m_newAction = m_fileMenu->addAction("&New World...");
@@ -135,44 +139,25 @@ void MainWindow::createMenus()
     m_newAction->setStatusTip("Create a new world connection");
     connect(m_newAction, &QAction::triggered, this, &MainWindow::newWorld);
 
-    m_openAction = m_fileMenu->addAction("&Open...");
+    m_openAction = m_fileMenu->addAction("&Open World...");
     m_openAction->setShortcut(QKeySequence::Open);
     m_openAction->setStatusTip("Open an existing world file");
     connect(m_openAction, &QAction::triggered, this, qOverload<>(&MainWindow::openWorld));
 
-    m_quickConnectAction = m_fileMenu->addAction("&Quick Connect...");
-    m_quickConnectAction->setStatusTip("Quickly connect to a MUD server");
-    connect(m_quickConnectAction, &QAction::triggered, this, &MainWindow::quickConnect);
+    m_openStartupListAction = m_fileMenu->addAction("Open Worlds In Startup &List");
+    m_openStartupListAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_O));
+    m_openStartupListAction->setStatusTip("Open all worlds in the startup list");
+    connect(m_openStartupListAction, &QAction::triggered, this, &MainWindow::openStartupWorlds);
 
-    m_fileMenu->addSeparator();
-
-    m_closeAction = m_fileMenu->addAction("&Close");
+    m_closeAction = m_fileMenu->addAction("&Close World");
     m_closeAction->setShortcut(QKeySequence::Close);
     m_closeAction->setStatusTip("Close the current world");
     connect(m_closeAction, &QAction::triggered, this, &MainWindow::closeWorld);
 
-    m_fileMenu->addSeparator();
-
-    m_saveAction = m_fileMenu->addAction("&Save");
-    m_saveAction->setShortcut(QKeySequence::Save);
-    m_saveAction->setStatusTip("Save the current world");
-    connect(m_saveAction, &QAction::triggered, this, &MainWindow::saveWorld);
-
-    m_saveAsAction = m_fileMenu->addAction("Save &As...");
-    m_saveAsAction->setShortcut(QKeySequence::SaveAs);
-    m_saveAsAction->setStatusTip("Save the current world with a new name");
-    connect(m_saveAsAction, &QAction::triggered, this, &MainWindow::saveWorldAs);
-
-    m_saveSelectionAction = m_fileMenu->addAction("Save Se&lection...");
-    m_saveSelectionAction->setStatusTip("Save selected text to a file");
-    connect(m_saveSelectionAction, &QAction::triggered, this, &MainWindow::saveSelection);
-
-    m_fileMenu->addSeparator();
-
-    m_worldPropertiesAction = m_fileMenu->addAction("World &Properties...");
-    m_worldPropertiesAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_P));
-    m_worldPropertiesAction->setStatusTip("Configure world settings");
-    connect(m_worldPropertiesAction, &QAction::triggered, this, &MainWindow::worldProperties);
+    m_importXmlAction = m_fileMenu->addAction("&Import...");
+    m_importXmlAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_I));
+    m_importXmlAction->setStatusTip("Import triggers, aliases, and other settings from XML");
+    connect(m_importXmlAction, &QAction::triggered, this, &MainWindow::importXml);
 
     m_configurePluginsAction = m_fileMenu->addAction("Pl&ugins...");
     m_configurePluginsAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_P));
@@ -180,28 +165,51 @@ void MainWindow::createMenus()
     connect(m_configurePluginsAction, &QAction::triggered, this, &MainWindow::configurePlugins);
 
     m_pluginWizardAction = m_fileMenu->addAction("Plugin &Wizard...");
+    m_pluginWizardAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::ALT | Qt::Key_P));
     m_pluginWizardAction->setStatusTip("Create a new plugin from world items");
     connect(m_pluginWizardAction, &QAction::triggered, this, &MainWindow::pluginWizard);
 
+    m_saveAction = m_fileMenu->addAction("&Save World Details");
+    m_saveAction->setShortcut(QKeySequence::Save);
+    m_saveAction->setStatusTip("Save the current world");
+    connect(m_saveAction, &QAction::triggered, this, &MainWindow::saveWorld);
+
+    m_saveAsAction = m_fileMenu->addAction("Save World Details &As...");
+    m_saveAsAction->setShortcut(QKeySequence::SaveAs);
+    m_saveAsAction->setStatusTip("Save the current world with a new name");
+    connect(m_saveAsAction, &QAction::triggered, this, &MainWindow::saveWorldAs);
+
+    m_saveSelectionAction = m_fileMenu->addAction("Save Se&lection...");
+    m_saveSelectionAction->setStatusTip("Save selected output text to a file");
+    connect(m_saveSelectionAction, &QAction::triggered, this, &MainWindow::saveSelection);
+
     m_fileMenu->addSeparator();
+
+    m_globalPreferencesAction = m_fileMenu->addAction("&Global Preferences...");
+    m_globalPreferencesAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_G));
+    m_globalPreferencesAction->setStatusTip("Configure application-wide settings");
+    connect(m_globalPreferencesAction, &QAction::triggered, this, &MainWindow::globalPreferences);
 
     m_logSessionAction = m_fileMenu->addAction("&Log Session");
     m_logSessionAction->setCheckable(true);
+    m_logSessionAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_J));
     m_logSessionAction->setStatusTip("Toggle session logging to file");
     connect(m_logSessionAction, &QAction::triggered, this, &MainWindow::toggleLogSession);
 
+    m_worldPropertiesAction = m_fileMenu->addAction("World &Properties...");
+    m_worldPropertiesAction->setShortcut(QKeySequence(Qt::ALT | Qt::Key_Return));
+    m_worldPropertiesAction->setStatusTip("Configure world settings");
+    connect(m_worldPropertiesAction, &QAction::triggered, this, &MainWindow::worldProperties);
+
+    m_socketInfoAction = m_fileMenu->addAction("Socket &Info...");
+    m_socketInfoAction->setStatusTip("Show socket connection information");
+    connect(m_socketInfoAction, &QAction::triggered, this, &MainWindow::showSocketInfo);
+
     m_fileMenu->addSeparator();
 
-    m_importXmlAction = m_fileMenu->addAction("&Import XML...");
-    m_importXmlAction->setStatusTip("Import triggers, aliases, and other settings from XML");
-    connect(m_importXmlAction, &QAction::triggered, this, &MainWindow::importXml);
-
-    m_fileMenu->addSeparator();
-
-    // Recent Files submenu
-    m_recentFilesMenu = m_fileMenu->addMenu("Recent &Files");
+    // Recent Files - inline (not submenu)
     for (QAction* action : m_recentFileActions) {
-        m_recentFilesMenu->addAction(action);
+        m_fileMenu->addAction(action);
     }
 
     m_fileMenu->addSeparator();
@@ -209,6 +217,7 @@ void MainWindow::createMenus()
     m_exitAction = m_fileMenu->addAction("E&xit");
     m_exitAction->setShortcut(QKeySequence::Quit);
     m_exitAction->setStatusTip("Exit the application");
+    m_exitAction->setMenuRole(QAction::NoRole); // Keep in File menu, don't move to app menu
     connect(m_exitAction, &QAction::triggered, this, &MainWindow::exitApplication);
 
     // Edit Menu
@@ -1514,7 +1523,17 @@ void MainWindow::updateMenus()
     m_closeAction->setEnabled(hasActiveWorld);
     m_saveAction->setEnabled(hasActiveWorld);
     m_saveAsAction->setEnabled(hasActiveWorld);
-    m_saveSelectionAction->setEnabled(hasActiveWorld);
+
+    // Save Selection only enabled when text is selected in output
+    bool hasSelection = false;
+    if (hasActiveWorld) {
+        WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
+        if (worldWidget && worldWidget->outputView()) {
+            hasSelection = worldWidget->outputView()->hasSelection();
+        }
+    }
+    m_saveSelectionAction->setEnabled(hasSelection);
+
     m_worldPropertiesAction->setEnabled(hasActiveWorld);
     m_configurePluginsAction->setEnabled(hasActiveWorld);
     m_pluginWizardAction->setEnabled(hasActiveWorld);
@@ -1635,7 +1654,8 @@ void MainWindow::updateRecentFilesMenu()
         m_recentFileActions[i]->setVisible(false);
     }
 
-    m_recentFilesMenu->setEnabled(numRecentFiles > 0);
+    // Note: Recent files are now inline in the File menu (no submenu)
+    // Visibility of individual actions handles showing/hiding
 }
 
 void MainWindow::addRecentFile(const QString& filename)
@@ -1938,6 +1958,54 @@ void MainWindow::saveWorldAs()
     }
 }
 
+void MainWindow::saveSelection()
+{
+    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
+    if (!activeSubWindow) {
+        statusBar()->showMessage("No active world", 2000);
+        return;
+    }
+
+    WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
+    if (!worldWidget) {
+        return;
+    }
+
+    OutputView* outputView = worldWidget->outputView();
+    if (!outputView) {
+        return;
+    }
+
+    // Get selected text
+    QString selectedText = outputView->getSelectedText();
+    if (selectedText.isEmpty()) {
+        QMessageBox::information(this, "No Selection", "Please select some text first.");
+        return;
+    }
+
+    // Prompt for filename
+    QString filename = QFileDialog::getSaveFileName(
+        this, "Save Selection", QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation),
+        "Text Files (*.txt);;All Files (*)");
+
+    if (filename.isEmpty()) {
+        return; // User cancelled
+    }
+
+    // Save to file
+    QFile file(filename);
+    if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QTextStream out(&file);
+        out << selectedText;
+        file.close();
+        statusBar()->showMessage(
+            QString("Selection saved to %1").arg(QFileInfo(filename).fileName()), 3000);
+    } else {
+        QMessageBox::critical(this, "Error", QString("Failed to save file:\n%1").arg(filename));
+        statusBar()->showMessage("Failed to save selection", 2000);
+    }
+}
+
 void MainWindow::worldProperties()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
@@ -1955,6 +2023,81 @@ void MainWindow::worldProperties()
     dialog.exec();
 
     statusBar()->showMessage("World properties updated", 2000);
+}
+
+void MainWindow::globalPreferences()
+{
+    // Open Global Preferences dialog
+    GlobalPreferencesDialog dialog(this);
+    if (dialog.exec() == QDialog::Accepted) {
+        statusBar()->showMessage("Global preferences saved", 2000);
+        applyToolbarPreferences();
+    }
+}
+
+void MainWindow::showSocketInfo()
+{
+    // Build socket/network information similar to original MUSHclient's WinSock info dialog
+    QString info;
+
+    // Qt Network version info (equivalent to WinSock version)
+    info += QString("Qt Version: %1\n").arg(qVersion());
+    info += QString("Compiled Qt: %1\n").arg(QT_VERSION_STR);
+    info += "\n";
+
+    // Host name
+    QString hostName = QHostInfo::localHostName();
+    info += QString("Host name: %1\n").arg(hostName.isEmpty() ? "(unknown)" : hostName);
+    info += "\n";
+
+    // Local IP addresses
+    info += "Local address(es):\n";
+    QList<QHostAddress> addresses = QNetworkInterface::allAddresses();
+    QStringList addressList;
+    for (const QHostAddress& addr : addresses) {
+        // Skip loopback and link-local addresses for cleaner display
+        if (addr.isLoopback())
+            continue;
+        if (addr.protocol() == QAbstractSocket::IPv4Protocol) {
+            addressList.append(addr.toString());
+        }
+    }
+    if (addressList.isEmpty()) {
+        info += "  (none found)\n";
+    } else {
+        for (const QString& addr : addressList) {
+            info += QString("  %1\n").arg(addr);
+        }
+    }
+
+    // If there's an active world, show connection info
+    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
+    if (activeSubWindow) {
+        WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
+        if (worldWidget && worldWidget->document()) {
+            WorldDocument* doc = worldWidget->document();
+            info += "\n--- Current World ---\n";
+            info += QString("World: %1\n").arg(doc->worldName());
+            info += QString("Server: %1\n").arg(doc->m_server.isEmpty() ? "(not set)" : doc->m_server);
+            info += QString("Port: %1\n").arg(doc->m_port > 0 ? QString::number(doc->m_port) : "(not set)");
+
+            bool isConnected = (doc->m_iConnectPhase == eConnectConnectedToMud);
+            info += QString("Status: %1\n").arg(isConnected ? "Connected" : "Not connected");
+
+            if (isConnected && doc->m_tConnectTime.isValid()) {
+                qint64 secs = doc->m_tConnectTime.secsTo(QDateTime::currentDateTime());
+                int hours = secs / 3600;
+                int mins = (secs % 3600) / 60;
+                int seconds = secs % 60;
+                info += QString("Connected for: %1:%2:%3\n")
+                            .arg(hours, 2, 10, QChar('0'))
+                            .arg(mins, 2, 10, QChar('0'))
+                            .arg(seconds, 2, 10, QChar('0'));
+            }
+        }
+    }
+
+    QMessageBox::information(this, "Socket Information", info);
 }
 
 void MainWindow::toggleLogSession()
@@ -3253,54 +3396,6 @@ void MainWindow::about()
 }
 
 // Additional Edit/File/Display menu slots
-void MainWindow::saveSelection()
-{
-    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
-    if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
-        return;
-    }
-
-    WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
-    if (!worldWidget) {
-        return;
-    }
-
-    OutputView* outputView = worldWidget->outputView();
-    if (!outputView) {
-        return;
-    }
-
-    // Get selected text
-    QString selectedText = outputView->getSelectedText();
-    if (selectedText.isEmpty()) {
-        QMessageBox::information(this, "No Selection", "Please select some text first.");
-        return;
-    }
-
-    // Prompt for filename
-    QString filename = QFileDialog::getSaveFileName(
-        this, "Save Selection", QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation),
-        "Text Files (*.txt);;All Files (*)");
-
-    if (filename.isEmpty()) {
-        return; // User cancelled
-    }
-
-    // Save to file
-    QFile file(filename);
-    if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        QTextStream out(&file);
-        out << selectedText;
-        file.close();
-        statusBar()->showMessage(
-            QString("Selection saved to %1").arg(QFileInfo(filename).fileName()), 3000);
-    } else {
-        QMessageBox::critical(this, "Error", QString("Failed to save file:\n%1").arg(filename));
-        statusBar()->showMessage("Failed to save selection", 2000);
-    }
-}
-
 void MainWindow::insertDateTime()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
@@ -4120,15 +4215,6 @@ void MainWindow::createNotepadWindow(NotepadWidget* notepad)
 // ============================================================================
 // NEW DIALOG MENU ACTIONS
 // ============================================================================
-
-void MainWindow::quickConnect()
-{
-    QuickConnectDialog dlg(this);
-    if (dlg.exec() == QDialog::Accepted) {
-        // TODO: Create temporary world and connect with the provided settings
-        statusBar()->showMessage("Quick connect: feature in development", 3000);
-    }
-}
 
 void MainWindow::importXml()
 {

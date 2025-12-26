@@ -630,8 +630,15 @@ void OutputView::drawLine(QPainter& painter, int y, Line* line, int lineIndex)
         strPreamble.replace("%e", strElapsedTime);
 
         // Calculate delta time from previous line (%D)
-        // TODO: Track previous line time for %D support
-        strPreamble.replace("%D", "0.000000");
+        double fDeltaTime = 0.0;
+        if (lineIndex > 0 && lineIndex <= m_doc->m_lineList.count()) {
+            Line* prevLine = m_doc->m_lineList[lineIndex - 1];
+            if (prevLine && prevLine->m_theTime.isValid() && line->m_theTime.isValid()) {
+                fDeltaTime = prevLine->m_theTime.msecsTo(line->m_theTime) / 1000.0;
+            }
+        }
+        QString strDeltaTime = QString::asprintf("%.6f", fDeltaTime);
+        strPreamble.replace("%D", strDeltaTime);
 
         // Expand remaining time codes
         strPreamble = m_doc->FormatTime(line->m_theTime, strPreamble, false);
@@ -1740,6 +1747,24 @@ QRect OutputView::getTextRectangle(bool includeBorder) const
     }
 
     return textRect;
+}
+
+/**
+ * getMaxScrollPosition - Get maximum scroll position in lines
+ *
+ * @return Maximum scroll position (totalLines - visibleLines), or 0 if all lines fit
+ */
+int OutputView::getMaxScrollPosition() const
+{
+    if (!m_doc)
+        return 0;
+
+    int totalLines = m_doc->m_lineList.count();
+    if (m_doc->m_currentLine && m_doc->m_currentLine->len() > 0) {
+        totalLines++; // Include incomplete line
+    }
+
+    return qMax(0, totalLines - m_visibleLines);
 }
 
 /**

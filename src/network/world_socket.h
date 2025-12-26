@@ -26,6 +26,7 @@ class WorldSocket : public QObject {
     qint64 send(const char* data, qint64 len);
     qint64 receive(char* buffer, qint64 maxLen);
     bool isConnected() const;
+    QString peerAddress() const;
 
     WorldDocument* m_pDoc;
     QString m_outstanding_data;

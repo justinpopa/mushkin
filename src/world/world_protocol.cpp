@@ -106,6 +106,10 @@ static struct XtermColorInit {
 
 // ========== Telnet State Machine ==========
 
+// Maximum size for subnegotiation data buffer (prevents DoS via memory exhaustion)
+// 1MB should be more than enough for any legitimate GMCP/ATCP/MXP data
+static constexpr size_t MAX_SUBNEGOTIATION_SIZE = 1024 * 1024;
+
 /**
  * ProcessIncomingByte - Main telnet protocol state machine dispatcher
  *
@@ -727,8 +731,11 @@ void WorldDocument::Phase_SUBNEGOTIATION(unsigned char c)
         // Got IAC inside subnegotiation
         m_phase = HAVE_SUBNEGOTIATION_IAC;
     } else {
-        // Just collect the data
-        m_IAC_subnegotiation_data.append(c);
+        // Just collect the data (with size limit to prevent DoS)
+        if (static_cast<size_t>(m_IAC_subnegotiation_data.size()) < MAX_SUBNEGOTIATION_SIZE) {
+            m_IAC_subnegotiation_data.append(c);
+        }
+        // Silently drop data beyond the limit - connection will continue
     }
 }
 
@@ -741,7 +748,10 @@ void WorldDocument::Phase_SUBNEGOTIATION_IAC(unsigned char c)
 {
     if (c == IAC) {
         // IAC IAC inside subnegotiation = escaped IAC (store single IAC)
-        m_IAC_subnegotiation_data.append(c);
+        // Apply same size limit as Phase_SUBNEGOTIATION
+        if (static_cast<size_t>(m_IAC_subnegotiation_data.size()) < MAX_SUBNEGOTIATION_SIZE) {
+            m_IAC_subnegotiation_data.append(c);
+        }
         m_phase = HAVE_SUBNEGOTIATION;
         return;
     }
@@ -1913,8 +1923,8 @@ void WorldDocument::MXP_On()
     InitializeMXPElements();
     InitializeMXPEntities();
 
-    // TODO: Execute OnMXP_Start script
-    // TODO: SendToAllPluginCallbacks(ON_PLUGIN_MXP_START)
+    // Notify plugins that MXP has started
+    SendToAllPluginCallbacks(ON_PLUGIN_MXP_START);
 }
 
 
@@ -2147,8 +2157,8 @@ void WorldDocument::MXP_Off(bool force)
         m_bPuebloActive = false;
         m_bMXP = false;
 
-        // TODO: Execute OnMXP_Stop script
-        // TODO: SendToAllPluginCallbacks(ON_PLUGIN_MXP_STOP)
+        // Notify plugins that MXP has stopped
+        SendToAllPluginCallbacks(ON_PLUGIN_MXP_STOP);
     }
 }
 

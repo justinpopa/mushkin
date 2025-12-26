@@ -70,13 +70,9 @@ void WorldDocument::sendTo(quint16 iWhere, const QString& strSendText, bool bOmi
             break;
 
         // ========== eSendToCommand: Put in command input field ==========
-        // Original: doc.cpp
+        // Original: doc.cpp - finds CSendView and calls GetEditCtrl().ReplaceSel()
         case eSendToCommand:
-            // TODO: Set command input field text
-            // Original finds CSendView and calls GetEditCtrl().ReplaceSel()
-            // We need to emit signal or call InputWidget method
-            qCDebug(lcWorld) << "SendTo: eSendToCommand:" << strSendText;
-            qCDebug(lcWorld) << "  TODO: Set command input field";
+            emit pasteToCommand(strSendText);
             break;
 
         // ========== eSendToCommandQueue: Add to command queue ==========

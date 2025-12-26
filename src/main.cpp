@@ -110,8 +110,8 @@ int main(int argc, char* argv[])
 
     // Build LUA_PATH for Lua modules (issue #4)
     // Use only relative paths for portability - no system paths
-    // MUSHclient also includes absolute exe_dir paths (the ! notation in luaconf.h),
-    // but we intentionally omit those to avoid the portability issues they cause
+    // NOTE: We intentionally do NOT include existing LUA_PATH from environment
+    // to prevent path injection attacks (loading arbitrary Lua code via env vars)
     QStringList luaPaths = {
         "./?.lua",
         "./lua/?.lua",
@@ -124,6 +124,8 @@ int main(int argc, char* argv[])
     // Include app bundle paths for bundled modules (LuaSocket, etc.)
     // Include relative paths for user modules
     // No system paths (issue #4)
+    // NOTE: We intentionally do NOT include existing LUA_CPATH from environment
+    // to prevent path injection attacks (loading arbitrary native code via env vars)
     QStringList luaCPaths = {
         // App bundle paths (for bundled C modules like LuaSocket)
         appDir + "/lib/?." + libExt,

@@ -74,29 +74,64 @@ QString resolvePluginPath(const QString& pluginPath, const QString& worldFilePat
         return path;
     }
 
+    // Helper to validate resolved path stays within allowed directory
+    auto isPathWithinBase = [](const QString& resolvedPath, const QString& baseDir) -> bool {
+        QString canonicalResolved = QDir::cleanPath(resolvedPath);
+        QString canonicalBase = QDir::cleanPath(baseDir);
+        // Ensure base ends with separator for proper prefix matching
+        if (!canonicalBase.endsWith('/')) {
+            canonicalBase += '/';
+        }
+        return canonicalResolved.startsWith(canonicalBase) ||
+               canonicalResolved == QDir::cleanPath(baseDir);
+    };
+
     // Check if path starts with relative indicators (../, ./, etc.)
     bool hasRelativePrefix = path.startsWith("../") || path.startsWith("..\\") ||
                              path.startsWith("./") || path.startsWith(".\\");
 
     if (hasRelativePrefix) {
         // Resolve relative to world file directory
-        return QDir(worldDir).absoluteFilePath(path);
+        QString resolvedPath = QDir::cleanPath(QDir(worldDir).absoluteFilePath(path));
+        // Security: validate path doesn't escape worldDir
+        if (!isPathWithinBase(resolvedPath, worldDir)) {
+            qWarning() << "Path traversal attempt blocked:" << pluginPath;
+            return QString(); // Return empty to indicate invalid path
+        }
+        return resolvedPath;
     }
 
     // For simple relative paths, try plugins directory first (matches original)
-    QString fullPath = QDir(pluginsDir).absoluteFilePath(path);
+    QString fullPath = QDir::cleanPath(QDir(pluginsDir).absoluteFilePath(path));
     if (QFile::exists(fullPath)) {
+        // Security: validate path stays within pluginsDir
+        if (!isPathWithinBase(fullPath, pluginsDir)) {
+            qWarning() << "Path traversal attempt blocked:" << pluginPath;
+            return QString();
+        }
         return fullPath;
     }
 
     // Fallback: try world file directory
-    fullPath = QDir(worldDir).absoluteFilePath(path);
+    fullPath = QDir::cleanPath(QDir(worldDir).absoluteFilePath(path));
     if (QFile::exists(fullPath)) {
+        // Security: validate path stays within worldDir
+        if (!isPathWithinBase(fullPath, worldDir)) {
+            qWarning() << "Path traversal attempt blocked:" << pluginPath;
+            return QString();
+        }
         return fullPath;
     }
 
     // Not found - return plugins directory path (original behavior)
-    return QDir(pluginsDir).absoluteFilePath(path);
+    // Since it doesn't exist, path traversal check is less critical
+    // but we still validate for consistency
+    fullPath = QDir::cleanPath(QDir(pluginsDir).absoluteFilePath(path));
+    if (!isPathWithinBase(fullPath, pluginsDir)) {
+        qWarning() << "Path traversal attempt blocked:" << pluginPath;
+        return QString();
+    }
+    return fullPath;
 }
 
 } // anonymous namespace

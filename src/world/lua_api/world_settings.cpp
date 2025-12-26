@@ -8,7 +8,9 @@
  */
 
 #include "../../automation/plugin.h"
+#include "../../network/world_socket.h"
 #include "../../storage/database.h"
+#include "../../storage/global_options.h"
 #include "../../world/config_options.h"
 #include "../../world/world_document.h"
 #include "../lua_dialog_callbacks.h"
@@ -19,6 +21,7 @@
 #include <QFontDatabase>
 #include <QHostInfo>
 #include <QLocale>
+#include <QOperatingSystemVersion>
 #include <QRegularExpression>
 #include <QSysInfo>
 #include <sqlite3.h>
@@ -32,6 +35,9 @@ extern "C" {
 
 #include "logging.h"
 #include "lua_common.h"
+
+// Application start time (set when first accessed)
+static QDateTime s_applicationStartTime = QDateTime::currentDateTime();
 
 // ========== Font Management ==========
 
@@ -431,14 +437,24 @@ int L_GetInfo(lua_State* L)
 
         case 57: // Default world file directory
         {
-            // TODO: Add default world directory config
-            lua_pushstring(L, "");
+            GlobalOptions* opts = GlobalOptions::instance();
+            QString dir = opts->defaultWorldFileDirectory();
+            if (dir.isEmpty()) {
+                dir = QCoreApplication::applicationDirPath() + "/worlds/";
+            }
+            QByteArray ba = dir.toUtf8();
+            lua_pushlstring(L, ba.constData(), ba.length());
         } break;
 
         case 58: // Default log file directory
         {
-            // TODO: Add default log directory config
-            lua_pushstring(L, "");
+            GlobalOptions* opts = GlobalOptions::instance();
+            QString dir = opts->defaultLogFileDirectory();
+            if (dir.isEmpty()) {
+                dir = QCoreApplication::applicationDirPath() + "/logs/";
+            }
+            QByteArray ba = dir.toUtf8();
+            lua_pushlstring(L, ba.constData(), ba.length());
         } break;
 
         case 59: // Scripts directory (executable directory)
@@ -476,8 +492,12 @@ int L_GetInfo(lua_State* L)
 
         case 61: // IP address from socket connection
         {
-            // TODO: Extract IP from m_sockAddr or connection socket
-            lua_pushstring(L, "");
+            QString peerAddr;
+            if (pDoc->m_pSocket) {
+                peerAddr = pDoc->m_pSocket->peerAddress();
+            }
+            QByteArray ba = peerAddr.toUtf8();
+            lua_pushlstring(L, ba.constData(), ba.length());
         } break;
 
         case 62: // Proxy server (removed in original)
@@ -523,14 +543,26 @@ int L_GetInfo(lua_State* L)
 
         case 67: // World file directory
         {
-            // TODO: Extract directory from world file path
-            lua_pushstring(L, "");
+            QString dir;
+            if (!pDoc->m_strWorldFilePath.isEmpty()) {
+                QFileInfo fi(pDoc->m_strWorldFilePath);
+                dir = fi.absolutePath();
+                if (!dir.endsWith("/")) {
+                    dir += "/";
+                }
+            }
+            QByteArray ba = dir.toUtf8();
+            lua_pushlstring(L, ba.constData(), ba.length());
         } break;
 
         case 68: // Working directory
         {
-            // TODO: Store working directory (different from current directory)
-            lua_pushstring(L, "");
+            QString dir = QDir::currentPath();
+            if (!dir.endsWith("/")) {
+                dir += "/";
+            }
+            QByteArray ba = dir.toUtf8();
+            lua_pushlstring(L, ba.constData(), ba.length());
         } break;
 
         case 69: // Translator file
@@ -554,8 +586,7 @@ int L_GetInfo(lua_State* L)
 
         case 72: // Version
         {
-            // TODO: Define MUSHCLIENT_QT_VERSION or similar
-            lua_pushstring(L, "5.06-preview");
+            lua_pushstring(L, MUSHKIN_VERSION);
         } break;
 
         case 73: // Build date/time
@@ -621,8 +652,10 @@ int L_GetInfo(lua_State* L)
 
         case 82: // Preferences database name
         {
-            // TODO: Add preferences database path
-            lua_pushstring(L, "");
+            Database* db = Database::instance();
+            QString path = db->databasePath();
+            QByteArray ba = path.toUtf8();
+            lua_pushlstring(L, ba.constData(), ba.length());
         } break;
 
         case 83: // SQLite version
@@ -638,8 +671,13 @@ int L_GetInfo(lua_State* L)
 
         case 85: // Default state files directory
         {
-            // TODO: Add default state files directory config
-            lua_pushstring(L, "");
+            GlobalOptions* opts = GlobalOptions::instance();
+            QString dir = opts->stateFilesDirectory();
+            if (dir.isEmpty()) {
+                dir = QCoreApplication::applicationDirPath() + "/worlds/plugins/state/";
+            }
+            QByteArray ba = dir.toUtf8();
+            lua_pushlstring(L, ba.constData(), ba.length());
         } break;
 
         case 86: // Word under menu
@@ -710,8 +748,7 @@ int L_GetInfo(lua_State* L)
 
         case 111: // World modified (IsModified)
         {
-            // TODO: Track world modified state
-            lua_pushboolean(L, false);
+            lua_pushboolean(L, pDoc->isModified());
         } break;
 
         case 112: // Mapping enabled
@@ -875,13 +912,11 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 225: // Count of custom MXP elements
-            // TODO: Add MXP custom element support
-            lua_pushinteger(L, 0);
+            lua_pushinteger(L, pDoc->m_customElementMap.size());
             break;
 
         case 226: // Count of custom MXP entities
-            // TODO: Add MXP custom entity support
-            lua_pushinteger(L, 0);
+            lua_pushinteger(L, pDoc->m_customEntityMap.size());
             break;
 
         case 227: // Connection phase
@@ -889,9 +924,20 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 228: // IP address (as integer)
-            // TODO: Convert QHostAddress to integer
-            lua_pushinteger(L, 0);
-            break;
+        {
+            quint32 ipInt = 0;
+            if (pDoc->m_pSocket) {
+                QString addr = pDoc->m_pSocket->peerAddress();
+                if (!addr.isEmpty()) {
+                    QHostAddress hostAddr(addr);
+                    // toIPv4Address returns in network order (big-endian)
+                    if (hostAddr.protocol() == QAbstractSocket::IPv4Protocol) {
+                        ipInt = hostAddr.toIPv4Address();
+                    }
+                }
+            }
+            lua_pushinteger(L, ipInt);
+        } break;
 
         case 229: // Proxy (always 0 - proxy support removed)
             lua_pushinteger(L, 0);
@@ -902,8 +948,11 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 231: // Log file size
-            // TODO: Track log file size
-            lua_pushinteger(L, 0);
+            if (pDoc->m_logfile && pDoc->m_logfile->isOpen()) {
+                lua_pushinteger(L, pDoc->m_logfile->size());
+            } else {
+                lua_pushinteger(L, 0);
+            }
             break;
 
         case 232: // High-resolution timer (seconds since epoch)
@@ -1080,24 +1129,38 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 265: // OS major version
-            // TODO: Parse QSysInfo::kernelVersion()
-            lua_pushinteger(L, 0);
-            break;
+        {
+            QOperatingSystemVersion osVer = QOperatingSystemVersion::current();
+            lua_pushinteger(L, osVer.majorVersion());
+        } break;
 
         case 266: // OS minor version
-            // TODO: Parse QSysInfo::kernelVersion()
-            lua_pushinteger(L, 0);
-            break;
+        {
+            QOperatingSystemVersion osVer = QOperatingSystemVersion::current();
+            lua_pushinteger(L, osVer.minorVersion());
+        } break;
 
         case 267: // OS build number
-            // TODO: Parse QSysInfo::kernelVersion()
-            lua_pushinteger(L, 0);
-            break;
+        {
+            QOperatingSystemVersion osVer = QOperatingSystemVersion::current();
+            // microVersion() returns patch/build number
+            lua_pushinteger(L, osVer.microVersion());
+        } break;
 
         case 268: // OS platform ID
-            // TODO: Map QSysInfo to platform ID
-            lua_pushinteger(L, 0);
-            break;
+        {
+            // Windows platform IDs: 0=Win32s, 1=Win9x, 2=NT-based
+            // For cross-platform: 2=Windows, 3=macOS, 4=Linux
+            int platformId = 0;
+#ifdef Q_OS_WIN
+            platformId = 2; // VER_PLATFORM_WIN32_NT
+#elif defined(Q_OS_MACOS)
+            platformId = 3; // macOS (custom)
+#elif defined(Q_OS_LINUX)
+            platformId = 4; // Linux (custom)
+#endif
+            lua_pushinteger(L, platformId);
+        } break;
 
         case 269: // Foreground mode
             lua_pushinteger(L, pDoc->m_iForegroundMode);
@@ -1222,13 +1285,19 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 294: // Scroll bar max position
-            // TODO: Add scroll bar position tracking
-            lua_pushinteger(L, 0);
+            if (pDoc->m_pActiveOutputView) {
+                lua_pushinteger(L, pDoc->m_pActiveOutputView->getMaxScrollPosition());
+            } else {
+                lua_pushinteger(L, 0);
+            }
             break;
 
-        case 295: // Scroll bar page size
-            // TODO: Add scroll bar page size tracking
-            lua_pushinteger(L, 0);
+        case 295: // Scroll bar page size (visible lines)
+            if (pDoc->m_pActiveOutputView) {
+                lua_pushinteger(L, pDoc->m_pActiveOutputView->getVisibleLines());
+            } else {
+                lua_pushinteger(L, 0);
+            }
             break;
 
         case 296: // Output window scroll bar position
@@ -1257,8 +1326,7 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 300: // Commands in history buffer
-            // TODO: Add input history tracking
-            lua_pushinteger(L, 0);
+            lua_pushinteger(L, pDoc->m_commandHistory.count());
             break;
 
         case 301: // Number of sent packets
@@ -1267,13 +1335,15 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 302: // Connect time (seconds since connected)
-            // TODO: Track connection start time
-            lua_pushnumber(L, 0.0);
+            if (pDoc->m_tConnectTime.isValid()) {
+                lua_pushnumber(L, pDoc->m_tConnectTime.secsTo(QDateTime::currentDateTime()));
+            } else {
+                lua_pushnumber(L, 0.0);
+            }
             break;
 
-        case 303: // Number of MXP elements
-            // TODO: Add MXP element tracking
-            lua_pushinteger(L, 0);
+        case 303: // Number of MXP elements (custom/user-defined)
+            lua_pushinteger(L, pDoc->m_customElementMap.size());
             break;
 
         case 304: // Locale
@@ -1284,16 +1354,24 @@ int L_GetInfo(lua_State* L)
         } break;
 
         case 305: // Client start time (when application started)
-            // TODO: Track application start time
-            // Original: App.m_whenClientStarted
-            lua_pushnumber(L, 0.0);
-            break;
+        {
+            // OLE date format: days since December 30, 1899 (including fractional days)
+            // Convert: OLE = (Unix timestamp / 86400.0) + 25569.0
+            // 25569 = days between Dec 30, 1899 and Jan 1, 1970
+            double oleDate = (s_applicationStartTime.toSecsSinceEpoch() / 86400.0) + 25569.0;
+            lua_pushnumber(L, oleDate);
+        } break;
 
-        case 306: // World start time (when world connected)
-            // TODO: Track world connection start time
-            // Original: m_whenWorldStarted
-            lua_pushnumber(L, 0.0);
-            break;
+        case 306: // World start time (when world connected/started)
+        {
+            // OLE date format for compatibility with original MUSHclient
+            if (pDoc->m_whenWorldStarted.isValid()) {
+                double oleDate = (pDoc->m_whenWorldStarted.toSecsSinceEpoch() / 86400.0) + 25569.0;
+                lua_pushnumber(L, oleDate);
+            } else {
+                lua_pushnumber(L, 0.0);
+            }
+        } break;
 
         case 310: // Newlines received count
             lua_pushinteger(L, pDoc->m_newlines_received);

@@ -186,8 +186,8 @@ void WorldDocument::executeTrigger(Trigger* trigger, Line* line, const QString& 
 
     // Omit from output
     if (trigger->bOmitFromOutput) {
-        // TODO: Mark line as omitted
-        // line->flags |= OMITTED;
+        // TODO: Actually delete the line from m_lineList (like original does)
+        // The original removes omitted lines but preserves notes/player input
         qCDebug(lcWorld) << "Trigger omit from output (not yet implemented)";
     }
 
@@ -302,6 +302,31 @@ void WorldDocument::executeTriggerScript(Trigger* trigger, const QString& matche
 
     // Save stack top for cleanup
     int stackTop = lua_gettop(L);
+
+    // Create and set global wildcards table (for scripts that access it as a global)
+    // This matches MUSHclient behavior where wildcards is available globally
+    lua_newtable(L);
+    for (int i = 0; i < trigger->wildcards.size(); ++i) {
+        QString wildcard = trigger->wildcards[i];
+        if (trigger->bLowercaseWildcard && i > 0) {
+            wildcard = wildcard.toLower();
+        }
+        lua_pushinteger(L, i);
+        QByteArray ba = wildcard.toUtf8();
+        lua_pushlstring(L, ba.constData(), ba.length());
+        lua_settable(L, -3);
+    }
+    // Add named capture groups to global wildcards table
+    for (auto it = trigger->namedWildcards.constBegin(); it != trigger->namedWildcards.constEnd();
+         ++it) {
+        QString value = trigger->bLowercaseWildcard ? it.value().toLower() : it.value();
+        QByteArray keyBytes = it.key().toUtf8();
+        lua_pushlstring(L, keyBytes.constData(), keyBytes.length());
+        QByteArray valueBytes = value.toUtf8();
+        lua_pushlstring(L, valueBytes.constData(), valueBytes.length());
+        lua_settable(L, -3);
+    }
+    lua_setglobal(L, "wildcards");
 
     // Push the function onto the stack
     lua_getglobal(L, trigger->strProcedure.toUtf8().constData());

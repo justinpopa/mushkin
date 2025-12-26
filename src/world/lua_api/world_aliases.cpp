@@ -861,7 +861,7 @@ int L_SetAliasOption(lua_State* L)
             alias->iSendTo = value;
         } else if (qOption == "sequence") {
             alias->iSequence = value;
-            // TODO: Re-sort aliases
+            pDoc->m_aliasesNeedSorting = true;
         } else if (qOption == "user") {
             alias->iUserOption = value;
         }
@@ -917,7 +917,7 @@ int L_SetAliasOption(lua_State* L)
             alias->compileRegexp(); // Recompile with new pattern
         } else if (qOption == "script") {
             alias->strProcedure = qValue;
-            // TODO: Update dispid
+            alias->dispid = DISPID_UNKNOWN; // Reset so it gets re-looked up
         } else if (qOption == "send") {
             alias->contents = qValue;
         } else if (qOption == "variable") {

@@ -2,6 +2,9 @@
 #include "world/world_document.h"
 
 #include "logging.h"
+
+// SAMECOLOUR constant from original MUSHclient - means "use same color as output"
+#define SAMECOLOUR 65535
 #include <QCheckBox>
 #include <QColor>
 #include <QColorDialog>
@@ -197,9 +200,12 @@ void WorldPropertiesDialog::setupInputTab()
     m_echoInputCheck = new QCheckBox("Echo my input in output window");
     layout->addRow("", m_echoInputCheck);
 
-    // Echo color
+    // Echo color (index 0 = same as output, 1-16 = custom colors 1-16)
     m_echoColorCombo = new QComboBox();
-    m_echoColorCombo->addItems({"Same as output", "Custom color"});
+    m_echoColorCombo->addItem("Same as output");
+    for (int i = 1; i <= 16; i++) {
+        m_echoColorCombo->addItem(QString("Custom %1").arg(i));
+    }
     layout->addRow("Echo color:", m_echoColorCombo);
 
     // Command history size
@@ -521,7 +527,9 @@ void WorldPropertiesDialog::loadSettings()
         QString("%1, %2pt").arg(m_inputFont.family()).arg(m_inputFont.pointSize()));
 
     m_echoInputCheck->setChecked(m_doc->m_display_my_input != 0);
-    // TODO: m_echoColorCombo - needs echo color setting in WorldDocument
+    // Echo color: index 0 = SAMECOLOUR, index 1-16 = custom colors 0-15
+    int echoColorIndex = (m_doc->m_echo_colour == SAMECOLOUR) ? 0 : (m_doc->m_echo_colour + 1);
+    m_echoColorCombo->setCurrentIndex(qBound(0, echoColorIndex, 16));
 
     // Command history size
     m_historySizeSpin->setValue(m_doc->m_maxCommandHistory);
@@ -595,7 +603,9 @@ void WorldPropertiesDialog::saveSettings()
     m_doc->m_input_font_weight = m_inputFont.weight();
     m_doc->m_input_font_italic = m_inputFont.italic() ? 1 : 0;
     m_doc->m_display_my_input = m_echoInputCheck->isChecked() ? 1 : 0;
-    // TODO: m_echoColorCombo - save when WorldDocument has echo color setting
+    // Echo color: index 0 = SAMECOLOUR, index 1-16 = custom colors 0-15
+    int echoIdx = m_echoColorCombo->currentIndex();
+    m_doc->m_echo_colour = (echoIdx == 0) ? SAMECOLOUR : static_cast<quint16>(echoIdx - 1);
 
     // Command history size
     m_doc->m_maxCommandHistory = m_historySizeSpin->value();

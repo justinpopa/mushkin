@@ -937,33 +937,33 @@ int L_GetTriggerOption(lua_State* L)
     } else if (qOption == "user") {
         lua_pushnumber(L, trigger->iUserOption);
     }
-    // Boolean options
+    // Boolean options - return 0/1 to match original MUSHclient (uses SetUpVariantLong)
     else if (qOption == "enabled") {
-        lua_pushboolean(L, trigger->bEnabled);
+        lua_pushnumber(L, trigger->bEnabled ? 1 : 0);
     } else if (qOption == "expand_variables") {
-        lua_pushboolean(L, trigger->bExpandVariables);
+        lua_pushnumber(L, trigger->bExpandVariables ? 1 : 0);
     } else if (qOption == "ignore_case") {
-        lua_pushboolean(L, trigger->ignore_case);
+        lua_pushnumber(L, trigger->ignore_case ? 1 : 0);
     } else if (qOption == "keep_evaluating") {
-        lua_pushboolean(L, trigger->bKeepEvaluating);
+        lua_pushnumber(L, trigger->bKeepEvaluating ? 1 : 0);
     } else if (qOption == "multi_line") {
-        lua_pushboolean(L, trigger->bMultiLine);
+        lua_pushnumber(L, trigger->bMultiLine ? 1 : 0);
     } else if (qOption == "omit_from_log") {
-        lua_pushboolean(L, trigger->omit_from_log);
+        lua_pushnumber(L, trigger->omit_from_log ? 1 : 0);
     } else if (qOption == "omit_from_output") {
-        lua_pushboolean(L, trigger->bOmitFromOutput);
+        lua_pushnumber(L, trigger->bOmitFromOutput ? 1 : 0);
     } else if (qOption == "regexp") {
-        lua_pushboolean(L, trigger->bRegexp);
+        lua_pushnumber(L, trigger->bRegexp ? 1 : 0);
     } else if (qOption == "repeat") {
-        lua_pushboolean(L, trigger->bRepeat);
+        lua_pushnumber(L, trigger->bRepeat ? 1 : 0);
     } else if (qOption == "sound_if_inactive") {
-        lua_pushboolean(L, trigger->bSoundIfInactive);
+        lua_pushnumber(L, trigger->bSoundIfInactive ? 1 : 0);
     } else if (qOption == "lowercase_wildcard") {
-        lua_pushboolean(L, trigger->bLowercaseWildcard);
+        lua_pushnumber(L, trigger->bLowercaseWildcard ? 1 : 0);
     } else if (qOption == "temporary") {
-        lua_pushboolean(L, trigger->bTemporary);
+        lua_pushnumber(L, trigger->bTemporary ? 1 : 0);
     } else if (qOption == "one_shot") {
-        lua_pushboolean(L, trigger->bOneShot);
+        lua_pushnumber(L, trigger->bOneShot ? 1 : 0);
     }
     // String options
     else if (qOption == "group") {
@@ -1044,7 +1044,7 @@ int L_SetTriggerOption(lua_State* L)
             trigger->iSendTo = value;
         } else if (qOption == "sequence") {
             trigger->iSequence = value;
-            // TODO: Re-sort triggers
+            pDoc->m_triggersNeedSorting = true;
         } else if (qOption == "user") {
             trigger->iUserOption = value;
         }
@@ -1103,7 +1103,7 @@ int L_SetTriggerOption(lua_State* L)
             trigger->compileRegexp(); // Recompile with new pattern
         } else if (qOption == "script") {
             trigger->strProcedure = qValue;
-            // TODO: Update dispid
+            trigger->dispid = DISPID_UNKNOWN; // Reset so it gets re-looked up
         } else if (qOption == "sound") {
             trigger->sound_to_play = qValue;
         } else if (qOption == "send") {

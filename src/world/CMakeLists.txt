@@ -87,3 +87,8 @@ target_include_directories(world PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/lua_api
 )
+
+# Pass project version to code
+target_compile_definitions(world PUBLIC
+    MUSHKIN_VERSION="${PROJECT_VERSION}"
+)

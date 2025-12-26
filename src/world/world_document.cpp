@@ -33,6 +33,9 @@
 
 #include "color_utils.h"
 
+// SAMECOLOUR constant from original MUSHclient - means "use current/default color"
+#define SAMECOLOUR 65535
+
 // Default ANSI colors in BGR format (Windows COLORREF)
 // These match the original MUSHclient values shown in aardwolf_colors.lua
 static const QRgb DEFAULT_NORMAL_COLORS[8] = {
@@ -1103,6 +1106,15 @@ void WorldDocument::ReceiveMsg()
             if (izError == Z_BUF_ERROR) {
                 // Output buffer is too small - double it and try again
                 qint32 newSize = m_nCompressionOutputBufferSize * 2;
+
+                // Security: prevent unbounded buffer growth (DoS protection)
+                if (newSize > MAX_COMPRESS_BUFFER_SIZE) {
+                    qCDebug(lcWorld) << "Compression buffer exceeded maximum size limit";
+                    m_bCompress = false;
+                    OnConnectionDisconnect();
+                    return;
+                }
+
                 Bytef* newBuffer = (Bytef*)realloc(m_CompressOutput, newSize);
                 if (!newBuffer) {
                     qCDebug(lcWorld) << "Failed to grow compression output buffer";
@@ -1614,9 +1626,12 @@ void WorldDocument::DoSendMsg(const QString& text, bool bEcho, bool bLog)
     // Echo sent text to output window if requested
     // Don't echo if m_bNoEcho is set (MUD requested echo suppression for password entry)
     if (bEcho && m_display_my_input && !m_bNoEcho) {
-        // Display as colored note with input colors
-        QRgb inputFore = m_normalcolour[m_echo_colour % 8]; // Ensure valid index 0-7
-        QRgb inputBack = m_normalcolour[0];                 // Black background (index 0)
+        // Display as colored note with input colors (custom color index 0-15)
+        QRgb inputFore = m_normalcolour[ANSI_WHITE]; // Default to white
+        if (m_echo_colour != SAMECOLOUR && m_echo_colour < MAX_CUSTOM) {
+            inputFore = m_customtext[m_echo_colour];
+        }
+        QRgb inputBack = m_normalcolour[ANSI_BLACK]; // Black background
 
         // Use colourNote to display in output window
         colourNote(inputFore, inputBack, str);
@@ -1987,7 +2002,7 @@ qint32 WorldDocument::SetCommand(const QString& text)
     }
 
     m_pActiveInputView->setText(text);
-    // TODO: Notify plugins of command change
+    SendToAllPluginCallbacks(ON_PLUGIN_COMMAND_CHANGED);
     return 0; // eOK
 }
 
@@ -2065,7 +2080,7 @@ QString WorldDocument::PushCommand()
 
     QString command = m_pActiveInputView->text();
     m_pActiveInputView->clear();
-    // TODO: Notify plugins of command change
+    SendToAllPluginCallbacks(ON_PLUGIN_COMMAND_CHANGED);
     return command;
 }
 
@@ -3012,13 +3027,22 @@ void WorldDocument::StartNewLine(bool bNewLine, unsigned char iFlags)
 
     // Special handling for user input and comments (like original)
     if (iFlags & USER_INPUT) {
-        // User input uses echo color if configured
-        // TODO: Check m_echo_colour setting
-        // For now, use default style
+        // User input uses echo color (custom color index 0-15)
+        if (m_echo_colour != SAMECOLOUR && m_echo_colour < MAX_CUSTOM) {
+            initialFore = m_customtext[m_echo_colour];
+        }
     } else if (iFlags & COMMENT) {
         // Comments (notes) use note color if configured
-        // TODO: Check m_iNoteTextColour setting
-        // For now, use default style
+        if (m_bNotesInRGB) {
+            initialFore = m_iNoteColourFore;
+            initialBack = m_iNoteColourBack;
+        } else if (m_iNoteTextColour != SAMECOLOUR) {
+            int colorIndex = m_iNoteTextColour;
+            if (colorIndex >= 0 && colorIndex < MAX_CUSTOM) {
+                initialFore = m_customtext[colorIndex];
+                initialBack = m_customback[colorIndex];
+            }
+        }
     }
 
     // Create new Line object
@@ -3767,9 +3791,6 @@ void WorldDocument::showErrorLines(int lineNumber)
 // ============================================================================
 // Trigger/Alias XML Serialization
 // ============================================================================
-
-// SAMECOLOUR constant from original MUSHclient
-#define SAMECOLOUR 65535
 
 // Style bit masks from original MUSHclient
 #define HILITE 0x0001

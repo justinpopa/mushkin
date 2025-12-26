@@ -101,11 +101,12 @@ class MainWindow : public QMainWindow {
     void closeWorld();
     void saveWorld();
     void saveWorldAs();
-    void worldProperties();
-    void toggleLogSession();
     void saveSelection();
+    void worldProperties();
+    void globalPreferences();
+    void toggleLogSession();
+    void showSocketInfo();
     void openRecentFile();
-    void quickConnect();
     void importXml();
     void exitApplication();
 
@@ -353,15 +354,16 @@ class MainWindow : public QMainWindow {
     QMenu* m_fileMenu;
     QAction* m_newAction;
     QAction* m_openAction;
+    QAction* m_openStartupListAction;
     QAction* m_closeAction;
+    QAction* m_importXmlAction;
     QAction* m_saveAction;
     QAction* m_saveAsAction;
     QAction* m_saveSelectionAction;
-    QAction* m_worldPropertiesAction;
+    QAction* m_globalPreferencesAction;
     QAction* m_logSessionAction;
-    QAction* m_quickConnectAction;
-    QAction* m_importXmlAction;
-    QMenu* m_recentFilesMenu;
+    QAction* m_worldPropertiesAction;
+    QAction* m_socketInfoAction;
     QAction* m_exitAction;
 
     // Edit menu and actions

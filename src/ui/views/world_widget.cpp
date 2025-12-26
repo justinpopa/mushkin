@@ -190,6 +190,10 @@ void WorldWidget::setupUi()
     connect(m_document, &WorldDocument::inputSettingsChanged, m_inputView,
             &InputView::applyInputSettings);
 
+    // Connect pasteToCommand signal to insert text into input field
+    connect(m_document, &WorldDocument::pasteToCommand, m_inputView,
+            &QPlainTextEdit::insertPlainText);
+
     // Connect info bar signal
     connect(m_document, &WorldDocument::infoBarChanged, this, &WorldWidget::updateInfoBar);
 

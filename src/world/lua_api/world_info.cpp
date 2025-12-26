@@ -151,7 +151,7 @@ int L_WorldName(lua_State* L)
  */
 int L_Version(lua_State* L)
 {
-    lua_pushstring(L, MUSHCLIENT_QT_VERSION);
+    lua_pushstring(L, MUSHKIN_VERSION);
     return 1;
 }
 

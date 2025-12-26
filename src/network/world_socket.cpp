@@ -44,6 +44,14 @@ bool WorldSocket::isConnected() const
     return m_socket->state() == QAbstractSocket::ConnectedState;
 }
 
+QString WorldSocket::peerAddress() const
+{
+    if (m_socket && m_socket->state() == QAbstractSocket::ConnectedState) {
+        return m_socket->peerAddress().toString();
+    }
+    return QString();
+}
+
 void WorldSocket::onReadyRead()
 {
     m_pDoc->ReceiveMsg();

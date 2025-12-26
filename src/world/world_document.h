@@ -216,6 +216,7 @@ enum ScriptReloadOption {
 
 // MCCP constants
 #define COMPRESS_BUFFER_LENGTH 20000
+#define MAX_COMPRESS_BUFFER_SIZE (16 * 1024 * 1024) // 16MB max to prevent DoS
 
 // MXP line security modes (ESC[<n>z) - doc.h
 // IMPORTANT: These values must match the ANSI escape code values!
