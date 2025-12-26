@@ -1,456 +1,313 @@
 /**
- * test_timer_api_gtest.cpp - GoogleTest version
- * Test Timer Lua API functions
+ * test_timer_api_gtest.cpp - Timer API Tests
  *
- * Comprehensive test for all Timer Lua API functions:
- * - AddTimer (interval and at-time)
- * - IsTimer
- * - GetTimerInfo
- * - EnableTimer
- * - GetTimerList
- * - GetTimerOption / SetTimerOption
- * - ResetTimer
- * - DoAfter
- * - DoAfterNote
- * - EnableTimerGroup
- * - DeleteTimerGroup
- * - DeleteTemporaryTimers
- * - DeleteTimer
+ * Tests for timer management functions:
+ * - AddTimer, DeleteTimer, EnableTimer, ResetTimer
+ * - GetTimerInfo, GetTimer
+ * - EnableTimerGroup, DeleteTimerGroup
+ * - TimerOption, SetTimerOption
+ * - ResetTimers
  */
 
-#include "../src/automation/sendto.h"
-#include "../src/automation/timer.h"
-#include "../src/world/script_engine.h"
-#include "../src/world/world_document.h"
-#include <QCoreApplication>
-#include <QDateTime>
-#include <gtest/gtest.h>
+#include "lua_api_test_fixture.h"
 
-extern "C" {
-#include <lauxlib.h>
-#include <lua.h>
-#include <lualib.h>
-}
-
-// Test fixture for timer API tests
-class TimerApiTest : public ::testing::Test {
-  protected:
-    void SetUp() override
-    {
-        doc = new WorldDocument();
-        doc->m_mush_name = "Test World";
-        doc->m_server = "localhost";
-        doc->m_port = 4000;
-
-        // Verify script engine is available
-        ASSERT_NE(doc->m_ScriptEngine, nullptr) << "Script engine should be initialized";
-        ASSERT_NE(doc->m_ScriptEngine->L, nullptr) << "Lua state should be initialized";
-    }
-
-    void TearDown() override
-    {
-        delete doc;
-    }
-
-    // Helper to execute Lua code
-    void executeLua(const QString& code)
-    {
-        bool hasError = doc->m_ScriptEngine->parseLua(code, "test");
-        ASSERT_FALSE(hasError) << "Lua execution should succeed";
-    }
-
-    // Helper to get Lua global number
-    double getLuaNumber(const QString& varName)
-    {
-        lua_State* L = doc->m_ScriptEngine->L;
-        lua_getglobal(L, varName.toUtf8().constData());
-        double value = lua_tonumber(L, -1);
-        lua_pop(L, 1);
-        return value;
-    }
-
-    // Helper to get Lua global string
-    QString getLuaString(const QString& varName)
-    {
-        lua_State* L = doc->m_ScriptEngine->L;
-        lua_getglobal(L, varName.toUtf8().constData());
-        const char* value = lua_tostring(L, -1);
-        QString result = value ? QString::fromUtf8(value) : QString();
-        lua_pop(L, 1);
-        return result;
-    }
-
-    // Helper to get Lua global boolean
-    bool getLuaBoolean(const QString& varName)
-    {
-        lua_State* L = doc->m_ScriptEngine->L;
-        lua_getglobal(L, varName.toUtf8().constData());
-        bool value = lua_toboolean(L, -1);
-        lua_pop(L, 1);
-        return value;
-    }
-
-    WorldDocument* doc = nullptr;
-};
-
-// Test 1: AddTimer - Create interval timer
-TEST_F(TimerApiTest, AddTimerInterval)
+// Test 1: timer_flag constant table
+TEST_F(LuaApiTest, TimerFlagTable)
 {
-    executeLua(R"(
-        -- Create a 5-second interval timer
-        result = world.AddTimer("test_timer1", 0, 0, 5.0, "look",
-            timer_flag.Enabled, "")
-    )");
+    lua_getglobal(L, "timer_flag");
+    ASSERT_TRUE(lua_istable(L, -1)) << "timer_flag should be a table";
 
-    double result = getLuaNumber("result");
-    EXPECT_EQ(result, 0.0) << "AddTimer should return eOK (0)";
+    lua_getfield(L, -1, "Enabled");
+    int enabled_flag = lua_tointeger(L, -1);
+    lua_pop(L, 1);
 
-    // Verify timer was created
-    Timer* timer = doc->getTimer("test_timer1");
-    ASSERT_NE(timer, nullptr) << "Timer should exist";
-    EXPECT_EQ(timer->iType, Timer::eInterval) << "Timer should be interval type";
-    EXPECT_EQ(timer->iEveryHour, 0) << "Hour should be 0";
-    EXPECT_EQ(timer->iEveryMinute, 0) << "Minute should be 0";
-    EXPECT_EQ(timer->fEverySecond, 5.0) << "Second should be 5.0";
-    EXPECT_EQ(timer->strContents, QString("look")) << "Contents should be 'look'";
-    EXPECT_TRUE(timer->bEnabled) << "Timer should be enabled";
+    EXPECT_EQ(enabled_flag, 1) << "timer_flag.Enabled should be 1";
+
+    lua_getfield(L, -1, "OneShot");
+    int oneshot_flag = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+
+    EXPECT_EQ(oneshot_flag, 4) << "timer_flag.OneShot should be 4";
+    lua_pop(L, 1); // pop timer_flag table
 }
 
-// Test 2: AddTimer - Create at-time timer
-TEST_F(TimerApiTest, AddTimerAtTime)
+// Test 2: AddTimer API
+TEST_F(LuaApiTest, AddTimer)
 {
-    executeLua(R"(
-        -- Create a timer that fires at 15:30:00 each day
-        result = world.AddTimer("test_timer2", 15, 30, 0.0, "check mail",
-            timer_flag.Enabled + timer_flag.AtTime, "")
-    )");
+    lua_getglobal(L, "test_add_timer");
+    int pcall_result = lua_pcall(L, 0, 1, 0);
 
-    double result = getLuaNumber("result");
-    EXPECT_EQ(result, 0.0) << "AddTimer should return eOK (0)";
+    ASSERT_EQ(pcall_result, 0) << "test_add_timer should not error: "
+                               << (pcall_result != 0 ? lua_tostring(L, -1) : "");
 
-    // Verify timer was created
-    Timer* timer = doc->getTimer("test_timer2");
-    ASSERT_NE(timer, nullptr) << "Timer should exist";
-    EXPECT_EQ(timer->iType, Timer::eAtTime) << "Timer should be at-time type";
-    EXPECT_EQ(timer->iAtHour, 15) << "Hour should be 15";
-    EXPECT_EQ(timer->iAtMinute, 30) << "Minute should be 30";
-    EXPECT_EQ(timer->fAtSecond, 0.0) << "Second should be 0.0";
-    EXPECT_EQ(timer->strContents, QString("check mail")) << "Contents should be 'check mail'";
+    int result = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+
+    EXPECT_EQ(result, 0) << "test_add_timer should succeed";
+
+    // Verify timer exists in document
+    EXPECT_NE(doc->getTimer("test_timer"), nullptr) << "Timer should exist in document";
 }
 
-// Test 3: IsTimer
-TEST_F(TimerApiTest, IsTimer)
+// Test 3: GetTimerInfo API
+TEST_F(LuaApiTest, GetTimerInfo)
 {
-    // Create a timer first
-    executeLua(R"(
-        world.AddTimer("test_timer1", 0, 0, 5.0, "look", timer_flag.Enabled, "")
-    )");
+    // First add the timer
+    lua_getglobal(L, "test_add_timer");
+    ASSERT_EQ(lua_pcall(L, 0, 1, 0), 0);
+    lua_pop(L, 1);
 
-    executeLua(R"(
-        result1 = world.IsTimer("test_timer1")
-        result2 = world.IsTimer("nonexistent_timer")
-    )");
+    // Now test GetTimerInfo
+    lua_getglobal(L, "test_get_timer_info");
+    int pcall_result = lua_pcall(L, 0, 1, 0);
 
-    double result1 = getLuaNumber("result1");
-    double result2 = getLuaNumber("result2");
+    ASSERT_EQ(pcall_result, 0) << "test_get_timer_info should not error: "
+                               << (pcall_result != 0 ? lua_tostring(L, -1) : "");
 
-    EXPECT_EQ(result1, 0.0) << "IsTimer should return eOK (0) for existing timer";
-    EXPECT_EQ(result2, 30017.0) << "IsTimer should return eTimerNotFound for nonexistent timer";
+    int result = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+
+    EXPECT_EQ(result, 0) << "test_get_timer_info should succeed";
 }
 
-// Test 4: GetTimerInfo
-TEST_F(TimerApiTest, GetTimerInfo)
+// Test 4: EnableTimer API
+TEST_F(LuaApiTest, EnableTimer)
 {
-    // Create a timer first
-    executeLua(R"(
-        world.AddTimer("test_timer1", 0, 0, 5.0, "look", timer_flag.Enabled, "")
-    )");
+    // First add the timer
+    lua_getglobal(L, "test_add_timer");
+    ASSERT_EQ(lua_pcall(L, 0, 1, 0), 0);
+    lua_pop(L, 1);
 
-    executeLua(R"(
-        hour = world.GetTimerInfo("test_timer1", 1)
-        minute = world.GetTimerInfo("test_timer1", 2)
-        second = world.GetTimerInfo("test_timer1", 3)
-        contents = world.GetTimerInfo("test_timer1", 4)
-        enabled = world.GetTimerInfo("test_timer1", 7)
-        at_time = world.GetTimerInfo("test_timer1", 8)
-    )");
+    // Now test EnableTimer
+    lua_getglobal(L, "test_enable_timer");
+    int pcall_result = lua_pcall(L, 0, 1, 0);
 
-    double hour = getLuaNumber("hour");
-    double minute = getLuaNumber("minute");
-    double second = getLuaNumber("second");
-    QString contents = getLuaString("contents");
-    bool enabled = getLuaBoolean("enabled");
-    bool at_time = getLuaBoolean("at_time");
+    ASSERT_EQ(pcall_result, 0) << "test_enable_timer should not error: "
+                               << (pcall_result != 0 ? lua_tostring(L, -1) : "");
 
-    EXPECT_EQ(hour, 0.0) << "Hour should be 0";
-    EXPECT_EQ(minute, 0.0) << "Minute should be 0";
-    EXPECT_EQ(second, 5.0) << "Second should be 5.0";
-    EXPECT_EQ(contents, QString("look")) << "Contents should be 'look'";
-    EXPECT_TRUE(enabled) << "Timer should be enabled";
-    EXPECT_FALSE(at_time) << "Timer should not be at-time type";
+    int result = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+
+    EXPECT_EQ(result, 0) << "test_enable_timer should succeed";
 }
 
-// Test 5: EnableTimer
-TEST_F(TimerApiTest, EnableTimer)
+// Test 5: GetTimerOption and SetTimerOption
+TEST_F(LuaApiTest, TimerOption)
 {
-    // Create a timer first
-    executeLua(R"(
-        world.AddTimer("test_timer1", 0, 0, 5.0, "look", timer_flag.Enabled, "")
-    )");
+    // First add the timer
+    lua_getglobal(L, "test_add_timer");
+    ASSERT_EQ(lua_pcall(L, 0, 1, 0), 0);
+    lua_pop(L, 1);
 
-    executeLua(R"(
-        -- Disable the timer
-        result1 = world.EnableTimer("test_timer1", false)
-        enabled1 = world.GetTimerInfo("test_timer1", 7)
+    lua_getglobal(L, "test_timer_option");
+    int pcall_result = lua_pcall(L, 0, 1, 0);
 
-        -- Enable it again
-        result2 = world.EnableTimer("test_timer1", true)
-        enabled2 = world.GetTimerInfo("test_timer1", 7)
-    )");
+    ASSERT_EQ(pcall_result, 0) << "test_timer_option should not error: "
+                               << (pcall_result != 0 ? lua_tostring(L, -1) : "");
 
-    double result1 = getLuaNumber("result1");
-    bool enabled1 = getLuaBoolean("enabled1");
-    double result2 = getLuaNumber("result2");
-    bool enabled2 = getLuaBoolean("enabled2");
+    int result = lua_tointeger(L, -1);
+    lua_pop(L, 1);
 
-    EXPECT_EQ(result1, 0.0) << "EnableTimer should return eOK";
-    EXPECT_FALSE(enabled1) << "Timer should be disabled";
-    EXPECT_EQ(result2, 0.0) << "EnableTimer should return eOK";
-    EXPECT_TRUE(enabled2) << "Timer should be enabled";
+    EXPECT_EQ(result, 0) << "test_timer_option should succeed";
 }
 
-// Test 6: GetTimerList
-TEST_F(TimerApiTest, GetTimerList)
+// Test 6: EnableTimerGroup API
+TEST_F(LuaApiTest, EnableTimerGroup)
 {
-    // Create timers first
-    executeLua(R"(
-        world.AddTimer("test_timer1", 0, 0, 5.0, "look", timer_flag.Enabled, "")
-        world.AddTimer("test_timer2", 15, 30, 0.0, "check mail",
-            timer_flag.Enabled + timer_flag.AtTime, "")
-    )");
+    lua_getglobal(L, "test_enable_timer_group");
+    int pcall_result = lua_pcall(L, 0, 1, 0);
 
-    executeLua(R"(
-        list = world.GetTimerList()
-        count = #list
-    )");
+    ASSERT_EQ(pcall_result, 0) << "test_enable_timer_group should not error: "
+                               << (pcall_result != 0 ? lua_tostring(L, -1) : "");
 
-    double count = getLuaNumber("count");
-    EXPECT_EQ(count, 2.0) << "Should have 2 timers (test_timer1 and test_timer2)";
+    int result = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+
+    EXPECT_EQ(result, 0) << "test_enable_timer_group should succeed";
 }
 
-// Test 7: GetTimerOption and SetTimerOption
-TEST_F(TimerApiTest, TimerOptions)
+// Test 7: EnableTimerGroup with empty group
+TEST_F(LuaApiTest, EnableTimerGroupEmpty)
 {
-    // Create a timer first
-    executeLua(R"(
-        world.AddTimer("test_timer1", 0, 0, 5.0, "look", timer_flag.Enabled, "")
-    )");
+    lua_getglobal(L, "test_enable_timer_group_empty");
+    int pcall_result = lua_pcall(L, 0, 1, 0);
 
-    executeLua(R"(
-        -- Get current hour
-        hour1 = world.GetTimerOption("test_timer1", "hour")
+    ASSERT_EQ(pcall_result, 0) << "test_enable_timer_group_empty should not error: "
+                               << (pcall_result != 0 ? lua_tostring(L, -1) : "");
 
-        -- Set new hour
-        result = world.SetTimerOption("test_timer1", "hour", 1)
+    int result = lua_tointeger(L, -1);
+    lua_pop(L, 1);
 
-        -- Get updated hour
-        hour2 = world.GetTimerOption("test_timer1", "hour")
-    )");
-
-    double hour1 = getLuaNumber("hour1");
-    double result = getLuaNumber("result");
-    double hour2 = getLuaNumber("hour2");
-
-    EXPECT_EQ(hour1, 0.0) << "Initial hour should be 0";
-    EXPECT_EQ(result, 0.0) << "SetTimerOption should return eOK";
-    EXPECT_EQ(hour2, 1.0) << "Updated hour should be 1";
+    EXPECT_EQ(result, 0) << "test_enable_timer_group_empty should succeed";
 }
 
-// Test 8: ResetTimer
-TEST_F(TimerApiTest, ResetTimer)
+// Test 8: ResetTimer API
+TEST_F(LuaApiTest, ResetTimer)
 {
-    // Create a timer first
-    executeLua(R"(
-        world.AddTimer("test_timer1", 0, 0, 5.0, "look", timer_flag.Enabled, "")
-    )");
+    // First add the timer
+    lua_getglobal(L, "test_add_timer");
+    ASSERT_EQ(lua_pcall(L, 0, 1, 0), 0);
+    lua_pop(L, 1);
 
-    executeLua(R"(
-        result = world.ResetTimer("test_timer1")
-    )");
+    lua_getglobal(L, "test_reset_timer");
+    int pcall_result = lua_pcall(L, 0, 1, 0);
 
-    double result = getLuaNumber("result");
-    EXPECT_EQ(result, 0.0) << "ResetTimer should return eOK";
+    ASSERT_EQ(pcall_result, 0) << "test_reset_timer should not error: "
+                               << (pcall_result != 0 ? lua_tostring(L, -1) : "");
 
-    // Verify fire time was recalculated
-    Timer* timer = doc->getTimer("test_timer1");
-    ASSERT_NE(timer, nullptr) << "Timer should exist";
-    EXPECT_TRUE(timer->tFireTime.isValid()) << "Fire time should be valid";
+    int result = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+
+    EXPECT_EQ(result, 0) << "test_reset_timer should succeed";
 }
 
-// Test 9: DoAfter
-TEST_F(TimerApiTest, DoAfter)
+// Test 9: GetTimerOption for non-existent timer
+TEST_F(LuaApiTest, TimerOptionNotFound)
 {
-    executeLua(R"(
-        result = world.DoAfter(3.5, "north")
-    )");
+    lua_getglobal(L, "test_timer_option_not_found");
+    int pcall_result = lua_pcall(L, 0, 1, 0);
 
-    double result = getLuaNumber("result");
-    EXPECT_EQ(result, 0.0) << "DoAfter should return eOK";
+    ASSERT_EQ(pcall_result, 0) << "test_timer_option_not_found should not error: "
+                               << (pcall_result != 0 ? lua_tostring(L, -1) : "");
 
-    // Find the doafter timer (name starts with "doafter_")
-    Timer* doafterTimer = nullptr;
-    for (const auto& [name, timerPtr] : doc->m_TimerMap) {
-        if (name.startsWith("doafter_")) {
-            doafterTimer = timerPtr.get();
-            break;
-        }
-    }
+    int result = lua_tointeger(L, -1);
+    lua_pop(L, 1);
 
-    ASSERT_NE(doafterTimer, nullptr) << "DoAfter timer should be created";
-    EXPECT_EQ(doafterTimer->iType, Timer::eInterval) << "DoAfter timer should be interval type";
-    EXPECT_EQ(doafterTimer->fEverySecond, 3.5) << "DoAfter timer should fire after 3.5 seconds";
-    EXPECT_EQ(doafterTimer->strContents, QString("north")) << "DoAfter contents should be 'north'";
-    EXPECT_TRUE(doafterTimer->bOneShot) << "DoAfter timer should be one-shot";
-    EXPECT_TRUE(doafterTimer->bTemporary) << "DoAfter timer should be temporary";
+    EXPECT_EQ(result, 0) << "test_timer_option_not_found should succeed";
 }
 
-// Test 10: DoAfterNote
-TEST_F(TimerApiTest, DoAfterNote)
+// Test 10: SetTimerOption for non-existent timer
+TEST_F(LuaApiTest, SetTimerOptionNotFound)
 {
-    executeLua(R"(
-        result = world.DoAfterNote(2.0, "Timer fired!")
-    )");
+    lua_getglobal(L, "test_set_timer_option_not_found");
+    int pcall_result = lua_pcall(L, 0, 1, 0);
 
-    double result = getLuaNumber("result");
-    EXPECT_EQ(result, 0.0) << "DoAfterNote should return eOK";
+    ASSERT_EQ(pcall_result, 0) << "test_set_timer_option_not_found should not error: "
+                               << (pcall_result != 0 ? lua_tostring(L, -1) : "");
 
-    // Find the doafternote timer
-    Timer* noteTimer = nullptr;
-    for (const auto& [name, timerPtr] : doc->m_TimerMap) {
-        if (name.startsWith("doafternote_")) {
-            noteTimer = timerPtr.get();
-            break;
-        }
-    }
+    int result = lua_tointeger(L, -1);
+    lua_pop(L, 1);
 
-    ASSERT_NE(noteTimer, nullptr) << "DoAfterNote timer should be created";
-    EXPECT_EQ(noteTimer->iSendTo, (quint16)eSendToOutput) << "DoAfterNote should send to output";
+    EXPECT_EQ(result, 0) << "test_set_timer_option_not_found should succeed";
 }
 
-// Test 11: EnableTimerGroup
-TEST_F(TimerApiTest, EnableTimerGroup)
+// Test 11: DeleteTimer API
+TEST_F(LuaApiTest, DeleteTimer)
 {
-    // Create timers in a group
-    executeLua(R"(
-        world.AddTimer("group_timer1", 0, 0, 10.0, "cmd1", timer_flag.Enabled, "")
-        world.SetTimerOption("group_timer1", "group", "testgroup")
+    // First add the timer
+    lua_getglobal(L, "test_add_timer");
+    ASSERT_EQ(lua_pcall(L, 0, 1, 0), 0);
+    lua_pop(L, 1);
 
-        world.AddTimer("group_timer2", 0, 0, 20.0, "cmd2", timer_flag.Enabled, "")
-        world.SetTimerOption("group_timer2", "group", "testgroup")
+    // Now test DeleteTimer
+    lua_getglobal(L, "test_delete_timer");
+    int pcall_result = lua_pcall(L, 0, 1, 0);
 
-        -- Disable the group
-        count = world.EnableTimerGroup("testgroup", false)
+    ASSERT_EQ(pcall_result, 0) << "test_delete_timer should not error: "
+                               << (pcall_result != 0 ? lua_tostring(L, -1) : "");
 
-        -- Check if timers are disabled
-        enabled1 = world.GetTimerInfo("group_timer1", 7)
-        enabled2 = world.GetTimerInfo("group_timer2", 7)
-    )");
+    int result = lua_tointeger(L, -1);
+    lua_pop(L, 1);
 
-    double count = getLuaNumber("count");
-    bool enabled1 = getLuaBoolean("enabled1");
-    bool enabled2 = getLuaBoolean("enabled2");
+    EXPECT_EQ(result, 0) << "test_delete_timer should succeed";
 
-    EXPECT_EQ(count, 2.0) << "Should have disabled 2 timers";
-    EXPECT_FALSE(enabled1) << "group_timer1 should be disabled";
-    EXPECT_FALSE(enabled2) << "group_timer2 should be disabled";
+    // Verify timer was deleted from document
+    EXPECT_EQ(doc->getTimer("test_timer"), nullptr) << "Timer should be deleted from document";
 }
 
-// Test 12: DeleteTimerGroup
-TEST_F(TimerApiTest, DeleteTimerGroup)
+// Test 12: DeleteTimer for non-existent timer
+TEST_F(LuaApiTest, DeleteTimerNotFound)
 {
-    // Create timers in a group (reusing from previous test)
-    executeLua(R"(
-        world.AddTimer("group_timer1", 0, 0, 10.0, "cmd1", timer_flag.Enabled, "")
-        world.SetTimerOption("group_timer1", "group", "testgroup")
+    lua_getglobal(L, "test_delete_timer_not_found");
+    int pcall_result = lua_pcall(L, 0, 1, 0);
 
-        world.AddTimer("group_timer2", 0, 0, 20.0, "cmd2", timer_flag.Enabled, "")
-        world.SetTimerOption("group_timer2", "group", "testgroup")
-    )");
+    ASSERT_EQ(pcall_result, 0) << "test_delete_timer_not_found should not error: "
+                               << (pcall_result != 0 ? lua_tostring(L, -1) : "");
 
-    executeLua(R"(
-        -- Delete the group
-        count = world.DeleteTimerGroup("testgroup")
+    int result = lua_tointeger(L, -1);
+    lua_pop(L, 1);
 
-        -- Verify timers are gone
-        result1 = world.IsTimer("group_timer1")
-        result2 = world.IsTimer("group_timer2")
-    )");
-
-    double count = getLuaNumber("count");
-    double result1 = getLuaNumber("result1");
-    double result2 = getLuaNumber("result2");
-
-    EXPECT_EQ(count, 2.0) << "Should have deleted 2 timers";
-    EXPECT_EQ(result1, 30017.0) << "group_timer1 should not exist";
-    EXPECT_EQ(result2, 30017.0) << "group_timer2 should not exist";
+    EXPECT_EQ(result, 0) << "test_delete_timer_not_found should succeed";
 }
 
-// Test 13: DeleteTemporaryTimers
-TEST_F(TimerApiTest, DeleteTemporaryTimers)
+// Test 13: IsTimer function
+TEST_F(LuaApiTest, IsTimer)
 {
-    // Create some temporary timers
-    executeLua(R"(
-        world.DoAfter(1.0, "test1")
-        world.DoAfterNote(2.0, "test2")
-    )");
+    lua_getglobal(L, "test_is_timer");
+    int pcall_result = lua_pcall(L, 0, 1, 0);
 
-    executeLua(R"(
-        -- Count how many temporary timers exist (from DoAfter/DoAfterNote)
-        count = world.DeleteTemporaryTimers()
-    )");
+    ASSERT_EQ(pcall_result, 0) << "test_is_timer should not error: "
+                               << (pcall_result != 0 ? lua_tostring(L, -1) : "");
 
-    double count = getLuaNumber("count");
-    EXPECT_GE(count, 2.0) << "Should have deleted at least 2 temporary timers";
+    int result = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+
+    EXPECT_EQ(result, 0) << "test_is_timer should succeed";
 }
 
-// Test 14: DeleteTimer
-TEST_F(TimerApiTest, DeleteTimer)
+// Test 14: GetTimer function
+TEST_F(LuaApiTest, GetTimer)
 {
-    // Create timers first
-    executeLua(R"(
-        world.AddTimer("test_timer1", 0, 0, 5.0, "look", timer_flag.Enabled, "")
-        world.AddTimer("test_timer2", 15, 30, 0.0, "check mail",
-            timer_flag.Enabled + timer_flag.AtTime, "")
-    )");
+    lua_getglobal(L, "test_get_timer");
+    int pcall_result = lua_pcall(L, 0, 1, 0);
 
-    executeLua(R"(
-        result1 = world.DeleteTimer("test_timer1")
-        result2 = world.DeleteTimer("test_timer2")
-        result3 = world.DeleteTimer("nonexistent_timer")
-    )");
+    ASSERT_EQ(pcall_result, 0) << "test_get_timer should not error: "
+                               << (pcall_result != 0 ? lua_tostring(L, -1) : "");
 
-    double result1 = getLuaNumber("result1");
-    double result2 = getLuaNumber("result2");
-    double result3 = getLuaNumber("result3");
+    int result = lua_tointeger(L, -1);
+    lua_pop(L, 1);
 
-    EXPECT_EQ(result1, 0.0) << "DeleteTimer should return eOK for test_timer1";
-    EXPECT_EQ(result2, 0.0) << "DeleteTimer should return eOK for test_timer2";
-    EXPECT_EQ(result3, 30017.0) << "DeleteTimer should return eTimerNotFound";
-
-    // Verify timers are deleted
-    EXPECT_EQ(doc->getTimer("test_timer1"), nullptr) << "test_timer1 should be deleted";
-    EXPECT_EQ(doc->getTimer("test_timer2"), nullptr) << "test_timer2 should be deleted";
+    EXPECT_EQ(result, 0) << "test_get_timer should succeed";
 }
 
-// GoogleTest main function
+// Test 15: DeleteTimerGroup function
+TEST_F(LuaApiTest, DeleteTimerGroup)
+{
+    lua_getglobal(L, "test_delete_timer_group");
+    int pcall_result = lua_pcall(L, 0, 1, 0);
+
+    ASSERT_EQ(pcall_result, 0) << "test_delete_timer_group should not error: "
+                               << (pcall_result != 0 ? lua_tostring(L, -1) : "");
+
+    int result = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+
+    EXPECT_EQ(result, 0) << "test_delete_timer_group should succeed";
+}
+
+// Test 16: DeleteTemporaryTimers function
+TEST_F(LuaApiTest, DeleteTemporaryTimers)
+{
+    lua_getglobal(L, "test_delete_temporary_timers");
+    int pcall_result = lua_pcall(L, 0, 1, 0);
+
+    ASSERT_EQ(pcall_result, 0) << "test_delete_temporary_timers should not error: "
+                               << (pcall_result != 0 ? lua_tostring(L, -1) : "");
+
+    int result = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+
+    EXPECT_EQ(result, 0) << "test_delete_temporary_timers should succeed";
+}
+
+// Test 17: ResetTimers function
+TEST_F(LuaApiTest, ResetTimers)
+{
+    lua_getglobal(L, "test_reset_timers");
+    int pcall_result = lua_pcall(L, 0, 1, 0);
+
+    ASSERT_EQ(pcall_result, 0) << "test_reset_timers should not error: "
+                               << (pcall_result != 0 ? lua_tostring(L, -1) : "");
+
+    int result = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+
+    EXPECT_EQ(result, 0) << "test_reset_timers should succeed";
+}
+
 int main(int argc, char** argv)
 {
-    // Initialize Qt application (required for Qt types)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
+    QGuiApplication app(argc, argv);
     ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
     return RUN_ALL_TESTS();
 }

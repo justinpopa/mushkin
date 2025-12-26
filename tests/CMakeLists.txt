@@ -381,23 +381,6 @@ gtest_discover_tests(test-plugin-errors-gtest
     DISCOVERY_TIMEOUT 30
 )
 
-# Trigger/Alias Lua API test (GoogleTest version)
-add_executable(test-trigger-alias-api-gtest
-    test_trigger_alias_api_gtest.cpp
-)
-
-target_link_libraries(test-trigger-alias-api-gtest PRIVATE
-    GTest::gtest
-    Qt6::Core
-    Qt6::Gui
-    Qt6::Widgets
-    ui
-)
-
-gtest_discover_tests(test-trigger-alias-api-gtest
-    DISCOVERY_TIMEOUT 30
-)
-
 # Command Window and Color Lua API test (GoogleTest version)
 add_executable(test-command-color-api-gtest
     test_command_color_api_gtest.cpp
@@ -864,5 +847,229 @@ target_link_libraries(test-url-detection-gtest PRIVATE
 )
 
 gtest_discover_tests(test-url-detection-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
+# ========== Reorganized Lua API Tests ==========
+# Tests split from test_trigger_alias_api_gtest.cpp for better organization
+
+# Trigger Lua API test (GoogleTest version)
+add_executable(test-trigger-api-gtest
+    test_trigger_api_gtest.cpp
+)
+
+target_link_libraries(test-trigger-api-gtest PRIVATE
+    GTest::gtest
+    Qt6::Core
+    Qt6::Gui
+    Qt6::Widgets
+    ui
+)
+
+gtest_discover_tests(test-trigger-api-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
+# Alias Lua API test (GoogleTest version)
+add_executable(test-alias-api-gtest
+    test_alias_api_gtest.cpp
+)
+
+target_link_libraries(test-alias-api-gtest PRIVATE
+    GTest::gtest
+    Qt6::Core
+    Qt6::Gui
+    Qt6::Widgets
+    ui
+)
+
+gtest_discover_tests(test-alias-api-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
+# Miniwindow Lua API test (GoogleTest version)
+add_executable(test-miniwindow-lua-api-gtest
+    test_miniwindow_lua_api_gtest.cpp
+)
+
+target_link_libraries(test-miniwindow-lua-api-gtest PRIVATE
+    GTest::gtest
+    Qt6::Core
+    Qt6::Gui
+    Qt6::Widgets
+    ui
+)
+
+gtest_discover_tests(test-miniwindow-lua-api-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
+# UI Lua API test (GoogleTest version)
+add_executable(test-ui-lua-api-gtest
+    test_ui_lua_api_gtest.cpp
+)
+
+target_link_libraries(test-ui-lua-api-gtest PRIVATE
+    GTest::gtest
+    Qt6::Core
+    Qt6::Gui
+    Qt6::Widgets
+    ui
+)
+
+gtest_discover_tests(test-ui-lua-api-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
+# Variable Lua API test (GoogleTest version)
+add_executable(test-variable-lua-api-gtest
+    test_variable_lua_api_gtest.cpp
+)
+
+target_link_libraries(test-variable-lua-api-gtest PRIVATE
+    GTest::gtest
+    Qt6::Core
+    Qt6::Gui
+    Qt6::Widgets
+    ui
+)
+
+gtest_discover_tests(test-variable-lua-api-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
+# Database Lua API test (GoogleTest version)
+add_executable(test-database-lua-api-gtest
+    test_database_lua_api_gtest.cpp
+)
+
+target_link_libraries(test-database-lua-api-gtest PRIVATE
+    GTest::gtest
+    Qt6::Core
+    Qt6::Gui
+    Qt6::Widgets
+    ui
+)
+
+gtest_discover_tests(test-database-lua-api-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
+# Speedwalk Lua API test (GoogleTest version)
+add_executable(test-speedwalk-lua-api-gtest
+    test_speedwalk_lua_api_gtest.cpp
+)
+
+target_link_libraries(test-speedwalk-lua-api-gtest PRIVATE
+    GTest::gtest
+    Qt6::Core
+    Qt6::Gui
+    Qt6::Widgets
+    ui
+)
+
+gtest_discover_tests(test-speedwalk-lua-api-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
+# Info Lua API test (GoogleTest version)
+add_executable(test-info-lua-api-gtest
+    test_info_lua_api_gtest.cpp
+)
+
+target_link_libraries(test-info-lua-api-gtest PRIVATE
+    GTest::gtest
+    Qt6::Core
+    Qt6::Gui
+    Qt6::Widgets
+    ui
+)
+
+gtest_discover_tests(test-info-lua-api-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
+# Command Lua API test (GoogleTest version)
+add_executable(test-command-lua-api-gtest
+    test_command_lua_api_gtest.cpp
+)
+
+target_link_libraries(test-command-lua-api-gtest PRIVATE
+    GTest::gtest
+    Qt6::Core
+    Qt6::Gui
+    Qt6::Widgets
+    ui
+)
+
+gtest_discover_tests(test-command-lua-api-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
+# Logging Lua API test (GoogleTest version)
+add_executable(test-logging-lua-api-gtest
+    test_logging_lua_api_gtest.cpp
+)
+
+target_link_libraries(test-logging-lua-api-gtest PRIVATE
+    GTest::gtest
+    Qt6::Core
+    Qt6::Gui
+    Qt6::Widgets
+    ui
+)
+
+gtest_discover_tests(test-logging-lua-api-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
+# Network Lua API test (GoogleTest version)
+add_executable(test-network-lua-api-gtest
+    test_network_lua_api_gtest.cpp
+)
+
+target_link_libraries(test-network-lua-api-gtest PRIVATE
+    GTest::gtest
+    Qt6::Core
+    Qt6::Gui
+    Qt6::Widgets
+    ui
+)
+
+gtest_discover_tests(test-network-lua-api-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
+# Color Lua API test (GoogleTest version)
+add_executable(test-color-lua-api-gtest
+    test_color_lua_api_gtest.cpp
+)
+
+target_link_libraries(test-color-lua-api-gtest PRIVATE
+    GTest::gtest
+    Qt6::Core
+    Qt6::Gui
+    Qt6::Widgets
+    ui
+)
+
+gtest_discover_tests(test-color-lua-api-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
+# Miscellaneous Lua API test (GoogleTest version)
+add_executable(test-misc-lua-api-gtest
+    test_misc_lua_api_gtest.cpp
+)
+
+target_link_libraries(test-misc-lua-api-gtest PRIVATE
+    GTest::gtest
+    Qt6::Core
+    Qt6::Gui
+    Qt6::Widgets
+    ui
+)
+
+gtest_discover_tests(test-misc-lua-api-gtest
     DISCOVERY_TIMEOUT 30
 )
