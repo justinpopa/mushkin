@@ -45,7 +45,7 @@ jobs:
       - name: Install Qt (Linux)
         if: matrix.os == 'Linux'
         run: |
-          aqt install-qt linux desktop ${{ env.QT_VERSION }} linux_gcc_64 --outputdir $HOME/Qt
+          aqt install-qt linux desktop ${{ env.QT_VERSION }} linux_gcc_64 -m qtmultimedia --outputdir $HOME/Qt
           echo "Qt6_DIR=$HOME/Qt/${{ env.QT_VERSION }}/gcc_64/lib/cmake/Qt6" >> $GITHUB_ENV
           echo "$HOME/Qt/${{ env.QT_VERSION }}/gcc_64/bin" >> $GITHUB_PATH
 
@@ -59,7 +59,7 @@ jobs:
       - name: Install Qt (macOS)
         if: matrix.os == 'macOS'
         run: |
-          python3 -m aqt install-qt mac desktop ${{ env.QT_VERSION }} --outputdir $HOME/Qt
+          python3 -m aqt install-qt mac desktop ${{ env.QT_VERSION }} -m qtmultimedia --outputdir $HOME/Qt
           echo "Qt6_DIR=$HOME/Qt/${{ env.QT_VERSION }}/macos/lib/cmake/Qt6" >> $GITHUB_ENV
           echo "$HOME/Qt/${{ env.QT_VERSION }}/macos/bin" >> $GITHUB_PATH
 
@@ -78,7 +78,7 @@ jobs:
       - name: Install Qt (Windows)
         if: matrix.os == 'Windows'
         run: |
-          python -m aqt install-qt windows desktop ${{ env.QT_VERSION }} win64_msvc2022_64 --outputdir C:/Qt
+          python -m aqt install-qt windows desktop ${{ env.QT_VERSION }} win64_msvc2022_64 -m qtmultimedia --outputdir C:/Qt
           echo "Qt6_DIR=C:/Qt/${{ env.QT_VERSION }}/msvc2022_64/lib/cmake/Qt6" >> $env:GITHUB_ENV
           echo "C:/Qt/${{ env.QT_VERSION }}/msvc2022_64/bin" >> $env:GITHUB_PATH
 
