@@ -130,6 +130,15 @@ C:\vcpkg\bootstrap-vcpkg.bat
 C:\vcpkg\vcpkg install pcre:x64-windows luajit:x64-windows sqlite3:x64-windows openssl:x64-windows zlib:x64-windows
 ```
 
+5. **Enable Long Paths** (required for Qt build):
+
+```powershell
+# Run as Administrator
+Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' -Name 'LongPathsEnabled' -Value 1 -Type DWord
+```
+
+Qt's source tree has deeply nested paths that exceed Windows' default 260 character limit. This registry change enables long path support system-wide.
+
 #### Static Build (Release Binary)
 
 Run from **Developer PowerShell for VS 2022**:
@@ -152,9 +161,9 @@ Mushkin uses MUSHclient-compatible paths for easy migration:
 - `~/Documents/MUSHclient/` (worlds, plugins, logs subdirectories)
 
 **Settings:**
-- macOS: `~/Library/Preferences/com.mushkin.Mushkin.plist`
-- Linux: `~/.config/Mushkin/Mushkin.conf`
-- Windows: `%APPDATA%\Mushkin\Mushkin.ini`
+- macOS: `~/Library/Preferences/com.Gammon.MUSHclient.plist`
+- Linux: `~/.config/Gammon/MUSHclient.conf`
+- Windows: Registry `HKEY_CURRENT_USER\Software\Gammon\MUSHclient`
 
 ## Plugin Compatibility
 

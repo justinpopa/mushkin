@@ -117,10 +117,14 @@ function Build-StaticQt {
     Push-Location $QtBuildDir
 
     $configureCmd = Join-Path $QtSrcDir "configure.bat"
+    # Set SQLite path for Qt to find vcpkg's sqlite
+    $env:SQLITE3_PREFIX = Join-Path $env:VCPKG_ROOT "installed\x64-windows"
+
     & $configureCmd `
         -static `
         -release `
         -prefix $QtStaticDir `
+        -system-sqlite `
         -skip qtwebengine -skip qtwebview -skip qt3d -skip qtcharts `
         -skip qtdatavis3d -skip qtlottie -skip qtquick3d -skip qtquick3dphysics `
         -skip qtvirtualkeyboard -skip qtwayland -skip qtwebchannel -skip qtwebsockets `
