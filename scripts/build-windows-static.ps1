@@ -117,8 +117,7 @@ function Build-StaticQt {
     Push-Location $QtBuildDir
 
     $configureCmd = Join-Path $QtSrcDir "configure.bat"
-    # Set SQLite path for Qt to find vcpkg's sqlite
-    $env:SQLITE3_PREFIX = Join-Path $env:VCPKG_ROOT "installed\x64-windows"
+    $vcpkgInstalled = Join-Path $env:VCPKG_ROOT "installed\x64-windows"
 
     & $configureCmd `
         -static `
@@ -133,7 +132,8 @@ function Build-StaticQt {
         -skip qtquickeffectmaker -skip qtlocation -skip qtcoap -skip qtmqtt `
         -skip qtopcua -skip qtgrpc -skip qtlanguageserver -skip qtspeech `
         -skip qtconnectivity -skip qtactiveqt -skip qtscxml `
-        -nomake examples -nomake tests
+        -nomake examples -nomake tests `
+        -- -DSQLite3_ROOT="$vcpkgInstalled" -DCMAKE_OBJECT_PATH_MAX=350
 
     if ($LASTEXITCODE -ne 0) { throw "Qt configure failed" }
 
