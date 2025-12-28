@@ -5,6 +5,16 @@
       "release-type": "simple",
       "bump-minor-pre-major": true,
       "bump-patch-for-minor-pre-major": true,
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "CMakeLists.txt"
+        },
+        {
+          "type": "generic",
+          "path": "src/world/lua_api/world_info.cpp"
+        }
+      ],
       "changelog-sections": [
         {"type": "feat", "section": "Features"},
         {"type": "fix", "section": "Bug Fixes"},
