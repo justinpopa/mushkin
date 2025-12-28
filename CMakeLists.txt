@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(mushkin VERSION 0.0.4 LANGUAGES C CXX)
+project(mushkin VERSION 0.1.0 LANGUAGES C CXX)
 
 # C++ standard
 set(CMAKE_CXX_STANDARD 17)

@@ -11,7 +11,7 @@
 
 // MUSHclient Qt version string
 // TODO: Generate from CMake PROJECT_VERSION
-#define MUSHCLIENT_QT_VERSION "0.0.4"
+#define MUSHCLIENT_QT_VERSION "0.1.0"
 
 /**
  * world.GetLineCount()
