@@ -97,7 +97,8 @@ jobs:
             libxcb-image0-dev libxcb-glx0-dev libxcb-shm0-dev \
             libfontconfig1-dev libfreetype6-dev libx11-dev libx11-xcb-dev \
             libxext-dev libxfixes-dev libxi-dev libxrender-dev \
-            libatspi2.0-dev libglib2.0-dev
+            libatspi2.0-dev libglib2.0-dev \
+            libpulse-dev libasound2-dev libpipewire-0.3-dev
           pip3 install aqtinstall
 
       - name: Cache Qt Static
