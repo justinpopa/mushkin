@@ -40,7 +40,7 @@ jobs:
             libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 \
             libluajit-5.1-dev libpcre3-dev libsqlite3-dev \
             libssl-dev zlib1g-dev \
-            libpulse-dev libasound2-dev
+            libpulse-dev libasound2-dev libpipewire-0.3-dev
           pip3 install aqtinstall
 
       - name: Install Qt (Linux)
