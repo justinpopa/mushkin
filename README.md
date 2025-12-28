@@ -34,8 +34,8 @@ brew install cmake ninja pcre luajit sqlite openssl
 pip3 install aqtinstall
 
 # Clone and build
-git clone https://github.com/justinpopa/mushkin-public.git
-cd mushkin-public
+git clone https://github.com/justinpopa/mushkin.git
+cd mushkin
 ./scripts/build-macos.sh
 
 open build/mushkin.app
@@ -52,8 +52,8 @@ brew install cmake ninja pcre luajit sqlite openssl
 pip3 install aqtinstall
 
 # Build (first run ~60 min for Qt, subsequent runs ~2 min)
-git clone https://github.com/justinpopa/mushkin-public.git
-cd mushkin-public
+git clone https://github.com/justinpopa/mushkin.git
+cd mushkin
 ./scripts/build-macos-static.sh
 
 # Output: build-static/mushkin
@@ -76,8 +76,8 @@ sudo apt install cmake ninja-build build-essential pkg-config \
 pip3 install aqtinstall
 
 # Clone and build
-git clone https://github.com/justinpopa/mushkin-public.git
-cd mushkin-public
+git clone https://github.com/justinpopa/mushkin.git
+cd mushkin
 ./scripts/build-linux.sh
 
 ./build/mushkin
@@ -102,8 +102,8 @@ sudo apt install cmake ninja-build build-essential pkg-config \
 pip3 install aqtinstall
 
 # Build (first run ~60 min for Qt, subsequent runs ~2 min)
-git clone https://github.com/justinpopa/mushkin-public.git
-cd mushkin-public
+git clone https://github.com/justinpopa/mushkin.git
+cd mushkin
 ./scripts/build-linux-static.sh
 
 # Output: build-static/mushkin
@@ -144,8 +144,8 @@ Qt's source tree has deeply nested paths that exceed Windows' default 260 charac
 Run from **Developer PowerShell for VS 2022**:
 
 ```powershell
-git clone https://github.com/justinpopa/mushkin-public.git
-cd mushkin-public
+git clone https://github.com/justinpopa/mushkin.git
+cd mushkin
 .\scripts\build-windows-static.ps1
 
 # Output: build-static\mushkin.exe
