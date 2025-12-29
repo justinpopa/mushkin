@@ -244,107 +244,68 @@ void ScriptEngine::openLua()
     // 4. Register MUSHclient API functions
     RegisterLuaRoutines(L);
 
-    // 5. Set up Lua package.path to include our lua directory (for require statements)
-    // Get current package.path
+    // 5. Set up Lua package.path (issue #4)
+    // Use only relative paths for portability - no system paths
+    // MUSHclient also includes absolute exe_dir paths (the ! notation in luaconf.h),
+    // but we intentionally omit those to avoid the portability issues they cause
     lua_getglobal(L, "package");
-    lua_getfield(L, -1, "path");
-    QString packagePath = QString::fromUtf8(lua_tostring(L, -1));
-    lua_pop(L, 1); // pop path string
 
-    // Add our lua directories to the path
-    // Use application directory for absolute paths (works in dev and production)
-    QString appDir = QCoreApplication::applicationDirPath();
-    QStringList luaPaths = {appDir + "/lua/?.lua", appDir + "/lua/?/init.lua",
-                            "lua/?.lua", // Relative path (for running from project root)
-                            "lua/?/init.lua"};
+    QStringList luaPaths = {
+        "./?.lua",
+        "./lua/?.lua",
+        "./lua/?/init.lua",
+    };
 
-    for (const QString& path : luaPaths) {
-        packagePath += ";" + path;
-    }
-
-    // For plugins, add the plugin directory and MUSHclient installation directories
+    // For plugins, add the plugin directory paths
     // This allows require() to find Lua files in:
     // 1. Plugin's own directory and subdirectories
-    // 2. MUSHclient installation's lua/ directory
-    // NOTE: We intentionally skip the parent "plugins/" directory to avoid
-    // finding the XML-wrapped constants.lua that's meant for <include> tags
+    // 2. Paths relative to current working directory
     Plugin* plugin = qobject_cast<Plugin*>(parent());
     if (plugin && !plugin->m_strDirectory.isEmpty()) {
         QString pluginDir = plugin->m_strDirectory;
 
         // Add plugin directory
-        packagePath += ";" + pluginDir + "/?.lua";
-        packagePath += ";" + pluginDir + "/?/init.lua";
+        luaPaths << pluginDir + "/?.lua";
+        luaPaths << pluginDir + "/?/init.lua";
 
         // Add plugin's lua subdirectory
-        packagePath += ";" + pluginDir + "/lua/?.lua";
-        packagePath += ";" + pluginDir + "/lua/?/init.lua";
-
-        // Navigate up to find Mushkin installation root lua/ directory
-        // Plugin path: .../Mushkin/worlds/plugins/<pluginname>/
-        // We want: .../Mushkin/lua/
-        // We skip intermediate directories (plugins/, worlds/) as they may contain
-        // XML-wrapped Lua files that aren't meant for require()
-        QDir dir(pluginDir);
-        // Go up: <pluginname>/ -> plugins/ -> worlds/ -> Mushkin root
-        if (dir.cdUp() && dir.cdUp() && dir.cdUp()) {
-            QString appDir = dir.absolutePath();
-            packagePath += ";" + appDir + "/lua/?.lua";
-            packagePath += ";" + appDir + "/lua/?/init.lua";
-        }
+        luaPaths << pluginDir + "/lua/?.lua";
+        luaPaths << pluginDir + "/lua/?/init.lua";
     }
 
-    // Set the modified package.path
+    QString packagePath = luaPaths.join(";");
     lua_pushstring(L, packagePath.toUtf8().constData());
     lua_setfield(L, -2, "path");
     lua_pop(L, 1); // pop package table
 
-    // 5b. Set up Lua package.cpath to include our lua directory (for compiled C modules like
-    // socket.core)
+    // 5b. Set up Lua package.cpath for compiled C modules (issue #4)
+    // We replace the default cpath entirely - no system paths
+    // App bundle paths are needed for bundled modules like LuaSocket
     lua_getglobal(L, "package");
-    lua_getfield(L, -1, "cpath");
-    QString packageCPath = QString::fromUtf8(lua_tostring(L, -1));
-    lua_pop(L, 1); // pop cpath string
 
-    // Add our lua directories to the cpath for compiled modules (.so on Unix, .dll on Windows)
-    // Includes lib/ for LuaSocket modules (socket.core, mime.core)
+    QString appDir = QCoreApplication::applicationDirPath();
+
 #ifdef Q_OS_WIN
-    QStringList luaCPaths = {appDir + "/lua/?.dll",
-                             appDir + "/lua/?/core.dll",
-                             appDir + "/lua/loadall.dll",
-                             appDir + "/lib/?.dll",      // LuaSocket modules
-                             appDir + "/lib/?/core.dll", // socket/core.dll, mime/core.dll
-                             appDir + "/?.dll",
-                             appDir + "/?/core.dll", // Root level modules
-                             "lua/?.dll",
-                             "lua/?/core.dll",
-                             "lua/loadall.dll",
-                             "lib/?.dll",
-                             "lib/?/core.dll",
-                             "?.dll",
-                             "?/core.dll"}; // Current dir root level
+    QString libExt = "dll";
 #else
-    QStringList luaCPaths = {appDir + "/lua/?.so",
-                             appDir + "/lua/?/core.so",
-                             appDir + "/lua/loadall.so",
-                             appDir + "/lib/?.so",      // LuaSocket modules
-                             appDir + "/lib/?/core.so", // socket/core.so, mime/core.so
-                             appDir + "/?.so",
-                             appDir + "/?/core.so", // Root level modules
-                             "lua/?.so",
-                             "lua/?/core.so",
-                             "lua/loadall.so",
-                             "lib/?.so",
-                             "lib/?/core.so",
-                             "?.so",
-                             "?/core.so"}; // Current dir root level
+    QString libExt = "so";
 #endif
 
-    for (const QString& path : luaCPaths) {
-        packageCPath += ";" + path;
-    }
+    QStringList luaCPaths = {
+        // App bundle paths (for bundled C modules like LuaSocket)
+        appDir + "/lib/?." + libExt,
+        appDir + "/lib/?/core." + libExt,
+        appDir + "/lua/?." + libExt,
+        appDir + "/lua/?/core." + libExt,
+        // Relative paths (for user C modules)
+        "./lib/?." + libExt,
+        "./lib/?/core." + libExt,
+        "./lua/?." + libExt,
+        "./lua/?/core." + libExt,
+        "./?." + libExt,
+    };
 
-    // Set the modified package.cpath
+    QString packageCPath = luaCPaths.join(";");
     lua_pushstring(L, packageCPath.toUtf8().constData());
     lua_setfield(L, -2, "cpath");
     lua_pop(L, 1); // pop package table
