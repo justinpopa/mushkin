@@ -103,12 +103,13 @@ build_static_qt() {
 
     # Only build what we need, skip optional QML/Quick deps
     # -no-pch disables precompiled headers to reduce disk usage
+    # Note: qtshadertools is required by qtmultimedia, so we can't skip it
     "$QT_SRC_DIR/configure" \
         -static \
         -release \
         -prefix "$QT_STATIC_DIR" \
-        -submodules qtbase,qtmultimedia,qtsvg \
-        -skip qtdeclarative -skip qtquick3d -skip qtshadertools \
+        -submodules qtbase,qtmultimedia,qtsvg,qtshadertools \
+        -skip qtdeclarative -skip qtquick3d \
         -nomake examples -nomake tests \
         -no-pch
 

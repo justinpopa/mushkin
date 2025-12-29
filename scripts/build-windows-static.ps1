@@ -121,12 +121,13 @@ function Build-StaticQt {
 
     # Only build what we need, skip optional QML/Quick deps
     # -no-pch disables precompiled headers to reduce disk usage
+    # Note: qtshadertools is required by qtmultimedia, so we can't skip it
     & $configureCmd `
         -static `
         -release `
         -prefix $QtStaticDir `
-        -submodules qtbase,qtmultimedia,qtsvg `
-        -skip qtdeclarative -skip qtquick3d -skip qtshadertools `
+        -submodules qtbase,qtmultimedia,qtsvg,qtshadertools `
+        -skip qtdeclarative -skip qtquick3d `
         -nomake examples -nomake tests `
         -no-pch `
         -- -DSQLite3_ROOT="$vcpkgInstalled" -DCMAKE_OBJECT_PATH_MAX=350
