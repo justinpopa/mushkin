@@ -104,35 +104,36 @@ int main(int argc, char* argv[])
     QString libExt = "so";
 #endif
 
-    // Build LUA_PATH for Lua modules
+    // Build LUA_PATH for Lua modules (issue #4)
+    // Use only relative paths for portability - no system paths
+    // MUSHclient also includes absolute exe_dir paths (the ! notation in luaconf.h),
+    // but we intentionally omit those to avoid the portability issues they cause
     QStringList luaPaths = {
-        appDir + "/lua/?.lua",
-        appDir + "/lua/?/init.lua",
-        "lua/?.lua",
-        "lua/?/init.lua",
+        "./?.lua",
+        "./lua/?.lua",
+        "./lua/?/init.lua",
     };
-    QString existingLuaPath = QString::fromLocal8Bit(qgetenv("LUA_PATH"));
     QString newLuaPath = luaPaths.join(luaPathSep);
-    if (!existingLuaPath.isEmpty()) {
-        newLuaPath += luaPathSep + existingLuaPath;
-    }
-    newLuaPath += luaPathSep + luaPathSep; // Append ;; to include default paths
     qputenv("LUA_PATH", newLuaPath.toLocal8Bit());
 
     // Build LUA_CPATH for compiled C modules (.so/.dll)
+    // Include app bundle paths for bundled modules (LuaSocket, etc.)
+    // Include relative paths for user modules
+    // No system paths (issue #4)
     QStringList luaCPaths = {
-        appDir + "/lib/?." + libExt,      appDir + "/lib/?/core." + libExt,
-        appDir + "/lib/?/?." + libExt,    appDir + "/lua/?." + libExt,
-        appDir + "/lua/?/core." + libExt, "lib/?." + libExt,
-        "lib/?/core." + libExt,           "lua/?." + libExt,
-        "lua/?/core." + libExt,
+        // App bundle paths (for bundled C modules like LuaSocket)
+        appDir + "/lib/?." + libExt,
+        appDir + "/lib/?/core." + libExt,
+        appDir + "/lua/?." + libExt,
+        appDir + "/lua/?/core." + libExt,
+        // Relative paths (for user C modules)
+        "./lib/?." + libExt,
+        "./lib/?/core." + libExt,
+        "./lua/?." + libExt,
+        "./lua/?/core." + libExt,
+        "./?." + libExt,
     };
-    QString existingLuaCPath = QString::fromLocal8Bit(qgetenv("LUA_CPATH"));
     QString newLuaCPath = luaCPaths.join(luaPathSep);
-    if (!existingLuaCPath.isEmpty()) {
-        newLuaCPath += luaPathSep + existingLuaCPath;
-    }
-    newLuaCPath += luaPathSep + luaPathSep; // Append ;; to include default paths
     qputenv("LUA_CPATH", newLuaCPath.toLocal8Bit());
 
     // Open preferences database
