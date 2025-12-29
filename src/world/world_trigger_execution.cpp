@@ -311,6 +311,34 @@ void WorldDocument::executeTriggerScript(Trigger* trigger, const QString& matche
         return;
     }
 
+    // Create and set global wildcards table (for scripts that access it as a global)
+    // This matches MUSHclient behavior where wildcards is available both as a global
+    // and as a function parameter
+    lua_newtable(L);
+    for (int i = 0; i < trigger->wildcards.size(); ++i) {
+        QString wildcard = trigger->wildcards[i];
+        if (trigger->bLowercaseWildcard && i > 0) {
+            wildcard = wildcard.toLower();
+        }
+        lua_pushinteger(L, i);
+        QByteArray ba = wildcard.toUtf8();
+        lua_pushlstring(L, ba.constData(), ba.length());
+        lua_settable(L, -3);
+    }
+    for (auto it = trigger->namedWildcards.constBegin(); it != trigger->namedWildcards.constEnd();
+         ++it) {
+        QString value = it.value();
+        if (trigger->bLowercaseWildcard) {
+            value = value.toLower();
+        }
+        QByteArray nameBytes = it.key().toUtf8();
+        lua_pushlstring(L, nameBytes.constData(), nameBytes.length());
+        QByteArray valueBytes = value.toUtf8();
+        lua_pushlstring(L, valueBytes.constData(), valueBytes.length());
+        lua_settable(L, -3);
+    }
+    lua_setglobal(L, "wildcards");
+
     // Argument 1: Trigger name (string)
     QByteArray nameBytes = triggerName.toUtf8();
     lua_pushlstring(L, nameBytes.constData(), nameBytes.length());
@@ -319,7 +347,7 @@ void WorldDocument::executeTriggerScript(Trigger* trigger, const QString& matche
     QByteArray lineBytes = matchedText.toUtf8();
     lua_pushlstring(L, lineBytes.constData(), lineBytes.length());
 
-    // Argument 3: Wildcards table
+    // Argument 3: Wildcards table (also passed as function parameter)
     lua_newtable(L);
 
     // Add wildcards: wildcards[0] = full match, wildcards[1..N] = capture groups
