@@ -9,6 +9,8 @@
 #include <QRegularExpression>
 #include <QStringList>
 
+#include "color_utils.h"
+
 // Lua headers
 extern "C" {
 #include <lauxlib.h>
@@ -960,9 +962,10 @@ static void luaError(lua_State* L, const QString& event, const QString& name, Wo
 
     // Display in output window
     if (doc) {
-        doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0),
+        // Orange error text on black background (BGR format for MUSHclient compatibility)
+        doc->colourNote(BGR(255, 140, 0), BGR(0, 0, 0),
                         QString("=== %1: %2 ===").arg(event, name));
-        doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0), errorMsg);
+        doc->colourNote(BGR(255, 140, 0), BGR(0, 0, 0), errorMsg);
 
         // Show error lines (if we have a line number and script file)
         if (lineNumber > 0) {

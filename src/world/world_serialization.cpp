@@ -26,6 +26,7 @@
 #include "../automation/trigger.h"  // For Trigger
 #include "../automation/variable.h" // For Variable
 #include "accelerator_manager.h"    // For AcceleratorEntry
+#include "color_utils.h"            // For BGR/RGB conversion
 #include "logging.h"                // For qCDebug(lcWorld)
 #include "macro_keypad_compat.h"    // For macro/keypad format conversion
 #include "world_document.h"
@@ -50,32 +51,37 @@
 #define TRIGGER_MATCH_BLINK 0x4000 // italic
 #define TRIGGER_MATCH_INVERSE 0x8000
 
-// Helper function to convert RGB color to hex name
-static QString colorToName(QRgb rgb)
+// Helper function to convert BGR color to hex name (#RRGGBB for XML)
+// Internal colors are stored in BGR format (MUSHclient COLORREF)
+static QString colorToName(QRgb bgr)
 {
-    // For now, just return hex format #RRGGBB
-    // Original MUSHclient would check color name map first
+    // Convert BGR to RGB for human-readable hex format
+    QColor color = bgrToQColor(bgr);
     return QString("#%1%2%3")
-        .arg(qRed(rgb), 2, 16, QChar('0'))
-        .arg(qGreen(rgb), 2, 16, QChar('0'))
-        .arg(qBlue(rgb), 2, 16, QChar('0'))
+        .arg(color.red(), 2, 16, QChar('0'))
+        .arg(color.green(), 2, 16, QChar('0'))
+        .arg(color.blue(), 2, 16, QChar('0'))
         .toUpper();
 }
 
-// Helper function to parse color name to RGB
+// Helper function to parse color name (#RRGGBB) to BGR
+// Returns BGR format for internal storage
 static QRgb nameToColor(const QString& name)
 {
     if (name.startsWith("#")) {
-        // Hex format: #RRGGBB
+        // Hex format: #RRGGBB - parse as RGB then convert to BGR
         bool ok;
         unsigned int rgb = name.mid(1).toUInt(&ok, 16);
         if (ok) {
-            return qRgb((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
+            int r = (rgb >> 16) & 0xFF;
+            int g = (rgb >> 8) & 0xFF;
+            int b = rgb & 0xFF;
+            return BGR(r, g, b);
         }
     }
     // Could add named color lookup here (red, blue, etc.)
     // For now, return black as default
-    return qRgb(0, 0, 0);
+    return BGR(0, 0, 0);
 }
 
 void WorldDocument::saveTriggersToXml(QXmlStreamWriter& xml)

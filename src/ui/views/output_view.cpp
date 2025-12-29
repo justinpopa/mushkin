@@ -1,5 +1,6 @@
 #include "output_view.h"
 #include "../../text/action.h"
+#include "../../world/color_utils.h"
 #include "../../world/miniwindow.h"
 #include "../automation/plugin.h"
 #include "../text/line.h"
@@ -297,13 +298,6 @@ void OutputView::wheelEvent(QWheelEvent* event)
     update();
 
     event->accept();
-}
-
-// Helper to convert BGR color value (Windows COLORREF) to QColor
-// All color values in MUSHclient Lua API use BGR format: 0x00BBGGRR
-static inline QColor bgrToQColor(quint32 bgr)
-{
-    return QColor(bgr & 0xFF, (bgr >> 8) & 0xFF, (bgr >> 16) & 0xFF);
 }
 
 /**
@@ -638,10 +632,8 @@ void OutputView::drawLine(QPainter& painter, int y, Line* line, int lineIndex)
         painter.setFont(font);
         QFontMetrics fm(font);
 
-        QColor preambleFore =
-            QColor(qRed(cPreambleText), qGreen(cPreambleText), qBlue(cPreambleText));
-        QColor preambleBack =
-            QColor(qRed(cPreambleBack), qGreen(cPreambleBack), qBlue(cPreambleBack));
+        QColor preambleFore = bgrToQColor(cPreambleText);
+        QColor preambleBack = bgrToQColor(cPreambleBack);
 
         int preambleWidth = fm.horizontalAdvance(strPreamble);
 
@@ -1118,22 +1110,103 @@ void OutputView::positionToLineChar(const QPoint& pos, int& line, int& charOffse
         return;
     }
 
-    // Use font metrics to find character at X position (account for text rectangle offset)
-    QFontMetrics fm(m_font);
+    // Adjust X for text rectangle offset
+    int adjustedX = pos.x() - textRect.left();
     int x = 0;
-    charOffset = 0;
-    int adjustedX = pos.x() - textRect.left(); // Account for text rectangle left offset
 
-    for (int i = 0; i < pLine->len(); i++) {
-        QChar ch = QChar::fromLatin1(pLine->text()[i]);
-        int charWidth = fm.horizontalAdvance(ch);
-        if (x + charWidth / 2 > adjustedX) {
-            // Clicked on this character
-            charOffset = i;
-            return;
+    // Account for preamble width (must match drawLine logic)
+    QString strPreamble;
+    if (pLine->flags & COMMENT) {
+        strPreamble = m_doc->m_strOutputLinePreambleNotes;
+    } else if (pLine->flags & USER_INPUT) {
+        strPreamble = m_doc->m_strOutputLinePreambleInput;
+    } else {
+        strPreamble = m_doc->m_strOutputLinePreambleOutput;
+    }
+
+    if (!strPreamble.isEmpty()) {
+        // Expand time codes (simplified - matches drawLine)
+        strPreamble.replace("%e", "0.000000");
+        strPreamble.replace("%D", "0.000000");
+        strPreamble = m_doc->FormatTime(pLine->m_theTime, strPreamble, false);
+
+        // Use widget as paint device for accurate DPI-aware metrics
+        QFontMetrics fm(m_font, const_cast<OutputView*>(this));
+        x += fm.horizontalAdvance(strPreamble);
+    }
+
+    // If click is in preamble area, return position 0
+    if (adjustedX < x) {
+        charOffset = 0;
+        return;
+    }
+
+    // Iterate through styles (must match drawLine rendering)
+    int textPos = 0; // Byte position in line text
+    charOffset = 0;
+
+    for (const auto& style : pLine->styleList) {
+        if (!style || style->iLength == 0)
+            continue;
+
+        if (textPos >= pLine->len())
+            break;
+
+        int styleLength = qMin((int)style->iLength, pLine->len() - textPos);
+
+        // Apply same font attributes as drawLine
+        QFont font = m_font;
+        font.setBold(style->iFlags & HILITE);
+        font.setUnderline(style->iFlags & UNDERLINE);
+        font.setItalic(style->iFlags & BLINK);
+        font.setStrikeOut(style->iFlags & STRIKEOUT);
+        // Use widget as paint device for accurate DPI-aware metrics
+        QFontMetrics fm(font, const_cast<OutputView*>(this));
+
+        // Convert style text to QString using UTF-8 (matches drawLine)
+        QString styleText = QString::fromUtf8(pLine->text() + textPos, styleLength);
+
+        // Calculate byte length for each character (for proper byte offset tracking)
+        int bytePos = textPos;
+
+        for (int charIdx = 0; charIdx < styleText.length(); charIdx++) {
+            // Handle surrogate pairs the same way as drawLine
+            QString charText;
+            int charByteLen;
+
+            if (styleText[charIdx].isHighSurrogate() && charIdx + 1 < styleText.length() &&
+                styleText[charIdx + 1].isLowSurrogate()) {
+                // Surrogate pair (4-byte UTF-8 character like emoji)
+                charText = styleText.mid(charIdx, 2);
+                charByteLen = 4;
+                charIdx++; // Skip the low surrogate (same as drawLine)
+            } else {
+                charText = styleText[charIdx];
+                QChar ch = styleText[charIdx];
+                if (ch.unicode() < 0x80) {
+                    charByteLen = 1;
+                } else if (ch.unicode() < 0x800) {
+                    charByteLen = 2;
+                } else {
+                    charByteLen = 3;
+                }
+            }
+
+            // Measure character width (use QString, same as drawLine)
+            int charWidth = fm.horizontalAdvance(charText);
+
+            // Check if click is on this character
+            if (x + charWidth / 2 > adjustedX) {
+                charOffset = bytePos;
+                return;
+            }
+
+            x += charWidth;
+            bytePos += charByteLen;
+            charOffset = bytePos;
         }
-        x += charWidth;
-        charOffset = i + 1; // After this char
+
+        textPos += styleLength;
     }
 
     // Clicked beyond end of line

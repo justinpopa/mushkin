@@ -3,6 +3,7 @@
  */
 
 #include "lua_common.h"
+#include "../color_utils.h"
 
 /**
  * world.Note(text, ...)
@@ -35,8 +36,8 @@ int L_ColourNote(lua_State* L)
                 L, "ColourNote requires arguments in groups of 3 (foreColor, backColor, text)");
         }
 
-        QRgb foreColor = getColor(L, i, qRgb(255, 255, 255));
-        QRgb backColor = getColor(L, i + 1, qRgb(0, 0, 0));
+        QRgb foreColor = getColor(L, i, BGR(255, 255, 255));
+        QRgb backColor = getColor(L, i + 1, BGR(0, 0, 0));
         const char* text = luaL_checkstring(L, i + 2);
         QString qtext = QString::fromUtf8(text);
 
@@ -64,8 +65,8 @@ int L_Tell(lua_State* L)
     QString text = concatArgs(L);
 
     // Use default note colors
-    QRgb foreColor = pDoc->m_bNotesInRGB ? pDoc->m_iNoteColourFore : qRgb(255, 255, 255);
-    QRgb backColor = pDoc->m_bNotesInRGB ? pDoc->m_iNoteColourBack : qRgb(0, 0, 0);
+    QRgb foreColor = pDoc->m_bNotesInRGB ? pDoc->m_iNoteColourFore : BGR(255, 255, 255);
+    QRgb backColor = pDoc->m_bNotesInRGB ? pDoc->m_iNoteColourBack : BGR(0, 0, 0);
 
     pDoc->colourTell(foreColor, backColor, text);
     return 0;
@@ -110,33 +111,33 @@ int L_AnsiNote(lua_State* L)
     const char* text = luaL_checkstring(L, 1);
     QString qtext = QString::fromUtf8(text);
 
-    // Standard ANSI color palette (first 8 colors)
+    // Standard ANSI color palette (first 8 colors) - BGR format for colourTell()
     static const QRgb ansiColors[8] = {
-        qRgb(0, 0, 0),      // Black
-        qRgb(128, 0, 0),    // Red
-        qRgb(0, 128, 0),    // Green
-        qRgb(128, 128, 0),  // Yellow
-        qRgb(0, 0, 128),    // Blue
-        qRgb(128, 0, 128),  // Magenta
-        qRgb(0, 128, 128),  // Cyan
-        qRgb(192, 192, 192) // White
+        BGR(0, 0, 0),      // Black
+        BGR(128, 0, 0),    // Red
+        BGR(0, 128, 0),    // Green
+        BGR(128, 128, 0),  // Yellow
+        BGR(0, 0, 128),    // Blue
+        BGR(128, 0, 128),  // Magenta
+        BGR(0, 128, 128),  // Cyan
+        BGR(192, 192, 192) // White
     };
 
-    // Bright ANSI colors (high intensity)
+    // Bright ANSI colors (high intensity) - BGR format for colourTell()
     static const QRgb ansiBrightColors[8] = {
-        qRgb(128, 128, 128), // Bright Black (Gray)
-        qRgb(255, 0, 0),     // Bright Red
-        qRgb(0, 255, 0),     // Bright Green
-        qRgb(255, 255, 0),   // Bright Yellow
-        qRgb(0, 0, 255),     // Bright Blue
-        qRgb(255, 0, 255),   // Bright Magenta
-        qRgb(0, 255, 255),   // Bright Cyan
-        qRgb(255, 255, 255)  // Bright White
+        BGR(128, 128, 128), // Bright Black (Gray)
+        BGR(255, 0, 0),     // Bright Red
+        BGR(0, 255, 0),     // Bright Green
+        BGR(255, 255, 0),   // Bright Yellow
+        BGR(0, 0, 255),     // Bright Blue
+        BGR(255, 0, 255),   // Bright Magenta
+        BGR(0, 255, 255),   // Bright Cyan
+        BGR(255, 255, 255)  // Bright White
     };
 
-    // Default colors
-    QRgb foreColor = qRgb(192, 192, 192); // Light gray
-    QRgb backColor = qRgb(0, 0, 0);       // Black
+    // Default colors - BGR format for colourTell()
+    QRgb foreColor = BGR(192, 192, 192); // Light gray
+    QRgb backColor = BGR(0, 0, 0);       // Black
     bool bold = false;
 
     int pos = 0;
@@ -191,8 +192,8 @@ int L_AnsiNote(lua_State* L)
 
             if (code == 0) {
                 // Reset all
-                foreColor = qRgb(192, 192, 192);
-                backColor = qRgb(0, 0, 0);
+                foreColor = BGR(192, 192, 192);
+                backColor = BGR(0, 0, 0);
                 bold = false;
             } else if (code == 1) {
                 bold = true;
@@ -257,7 +258,7 @@ int L_Hyperlink(lua_State* L)
     }
 
     // backcolour is optional, defaults to note background
-    QRgb backColor = pDoc->m_bNotesInRGB ? pDoc->m_iNoteColourBack : qRgb(0, 0, 0);
+    QRgb backColor = pDoc->m_bNotesInRGB ? pDoc->m_iNoteColourBack : BGR(0, 0, 0);
     if (!lua_isnoneornil(L, 5)) {
         backColor = getColor(L, 5, backColor);
     }
@@ -304,8 +305,8 @@ int L_ColourTell(lua_State* L)
                 L, "ColourTell requires arguments in groups of 3 (foreColor, backColor, text)");
         }
 
-        QRgb foreColor = getColor(L, i, qRgb(255, 255, 255));
-        QRgb backColor = getColor(L, i + 1, qRgb(0, 0, 0));
+        QRgb foreColor = getColor(L, i, BGR(255, 255, 255));
+        QRgb backColor = getColor(L, i + 1, BGR(0, 0, 0));
         const char* text = luaL_checkstring(L, i + 2);
         QString qtext = QString::fromUtf8(text);
 
@@ -884,9 +885,9 @@ int L_InfoClear(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
     pDoc->m_infoBarText.clear();
-    // Reset to defaults
-    pDoc->m_infoBarTextColor = qRgb(0, 0, 0);       // Black
-    pDoc->m_infoBarBackColor = qRgb(255, 255, 255); // White
+    // Reset to defaults - BGR format for consistency with ColourNameToRGB
+    pDoc->m_infoBarTextColor = BGR(0, 0, 0);       // Black
+    pDoc->m_infoBarBackColor = BGR(255, 255, 255); // White
     pDoc->m_infoBarFontName = "Courier New";
     pDoc->m_infoBarFontSize = 10;
     pDoc->m_infoBarFontStyle = 0;
