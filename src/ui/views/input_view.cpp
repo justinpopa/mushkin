@@ -1,5 +1,6 @@
 #include "input_view.h"
 #include "../../automation/plugin.h"
+#include "../../utils/font_utils.h"
 #include "../../world/color_utils.h"
 #include "../../world/lua_api/lua_registration.h"
 #include "../../world/script_engine.h"
@@ -342,8 +343,8 @@ void InputView::applyInputSettings()
         return;
     }
 
-    // Apply font settings
-    QFont inputFont(m_doc->m_input_font_name, m_doc->m_input_font_height);
+    // Apply font settings (uses createMUSHclientFont for Windows-compatible sizing on macOS)
+    QFont inputFont = createMUSHclientFont(m_doc->m_input_font_name, m_doc->m_input_font_height);
     inputFont.setItalic(m_doc->m_input_font_italic);
     inputFont.setWeight(static_cast<QFont::Weight>(m_doc->m_input_font_weight));
     setFont(inputFont);

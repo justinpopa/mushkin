@@ -1,5 +1,6 @@
 #include "output_view.h"
 #include "../../text/action.h"
+#include "../../utils/font_utils.h"
 #include "../../world/color_utils.h"
 #include "../../world/miniwindow.h"
 #include "../automation/plugin.h"
@@ -50,12 +51,13 @@ OutputView::OutputView(WorldDocument* doc, QWidget* parent)
 {
     // Set up fixed-width font for MUD display
     // Read font from WorldDocument if available, otherwise use default
+    // Uses createMUSHclientFont() for Windows-compatible sizing on macOS
     if (m_doc && !m_doc->m_font_name.isEmpty()) {
-        m_font = QFont(m_doc->m_font_name, m_doc->m_font_height);
+        m_font = createMUSHclientFont(m_doc->m_font_name, m_doc->m_font_height);
         qCDebug(lcUI) << "OutputView: Using font from WorldDocument:" << m_doc->m_font_name
                       << m_doc->m_font_height;
     } else {
-        m_font = QFont("Courier New", 10);
+        m_font = createMUSHclientFont("Courier New", 10);
         qCDebug(lcUI) << "OutputView: Using default font (Courier New, 10)";
     }
     m_font.setFixedPitch(true);

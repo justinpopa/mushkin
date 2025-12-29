@@ -1,5 +1,6 @@
 #include "world_widget.h"
 #include "../../automation/plugin.h"         // For plugin callback constants
+#include "../../utils/font_utils.h"          // For Windows-compatible font sizing
 #include "../../world/accelerator_manager.h" // For keyboard shortcuts
 #include "../../world/miniwindow.h"          // For miniwindow signal connection
 #include "../world/world_document.h"
@@ -182,7 +183,7 @@ void WorldWidget::setupUi()
 
     // Connect output settings signal
     connect(m_document, &WorldDocument::outputSettingsChanged, this, [this]() {
-        QFont font(m_document->m_font_name, m_document->m_font_height);
+        QFont font = createMUSHclientFont(m_document->m_font_name, m_document->m_font_height);
         m_outputView->setOutputFont(font);
     });
 
@@ -381,7 +382,7 @@ bool WorldWidget::loadFromFile(const QString& filename)
     // Apply loaded settings to views (fonts, colors, etc.)
     // This triggers the output and input views to refresh with the new settings from the XML
     if (m_outputView && m_document) {
-        QFont font(m_document->m_font_name, m_document->m_font_height);
+        QFont font = createMUSHclientFont(m_document->m_font_name, m_document->m_font_height);
         m_outputView->setOutputFont(font);
     }
     if (m_inputView && m_document) {
