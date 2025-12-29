@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+env:
+  QT_VERSION: "6.9.3"
+
+jobs:
+  build:
+    name: Build ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: Linux
+            runner: ubuntu-latest
+          - os: macOS
+            runner: macos-latest
+          - os: Windows
+            runner: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # ===== Linux =====
+      - name: Install dependencies (Linux)
+        if: matrix.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake ninja-build \
+            libgl1-mesa-dev libxkbcommon-dev \
+            libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 \
+            libluajit-5.1-dev libpcre3-dev libsqlite3-dev \
+            libssl-dev zlib1g-dev \
+            libpulse-dev libasound2-dev libpipewire-0.3-dev
+          pip3 install aqtinstall
+
+      - name: Install Qt (Linux)
+        if: matrix.os == 'Linux'
+        run: |
+          aqt install-qt linux desktop ${{ env.QT_VERSION }} linux_gcc_64 -m qtmultimedia --outputdir $HOME/Qt
+          echo "Qt6_DIR=$HOME/Qt/${{ env.QT_VERSION }}/gcc_64/lib/cmake/Qt6" >> $GITHUB_ENV
+          echo "$HOME/Qt/${{ env.QT_VERSION }}/gcc_64/bin" >> $GITHUB_PATH
+
+      # ===== macOS =====
+      - name: Install dependencies (macOS)
+        if: matrix.os == 'macOS'
+        run: |
+          brew install cmake ninja pcre luajit sqlite openssl
+          pip3 install aqtinstall --break-system-packages
+
+      - name: Install Qt (macOS)
+        if: matrix.os == 'macOS'
+        run: |
+          python3 -m aqt install-qt mac desktop ${{ env.QT_VERSION }} -m qtmultimedia --outputdir $HOME/Qt
+          echo "Qt6_DIR=$HOME/Qt/${{ env.QT_VERSION }}/macos/lib/cmake/Qt6" >> $GITHUB_ENV
+          echo "$HOME/Qt/${{ env.QT_VERSION }}/macos/bin" >> $GITHUB_PATH
+
+      # ===== Windows =====
+      - name: Install dependencies (Windows)
+        if: matrix.os == 'Windows'
+        run: |
+          choco install ninja -y
+          pip install aqtinstall
+          vcpkg install pcre:x64-windows luajit:x64-windows sqlite3:x64-windows openssl:x64-windows zlib:x64-windows
+
+      - name: Setup MSVC (Windows)
+        if: matrix.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install Qt (Windows)
+        if: matrix.os == 'Windows'
+        run: |
+          python -m aqt install-qt windows desktop ${{ env.QT_VERSION }} win64_msvc2022_64 -m qtmultimedia --outputdir C:/Qt
+          echo "Qt6_DIR=C:/Qt/${{ env.QT_VERSION }}/msvc2022_64/lib/cmake/Qt6" >> $env:GITHUB_ENV
+          echo "C:/Qt/${{ env.QT_VERSION }}/msvc2022_64/bin" >> $env:GITHUB_PATH
+
+      # ===== Build =====
+      - name: Configure (Unix)
+        if: matrix.os != 'Windows'
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Configure (Windows)
+        if: matrix.os == 'Windows'
+        run: |
+          cmake -B build -G Ninja `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake `
+            -DVCPKG_TARGET_TRIPLET=x64-windows
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+        env:
+          QT_QPA_PLATFORM: ${{ matrix.os == 'Linux' && 'offscreen' || '' }}
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure --build-config Release
+        env:
+          QT_QPA_PLATFORM: ${{ matrix.os == 'Linux' && 'offscreen' || '' }}

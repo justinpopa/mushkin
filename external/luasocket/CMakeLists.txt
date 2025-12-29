@@ -51,6 +51,7 @@ set_target_properties(socket_core PROPERTIES
     PREFIX ""
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/socket"
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/socket"
+    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/socket"
 )
 
 # macOS: Use .so extension for Lua compatibility (not .dylib)
@@ -78,6 +79,7 @@ set_target_properties(mime_core PROPERTIES
     PREFIX ""
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/mime"
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/mime"
+    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/mime"
 )
 
 if(APPLE)

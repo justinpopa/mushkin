@@ -31,15 +31,15 @@ extern "C" {
  *
  * Plugin Evaluation Order
  * Helper function that evaluates a single alias array (world or plugin).
- * Returns true if evaluation should stop (!bKeepEvaluating).
  *
  * @param aliasArray Array of aliases to evaluate
  * @param command The user's command
  * @param doc The world document
+ * @param anyMatched Output: set to true if any alias matched
  * @return true if evaluation should stop (alias matched and !bKeepEvaluating)
  */
 static bool evaluateOneAliasSequence(const QVector<Alias*>& aliasArray, const QString& command,
-                                     WorldDocument* doc)
+                                     WorldDocument* doc, bool& anyMatched)
 {
     // Check each alias in sequence order
     for (Alias* alias : aliasArray) {
@@ -54,6 +54,9 @@ static bool evaluateOneAliasSequence(const QVector<Alias*>& aliasArray, const QS
         if (matched) {
             qDebug() << "Alias MATCHED:" << alias->strLabel << "pattern:" << alias->name
                      << "script:" << alias->strProcedure;
+
+            // Track that at least one alias matched
+            anyMatched = true;
 
             // Execute the alias
             doc->executeAlias(alias, command);
@@ -107,6 +110,7 @@ bool WorldDocument::evaluateAliases(const QString& command)
     m_CurrentPlugin = nullptr;
 
     bool stopEvaluation = false;
+    bool anyMatched = false; // Track if ANY alias matched (regardless of bKeepEvaluating)
 
     // ========== Phase 1: Evaluate plugins with NEGATIVE sequence ==========
     // These plugins get to see the command BEFORE the world aliases
@@ -129,22 +133,22 @@ bool WorldDocument::evaluateAliases(const QString& command)
         m_CurrentPlugin = plugin.get();
 
         // Evaluate this plugin's aliases
-        stopEvaluation = evaluateOneAliasSequence(plugin->m_AliasArray, command, this);
+        stopEvaluation = evaluateOneAliasSequence(plugin->m_AliasArray, command, this, anyMatched);
 
         if (stopEvaluation) {
             m_CurrentPlugin = savedPlugin;
-            return true; // Alias handled it
+            return true; // Alias handled it and wants to stop
         }
     }
 
     // ========== Phase 2: Evaluate WORLD aliases ==========
     m_CurrentPlugin = nullptr;
 
-    stopEvaluation = evaluateOneAliasSequence(m_AliasArray, command, this);
+    stopEvaluation = evaluateOneAliasSequence(m_AliasArray, command, this, anyMatched);
 
     if (stopEvaluation) {
         m_CurrentPlugin = savedPlugin;
-        return true; // Alias handled it
+        return true; // Alias handled it and wants to stop
     }
 
     // ========== Phase 3: Evaluate plugins with ZERO/POSITIVE sequence ==========
@@ -168,16 +172,22 @@ bool WorldDocument::evaluateAliases(const QString& command)
         m_CurrentPlugin = plugin.get();
 
         // Evaluate this plugin's aliases
-        stopEvaluation = evaluateOneAliasSequence(plugin->m_AliasArray, command, this);
+        stopEvaluation = evaluateOneAliasSequence(plugin->m_AliasArray, command, this, anyMatched);
 
         if (stopEvaluation) {
             m_CurrentPlugin = savedPlugin;
-            return true; // Alias handled it
+            return true; // Alias handled it and wants to stop
         }
     }
 
     // Restore plugin context
     m_CurrentPlugin = savedPlugin;
+
+    // Return true if any alias matched, even if they all had bKeepEvaluating=true
+    if (anyMatched) {
+        qDebug() << "evaluateAliases: Alias(es) matched and handled command:" << command;
+        return true;
+    }
 
     qDebug() << "evaluateAliases: No alias matched, sending to MUD:" << command;
     return false; // No alias handled it, send to MUD

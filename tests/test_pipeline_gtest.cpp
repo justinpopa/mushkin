@@ -226,9 +226,11 @@ TEST_F(PipelineTest, ANSI256ColorForeground)
     // Verify the style has COLOUR_RGB flag set
     EXPECT_EQ((style->iFlags & COLOURTYPE), COLOUR_RGB) << "256-color should use COLOUR_RGB mode";
 
-    // Verify foreground color is from xterm palette (color 196 = 0xFF0000)
-    EXPECT_EQ(style->iForeColour, qRgb(0xFF, 0x00, 0x00))
-        << "xterm color 196 should be bright red (0xFF0000)";
+    // Verify foreground color is from xterm palette (color 196 = bright red)
+    // Colors are stored in BGR format (Windows COLORREF: 0x00BBGGRR) for MUSHclient compatibility
+    // Red in BGR: 0x000000FF
+    EXPECT_EQ(style->iForeColour, (QRgb)0x000000FF)
+        << "xterm color 196 should be bright red in BGR format (0x000000FF)";
 }
 
 // Test 9: 256-color ANSI sequences (background)
@@ -256,9 +258,11 @@ TEST_F(PipelineTest, ANSI256ColorBackground)
 
     EXPECT_EQ((style->iFlags & COLOURTYPE), COLOUR_RGB) << "256-color should use COLOUR_RGB mode";
 
-    // xterm color 21 = 0x0000FF (pure blue)
-    EXPECT_EQ(style->iBackColour, qRgb(0x00, 0x00, 0xFF))
-        << "xterm color 21 should be blue (0x0000FF)";
+    // xterm color 21 = pure blue
+    // Colors are stored in BGR format (Windows COLORREF: 0x00BBGGRR) for MUSHclient compatibility
+    // Blue in BGR: 0x00FF0000
+    EXPECT_EQ(style->iBackColour, (QRgb)0x00FF0000)
+        << "xterm color 21 should be blue in BGR format (0x00FF0000)";
 }
 
 // Test 10: TrueColor/24-bit RGB ANSI sequences (foreground)

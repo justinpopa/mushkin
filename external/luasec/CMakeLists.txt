@@ -14,6 +14,13 @@ endif()
 
 # ssl.so - main SSL library
 # Includes LuaSocket support files from src/luasocket/
+# Platform-specific socket implementation
+if(WIN32)
+    set(SOCKET_IMPL src/luasocket/wsocket.c)
+else()
+    set(SOCKET_IMPL src/luasocket/usocket.c)
+endif()
+
 add_library(ssl_core MODULE
     src/ssl.c
     src/context.c
@@ -25,7 +32,7 @@ add_library(ssl_core MODULE
     src/luasocket/buffer.c
     src/luasocket/io.c
     src/luasocket/timeout.c
-    src/luasocket/usocket.c
+    ${SOCKET_IMPL}
 )
 
 target_include_directories(ssl_core PRIVATE
@@ -40,6 +47,11 @@ target_link_libraries(ssl_core PRIVATE
     OpenSSL::SSL
     OpenSSL::Crypto
 )
+
+# Windows: Link WinSock2 for socket functions
+if(WIN32)
+    target_link_libraries(ssl_core PRIVATE ws2_32)
+endif()
 
 # Set output name to "ssl" in lib directory
 set_target_properties(ssl_core PROPERTIES

@@ -1,6 +1,6 @@
 # Mushkin
 
-A modern MUD client built with Qt. Mushkin is a cross-platform rewrite of [MUSHclient](http://www.gammon.com.au/mushclient/) designed to run natively on macOS and Linux (Windows support in place, but build instructions not ready at this time).
+A modern MUD client built with Qt. Mushkin is a cross-platform rewrite of [MUSHclient](http://www.gammon.com.au/mushclient/) designed to run natively on macOS, Linux, and Windows.
 
 ## Features
 
@@ -23,73 +23,135 @@ A modern MUD client built with Qt. Mushkin is a cross-platform rewrite of [MUSHc
 
 ### macOS
 
-**Dependencies:**
+#### Development Build
+
+For contributors and active development. This build links dynamically against Qt - meant for fast iteration and debugging, not distribution.
 
 ```bash
-# Xcode Command Line Tools
+# Prerequisites
 xcode-select --install
-
-# Build tools and libraries
 brew install cmake ninja pcre luajit sqlite openssl
+pip3 install aqtinstall
 
-# Qt 6.9+ (installs to current directory)
-pip install aqtinstall
-aqt install-qt mac desktop 6.9.3 clang_64 -m qtmultimedia qtshadertools
+# Clone and build
+git clone https://github.com/justinpopa/mushkin.git
+cd mushkin
+./scripts/build-macos.sh
+
+open build/mushkin.app
 ```
 
-**Build:**
+#### Static Build (Release Binary)
+
+**This is the recommended build for end users.** Creates a native binary (arm64 on Apple Silicon, x86_64 on Intel) with Qt statically linked. Other dependencies are dynamically linked from Homebrew.
 
 ```bash
-git clone https://github.com/justinpopa/mushkin-public.git
-cd mushkin-public
-mkdir build && cd build
+# Prerequisites
+xcode-select --install
+brew install cmake ninja pcre luajit sqlite openssl
+pip3 install aqtinstall
 
-# Optional: Create your own CMake presets file for convenience
-cp ../CMakeUserPresets.json.example ../CMakeUserPresets.json
-# Edit CMakeUserPresets.json to set your Qt path, then use:
-cmake --preset default
+# Build (first run ~60 min for Qt, subsequent runs ~2 min)
+git clone https://github.com/justinpopa/mushkin.git
+cd mushkin
+./scripts/build-macos-static.sh
 
-# Or configure directly (adjust Qt path to your aqt install location)
-cmake -DCMAKE_PREFIX_PATH=~/6.9.3/macos -G Ninja ..
-
-ninja
-open mushkin.app
+# Output: build-static/mushkin
 ```
+
+The binary requires the Homebrew dependencies to be installed, but Qt is embedded so users don't need to install Qt separately.
 
 ### Linux (Debian/Ubuntu)
 
-**Dependencies:**
+#### Development Build
+
+For contributors and active development. Links dynamically against Qt.
 
 ```bash
-# Build tools and libraries
+# Prerequisites
 sudo apt install cmake ninja-build build-essential pkg-config \
     libpcre3-dev libsqlite3-dev luajit libluajit-5.1-dev \
-    libssl-dev zlib1g-dev libgl1-mesa-dev
+    libssl-dev zlib1g-dev libgl1-mesa-dev libxkbcommon-dev \
+    libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0
+pip3 install aqtinstall
 
-# Qt 6.9+ (installs to current directory)
-pip install aqtinstall
-aqt install-qt linux desktop 6.9.3 linux_gcc_64 -m qtmultimedia qtshadertools
+# Clone and build
+git clone https://github.com/justinpopa/mushkin.git
+cd mushkin
+./scripts/build-linux.sh
+
+./build/mushkin
 ```
 
-**Build:**
+#### Static Build (Release Binary)
+
+**This is the recommended build for end users.** Creates a binary with Qt statically linked. Other dependencies are dynamically linked from system packages.
 
 ```bash
-git clone https://github.com/justinpopa/mushkin-public.git
-cd mushkin-public
-mkdir build && cd build
+# Prerequisites
+sudo apt install cmake ninja-build build-essential pkg-config \
+    libpcre3-dev libsqlite3-dev luajit libluajit-5.1-dev \
+    libssl-dev zlib1g-dev libgl1-mesa-dev libglu1-mesa-dev \
+    libxkbcommon-dev libxcb1-dev libxcb-cursor-dev libxcb-icccm4-dev \
+    libxcb-keysyms1-dev libxcb-shape0-dev libxcb-xfixes0-dev \
+    libxcb-sync-dev libxcb-randr0-dev libxcb-render-util0-dev \
+    libxcb-image0-dev libxcb-glx0-dev libxcb-shm0-dev \
+    libfontconfig1-dev libfreetype6-dev libx11-dev libx11-xcb-dev \
+    libxext-dev libxfixes-dev libxi-dev libxrender-dev \
+    libatspi2.0-dev libglib2.0-dev
+pip3 install aqtinstall
 
-# Configure (adjust Qt path to your aqt install location)
-cmake -DCMAKE_PREFIX_PATH=~/6.9.3/gcc_64 -G Ninja ..
+# Build (first run ~60 min for Qt, subsequent runs ~2 min)
+git clone https://github.com/justinpopa/mushkin.git
+cd mushkin
+./scripts/build-linux-static.sh
 
-ninja
-./mushkin
+# Output: build-static/mushkin
 ```
 
-**Headless/CI builds:** If building on a server without a display, set the Qt platform to offscreen:
+The binary requires the apt packages to be installed, but Qt is embedded so users don't need to install Qt separately.
 
-```bash
-QT_QPA_PLATFORM=offscreen ninja
+### Windows
+
+#### Prerequisites
+
+1. **Visual Studio 2022** with C++ workload
+2. **Git for Windows**
+3. **Python 3.x** and aqtinstall: `pip install aqtinstall`
+4. **vcpkg** for dependencies:
+
+```powershell
+# Install vcpkg (one-time setup)
+git clone https://github.com/microsoft/vcpkg.git C:\vcpkg
+C:\vcpkg\bootstrap-vcpkg.bat
+[Environment]::SetEnvironmentVariable("VCPKG_ROOT", "C:\vcpkg", "User")
+
+# Install dependencies
+C:\vcpkg\vcpkg install pcre:x64-windows luajit:x64-windows sqlite3:x64-windows openssl:x64-windows zlib:x64-windows
 ```
+
+5. **Enable Long Paths** (required for Qt build):
+
+```powershell
+# Run as Administrator
+Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' -Name 'LongPathsEnabled' -Value 1 -Type DWord
+```
+
+Qt's source tree has deeply nested paths that exceed Windows' default 260 character limit. This registry change enables long path support system-wide.
+
+#### Static Build (Release Binary)
+
+Run from **Developer PowerShell for VS 2022**:
+
+```powershell
+git clone https://github.com/justinpopa/mushkin.git
+cd mushkin
+.\scripts\build-windows-static.ps1
+
+# Output: build-static\mushkin.exe
+```
+
+First run takes ~60 minutes to build Qt. Subsequent builds take ~5 minutes.
 
 ## Configuration
 
@@ -99,8 +161,9 @@ Mushkin uses MUSHclient-compatible paths for easy migration:
 - `~/Documents/MUSHclient/` (worlds, plugins, logs subdirectories)
 
 **Settings:**
-- macOS: `~/Library/Preferences/com.mushkin.Mushkin.plist`
-- Linux: `~/.config/Mushkin/Mushkin.conf`
+- macOS: `~/Library/Preferences/com.Gammon.MUSHclient.plist`
+- Linux: `~/.config/Gammon/MUSHclient.conf`
+- Windows: Registry `HKEY_CURRENT_USER\Software\Gammon\MUSHclient`
 
 ## Plugin Compatibility
 
