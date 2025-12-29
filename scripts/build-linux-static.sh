@@ -114,18 +114,12 @@ build_static_qt() {
     mkdir -p "$QT_BUILD_DIR"
     cd "$QT_BUILD_DIR"
 
+    # Only build what we need - Qt will include dependencies automatically
     "$QT_SRC_DIR/configure" \
         -static \
         -release \
         -prefix "$QT_STATIC_DIR" \
-        -skip qtdeclarative -skip qtgraphs -skip qtwebengine -skip qtwebview -skip qt3d -skip qtcharts \
-        -skip qtdatavis3d -skip qtlottie -skip qtquick3d -skip qtquick3dphysics \
-        -skip qtvirtualkeyboard -skip qtwayland -skip qtwebchannel -skip qtwebsockets \
-        -skip qtpositioning -skip qtsensors -skip qtserialport -skip qtserialbus \
-        -skip qtremoteobjects -skip qthttpserver -skip qtquicktimeline \
-        -skip qtquickeffectmaker -skip qtlocation -skip qtcoap -skip qtmqtt \
-        -skip qtopcua -skip qtgrpc -skip qtlanguageserver -skip qtspeech \
-        -skip qtconnectivity -skip qtactiveqt -skip qtscxml -skip qttools \
+        -submodules qtbase,qtmultimedia,qtsvg \
         -nomake examples -nomake tests
 
     # Build & install

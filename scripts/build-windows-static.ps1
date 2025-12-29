@@ -119,19 +119,12 @@ function Build-StaticQt {
     $configureCmd = Join-Path $QtSrcDir "configure.bat"
     $vcpkgInstalled = Join-Path $env:VCPKG_ROOT "installed\x64-windows"
 
+    # Only build what we need - Qt will include dependencies automatically
     & $configureCmd `
         -static `
         -release `
         -prefix $QtStaticDir `
-        -system-sqlite `
-        -skip qtdeclarative -skip qtgraphs -skip qtwebengine -skip qtwebview -skip qt3d -skip qtcharts `
-        -skip qtdatavis3d -skip qtlottie -skip qtquick3d -skip qtquick3dphysics `
-        -skip qtvirtualkeyboard -skip qtwayland -skip qtwebchannel -skip qtwebsockets `
-        -skip qtpositioning -skip qtsensors -skip qtserialport -skip qtserialbus `
-        -skip qtremoteobjects -skip qthttpserver -skip qtquicktimeline `
-        -skip qtquickeffectmaker -skip qtlocation -skip qtcoap -skip qtmqtt `
-        -skip qtopcua -skip qtgrpc -skip qtlanguageserver -skip qtspeech `
-        -skip qtconnectivity -skip qtactiveqt -skip qtscxml -skip qttools `
+        -submodules qtbase,qtmultimedia,qtsvg `
         -nomake examples -nomake tests `
         -- -DSQLite3_ROOT="$vcpkgInstalled" -DCMAKE_OBJECT_PATH_MAX=350
 
