@@ -659,6 +659,27 @@ return re
     //    luaopen_rex(L);    // PCRE regex
     //    etc.
 
+    // Load YueScript module for YueScript transpilation support
+    // The yue.so module is in the lib/ directory (or lib/yue.so)
+    // We use require() which will find it via package.cpath
+    lua_getglobal(L, "require");
+    lua_pushstring(L, "yue");
+    if (lua_pcall(L, 1, 1, 0) == 0) {
+        // Store as global and in package.loaded
+        lua_pushvalue(L, -1);     // duplicate yue table
+        lua_setglobal(L, "yue");  // global "yue" = yue table
+        lua_getglobal(L, "package");
+        lua_getfield(L, -1, "loaded");
+        lua_pushvalue(L, -3);         // push yue table again
+        lua_setfield(L, -2, "yue");   // package.loaded["yue"] = yue
+        lua_pop(L, 3);                // pop loaded, package, and yue
+        qDebug() << "YueScript module loaded successfully";
+    } else {
+        // YueScript module not available - this is OK, just means no YueScript support
+        qDebug() << "YueScript module not available (optional):" << lua_tostring(L, -1);
+        lua_pop(L, 1); // pop error message
+    }
+
     // 6b. Install path normalization wrappers for Windows plugin compatibility
     // Windows plugins use backslashes in paths, but POSIX systems need forward slashes
     // We wrap io.open, dofile, and loadfile to transparently convert separators
@@ -1046,4 +1067,119 @@ bool ScriptEngine::parseLua(const QString& code, const QString& name)
     }
 
     return false; // Success
+}
+
+// ========== YueScript Transpilation ==========
+
+/**
+ * transpileYueScript - Convert YueScript to Lua
+ *
+ * Uses the yue.to_lua() function from the YueScript module.
+ *
+ * @param yueCode YueScript source code
+ * @param name Name for error messages
+ * @return Transpiled Lua code, or empty string on error
+ */
+QString ScriptEngine::transpileYueScript(const QString& yueCode, const QString& name)
+{
+    if (!L) {
+        qWarning() << "transpileYueScript: No Lua state";
+        return QString();
+    }
+
+    // Get yue module (should already be loaded in openLua)
+    lua_getglobal(L, "yue");
+    if (!lua_istable(L, -1)) {
+        lua_pop(L, 1);
+        qWarning() << "transpileYueScript: YueScript module not loaded";
+
+        // Display error to user
+        if (m_doc) {
+            m_doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0),
+                              QString("=== YueScript Error: %1 ===").arg(name));
+            m_doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0),
+                              "YueScript module (yue.so) is not loaded. Cannot transpile.");
+        }
+        return QString();
+    }
+
+    // Get yue.to_lua function
+    lua_getfield(L, -1, "to_lua");
+    if (!lua_isfunction(L, -1)) {
+        lua_pop(L, 2); // pop nil and yue table
+        qWarning() << "transpileYueScript: yue.to_lua function not found";
+        return QString();
+    }
+
+    // Push source code
+    QByteArray yueBytes = yueCode.toUtf8();
+    lua_pushlstring(L, yueBytes.constData(), yueBytes.length());
+
+    // Push options table
+    lua_newtable(L);
+    lua_pushboolean(L, true);
+    lua_setfield(L, -2, "implicitReturnRoot");
+    lua_pushboolean(L, true);
+    lua_setfield(L, -2, "reserveLineNumber");
+    lua_pushboolean(L, false);
+    lua_setfield(L, -2, "lint_global");
+
+    // Call yue.to_lua(source, options) - returns lua_code, error_or_nil
+    if (lua_pcall(L, 2, 2, 0) != 0) {
+        QString errorMsg = QString::fromUtf8(lua_tostring(L, -1));
+        lua_pop(L, 2); // pop error and yue table
+        qWarning() << "transpileYueScript: pcall failed:" << errorMsg;
+
+        if (m_doc) {
+            m_doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0),
+                              QString("=== YueScript Error: %1 ===").arg(name));
+            m_doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0), errorMsg);
+        }
+        return QString();
+    }
+
+    QString luaCode;
+
+    // Check result - first return value is lua code (string) or nil on error
+    if (lua_isstring(L, -2)) {
+        luaCode = QString::fromUtf8(lua_tostring(L, -2));
+    } else if (lua_isnil(L, -2) && lua_isstring(L, -1)) {
+        // Error case: nil, error_message
+        QString errorMsg = QString::fromUtf8(lua_tostring(L, -1));
+        qWarning() << "YueScript compile error in" << name << ":" << errorMsg;
+
+        if (m_doc) {
+            m_doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0),
+                              QString("=== YueScript Compile Error: %1 ===").arg(name));
+            m_doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0), errorMsg);
+        }
+    }
+
+    lua_pop(L, 3); // pop result, error/nil, yue table
+    return luaCode;
+}
+
+/**
+ * parseScript - Parse and execute script in specified language
+ *
+ * For YueScript, transpiles to Lua first then executes.
+ * For Lua, calls parseLua() directly.
+ *
+ * @param code Script code to execute
+ * @param name Name for error messages
+ * @param lang Script language
+ * @return true on error, false on success
+ */
+bool ScriptEngine::parseScript(const QString& code, const QString& name, ScriptLanguage lang)
+{
+    if (lang == ScriptLanguage::YueScript) {
+        QString luaCode = transpileYueScript(code, name);
+        if (luaCode.isEmpty()) {
+            return true; // Error during transpilation
+        }
+        return parseLua(luaCode, name + " (transpiled)");
+    }
+
+    // Default: Lua
+    return parseLua(code, name);
 }

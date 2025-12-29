@@ -237,7 +237,7 @@ void WorldDocument::executeAlias(Alias* alias, const QString& command)
             .arg(alias->strLabel.isEmpty() ? alias->strInternalName : alias->strLabel);
 
     sendTo(alias->iSendTo, contents, alias->bOmitFromOutput, alias->bOmitFromLog, aliasDescription,
-           alias->strVariable, strExtraOutput);
+           alias->strVariable, strExtraOutput, alias->scriptLanguage);
 
     // Display any output that was accumulated
     if (!strExtraOutput.isEmpty()) {

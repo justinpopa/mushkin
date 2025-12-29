@@ -1,6 +1,7 @@
 #ifndef SCRIPT_ENGINE_H
 #define SCRIPT_ENGINE_H
 
+#include "../automation/script_language.h"
 #include <QObject>
 #include <QString>
 
@@ -101,6 +102,31 @@ class ScriptEngine : public QObject {
      * @return true on error, false on success
      */
     bool parseLua(const QString& code, const QString& name);
+
+    /**
+     * Parse and execute script code in the specified language
+     *
+     * For YueScript, transpiles to Lua first then executes.
+     * For Lua, calls parseLua() directly.
+     *
+     * @param code Script code to execute
+     * @param name Name for error messages
+     * @param lang Script language (Lua or YueScript)
+     * @return true on error, false on success
+     */
+    bool parseScript(const QString& code, const QString& name, ScriptLanguage lang);
+
+    /**
+     * Transpile YueScript code to Lua
+     *
+     * Uses the yue.to_lua() function from the YueScript module to convert
+     * YueScript source code to equivalent Lua code.
+     *
+     * @param yueCode YueScript source code
+     * @param name Name for error messages
+     * @return Transpiled Lua code, or empty string on error
+     */
+    QString transpileYueScript(const QString& yueCode, const QString& name);
 
     // ========== Lua Function Callbacks ==========
 

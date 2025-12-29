@@ -325,6 +325,14 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/external/luasec/CMakeLists.txt")
     message(STATUS "LuaSec: Building ssl module for HTTPS support")
 endif()
 
+# ========== YueScript Library ==========
+# Build yue.so for YueScript support (MoonScript-like language that compiles to Lua)
+# Allows loading .yue files directly without manual transpilation
+if(EXISTS "${CMAKE_SOURCE_DIR}/external/yuescript/src/yuescript/yuescript.cpp")
+    add_subdirectory(external/yuescript-build)
+    message(STATUS "YueScript: Building yue module for .yue file support")
+endif()
+
 # ========== Google Test Framework ==========
 # Fetch GoogleTest for unit testing
 include(FetchContent)

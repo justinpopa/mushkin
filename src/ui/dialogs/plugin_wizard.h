@@ -276,6 +276,7 @@ private:
 
     // UI elements
     QTextEdit* m_scriptEdit;
+    QComboBox* m_languageCombo;
     QPushButton* m_editButton;
     QCheckBox* m_includeConstantsCheck;
 };

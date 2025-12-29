@@ -5,6 +5,7 @@
  */
 
 #include "../automation/plugin.h"
+#include "../automation/script_language.h"
 #include "logging.h"
 #include "miniwindow.h"
 #include "script_engine.h"
@@ -507,8 +508,10 @@ Plugin* WorldDocument::LoadPlugin(const QString& filepath, QString& errorMsg)
         m_CurrentPlugin = pluginPtr;
 
         // Execute plugin script
-        bool error = pluginPtr->m_ScriptEngine->parseLua(
-            pluginPtr->m_strScript, QString("Plugin %1").arg(pluginPtr->m_strName));
+        // Use parseScript() to handle YueScript transpilation if needed
+        ScriptLanguage pluginLang = scriptLanguageFromString(pluginPtr->m_strLanguage);
+        bool error = pluginPtr->m_ScriptEngine->parseScript(
+            pluginPtr->m_strScript, QString("Plugin %1").arg(pluginPtr->m_strName), pluginLang);
         if (error) {
             errorMsg = QString("Script error in plugin '%1'").arg(pluginPtr->m_strName);
             qWarning() << errorMsg;

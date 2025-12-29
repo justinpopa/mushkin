@@ -24,7 +24,7 @@ Timer::Timer()
       bIncluded(false), bSelected(false), iSendTo(0) // eSendToWorld = 0
       ,
       iUserOption(0), bOmitFromOutput(false), bOmitFromLog(false), bExecutingScript(false),
-      bEnabled(true) // Timers enabled by default
+      scriptLanguage(ScriptLanguage::Lua), bEnabled(true) // Timers enabled by default
       ,
       nUpdateNumber(0), nMatched(0) // Initialize match count
       ,

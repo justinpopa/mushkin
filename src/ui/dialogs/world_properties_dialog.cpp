@@ -271,7 +271,7 @@ void WorldPropertiesDialog::setupScriptingTab()
 
     // Language
     m_scriptLanguageCombo = new QComboBox();
-    m_scriptLanguageCombo->addItems({"Lua", "Python", "VBScript (deprecated)"});
+    m_scriptLanguageCombo->addItems({"Lua", "YueScript"});
     layout->addRow("Language:", m_scriptLanguageCombo);
 
     // Add some spacing

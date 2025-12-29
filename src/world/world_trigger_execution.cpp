@@ -218,7 +218,7 @@ void WorldDocument::executeTrigger(Trigger* trigger, Line* line, const QString& 
             .arg(trigger->strLabel.isEmpty() ? trigger->strInternalName : trigger->strLabel);
 
     sendTo(trigger->iSendTo, contents, trigger->bOmitFromOutput, trigger->omit_from_log,
-           triggerDescription, trigger->strVariable, strExtraOutput);
+           triggerDescription, trigger->strVariable, strExtraOutput, trigger->scriptLanguage);
 
     // Display any output that was accumulated
     if (!strExtraOutput.isEmpty()) {

@@ -1,5 +1,6 @@
 #include "alias_edit_dialog.h"
 #include "../../automation/alias.h"
+#include "../../automation/script_language.h"
 #include "../../automation/sendto.h"
 #include "../../world/world_document.h"
 #include <QDateTime>
@@ -114,6 +115,13 @@ void AliasEditDialog::setupUi()
     m_scriptEdit->setPlaceholderText("Function name to call");
     responseForm->addRow("Script &function:", m_scriptEdit);
 
+    // Script language dropdown
+    m_scriptLanguageCombo = new QComboBox(responseTab);
+    m_scriptLanguageCombo->addItem("Lua", static_cast<int>(ScriptLanguage::Lua));
+    m_scriptLanguageCombo->addItem("YueScript", static_cast<int>(ScriptLanguage::YueScript));
+    m_scriptLanguageCombo->setToolTip("Script language for the send text when Send To is Script");
+    responseForm->addRow("Script &language:", m_scriptLanguageCombo);
+
     responseLayout->addLayout(responseForm);
 
     // Send text
@@ -208,6 +216,12 @@ void AliasEditDialog::loadAliasData()
         m_sendToCombo->setCurrentIndex(index);
     }
 
+    // Set script language combo
+    int langIndex = m_scriptLanguageCombo->findData(static_cast<int>(alias->scriptLanguage));
+    if (langIndex >= 0) {
+        m_scriptLanguageCombo->setCurrentIndex(langIndex);
+    }
+
     // Options
     m_echoAliasCheck->setChecked(alias->bEchoAlias);
     m_keepEvaluatingCheck->setChecked(alias->bKeepEvaluating);
@@ -264,6 +278,8 @@ bool AliasEditDialog::saveAlias()
         alias->contents = m_sendTextEdit->toPlainText();
         alias->strProcedure = m_scriptEdit->text().trimmed();
         alias->iSendTo = m_sendToCombo->currentData().toInt();
+        alias->scriptLanguage =
+            static_cast<ScriptLanguage>(m_scriptLanguageCombo->currentData().toInt());
 
         // Options
         alias->bEchoAlias = m_echoAliasCheck->isChecked();
@@ -305,6 +321,8 @@ bool AliasEditDialog::saveAlias()
         newAlias->contents = m_sendTextEdit->toPlainText();
         newAlias->strProcedure = m_scriptEdit->text().trimmed();
         newAlias->iSendTo = m_sendToCombo->currentData().toInt();
+        newAlias->scriptLanguage =
+            static_cast<ScriptLanguage>(m_scriptLanguageCombo->currentData().toInt());
 
         // Options
         newAlias->bEchoAlias = m_echoAliasCheck->isChecked();

@@ -730,13 +730,23 @@ PluginWizardPage7::PluginWizardPage7(WorldDocument* doc, QWidget* parent)
     : QWizardPage(parent), m_doc(doc)
 {
     setTitle(tr("Script"));
-    setSubTitle(tr("Add Lua script code for your plugin"));
+    setSubTitle(tr("Add script code for your plugin"));
 
     QVBoxLayout* layout = new QVBoxLayout(this);
 
+    // Language selector
+    QHBoxLayout* langLayout = new QHBoxLayout();
+    langLayout->addWidget(new QLabel(tr("Script Language:"), this));
+    m_languageCombo = new QComboBox(this);
+    m_languageCombo->addItems({"Lua", "YueScript"});
+    langLayout->addWidget(m_languageCombo);
+    langLayout->addStretch();
+    layout->addLayout(langLayout);
+    registerField("scriptLanguage", m_languageCombo, "currentText");
+
     // Script text edit
     m_scriptEdit = new QTextEdit(this);
-    m_scriptEdit->setPlaceholderText(tr("Enter Lua script code here..."));
+    m_scriptEdit->setPlaceholderText(tr("Enter script code here..."));
     m_scriptEdit->setMinimumHeight(200);
     m_scriptEdit->setFontFamily("Courier New");
     layout->addWidget(m_scriptEdit);
@@ -970,7 +980,7 @@ QString PluginWizard::generatePluginXml()
     out << QString("   name=\"%1\"\n").arg(name);
     out << QString("   author=\"%1\"\n").arg(author);
     out << QString("   id=\"%1\"\n").arg(id);
-    out << "   language=\"Lua\"\n";
+    out << QString("   language=\"%1\"\n").arg(field("scriptLanguage").toString());
     out << QString("   purpose=\"%1\"\n").arg(purpose);
     out << QString("   save_state=\"%1\"\n").arg(saveState ? "y" : "n");
     out << QString("   date_written=\"%1\"\n").arg(dateWritten);

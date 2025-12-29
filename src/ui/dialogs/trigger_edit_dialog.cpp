@@ -1,4 +1,5 @@
 #include "trigger_edit_dialog.h"
+#include "../../automation/script_language.h"
 #include "../../automation/sendto.h"
 #include "../../automation/trigger.h"
 #include "../../world/world_document.h"
@@ -131,6 +132,13 @@ void TriggerEditDialog::setupUi()
     m_scriptEdit = new QLineEdit(responseTab);
     m_scriptEdit->setPlaceholderText("Function name to call");
     responseForm->addRow("Script &function:", m_scriptEdit);
+
+    // Script language dropdown
+    m_scriptLanguageCombo = new QComboBox(responseTab);
+    m_scriptLanguageCombo->addItem("Lua", static_cast<int>(ScriptLanguage::Lua));
+    m_scriptLanguageCombo->addItem("YueScript", static_cast<int>(ScriptLanguage::YueScript));
+    m_scriptLanguageCombo->setToolTip("Script language for the send text when Send To is Script");
+    responseForm->addRow("Script &language:", m_scriptLanguageCombo);
 
     responseLayout->addLayout(responseForm);
 
@@ -301,6 +309,10 @@ void TriggerEditDialog::loadTriggerData()
     if (index >= 0) {
         m_sendToCombo->setCurrentIndex(index);
     }
+    int langIndex = m_scriptLanguageCombo->findData(static_cast<int>(trigger->scriptLanguage));
+    if (langIndex >= 0) {
+        m_scriptLanguageCombo->setCurrentIndex(langIndex);
+    }
 
     // Options tab
     m_keepEvaluatingCheck->setChecked(trigger->bKeepEvaluating);
@@ -401,6 +413,8 @@ bool TriggerEditDialog::saveTrigger()
     trigger->contents = m_sendTextEdit->toPlainText();
     trigger->strProcedure = m_scriptEdit->text().trimmed();
     trigger->iSendTo = m_sendToCombo->currentData().toInt();
+    trigger->scriptLanguage =
+        static_cast<ScriptLanguage>(m_scriptLanguageCombo->currentData().toInt());
 
     // Options tab
     trigger->bKeepEvaluating = m_keepEvaluatingCheck->isChecked();

@@ -1,7 +1,9 @@
 #include "immediate_dialog.h"
+#include "../../automation/script_language.h"
 #include "../../world/script_engine.h"
 #include "../../world/world_document.h"
 
+#include <QComboBox>
 #include <QDialogButtonBox>
 #include <QFont>
 #include <QHBoxLayout>
@@ -46,14 +48,25 @@ void ImmediateDialog::setupUi()
     // Main layout
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
 
+    // Language selector
+    QHBoxLayout* langLayout = new QHBoxLayout();
+    QLabel* langLabel = new QLabel("Script language:", this);
+    m_languageCombo = new QComboBox(this);
+    m_languageCombo->addItem("Lua", static_cast<int>(ScriptLanguage::Lua));
+    m_languageCombo->addItem("YueScript", static_cast<int>(ScriptLanguage::YueScript));
+    langLayout->addWidget(langLabel);
+    langLayout->addWidget(m_languageCombo);
+    langLayout->addStretch();
+    mainLayout->addLayout(langLayout);
+
     // Label
-    QLabel* label = new QLabel("Enter Lua code to execute immediately:", this);
+    QLabel* label = new QLabel("Enter script code to execute immediately:", this);
     mainLayout->addWidget(label);
 
     // Expression text edit (multiline)
     m_expressionEdit = new QPlainTextEdit(this);
     m_expressionEdit->setPlaceholderText(
-        "Enter Lua code here...\n\nExample:\nprint(\"Hello, World!\")\nNote(\"Test message\")");
+        "Enter script code here...\n\nExample:\nprint(\"Hello, World!\")\nNote(\"Test message\")");
 
     // Use a monospace font for code editing
     QFont font("Monospace");
@@ -117,16 +130,21 @@ void ImmediateDialog::executeCode()
     QString code = m_expressionEdit->toPlainText();
 
     if (code.trimmed().isEmpty()) {
-        QMessageBox::information(this, "Immediate", "Please enter some Lua code to execute");
+        QMessageBox::information(this, "Immediate", "Please enter some script code to execute");
         return;
     }
 
-    // Execute the Lua code
+    // Execute the script code
     // Based on CImmediateDlg::OnRun() from ImmediateDlg.cpp
 
+    // Get selected language
+    ScriptLanguage lang =
+        static_cast<ScriptLanguage>(m_languageCombo->currentData().toInt());
+
     // Parse and execute the code
-    // parseLua returns true on error, false on success
-    bool error = m_doc->m_ScriptEngine->parseLua(code, "Immediate");
+    // parseScript handles YueScript transpilation if needed
+    // Returns true on error, false on success
+    bool error = m_doc->m_ScriptEngine->parseScript(code, "Immediate", lang);
 
     if (error) {
         // Error message already shown by parseLua

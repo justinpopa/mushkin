@@ -122,7 +122,8 @@ class TriggerEditDialog : public QDialog {
     QTextEdit* m_sendTextEdit;
     QComboBox* m_sendToCombo;
     QLineEdit* m_scriptEdit;
-    QLineEdit* m_variableEdit; // For "send to variable"
+    QComboBox* m_scriptLanguageCombo; // Script language (Lua, YueScript)
+    QLineEdit* m_variableEdit;        // For "send to variable"
 
     // Options tab widgets
     QCheckBox* m_keepEvaluatingCheck;

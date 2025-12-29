@@ -1,4 +1,5 @@
 #include "timer_edit_dialog.h"
+#include "../../automation/script_language.h"
 #include "../../automation/sendto.h"
 #include "../../automation/timer.h"
 #include "../../world/world_document.h"
@@ -182,6 +183,13 @@ void TimerEditDialog::setupUi()
     m_scriptEdit->setPlaceholderText("Function name to call");
     responseForm->addRow("Script &function:", m_scriptEdit);
 
+    // Script language dropdown
+    m_scriptLanguageCombo = new QComboBox(responseTab);
+    m_scriptLanguageCombo->addItem("Lua", static_cast<int>(ScriptLanguage::Lua));
+    m_scriptLanguageCombo->addItem("YueScript", static_cast<int>(ScriptLanguage::YueScript));
+    m_scriptLanguageCombo->setToolTip("Script language for the send text when Send To is Script");
+    responseForm->addRow("Script &language:", m_scriptLanguageCombo);
+
     responseLayout->addLayout(responseForm);
 
     // Send text
@@ -290,6 +298,12 @@ void TimerEditDialog::loadTimerData()
         m_sendToCombo->setCurrentIndex(index);
     }
 
+    // Set script language combo
+    int langIndex = m_scriptLanguageCombo->findData(static_cast<int>(timer->scriptLanguage));
+    if (langIndex >= 0) {
+        m_scriptLanguageCombo->setCurrentIndex(langIndex);
+    }
+
     // Options
     m_oneShotCheck->setChecked(timer->bOneShot);
     m_activeWhenClosedCheck->setChecked(timer->bActiveWhenClosed);
@@ -363,6 +377,8 @@ bool TimerEditDialog::saveTimer()
     timer->strContents = m_sendTextEdit->toPlainText();
     timer->strProcedure = m_scriptEdit->text().trimmed();
     timer->iSendTo = m_sendToCombo->currentData().toInt();
+    timer->scriptLanguage =
+        static_cast<ScriptLanguage>(m_scriptLanguageCombo->currentData().toInt());
 
     // Options
     timer->bOneShot = m_oneShotCheck->isChecked();
