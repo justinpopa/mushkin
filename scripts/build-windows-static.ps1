@@ -119,13 +119,16 @@ function Build-StaticQt {
     $configureCmd = Join-Path $QtSrcDir "configure.bat"
     $vcpkgInstalled = Join-Path $env:VCPKG_ROOT "installed\x64-windows"
 
-    # Only build what we need - Qt will include dependencies automatically
+    # Only build what we need, skip optional QML/Quick deps
+    # -no-pch disables precompiled headers to reduce disk usage
     & $configureCmd `
         -static `
         -release `
         -prefix $QtStaticDir `
         -submodules qtbase,qtmultimedia,qtsvg `
+        -skip qtdeclarative -skip qtquick3d -skip qtshadertools `
         -nomake examples -nomake tests `
+        -no-pch `
         -- -DSQLite3_ROOT="$vcpkgInstalled" -DCMAKE_OBJECT_PATH_MAX=350
 
     if ($LASTEXITCODE -ne 0) { throw "Qt configure failed" }

@@ -101,13 +101,16 @@ build_static_qt() {
     mkdir -p "$QT_BUILD_DIR"
     cd "$QT_BUILD_DIR"
 
-    # Only build what we need - Qt will include dependencies automatically
+    # Only build what we need, skip optional QML/Quick deps
+    # -no-pch disables precompiled headers to reduce disk usage
     "$QT_SRC_DIR/configure" \
         -static \
         -release \
         -prefix "$QT_STATIC_DIR" \
         -submodules qtbase,qtmultimedia,qtsvg \
-        -nomake examples -nomake tests
+        -skip qtdeclarative -skip qtquick3d -skip qtshadertools \
+        -nomake examples -nomake tests \
+        -no-pch
 
     # Build & install
     cmake --build . --parallel "$NUM_CORES"
