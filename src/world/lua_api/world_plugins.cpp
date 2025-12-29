@@ -805,18 +805,6 @@ int L_SendPkt(lua_State* L)
     size_t textLength;
     const char* text = luaL_checklstring(L, 1, &textLength);
 
-    // DEBUG: Log GMCP packets being sent
-    // Check if this looks like a GMCP packet (starts with IAC SB GMCP = 0xFF 0xFA 0xC9)
-    if (textLength >= 4 && (unsigned char)text[0] == 0xFF && (unsigned char)text[1] == 0xFA &&
-        (unsigned char)text[2] == 201) {
-        // Extract the GMCP message (skip IAC SB GMCP, end before IAC SE)
-        QString gmcpMsg;
-        for (size_t i = 3; i < textLength - 2; i++) {
-            gmcpMsg += QChar(text[i]);
-        }
-        qDebug() << "SendPkt: Sending GMCP packet:" << gmcpMsg;
-    }
-
     // Send raw packet
     pDoc->SendPacket((const unsigned char*)text, textLength);
 

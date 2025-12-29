@@ -1,5 +1,6 @@
 #include "input_view.h"
 #include "../../automation/plugin.h"
+#include "../../world/color_utils.h"
 #include "../../world/lua_api/lua_registration.h"
 #include "../../world/script_engine.h"
 #include "../dialogs/complete_word_dialog.h"
@@ -335,20 +336,17 @@ void InputView::applyInputSettings()
     inputFont.setWeight(static_cast<QFont::Weight>(m_doc->m_input_font_weight));
     setFont(inputFont);
 
-    // Apply color settings using stylesheet
-    QColor textColor(m_doc->m_input_text_colour);
-    QColor bgColor(m_doc->m_input_background_colour);
+    // Apply color settings using palette (more reliable than stylesheet with themes)
+    // Colors are stored in BGR format (Windows COLORREF), convert to QColor
+    QColor textColor = bgrToQColor(m_doc->m_input_text_colour);
+    QColor bgColor = bgrToQColor(m_doc->m_input_background_colour);
 
-    QString styleSheet = QString("QPlainTextEdit {"
-                                 "    color: %1;"
-                                 "    background-color: %2;"
-                                 "    border: none;"
-                                 "    outline: none;"
-                                 "}")
-                             .arg(textColor.name())
-                             .arg(bgColor.name());
-
-    setStyleSheet(styleSheet);
+    // Use QPalette instead of stylesheet for better theme compatibility
+    QPalette pal = palette();
+    pal.setColor(QPalette::Text, textColor);
+    pal.setColor(QPalette::Base, bgColor);
+    pal.setColor(QPalette::PlaceholderText, textColor.darker(150));
+    setPalette(pal);
     setAutoFillBackground(true);
 
     // Update height after font change
