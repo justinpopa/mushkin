@@ -22,7 +22,6 @@
 #include <QRadioButton>
 #include <QSpinBox>
 #include <QStackedWidget>
-#include <QStandardPaths>
 #include <QVBoxLayout>
 
 // Helper function to format font info with weight/italic
@@ -1182,9 +1181,8 @@ void GlobalPreferencesDialog::loadSettings()
     Database* db = Database::instance();
 
     // === Worlds Page ===
-    QString defaultWorldsDir =
-        QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + "/MUSHclient/worlds";
-    m_worldDirectory->setText(db->getPreference("DefaultWorldFileDirectory", defaultWorldsDir));
+    // Default to relative path like original MUSHclient (resolves relative to working directory)
+    m_worldDirectory->setText(db->getPreference("DefaultWorldFileDirectory", "./worlds/"));
 
     // World list
     QString worldList = db->getPreference("WorldList", "");
@@ -1242,17 +1240,13 @@ void GlobalPreferencesDialog::loadSettings()
     m_autoLogWorld->setChecked(db->getPreferenceInt("AutoLogWorld", 0) != 0);
     m_appendToLogFiles->setChecked(db->getPreferenceInt("AppendToLogFiles", 0) != 0);
     m_confirmLogFileClose->setChecked(db->getPreferenceInt("ConfirmLogFileClose", 1) != 0);
-    QString defaultLogDir =
-        QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + "/MUSHclient/logs";
-    m_logDirectory->setText(db->getPreference("DefaultLogFileDirectory", defaultLogDir));
+    // Default to relative path like original MUSHclient
+    m_logDirectory->setText(db->getPreference("DefaultLogFileDirectory", "./logs/"));
 
     // === Plugins Page ===
-    QString defaultPluginsDir =
-        QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + "/MUSHclient/plugins";
-    m_pluginsDirectory->setText(db->getPreference("PluginsDirectory", defaultPluginsDir));
-
-    QString defaultStateDir = defaultPluginsDir + "/state";
-    m_stateFilesDirectory->setText(db->getPreference("StateFilesDirectory", defaultStateDir));
+    // Default to relative paths like original MUSHclient
+    m_pluginsDirectory->setText(db->getPreference("PluginsDirectory", "./worlds/plugins/"));
+    m_stateFilesDirectory->setText(db->getPreference("StateFilesDirectory", "./worlds/plugins/state/"));
 
     // Plugin list
     QString pluginList = db->getPreference("PluginList", "");
