@@ -48,7 +48,8 @@
 
 // ========== xterm 256-Color Palette ==========
 // Port from: MUSHclient.cpp (Generate256colours)
-// This is the standard xterm 256-color palette in BGR format (Windows COLORREF)
+// This is the standard xterm 256-color palette in BGR format (Windows COLORREF: 0x00BBGGRR)
+// BGR format is used for MUSHclient compatibility - plugins may use hardcoded color values
 QRgb xterm_256_colours[256];
 
 // BGR macro for Windows COLORREF compatibility (0x00BBGGRR)
@@ -89,7 +90,6 @@ static void initializeXterm256Colors()
     }
 
     // Colors 232-255: grayscale ramp (24 shades of gray) - BGR format
-    // (grayscale is symmetric, so BGR vs RGB doesn't matter)
     for (int grey = 0; grey < 24; grey++) {
         quint8 value = 8 + (grey * 10);
         xterm_256_colours[232 + grey] = BGR(value, value, value);
@@ -2040,9 +2040,13 @@ void WorldDocument::Interpret256ANSIcode(const int iCode)
     else
         iForeColour = workingColor;
 
-    // Handle 256-color palette lookups
-    if ((iFlags & COLOURTYPE) == COLOUR_RGB &&
-        (m_phase == HAVE_FOREGROUND_256_FINISH || m_phase == HAVE_BACKGROUND_256_FINISH)) {
+    // Handle 256-color palette lookups - always convert to RGB
+    if (m_phase == HAVE_FOREGROUND_256_FINISH || m_phase == HAVE_BACKGROUND_256_FINISH) {
+        // Set COLOUR_RGB mode for 256-color sequences
+        iFlags &= ~COLOURTYPE;
+        iFlags |= COLOUR_RGB;
+
+        // Look up the RGB value from the xterm 256-color palette
         switch (m_phase) {
             case HAVE_FOREGROUND_256_FINISH:
                 if (iFlags & INVERSE)
@@ -2056,27 +2060,6 @@ void WorldDocument::Interpret256ANSIcode(const int iCode)
                     iForeColour = xterm_256_colours[iCode];
                 else
                     iBackColour = xterm_256_colours[iCode];
-                break;
-
-            default:
-                // Other phases not handled by this function
-                break;
-        }
-    } else if (m_phase == HAVE_FOREGROUND_256_FINISH || m_phase == HAVE_BACKGROUND_256_FINISH) {
-        // Must be in ANSI mode - store color index directly
-        switch (m_phase) {
-            case HAVE_FOREGROUND_256_FINISH:
-                if (iFlags & INVERSE)
-                    iBackColour = iCode;
-                else
-                    iForeColour = iCode;
-                break;
-
-            case HAVE_BACKGROUND_256_FINISH:
-                if (iFlags & INVERSE)
-                    iForeColour = iCode;
-                else
-                    iBackColour = iCode;
                 break;
 
             default:

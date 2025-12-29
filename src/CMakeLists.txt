@@ -12,6 +12,47 @@ target_link_libraries(mushkin PRIVATE
     ui        # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
+# ========== Static Qt Plugin Handling ==========
+# When Qt is built statically, plugins must be explicitly imported
+# See: https://doc.qt.io/qt-6/plugins-howto.html#static-plugins
+if(STATIC_BUILD AND NOT BUILD_SHARED_LIBS)
+    if(APPLE)
+        # macOS platform plugin
+        qt_import_plugins(mushkin
+            INCLUDE
+                Qt6::QCocoaIntegrationPlugin
+                Qt6::QSQLiteDriverPlugin
+                Qt6::QGifPlugin
+                Qt6::QJpegPlugin
+                Qt6::QICOPlugin
+                Qt6::QSvgPlugin
+        )
+    elseif(WIN32)
+        # Windows platform plugin
+        qt_import_plugins(mushkin
+            INCLUDE
+                Qt6::QWindowsIntegrationPlugin
+                Qt6::QSQLiteDriverPlugin
+                Qt6::QGifPlugin
+                Qt6::QJpegPlugin
+                Qt6::QICOPlugin
+                Qt6::QSvgPlugin
+        )
+    elseif(UNIX)
+        # Linux platform plugins - use XCB for X11 display
+        qt_import_plugins(mushkin
+            INCLUDE
+                Qt6::QXcbIntegrationPlugin
+                Qt6::QSQLiteDriverPlugin
+                Qt6::QGifPlugin
+                Qt6::QJpegPlugin
+                Qt6::QICOPlugin
+                Qt6::QSvgPlugin
+        )
+    endif()
+    message(STATUS "Static build: Qt plugins will be embedded in binary")
+endif()
+
 # Set output directory
 set_target_properties(mushkin PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
@@ -24,6 +65,10 @@ if(APPLE)
         MACOSX_BUNDLE_GUI_IDENTIFIER "com.mushkin.app"
         MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
         MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
+        # Set rpath so bundled Qt frameworks can be found at runtime
+        # This is critical for self-contained app bundles
+        INSTALL_RPATH "@executable_path/../Frameworks"
+        BUILD_WITH_INSTALL_RPATH TRUE
     )
 endif()
 
@@ -32,6 +77,21 @@ install(TARGETS mushkin
     RUNTIME DESTINATION bin
     BUNDLE DESTINATION .
 )
+
+# ========== macOS Qt Deployment (self-contained app bundle) ==========
+# This bundles Qt frameworks into the .app so it doesn't depend on external Qt installation
+# See: https://doc.qt.io/qt-6/qt-generate-deploy-app-script.html
+if(APPLE AND BUILD_APP_BUNDLE)
+    # Generate deployment script that will run macdeployqt
+    qt_generate_deploy_app_script(
+        TARGET mushkin
+        OUTPUT_SCRIPT deploy_script
+        NO_UNSUPPORTED_PLATFORM_ERROR
+    )
+
+    # Run the deployment script at install time
+    install(SCRIPT ${deploy_script})
+endif()
 
 # Add subdirectories for modules
 add_subdirectory(third-party)        # Third-party libraries (lsqlite3, etc.)

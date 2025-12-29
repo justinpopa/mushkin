@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
-project(mushkin VERSION 0.0.4 LANGUAGES C CXX)
+# x-release-please-start-version
+project(mushkin VERSION 0.1.0 LANGUAGES C CXX)
+# x-release-please-end
 
 # C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -10,15 +12,52 @@ if(APPLE)
     option(BUILD_APP_BUNDLE "Build macOS app bundle (.app) instead of plain binary" ON)
 endif()
 
+# ========== Static Build Option ==========
+# When enabled, statically links Qt while keeping other deps (pcre, sqlite, luajit)
+# dynamically linked from system packages (brew/apt). This produces a portable binary
+# that only requires common system libraries.
+option(STATIC_BUILD "Build with static Qt (dynamic deps from package manager)" OFF)
+
+if(STATIC_BUILD)
+    message(STATUS "Static build enabled - Qt will be statically linked")
+    # Disable app bundle for static builds (we want a single binary)
+    if(APPLE)
+        set(BUILD_APP_BUNDLE OFF)
+    endif()
+endif()
+
 # Qt setup - enable automatic MOC/UIC/RCC processing
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
-# macOS: Qt 6.9.3+ required for beta macOS versions without AGL framework
-# If on macOS beta and using Qt installer, configure with:
-#   cmake -DCMAKE_PREFIX_PATH=~/Qt/6.9.3/macos ..
-# Otherwise CMake will auto-detect the system Qt installation.
+# ========== Qt Discovery ==========
+# Check ~/.cache/mushkin/Qt for aqt-installed Qt (from build scripts)
+# This allows "cmake -B build" to just work after running the build script
+if(NOT DEFINED CMAKE_PREFIX_PATH OR CMAKE_PREFIX_PATH STREQUAL "")
+    if(APPLE)
+        set(_QT_CACHE_DIR "$ENV{HOME}/.cache/mushkin/Qt/6.9.3/macos")
+    else()
+        set(_QT_CACHE_DIR "$ENV{HOME}/.cache/mushkin/Qt/6.9.3/gcc_64")
+    endif()
+    if(EXISTS "${_QT_CACHE_DIR}/lib/cmake/Qt6")
+        list(APPEND CMAKE_PREFIX_PATH "${_QT_CACHE_DIR}")
+        message(STATUS "Found Qt in cache: ${_QT_CACHE_DIR}")
+    endif()
+endif()
+
+# ========== Static Build: Pre-create wrapper targets ==========
+# Static Qt builds require these wrapper targets to exist before find_package(Qt6)
+# because the Qt CMake config files check for them
+if(STATIC_BUILD AND APPLE)
+    # WrapResolv - DNS resolution library (libresolv on macOS)
+    # The Qt FindWrapResolv.cmake fails to find .tbd stubs, so we create the target manually
+    if(NOT TARGET WrapResolv::WrapResolv)
+        add_library(WrapResolv::WrapResolv INTERFACE IMPORTED)
+        target_link_libraries(WrapResolv::WrapResolv INTERFACE "-lresolv")
+        set(WrapResolv_FOUND ON CACHE BOOL "WrapResolv found (manually created)")
+    endif()
+endif()
 
 # Find packages
 find_package(Qt6 REQUIRED COMPONENTS
@@ -45,6 +84,7 @@ if(APPLE)
         PATH_SUFFIXES include
         NO_DEFAULT_PATH
     )
+
     find_library(PCRE_LIBRARY
         NAMES pcre
         PATHS /opt/homebrew/opt/pcre /usr/local/opt/pcre /opt/homebrew /usr/local
@@ -123,6 +163,7 @@ if(APPLE)
         PATH_SUFFIXES include
         NO_DEFAULT_PATH
     )
+
     find_library(SQLITE3_LIBRARY
         NAMES sqlite3
         PATHS /opt/homebrew/opt/sqlite /usr/local/opt/sqlite /opt/homebrew /usr/local
