@@ -5,10 +5,10 @@
 #include <QMdiArea>
 #include <QMdiSubWindow>
 #include <QMenu>
-#include <QStandardPaths>
 #include <QVBoxLayout>
 
 #include "../../storage/database.h"
+#include "../../storage/global_options.h"
 #include "../main_window.h"
 #include "../views/world_widget.h"
 #include "world_document.h"
@@ -346,10 +346,10 @@ void ActivityWindow::saveWorldAs()
     if (!ww)
         return;
 
+    // Use configured world directory (matches original MUSHclient behavior)
+    QString startDir = GlobalOptions::instance()->defaultWorldFileDirectory();
     QString filename = QFileDialog::getSaveFileName(
-        this, tr("Save World As"),
-        QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation),
-        tr("MUSHclient World Files (*.mcl);;All Files (*)"));
+        this, tr("Save World As"), startDir, tr("MUSHclient World Files (*.mcl);;All Files (*)"));
 
     if (!filename.isEmpty()) {
         ww->saveToFile(filename);

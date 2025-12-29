@@ -1,21 +1,21 @@
 #include "command_history_dialog.h"
+#include "../../storage/global_options.h"
 #include "../../world/world_document.h"
 
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QListWidget>
-#include <QLineEdit>
-#include <QPushButton>
 #include <QDialogButtonBox>
-#include <QLabel>
-#include <QInputDialog>
-#include <QMessageBox>
-#include <QFileDialog>
 #include <QFile>
-#include <QTextStream>
-#include <QStandardPaths>
-#include <QShortcut>
+#include <QFileDialog>
+#include <QHBoxLayout>
+#include <QInputDialog>
 #include <QKeySequence>
+#include <QLabel>
+#include <QLineEdit>
+#include <QListWidget>
+#include <QMessageBox>
+#include <QPushButton>
+#include <QShortcut>
+#include <QTextStream>
+#include <QVBoxLayout>
 
 CommandHistoryDialog::CommandHistoryDialog(WorldDocument* doc, QWidget* parent)
     : QDialog(parent)
@@ -277,12 +277,11 @@ void CommandHistoryDialog::saveToFile()
     if (!m_doc)
         return;
 
+    // Use configured log directory (matches original MUSHclient behavior)
+    QString logDir = GlobalOptions::instance()->defaultLogFileDirectory();
     QString filename = QFileDialog::getSaveFileName(
-        this,
-        "Save Command History",
-        QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + "/command_history.txt",
-        "Text Files (*.txt);;All Files (*)"
-    );
+        this, "Save Command History", logDir + "/command_history.txt",
+        "Text Files (*.txt);;All Files (*)");
 
     if (filename.isEmpty())
         return;

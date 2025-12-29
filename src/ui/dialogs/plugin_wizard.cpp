@@ -3,6 +3,7 @@
 #include "automation/timer.h"
 #include "automation/trigger.h"
 #include "automation/variable.h"
+#include "storage/global_options.h"
 #include "world/world_document.h"
 
 #include <QDateTime>
@@ -15,7 +16,6 @@
 #include <QHeaderView>
 #include <QMessageBox>
 #include <QRegularExpression>
-#include <QStandardPaths>
 #include <QTextStream>
 #include <QUuid>
 #include <QVBoxLayout>
@@ -1106,12 +1106,8 @@ bool PluginWizard::savePluginXml(const QString& xml)
     QString pluginName = field("name").toString();
     QString suggestedFilename = pluginName + ".xml";
 
-    // Get plugins directory (or use home directory)
-    QString pluginDir = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
-    QDir dir(pluginDir);
-    if (dir.exists("MUSHclient/plugins")) {
-        pluginDir = dir.filePath("MUSHclient/plugins");
-    }
+    // Use configured plugins directory (matches original MUSHclient behavior)
+    QString pluginDir = GlobalOptions::instance()->pluginsDirectory();
 
     // File save dialog
     QString filename = QFileDialog::getSaveFileName(this, tr("Save Plugin As"),

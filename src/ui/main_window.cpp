@@ -1,6 +1,7 @@
 #include "main_window.h"
 #include "../automation/plugin.h" // For plugin callback constants
 #include "../storage/database.h"
+#include "../storage/global_options.h"
 #include "../text/line.h"
 #include "../world/notepad_widget.h"
 #include "../world/world_document.h"
@@ -1685,10 +1686,11 @@ void MainWindow::newWorld()
 
 void MainWindow::openWorld()
 {
+    // Use configured world directory (matches original MUSHclient behavior)
+    QString startDir = GlobalOptions::instance()->defaultWorldFileDirectory();
+
     QString filename = QFileDialog::getOpenFileName(
-        this, "Open World File",
-        QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation),
-        "MUSHclient World Files (*.mcl);;All Files (*)");
+        this, "Open World File", startDir, "MUSHclient World Files (*.mcl);;All Files (*)");
 
     if (!filename.isEmpty()) {
         openWorld(filename);
@@ -1799,10 +1801,10 @@ void MainWindow::saveWorld()
 
     // If no filename (new world), prompt for one (Save As behavior)
     if (filename.isEmpty()) {
+        // Use configured world directory (matches original MUSHclient behavior)
+        QString startDir = GlobalOptions::instance()->defaultWorldFileDirectory();
         filename = QFileDialog::getSaveFileName(
-            this, "Save World File",
-            QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation),
-            "MUSHclient World Files (*.mcl);;All Files (*)");
+            this, "Save World File", startDir, "MUSHclient World Files (*.mcl);;All Files (*)");
 
         if (filename.isEmpty()) {
             return; // User cancelled
@@ -1832,10 +1834,10 @@ void MainWindow::saveWorldAs()
         return;
     }
 
+    // Use configured world directory (matches original MUSHclient behavior)
+    QString startDir = GlobalOptions::instance()->defaultWorldFileDirectory();
     QString filename = QFileDialog::getSaveFileName(
-        this, "Save World File As",
-        QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation),
-        "MUSHclient World Files (*.mcl);;All Files (*)");
+        this, "Save World File As", startDir, "MUSHclient World Files (*.mcl);;All Files (*)");
 
     if (filename.isEmpty()) {
         return;
@@ -1906,9 +1908,10 @@ void MainWindow::toggleLogSession()
                                   .arg(worldWidget->worldName())
                                   .arg(QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss"));
 
+        // Use configured log directory (matches original MUSHclient behavior)
+        QString logDir = GlobalOptions::instance()->defaultLogFileDirectory();
         QString filename = QFileDialog::getSaveFileName(
-            this, "Save Log File",
-            QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + "/" + defaultName,
+            this, "Save Log File", logDir + "/" + defaultName,
             "Log Files (*.log *.txt);;All Files (*)");
 
         if (filename.isEmpty()) {
