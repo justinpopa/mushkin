@@ -155,12 +155,17 @@ First run takes ~60 minutes to build Qt. Subsequent builds take ~5 minutes.
 
 ## Configuration
 
-Mushkin uses MUSHclient-compatible paths for easy migration:
+Mushkin uses portable relative paths like the original MUSHclient. By default, all data directories are relative to the current working directory:
 
-**World files, plugins, and logs:**
-- `~/Documents/MUSHclient/` (worlds, plugins, logs subdirectories)
+**Default directories (relative to working directory):**
+- `./worlds/` - World files (.mcl)
+- `./worlds/plugins/` - Plugin files
+- `./worlds/plugins/state/` - Plugin state files
+- `./logs/` - Log files
 
-**Settings:**
+This means you can put Mushkin in any folder and run it from there - all your worlds, plugins, and logs stay together in that folder.
+
+**Settings storage:**
 - macOS: `~/Library/Preferences/com.Gammon.MUSHclient.plist`
 - Linux: `~/.config/Gammon/MUSHclient.conf`
 - Windows: Registry `HKEY_CURRENT_USER\Software\Gammon\MUSHclient`
