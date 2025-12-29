@@ -170,7 +170,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: C:/Users/runneradmin/AppData/Local/mushkin/Qt-static
-          key: qt-static-6.9.3-windows-x64-v5
+          key: qt-static-6.9.3-windows-x64-v6
 
       - name: Build Static Binary
         run: |

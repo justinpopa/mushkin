@@ -122,6 +122,8 @@ function Build-StaticQt {
     # Only build what we need, skip optional QML/Quick deps
     # -no-pch disables precompiled headers to reduce disk usage
     # Note: qtshadertools is required by qtmultimedia, so we can't skip it
+    # -DFEATURE_system_sqlite=ON ensures Qt uses vcpkg's SQLite instead of bundled
+    # (avoids duplicate symbol errors when linking with our lsqlite3)
     & $configureCmd `
         -static `
         -release `
@@ -130,7 +132,7 @@ function Build-StaticQt {
         -skip qtdeclarative -skip qtquick3d `
         -nomake examples -nomake tests `
         -no-pch `
-        -- -DSQLite3_ROOT="$vcpkgInstalled" -DCMAKE_OBJECT_PATH_MAX=350
+        -- -DSQLite3_ROOT="$vcpkgInstalled" -DFEATURE_system_sqlite=ON -DCMAKE_OBJECT_PATH_MAX=350
 
     if ($LASTEXITCODE -ne 0) { throw "Qt configure failed" }
 
