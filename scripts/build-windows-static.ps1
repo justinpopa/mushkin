@@ -124,7 +124,7 @@ function Build-StaticQt {
         -release `
         -prefix $QtStaticDir `
         -system-sqlite `
-        -skip qtdeclarative -skip qtwebengine -skip qtwebview -skip qt3d -skip qtcharts `
+        -skip qtdeclarative -skip qtgraphs -skip qtwebengine -skip qtwebview -skip qt3d -skip qtcharts `
         -skip qtdatavis3d -skip qtlottie -skip qtquick3d -skip qtquick3dphysics `
         -skip qtvirtualkeyboard -skip qtwayland -skip qtwebchannel -skip qtwebsockets `
         -skip qtpositioning -skip qtsensors -skip qtserialport -skip qtserialbus `
