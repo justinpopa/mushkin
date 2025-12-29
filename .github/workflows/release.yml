@@ -55,7 +55,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/mushkin/Qt-static
-          key: qt-static-6.9.3-macos-${{ runner.arch }}
+          key: qt-static-6.9.3-macos-${{ runner.arch }}-v2
 
       - name: Build Static Binary
         run: ./scripts/build-macos-static.sh
@@ -115,7 +115,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/mushkin/Qt-static
-          key: qt-static-6.9.3-linux-x64
+          key: qt-static-6.9.3-linux-x64-v2
 
       - name: Build Static Binary
         run: ./scripts/build-linux-static.sh
@@ -162,7 +162,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: C:/Users/runneradmin/AppData/Local/mushkin/Qt-static
-          key: qt-static-6.9.3-windows-x64-v2
+          key: qt-static-6.9.3-windows-x64-v3
 
       - name: Build Static Binary
         run: |
