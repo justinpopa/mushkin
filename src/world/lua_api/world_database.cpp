@@ -9,13 +9,29 @@
  * world.DatabaseOpen(Name, Filename, Flags)
  *
  * Opens or creates a SQLite database for use by Lua scripts.
+ * Each database is identified by a logical name used in subsequent calls.
  *
- * @param Name - Logical name for the database (used in all other Database* functions)
- * @param Filename - Path to database file, or ":memory:" for in-memory database
- * @param Flags - SQLite open flags (default: SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE)
- * @return SQLite error code (SQLITE_OK = 0 on success), or negative custom error code
+ * @param Name (string) Logical name for this database connection
+ * @param Filename (string) Path to database file, or ":memory:" for in-memory database
+ * @param Flags (number) SQLite open flags (optional, default: SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE)
  *
- * Based on methods_database.cpp
+ * @return (number) Error code:
+ *   - SQLITE_OK (0): Success
+ *   - DATABASE_ERROR_DATABASE_ALREADY_EXISTS (-6): Name already used for different file
+ *   - Other SQLite error codes on failure
+ *
+ * @example
+ * -- Open a database file
+ * local rc = DatabaseOpen("mydb", GetPluginInfo(GetPluginID(), 20) .. "data.db")
+ * if rc ~= 0 then
+ *     Note("Failed to open database: " .. DatabaseError("mydb"))
+ * end
+ *
+ * @example
+ * -- Create in-memory database
+ * DatabaseOpen("temp", ":memory:")
+ *
+ * @see DatabaseClose, DatabaseExec, DatabaseError
  */
 int L_DatabaseOpen(lua_State* L)
 {
@@ -62,13 +78,20 @@ int L_DatabaseOpen(lua_State* L)
 /**
  * world.DatabaseClose(Name)
  *
- * Closes a database and removes it from the database map.
+ * Closes a database connection and releases all resources.
  * Automatically finalizes any outstanding prepared statement.
  *
- * @param Name - Database name
- * @return SQLite error code, or negative custom error code
+ * @param Name (string) Logical database name from DatabaseOpen
  *
- * Based on methods_database.cpp
+ * @return (number) Error code:
+ *   - SQLITE_OK (0): Success
+ *   - DATABASE_ERROR_ID_NOT_FOUND (-1): Database name not found
+ *   - DATABASE_ERROR_NOT_OPEN (-2): Database not open
+ *
+ * @example
+ * DatabaseClose("mydb")
+ *
+ * @see DatabaseOpen, DatabaseList
  */
 int L_DatabaseClose(lua_State* L)
 {
@@ -105,14 +128,24 @@ int L_DatabaseClose(lua_State* L)
 /**
  * world.DatabasePrepare(Name, Sql)
  *
- * Prepares (compiles) an SQL statement for execution.
+ * Prepares (compiles) an SQL statement for execution with parameters.
  * Only one prepared statement is allowed per database at a time.
+ * Must be finalized with DatabaseFinalize before preparing another.
  *
- * @param Name - Database name
- * @param Sql - SQL statement to prepare
- * @return SQLite error code, or negative custom error code
+ * @param Name (string) Logical database name
+ * @param Sql (string) SQL statement to prepare (can include ? placeholders)
  *
- * Based on methods_database.cpp
+ * @return (number) Error code:
+ *   - SQLITE_OK (0): Success
+ *   - DATABASE_ERROR_ID_NOT_FOUND (-1): Database name not found
+ *   - DATABASE_ERROR_NOT_OPEN (-2): Database not open
+ *   - DATABASE_ERROR_HAVE_PREPARED_STATEMENT (-3): Statement already prepared
+ *
+ * @example
+ * DatabasePrepare("mydb", "SELECT * FROM players WHERE name = ?")
+ * -- Bind parameters and execute with DatabaseStep
+ *
+ * @see DatabaseStep, DatabaseFinalize, DatabaseExec
  */
 int L_DatabasePrepare(lua_State* L)
 {
@@ -157,13 +190,27 @@ int L_DatabasePrepare(lua_State* L)
 /**
  * world.DatabaseStep(Name)
  *
- * Executes the next step of a prepared statement.
- * Returns SQLITE_ROW (100) if a row is ready, SQLITE_DONE (101) if finished.
+ * Executes the next step of a prepared statement. For SELECT queries,
+ * call repeatedly until SQLITE_DONE to iterate through all rows.
  *
- * @param Name - Database name
- * @return SQLite error code, or negative custom error code
+ * @param Name (string) Logical database name
  *
- * Based on methods_database.cpp
+ * @return (number) Result code:
+ *   - SQLITE_ROW (100): Row is available, use DatabaseColumnValue to read it
+ *   - SQLITE_DONE (101): No more rows / statement complete
+ *   - DATABASE_ERROR_ID_NOT_FOUND (-1): Database not found
+ *   - DATABASE_ERROR_NO_PREPARED_STATEMENT (-4): No statement prepared
+ *
+ * @example
+ * DatabasePrepare("mydb", "SELECT name, level FROM players")
+ * while DatabaseStep("mydb") == 100 do  -- SQLITE_ROW
+ *     local name = DatabaseColumnValue("mydb", 1)
+ *     local level = DatabaseColumnValue("mydb", 2)
+ *     Note(name .. " is level " .. level)
+ * end
+ * DatabaseFinalize("mydb")
+ *
+ * @see DatabasePrepare, DatabaseColumnValue, DatabaseFinalize
  */
 int L_DatabaseStep(lua_State* L)
 {
@@ -200,13 +247,22 @@ int L_DatabaseStep(lua_State* L)
 /**
  * world.DatabaseFinalize(Name)
  *
- * Finalizes (discards) a prepared statement.
- * Must be called to free resources after using DatabasePrepare.
+ * Finalizes (discards) a prepared statement and frees its resources.
+ * Must be called after using DatabasePrepare before preparing another statement.
  *
- * @param Name - Database name
- * @return SQLite error code, or negative custom error code
+ * @param Name (string) Logical database name
  *
- * Based on methods_database.cpp
+ * @return (number) Error code:
+ *   - SQLITE_OK (0): Success
+ *   - DATABASE_ERROR_ID_NOT_FOUND (-1): Database not found
+ *   - DATABASE_ERROR_NO_PREPARED_STATEMENT (-4): No statement to finalize
+ *
+ * @example
+ * DatabasePrepare("mydb", "SELECT * FROM items")
+ * -- ... process rows ...
+ * DatabaseFinalize("mydb")  -- Free resources
+ *
+ * @see DatabasePrepare, DatabaseStep, DatabaseReset
  */
 int L_DatabaseFinalize(lua_State* L)
 {
@@ -246,14 +302,33 @@ int L_DatabaseFinalize(lua_State* L)
  * world.DatabaseExec(Name, Sql)
  *
  * Executes an SQL statement directly without preparing it.
- * Useful for simple statements that don't return rows (CREATE, INSERT, UPDATE, DELETE).
- * Cannot be used if a prepared statement is already active.
+ * Ideal for statements that don't return rows (CREATE, INSERT, UPDATE, DELETE).
+ * Cannot be used while a prepared statement is active.
  *
- * @param Name - Database name
- * @param Sql - SQL statement to execute
- * @return SQLite error code, or negative custom error code
+ * @param Name (string) Logical database name
+ * @param Sql (string) SQL statement to execute
  *
- * Based on methods_database.cpp
+ * @return (number) Error code:
+ *   - SQLITE_OK (0): Success
+ *   - DATABASE_ERROR_ID_NOT_FOUND (-1): Database not found
+ *   - DATABASE_ERROR_HAVE_PREPARED_STATEMENT (-3): Must finalize first
+ *   - Other SQLite error codes on SQL failure
+ *
+ * @example
+ * -- Create a table
+ * DatabaseExec("mydb", [[
+ *     CREATE TABLE IF NOT EXISTS players (
+ *         id INTEGER PRIMARY KEY,
+ *         name TEXT,
+ *         level INTEGER
+ *     )
+ * ]])
+ *
+ * @example
+ * -- Insert a record
+ * DatabaseExec("mydb", "INSERT INTO players (name, level) VALUES ('Hero', 10)")
+ *
+ * @see DatabaseOpen, DatabasePrepare, DatabaseChanges
  */
 int L_DatabaseExec(lua_State* L)
 {
@@ -292,13 +367,18 @@ int L_DatabaseExec(lua_State* L)
 /**
  * world.DatabaseColumns(Name)
  *
- * Returns the number of columns in the prepared statement.
- * Can be called immediately after DatabasePrepare, doesn't require DatabaseStep.
+ * Returns the number of columns in the result set of a prepared statement.
+ * Can be called immediately after DatabasePrepare.
  *
- * @param Name - Database name
- * @return Column count (positive), or negative custom error code
+ * @param Name (string) Logical database name
  *
- * Based on methods_database.cpp
+ * @return (number) Column count, or negative error code
+ *
+ * @example
+ * DatabasePrepare("mydb", "SELECT name, level, gold FROM players")
+ * local cols = DatabaseColumns("mydb")  -- Returns 3
+ *
+ * @see DatabaseColumnName, DatabaseColumnType, DatabaseColumnValue
  */
 int L_DatabaseColumns(lua_State* L)
 {
@@ -330,15 +410,28 @@ int L_DatabaseColumns(lua_State* L)
 /**
  * world.DatabaseColumnType(Name, Column)
  *
- * Returns the type of a column from the last DatabaseStep() result.
- * Column numbers are 1-based (first column is 1).
+ * Returns the SQLite data type of a column value from the current row.
+ * Column numbers are 1-based.
  *
- * @param Name - Database name
- * @param Column - Column number (1-based)
- * @return Column type (SQLITE_INTEGER=1, SQLITE_FLOAT=2, SQLITE_TEXT=3, SQLITE_BLOB=4,
- * SQLITE_NULL=5), or negative custom error code
+ * Type values:
+ * - 1: SQLITE_INTEGER
+ * - 2: SQLITE_FLOAT
+ * - 3: SQLITE_TEXT
+ * - 4: SQLITE_BLOB
+ * - 5: SQLITE_NULL
  *
- * Based on methods_database.cpp
+ * @param Name (string) Logical database name
+ * @param Column (number) Column number (1-based)
+ *
+ * @return (number) Column type (1-5), or negative error code
+ *
+ * @example
+ * local colType = DatabaseColumnType("mydb", 1)
+ * if colType == 3 then  -- SQLITE_TEXT
+ *     Note("Column 1 is text")
+ * end
+ *
+ * @see DatabaseColumnValue, DatabaseColumnName, DatabaseColumns
  */
 int L_DatabaseColumnType(lua_State* L)
 {
@@ -382,13 +475,23 @@ int L_DatabaseColumnType(lua_State* L)
 /**
  * world.DatabaseReset(Name)
  *
- * Resets a prepared statement to the beginning, allowing it to be executed again.
- * Useful for re-executing the same query with different parameters.
+ * Resets a prepared statement to the beginning, allowing re-execution.
+ * Useful for re-executing the same query with different bound parameters.
  *
- * @param Name - Database name
- * @return SQLite error code, or negative custom error code
+ * @param Name (string) Logical database name
  *
- * Based on methods_database.cpp
+ * @return (number) Error code:
+ *   - SQLITE_OK (0): Success
+ *   - DATABASE_ERROR_NO_PREPARED_STATEMENT (-4): No statement to reset
+ *
+ * @example
+ * -- Re-run a query after modifying parameters
+ * DatabaseReset("mydb")
+ * while DatabaseStep("mydb") == 100 do
+ *     -- Process rows again
+ * end
+ *
+ * @see DatabasePrepare, DatabaseStep, DatabaseFinalize
  */
 int L_DatabaseReset(lua_State* L)
 {
@@ -422,12 +525,18 @@ int L_DatabaseReset(lua_State* L)
 /**
  * world.DatabaseChanges(Name)
  *
- * Returns the number of rows modified by the most recent INSERT, UPDATE, or DELETE statement.
+ * Returns the number of rows modified by the most recent INSERT, UPDATE, or DELETE.
  *
- * @param Name - Database name
- * @return Number of rows changed (positive), or negative custom error code
+ * @param Name (string) Logical database name
  *
- * Based on methods_database.cpp
+ * @return (number) Rows changed, or negative error code
+ *
+ * @example
+ * DatabaseExec("mydb", "UPDATE players SET level = level + 1 WHERE active = 1")
+ * local changed = DatabaseChanges("mydb")
+ * Note("Updated " .. changed .. " players")
+ *
+ * @see DatabaseTotalChanges, DatabaseExec, DatabaseLastInsertRowid
  */
 int L_DatabaseChanges(lua_State* L)
 {
@@ -454,12 +563,17 @@ int L_DatabaseChanges(lua_State* L)
 /**
  * world.DatabaseTotalChanges(Name)
  *
- * Returns the total number of rows modified since the database was opened.
+ * Returns the total number of rows modified since the database connection was opened.
  *
- * @param Name - Database name
- * @return Total number of rows changed (positive), or negative custom error code
+ * @param Name (string) Logical database name
  *
- * Based on methods_database.cpp
+ * @return (number) Total rows changed, or negative error code
+ *
+ * @example
+ * local total = DatabaseTotalChanges("mydb")
+ * Note("Total changes this session: " .. total)
+ *
+ * @see DatabaseChanges, DatabaseOpen
  */
 int L_DatabaseTotalChanges(lua_State* L)
 {
@@ -487,11 +601,19 @@ int L_DatabaseTotalChanges(lua_State* L)
  * world.DatabaseError(Name)
  *
  * Returns the error message from the most recent SQLite operation.
+ * Useful for diagnosing failed database operations.
  *
- * @param Name - Database name
- * @return Error message string, or empty string if no error/database not found
+ * @param Name (string) Logical database name
  *
- * Based on methods_database.cpp
+ * @return (string) Error message, or empty string if no error
+ *
+ * @example
+ * local rc = DatabaseExec("mydb", "INVALID SQL")
+ * if rc ~= 0 then
+ *     Note("SQL Error: " .. DatabaseError("mydb"))
+ * end
+ *
+ * @see DatabaseOpen, DatabaseExec, DatabasePrepare
  */
 int L_DatabaseError(lua_State* L)
 {
@@ -516,11 +638,18 @@ int L_DatabaseError(lua_State* L)
  * Returns the name of a column from the prepared statement.
  * Column numbers are 1-based.
  *
- * @param Name - Database name
- * @param Column - Column number (1-based)
- * @return Column name string, or empty string on error
+ * @param Name (string) Logical database name
+ * @param Column (number) Column number (1-based)
  *
- * Based on methods_database.cpp
+ * @return (string) Column name, or empty string on error
+ *
+ * @example
+ * DatabasePrepare("mydb", "SELECT name, level FROM players")
+ * for i = 1, DatabaseColumns("mydb") do
+ *     Note("Column " .. i .. ": " .. DatabaseColumnName("mydb", i))
+ * end
+ *
+ * @see DatabaseColumnNames, DatabaseColumns, DatabaseColumnType
  */
 int L_DatabaseColumnName(lua_State* L)
 {
@@ -544,14 +673,19 @@ int L_DatabaseColumnName(lua_State* L)
 /**
  * world.DatabaseColumnText(Name, Column)
  *
- * Returns the value of a column as text from the current row.
+ * Returns the value of a column as a string from the current row.
+ * All value types are coerced to text representation.
  * Column numbers are 1-based.
  *
- * @param Name - Database name
- * @param Column - Column number (1-based)
- * @return Column value as string, or nil on error
+ * @param Name (string) Logical database name
+ * @param Column (number) Column number (1-based)
  *
- * Based on methods_database.cpp
+ * @return (string) Column value as text, or nil on error
+ *
+ * @example
+ * local name = DatabaseColumnText("mydb", 1)
+ *
+ * @see DatabaseColumnValue, DatabaseColumnName, DatabaseStep
  */
 int L_DatabaseColumnText(lua_State* L)
 {
@@ -620,14 +754,19 @@ static void pushDatabaseColumnValue(lua_State* L, sqlite3_stmt* pStmt, int colum
  * world.DatabaseColumnValue(Name, Column)
  *
  * Returns the value of a column with appropriate Lua type from the current row.
- * Integer/float columns return numbers, text/blob return strings, null returns nil.
+ * Integer/float columns return numbers, text/blob return strings, NULL returns nil.
  * Column numbers are 1-based.
  *
- * @param Name - Database name
- * @param Column - Column number (1-based)
- * @return Column value with appropriate type, or nil on error
+ * @param Name (string) Logical database name
+ * @param Column (number) Column number (1-based)
  *
- * Based on methods_database.cpp
+ * @return (varies) Column value with native Lua type, or nil on error/NULL
+ *
+ * @example
+ * local name = DatabaseColumnValue("mydb", 1)   -- string
+ * local level = DatabaseColumnValue("mydb", 2)  -- number
+ *
+ * @see DatabaseColumnText, DatabaseColumnValues, DatabaseStep
  */
 int L_DatabaseColumnValue(lua_State* L)
 {
@@ -651,12 +790,19 @@ int L_DatabaseColumnValue(lua_State* L)
 /**
  * world.DatabaseColumnNames(Name)
  *
- * Returns a table of all column names from the prepared statement.
+ * Returns a table containing all column names from the prepared statement.
  *
- * @param Name - Database name
- * @return Table of column names (1-indexed), or empty table on error
+ * @param Name (string) Logical database name
  *
- * Based on methods_database.cpp
+ * @return (table) Array of column name strings (1-indexed), or empty table on error
+ *
+ * @example
+ * local names = DatabaseColumnNames("mydb")
+ * for i, name in ipairs(names) do
+ *     Note("Column " .. i .. ": " .. name)
+ * end
+ *
+ * @see DatabaseColumnName, DatabaseColumns, DatabaseColumnValues
  */
 int L_DatabaseColumnNames(lua_State* L)
 {
@@ -684,13 +830,20 @@ int L_DatabaseColumnNames(lua_State* L)
 /**
  * world.DatabaseColumnValues(Name)
  *
- * Returns a table of all column values from the current row.
+ * Returns a table containing all column values from the current row.
  * Values are returned with appropriate Lua types.
  *
- * @param Name - Database name
- * @return Table of column values (1-indexed), or empty table on error
+ * @param Name (string) Logical database name
  *
- * Based on methods_database.cpp
+ * @return (table) Array of column values (1-indexed), or empty table on error
+ *
+ * @example
+ * while DatabaseStep("mydb") == 100 do
+ *     local row = DatabaseColumnValues("mydb")
+ *     Note("Row: " .. table.concat(row, ", "))
+ * end
+ *
+ * @see DatabaseColumnValue, DatabaseColumnNames, DatabaseStep
  */
 int L_DatabaseColumnValues(lua_State* L)
 {
@@ -717,14 +870,23 @@ int L_DatabaseColumnValues(lua_State* L)
 /**
  * world.DatabaseGetField(Name, Sql)
  *
- * Convenience function: executes SQL, steps once, returns first column value,
- * then finalizes the statement. Useful for simple queries like "SELECT count(*) FROM...".
+ * Convenience function that executes SQL, returns the first column of the first row.
+ * Automatically prepares, steps once, gets the value, and finalizes.
+ * Ideal for simple queries like "SELECT count(*) FROM..." or "SELECT MAX(id) FROM...".
  *
- * @param Name - Database name
- * @param Sql - SQL query to execute
- * @return First column value from first row, or nil if no results/error
+ * @param Name (string) Logical database name
+ * @param Sql (string) SQL query to execute
  *
- * Based on methods_database.cpp
+ * @return (varies) First column value from first row, or nil if no results/error
+ *
+ * @example
+ * local count = DatabaseGetField("mydb", "SELECT COUNT(*) FROM players")
+ * Note("Total players: " .. (count or 0))
+ *
+ * @example
+ * local name = DatabaseGetField("mydb", "SELECT name FROM players WHERE id = 1")
+ *
+ * @see DatabaseExec, DatabasePrepare, DatabaseStep
  */
 int L_DatabaseGetField(lua_State* L)
 {
@@ -776,17 +938,24 @@ int L_DatabaseGetField(lua_State* L)
 /**
  * world.DatabaseInfo(Name, InfoType)
  *
- * Returns information about a database.
+ * Returns information about a database connection.
  *
- * @param Name - Database name
- * @param InfoType - Type of info to return:
- *                   1 = disk filename
- *                   2 = has prepared statement (boolean)
- *                   3 = has valid row (boolean)
- *                   4 = number of columns
- * @return Requested info, or nil if database not found or invalid type
+ * Info types:
+ * - 1: Disk filename (string)
+ * - 2: Has prepared statement (boolean)
+ * - 3: Has valid row after DatabaseStep (boolean)
+ * - 4: Number of columns in prepared statement (number)
  *
- * Based on methods_database.cpp
+ * @param Name (string) Logical database name
+ * @param InfoType (number) Type of information (1-4)
+ *
+ * @return (varies) Requested info, or nil if database not found
+ *
+ * @example
+ * local filename = DatabaseInfo("mydb", 1)
+ * Note("Database file: " .. filename)
+ *
+ * @see DatabaseOpen, DatabaseList, DatabaseColumns
  */
 int L_DatabaseInfo(lua_State* L)
 {
@@ -828,12 +997,18 @@ int L_DatabaseInfo(lua_State* L)
  * world.DatabaseLastInsertRowid(Name)
  *
  * Returns the rowid of the last successful INSERT operation.
- * Returns as a string to handle large rowids that might exceed Lua number precision.
+ * Returned as a string to preserve precision for large rowids.
  *
- * @param Name - Database name
- * @return Rowid as string, or empty string on error
+ * @param Name (string) Logical database name
  *
- * Based on methods_database.cpp
+ * @return (string) Rowid as string, or empty string on error
+ *
+ * @example
+ * DatabaseExec("mydb", "INSERT INTO players (name) VALUES ('NewPlayer')")
+ * local id = DatabaseLastInsertRowid("mydb")
+ * Note("Inserted player with ID: " .. id)
+ *
+ * @see DatabaseChanges, DatabaseExec
  */
 int L_DatabaseLastInsertRowid(lua_State* L)
 {
@@ -856,11 +1031,18 @@ int L_DatabaseLastInsertRowid(lua_State* L)
 /**
  * world.DatabaseList()
  *
- * Returns a table of all open database names.
+ * Returns a table of all currently open database connection names.
  *
- * @return Table of database names (1-indexed)
+ * @return (table) Array of database names (1-indexed)
  *
- * Based on methods_database.cpp
+ * @example
+ * local dbs = DatabaseList()
+ * Note("Open databases: " .. #dbs)
+ * for i, name in ipairs(dbs) do
+ *     Note("  " .. name)
+ * end
+ *
+ * @see DatabaseOpen, DatabaseClose, DatabaseInfo
  */
 int L_DatabaseList(lua_State* L)
 {

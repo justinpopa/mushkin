@@ -1,5 +1,7 @@
 /**
  * world_commands.cpp - Command Queue Functions
+ *
+ * Functions for queuing commands to be sent to the MUD with delays.
  */
 
 #include "lua_common.h"
@@ -7,15 +9,31 @@
 /**
  * world.Queue(message, echo)
  *
- * Queues a command to be sent to the MUD.
- * The command will be sent according to the speedwalk delay setting.
+ * Queues a command to be sent to the MUD. Commands in the queue are sent
+ * one at a time with a delay between them (controlled by speedwalk delay
+ * setting). This is useful for sending multiple commands without flooding
+ * the MUD.
  *
- * @param message Command text to queue
- * @param echo Whether to echo the command when sent (optional, defaults to true)
- * @return Error code:
+ * @param message (string) Command text to queue for sending
+ * @param echo (boolean) Whether to echo the command to output when sent (optional, defaults to true)
+ *
+ * @return (number) Error code:
  *   - eOK (0): Success
  *   - eWorldClosed (30002): Not connected to MUD
  *   - eItemInUse (30063): Plugin is processing sent text
+ *
+ * @example
+ * -- Queue multiple commands with automatic pacing
+ * Queue("north")
+ * Queue("east")
+ * Queue("open door")
+ * Queue("north")
+ *
+ * @example
+ * -- Queue a silent command (not echoed to output)
+ * Queue("password123", false)
+ *
+ * @see DiscardQueue, Send, DoAfterSpecial
  */
 int L_Queue(lua_State* L)
 {
@@ -31,9 +49,22 @@ int L_Queue(lua_State* L)
 /**
  * world.DiscardQueue()
  *
- * Clears all queued commands.
+ * Clears all queued commands, preventing them from being sent. Use this to
+ * cancel a queued speedwalk or command sequence when circumstances change
+ * (e.g., entering combat, receiving an error message).
  *
- * @return Number of commands that were discarded
+ * @return (number) Count of commands that were discarded from the queue
+ *
+ * @example
+ * -- Cancel queued commands when combat starts
+ * function OnCombatStart()
+ *     local discarded = DiscardQueue()
+ *     if discarded > 0 then
+ *         Note("Cancelled " .. discarded .. " queued commands")
+ *     end
+ * end
+ *
+ * @see Queue
  */
 int L_DiscardQueue(lua_State* L)
 {

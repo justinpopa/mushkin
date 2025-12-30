@@ -107,3 +107,23 @@ jobs:
         run: ctest --test-dir build --output-on-failure --build-config Release
         env:
           QT_QPA_PLATFORM: ${{ matrix.os == 'Linux' && 'offscreen' || '' }}
+
+  docs:
+    name: Verify Docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run doc generator
+        run: python3 scripts/generate-lua-docs.py --output-dir /tmp/wiki-test
+
+      - name: Verify output
+        run: |
+          # Check that index was generated
+          test -f /tmp/wiki-test/Lua-API-0.1.0.md
+          # Check that we have a reasonable number of function pages
+          count=$(ls /tmp/wiki-test/Lua-API-0.1.0-*.md | wc -l)
+          echo "Generated $count pages"
+          test $count -gt 400

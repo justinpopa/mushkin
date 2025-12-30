@@ -38,16 +38,43 @@ static inline MiniWindow* getMiniWindow(WorldDocument* doc, const QString& name)
 /**
  * world.WindowCreate(name, left, top, width, height, position, flags, bgColor)
  *
- * Miniwindow Creation
- * Creates or updates a miniwindow.
+ * Creates a new miniwindow or updates an existing one. Miniwindows are
+ * overlay graphics that can display custom content, images, and hotspots.
  *
- * @param name Miniwindow name
- * @param left, top Position coordinates
- * @param width, height Dimensions in pixels
- * @param position Position mode (0-8: center, corners, edges)
- * @param flags Positioning flags (2=absolute location)
- * @param bgColor Background color (RGB)
- * @return Error code (eOK on success)
+ * Position modes:
+ *   - 0: Custom position (left/top ignored unless absolute flag set)
+ *   - 1: Top left       5: Center left
+ *   - 2: Top center     6: Center
+ *   - 3: Top right      7: Center right
+ *   - 4: Bottom left    8: Bottom center
+ *   - 9: Bottom right
+ *
+ * Flag values (combine with bitwise OR):
+ *   - 0x00: Use position mode
+ *   - 0x02: Absolute position (use left/top directly)
+ *   - 0x04: Transparent background
+ *   - 0x08: Draw underneath text
+ *
+ * @param name (string) Unique window identifier
+ * @param left (number) Left position or X offset
+ * @param top (number) Top position or Y offset
+ * @param width (number) Window width in pixels (0 for font setup)
+ * @param height (number) Window height in pixels (0 for font setup)
+ * @param position (number) Position mode (0-9)
+ * @param flags (number) Positioning and drawing flags
+ * @param bgColor (number) Background color in BGR format (0x00BBGGRR)
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *
+ * @example
+ * -- Create a 200x100 window at top-left with blue background
+ * WindowCreate("mywin", 0, 0, 200, 100, 1, 0, 0xFF0000)
+ *
+ * -- Create at absolute position (10, 20) with red background
+ * WindowCreate("stats", 10, 20, 150, 80, 0, 2, 0x0000FF)
+ *
+ * @see WindowShow, WindowDelete, WindowResize, WindowPosition
  */
 int L_WindowCreate(lua_State* L)
 {
@@ -112,12 +139,28 @@ int L_WindowCreate(lua_State* L)
 /**
  * world.WindowShow(name, show)
  *
- * Miniwindow Creation
- * Shows or hides a miniwindow.
+ * Shows or hides a miniwindow. Hidden windows are not drawn but
+ * retain their contents and hotspots.
  *
- * @param name Miniwindow name
- * @param show true to show, false to hide
- * @return Error code (eOK on success)
+ * @param name (string) Miniwindow name
+ * @param show (boolean) true to show, false to hide
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchWindow: Window doesn't exist
+ *
+ * @example
+ * -- Show the window
+ * WindowShow("mywin", true)
+ *
+ * -- Hide the window
+ * WindowShow("mywin", false)
+ *
+ * -- Toggle visibility
+ * local visible = WindowInfo("mywin", 5)
+ * WindowShow("mywin", not visible)
+ *
+ * @see WindowCreate, WindowDelete, WindowInfo
  */
 int L_WindowShow(lua_State* L)
 {
@@ -147,15 +190,34 @@ int L_WindowShow(lua_State* L)
 /**
  * world.WindowPosition(name, left, top, position, flags)
  *
- * Miniwindow Creation
- * Changes the position of an existing miniwindow.
+ * Changes the position of an existing miniwindow without recreating it.
+ * Use this for animations or dynamic positioning.
  *
- * @param name Miniwindow name
- * @param left Left coordinate (for absolute positioning)
- * @param top Top coordinate (for absolute positioning)
- * @param position Position mode (0-8: center, corners, edges)
- * @param flags Positioning flags (2=absolute location)
- * @return Error code (eOK on success)
+ * Position modes:
+ *   - 0: Custom position    5: Center left
+ *   - 1: Top left           6: Center
+ *   - 2: Top center         7: Center right
+ *   - 3: Top right          8: Bottom center
+ *   - 4: Bottom left        9: Bottom right
+ *
+ * @param name (string) Miniwindow name
+ * @param left (number) Left position (used with absolute flag)
+ * @param top (number) Top position (used with absolute flag)
+ * @param position (number) Position mode (0-9)
+ * @param flags (number) Positioning flags (0x02 = absolute position)
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchWindow: Window doesn't exist
+ *
+ * @example
+ * -- Move to absolute position
+ * WindowPosition("mywin", 100, 50, 0, 2)
+ *
+ * -- Snap to bottom-right corner
+ * WindowPosition("mywin", 0, 0, 9, 0)
+ *
+ * @see WindowCreate, WindowInfo, WindowSetZOrder
  */
 int L_WindowPosition(lua_State* L)
 {
@@ -189,17 +251,25 @@ int L_WindowPosition(lua_State* L)
 /**
  * world.WindowSetZOrder(name, zOrder)
  *
- * Miniwindow Z-Order
  * Sets the z-order of a miniwindow for controlling draw order.
- *
- * CMUSHclientDoc::WindowSetZOrder
- *
  * Lower z-order values draw first (underneath), higher values draw last (on top).
  * Windows with the same z-order are drawn in alphabetical order by name.
  *
- * @param name Miniwindow name
- * @param zOrder Z-order value (lower = draw first)
- * @return Error code (eOK on success, eNoSuchWindow if window doesn't exist)
+ * @param name (string) Miniwindow name
+ * @param zOrder (number) Z-order value (lower = draw first)
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchWindow: Window doesn't exist
+ *
+ * @example
+ * -- Put this window on top
+ * WindowSetZOrder("tooltip", 100)
+ *
+ * -- Put this window behind others
+ * WindowSetZOrder("background", -10)
+ *
+ * @see WindowCreate, WindowInfo, WindowPosition
  */
 int L_WindowSetZOrder(lua_State* L)
 {
@@ -228,11 +298,27 @@ int L_WindowSetZOrder(lua_State* L)
 /**
  * world.WindowDelete(name)
  *
- * Miniwindow Creation
- * Deletes a miniwindow and all its resources (fonts, images, hotspots).
+ * Deletes a miniwindow and frees all associated resources including
+ * fonts, images, and hotspots. Cannot delete a window during its
+ * own callback execution.
  *
- * @param name Miniwindow name
- * @return Error code (eOK on success)
+ * @param name (string) Miniwindow name
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchWindow: Window doesn't exist
+ *   - eItemInUse: Window is executing a script callback
+ *
+ * @example
+ * -- Clean up a window when done
+ * WindowDelete("mywin")
+ *
+ * -- Delete all windows from a list
+ * for _, name in ipairs(WindowList()) do
+ *     WindowDelete(name)
+ * end
+ *
+ * @see WindowCreate, WindowList, WindowShow
  */
 int L_WindowDelete(lua_State* L)
 {
@@ -263,33 +349,52 @@ int L_WindowDelete(lua_State* L)
 /**
  * world.WindowInfo(name, infoType)
  *
- * Miniwindow Creation
- * Returns information about a miniwindow.
+ * Returns various information about a miniwindow.
  *
- * @param name Miniwindow name
- * @param infoType Information type (MUSHclient compatible):
+ * Info types:
  *   1 = left position (from WindowCreate)
  *   2 = top position (from WindowCreate)
- *   3 = width
- *   4 = height
- *   5 = show flag (visible)
- *   6 = hidden flag (opposite of visible)
+ *   3 = width in pixels
+ *   4 = height in pixels
+ *   5 = show flag (true if visible)
+ *   6 = hidden flag (true if hidden)
  *   7 = layout/position mode
- *   8 = flags
- *   9 = background color
- *   10 = rect left (current position after layout)
+ *   8 = flags value
+ *   9 = background color (BGR)
+ *   10 = rect left (actual position after layout)
  *   11 = rect top
  *   12 = rect right
  *   13 = rect bottom
- *   14 = last mouse x position (miniwindow-relative)
- *   15 = last mouse y position (miniwindow-relative)
+ *   14 = last mouse X (miniwindow-relative)
+ *   15 = last mouse Y (miniwindow-relative)
  *   16 = last mouse update count
- *   17 = client mouse x position (output-window-relative)
- *   18 = client mouse y position (output-window-relative)
- *   19 = mouse-over hotspot ID
- *   20 = mouse-down hotspot ID
- *   22 = z-order
- * @return Value (or nil if not found)
+ *   17 = client mouse X (output-window-relative)
+ *   18 = client mouse Y (output-window-relative)
+ *   19 = mouse-over hotspot ID (string)
+ *   20 = mouse-down hotspot ID (string)
+ *   22 = z-order value
+ *
+ * @param name (string) Miniwindow name
+ * @param infoType (number) Type of information to retrieve (1-22)
+ *
+ * @return (varies) Requested information, or nil if window doesn't exist
+ *
+ * @example
+ * -- Get window dimensions
+ * local width = WindowInfo("mywin", 3)
+ * local height = WindowInfo("mywin", 4)
+ * Note("Window size: " .. width .. "x" .. height)
+ *
+ * -- Check if window is visible
+ * if WindowInfo("mywin", 5) then
+ *     Note("Window is visible")
+ * end
+ *
+ * -- Get mouse position in window
+ * local mx = WindowInfo("mywin", 14)
+ * local my = WindowInfo("mywin", 15)
+ *
+ * @see WindowCreate, WindowShow, WindowPosition
  */
 int L_WindowInfo(lua_State* L)
 {
@@ -410,14 +515,29 @@ int L_WindowInfo(lua_State* L)
 /**
  * world.WindowResize(name, width, height, backgroundColor)
  *
- * Miniwindow Creation
- * Resize miniwindow and recreate offscreen pixmap.
+ * Resizes a miniwindow and recreates its drawing surface.
+ * Existing content is preserved where possible; new areas are
+ * filled with the background color.
  *
- * @param name Miniwindow name
- * @param width New width in pixels
- * @param height New height in pixels
- * @param backgroundColor New background color (RGB)
- * @return Error code (eOK on success)
+ * @param name (string) Miniwindow name
+ * @param width (number) New width in pixels
+ * @param height (number) New height in pixels
+ * @param backgroundColor (number) Background color (BGR format)
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchWindow: Window doesn't exist
+ *
+ * @example
+ * -- Resize window to 300x200 with black background
+ * WindowResize("mywin", 300, 200, 0x000000)
+ *
+ * -- Double the window size
+ * local w = WindowInfo("mywin", 3)
+ * local h = WindowInfo("mywin", 4)
+ * WindowResize("mywin", w * 2, h * 2, 0x000000)
+ *
+ * @see WindowCreate, WindowInfo
  */
 int L_WindowResize(lua_State* L)
 {
@@ -450,15 +570,40 @@ int L_WindowResize(lua_State* L)
 /**
  * world.WindowRectOp(name, action, left, top, right, bottom, penColor, brushColor)
  *
- * Drawing Primitives
- * Draw rectangle with various operations
+ * Draws rectangles with various operations.
  *
- * @param name Miniwindow name
- * @param action 1=frame, 2=fill, 3=invert, 5=3D rect
- * @param left, top, right, bottom Rectangle coordinates
- * @param penColor Pen color (RGB)
- * @param brushColor Brush color (RGB)
- * @return Error code
+ * Action codes:
+ *   1 = Frame rectangle (outline only)
+ *   2 = Fill rectangle (solid)
+ *   3 = Invert colors in rectangle
+ *   4 = 3D raised rectangle
+ *   5 = 3D sunken rectangle
+ *   6 = Flood fill from point
+ *
+ * @param name (string) Miniwindow name
+ * @param action (number) Drawing operation (1-6)
+ * @param left (number) Left coordinate
+ * @param top (number) Top coordinate
+ * @param right (number) Right coordinate
+ * @param bottom (number) Bottom coordinate
+ * @param penColor (number) Outline color (BGR format)
+ * @param brushColor (number) Fill color (BGR format, optional)
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchWindow: Window doesn't exist
+ *
+ * @example
+ * -- Draw a red filled rectangle
+ * WindowRectOp("mywin", 2, 10, 10, 100, 50, 0x0000FF, 0x0000FF)
+ *
+ * -- Draw a blue frame
+ * WindowRectOp("mywin", 1, 10, 10, 100, 50, 0xFF0000, 0)
+ *
+ * -- Draw 3D raised button
+ * WindowRectOp("mywin", 4, 10, 10, 100, 30, 0xC0C0C0, 0xC0C0C0)
+ *
+ * @see WindowCircleOp, WindowLine, WindowGradient
  */
 int L_WindowRectOp(lua_State* L)
 {
@@ -488,8 +633,49 @@ int L_WindowRectOp(lua_State* L)
  * world.WindowCircleOp(name, action, left, top, right, bottom, penColor, penStyle, penWidth,
  *                      brushColor, brushStyle, extra1, extra2, extra3, extra4)
  *
- * Drawing Primitives
- * Draw circle/ellipse with various operations
+ * Draws circles, ellipses, and rounded rectangles with various styles.
+ *
+ * Action codes:
+ *   1 = Ellipse (outline)
+ *   2 = Filled ellipse
+ *   3 = Pie slice (arc with lines to center)
+ *   4 = Chord (arc with straight line connecting ends)
+ *   5 = Rounded rectangle
+ *
+ * Pen styles: 0=solid, 1=dash, 2=dot, 3=dashdot, 4=dashdotdot
+ * Brush styles: 0=solid, 1=null (transparent)
+ *
+ * @param name (string) Miniwindow name
+ * @param action (number) Drawing operation (1-5)
+ * @param left (number) Bounding rectangle left
+ * @param top (number) Bounding rectangle top
+ * @param right (number) Bounding rectangle right
+ * @param bottom (number) Bounding rectangle bottom
+ * @param penColor (number) Outline color (BGR)
+ * @param penStyle (number) Line style (0-4)
+ * @param penWidth (number) Line width in pixels
+ * @param brushColor (number) Fill color (BGR)
+ * @param brushStyle (number) Fill style (0-1)
+ * @param extra1 (number) Start angle (pie/chord) or corner width (rounded rect)
+ * @param extra2 (number) End angle (pie/chord) or corner height (rounded rect)
+ * @param extra3 (number) Reserved
+ * @param extra4 (number) Reserved
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchWindow: Window doesn't exist
+ *
+ * @example
+ * -- Draw a filled blue circle
+ * WindowCircleOp("mywin", 2, 10, 10, 110, 110, 0xFF0000, 0, 2, 0xFF0000, 0)
+ *
+ * -- Draw an outlined ellipse
+ * WindowCircleOp("mywin", 1, 10, 10, 200, 100, 0x00FF00, 0, 1, 0, 1)
+ *
+ * -- Rounded rectangle with 10x10 corners
+ * WindowCircleOp("mywin", 5, 10, 10, 100, 50, 0, 0, 1, 0xC0C0C0, 0, 10, 10)
+ *
+ * @see WindowRectOp, WindowLine, WindowArc
  */
 int L_WindowCircleOp(lua_State* L)
 {
@@ -526,8 +712,31 @@ int L_WindowCircleOp(lua_State* L)
 /**
  * world.WindowLine(name, x1, y1, x2, y2, penColor, penStyle, penWidth)
  *
- * Drawing Primitives
- * Draw line
+ * Draws a line between two points.
+ *
+ * Pen styles: 0=solid, 1=dash, 2=dot, 3=dashdot, 4=dashdotdot
+ *
+ * @param name (string) Miniwindow name
+ * @param x1 (number) Start X coordinate
+ * @param y1 (number) Start Y coordinate
+ * @param x2 (number) End X coordinate
+ * @param y2 (number) End Y coordinate
+ * @param penColor (number) Line color (BGR format)
+ * @param penStyle (number) Line style (0-4)
+ * @param penWidth (number) Line width in pixels
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchWindow: Window doesn't exist
+ *
+ * @example
+ * -- Draw a red diagonal line
+ * WindowLine("mywin", 0, 0, 100, 100, 0x0000FF, 0, 2)
+ *
+ * -- Draw a dashed horizontal line
+ * WindowLine("mywin", 10, 50, 190, 50, 0xFFFFFF, 1, 1)
+ *
+ * @see WindowPolygon, WindowBezier, WindowArc
  */
 int L_WindowLine(lua_State* L)
 {
@@ -555,10 +764,36 @@ int L_WindowLine(lua_State* L)
 
 /**
  * world.WindowPolygon(name, points, penColor, penStyle, penWidth, brushColor, brushStyle, close,
- * winding)
+ *                     winding)
  *
- * Drawing Primitives
- * Draw polygon
+ * Draws a polygon from a series of points.
+ *
+ * Points are specified as comma-separated coordinate pairs: "x1,y1,x2,y2,..."
+ * Pen styles: 0=solid, 1=dash, 2=dot, 3=dashdot, 4=dashdotdot
+ * Brush styles: 0=solid, 1=null (no fill)
+ *
+ * @param name (string) Miniwindow name
+ * @param points (string) Comma-separated X,Y coordinate pairs
+ * @param penColor (number) Outline color (BGR)
+ * @param penStyle (number) Line style (0-4)
+ * @param penWidth (number) Line width in pixels
+ * @param brushColor (number) Fill color (BGR)
+ * @param brushStyle (number) Fill style (0-1)
+ * @param close (boolean) true to connect last point to first
+ * @param winding (boolean) true for winding fill, false for alternate fill
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchWindow: Window doesn't exist
+ *
+ * @example
+ * -- Draw a triangle
+ * WindowPolygon("mywin", "50,10,10,90,90,90", 0xFFFFFF, 0, 1, 0x00FF00, 0, true, false)
+ *
+ * -- Draw an open polyline (not closed)
+ * WindowPolygon("mywin", "0,0,50,50,100,0", 0xFFFFFF, 0, 2, 0, 1, false, false)
+ *
+ * @see WindowLine, WindowBezier, WindowRectOp
  */
 int L_WindowPolygon(lua_State* L)
 {
@@ -591,18 +826,33 @@ int L_WindowPolygon(lua_State* L)
 /**
  * world.WindowGradient(name, left, top, right, bottom, color1, color2, mode)
  *
- * Drawing Primitives
- * Draw gradient fill
+ * Fills a rectangle with a smooth gradient between two colors.
  *
- * @param name Miniwindow name
- * @param left Left coordinate
- * @param top Top coordinate
- * @param right Right coordinate
- * @param bottom Bottom coordinate
- * @param color1 Start color (ARGB)
- * @param color2 End color (ARGB)
- * @param mode Gradient mode (1=horizontal, 2=vertical)
- * @return Error code (eOK on success)
+ * Gradient modes:
+ *   1 = Horizontal (left to right)
+ *   2 = Vertical (top to bottom)
+ *
+ * @param name (string) Miniwindow name
+ * @param left (number) Left coordinate
+ * @param top (number) Top coordinate
+ * @param right (number) Right coordinate
+ * @param bottom (number) Bottom coordinate
+ * @param color1 (number) Start color (BGR format)
+ * @param color2 (number) End color (BGR format)
+ * @param mode (number) Gradient direction (1=horizontal, 2=vertical)
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchWindow: Window doesn't exist
+ *
+ * @example
+ * -- Horizontal gradient from blue to red
+ * WindowGradient("mywin", 0, 0, 200, 100, 0xFF0000, 0x0000FF, 1)
+ *
+ * -- Vertical gradient from black to white
+ * WindowGradient("mywin", 0, 0, 200, 100, 0x000000, 0xFFFFFF, 2)
+ *
+ * @see WindowRectOp, WindowCircleOp
  */
 int L_WindowGradient(lua_State* L)
 {
@@ -631,8 +881,27 @@ int L_WindowGradient(lua_State* L)
 /**
  * world.WindowSetPixel(name, x, y, color)
  *
- * Drawing Primitives
- * Set pixel color
+ * Sets the color of a single pixel.
+ *
+ * @param name (string) Miniwindow name
+ * @param x (number) X coordinate
+ * @param y (number) Y coordinate
+ * @param color (number) Pixel color (BGR format)
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchWindow: Window doesn't exist
+ *
+ * @example
+ * -- Draw a red pixel at (50, 50)
+ * WindowSetPixel("mywin", 50, 50, 0x0000FF)
+ *
+ * -- Draw a pattern of pixels
+ * for i = 0, 99 do
+ *     WindowSetPixel("mywin", i, i, 0xFFFFFF)
+ * end
+ *
+ * @see WindowGetPixel, WindowLine
  */
 int L_WindowSetPixel(lua_State* L)
 {
@@ -657,8 +926,25 @@ int L_WindowSetPixel(lua_State* L)
 /**
  * world.WindowGetPixel(name, x, y)
  *
- * Drawing Primitives
- * Get pixel color
+ * Gets the color of a single pixel.
+ *
+ * @param name (string) Miniwindow name
+ * @param x (number) X coordinate
+ * @param y (number) Y coordinate
+ *
+ * @return (number) Pixel color (BGR format), or 0 if window doesn't exist
+ *
+ * @example
+ * -- Get color at a point
+ * local color = WindowGetPixel("mywin", 50, 50)
+ * Note("Color: " .. string.format("0x%06X", color))
+ *
+ * -- Check if pixel is white
+ * if WindowGetPixel("mywin", x, y) == 0xFFFFFF then
+ *     Note("Pixel is white")
+ * end
+ *
+ * @see WindowSetPixel
  */
 int L_WindowGetPixel(lua_State* L)
 {
@@ -683,22 +969,34 @@ int L_WindowGetPixel(lua_State* L)
 /**
  * world.WindowArc(name, left, top, right, bottom, x1, y1, x2, y2, penColor, penStyle, penWidth)
  *
- * Drawing Primitives
- * Draw arc (portion of ellipse)
+ * Draws an arc (portion of an ellipse outline) from start point to end point.
+ * The arc is drawn counter-clockwise from the start point to the end point
+ * along the ellipse defined by the bounding rectangle.
  *
- * @param name Miniwindow name
- * @param left Left coordinate of bounding rectangle
- * @param top Top coordinate of bounding rectangle
- * @param right Right coordinate of bounding rectangle
- * @param bottom Bottom coordinate of bounding rectangle
- * @param x1 X coordinate of arc start point
- * @param y1 Y coordinate of arc start point
- * @param x2 X coordinate of arc end point
- * @param y2 Y coordinate of arc end point
- * @param penColor Pen color (ARGB)
- * @param penStyle Pen style (0=solid, 1=dash, 2=dot, etc.)
- * @param penWidth Pen width in pixels
- * @return Error code (eOK on success)
+ * Pen styles: 0=solid, 1=dash, 2=dot, 3=dashdot, 4=dashdotdot
+ *
+ * @param name (string) Miniwindow name
+ * @param left (number) Bounding rectangle left
+ * @param top (number) Bounding rectangle top
+ * @param right (number) Bounding rectangle right
+ * @param bottom (number) Bounding rectangle bottom
+ * @param x1 (number) Arc start point X (on or near ellipse)
+ * @param y1 (number) Arc start point Y
+ * @param x2 (number) Arc end point X
+ * @param y2 (number) Arc end point Y
+ * @param penColor (number) Line color (BGR format)
+ * @param penStyle (number) Line style (0-4)
+ * @param penWidth (number) Line width in pixels
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchWindow: Window doesn't exist
+ *
+ * @example
+ * -- Draw a quarter-circle arc
+ * WindowArc("mywin", 10, 10, 110, 110, 110, 60, 60, 10, 0xFFFFFF, 0, 2)
+ *
+ * @see WindowCircleOp, WindowBezier, WindowLine
  */
 int L_WindowArc(lua_State* L)
 {
@@ -732,15 +1030,31 @@ int L_WindowArc(lua_State* L)
 /**
  * world.WindowBezier(name, points, penColor, penStyle, penWidth)
  *
- * Drawing Primitives
- * Draw Bezier curve
+ * Draws a Bezier curve through the specified control points.
+ * Points must be specified as (3n+1) points where n is the number of
+ * cubic Bezier segments. Each segment uses 4 points: start, control1,
+ * control2, end (with end being the start of the next segment).
  *
- * @param name Miniwindow name
- * @param points Comma-separated coordinate pairs (x1,y1,x2,y2,...) - must be (3n+1) points
- * @param penColor Pen color (ARGB)
- * @param penStyle Pen style (0=solid, 1=dash, 2=dot, etc.)
- * @param penWidth Pen width in pixels
- * @return Error code (eOK on success)
+ * Pen styles: 0=solid, 1=dash, 2=dot, 3=dashdot, 4=dashdotdot
+ *
+ * @param name (string) Miniwindow name
+ * @param points (string) Comma-separated X,Y coordinate pairs
+ * @param penColor (number) Line color (BGR format)
+ * @param penStyle (number) Line style (0-4)
+ * @param penWidth (number) Line width in pixels
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchWindow: Window doesn't exist
+ *
+ * @example
+ * -- Draw a simple Bezier curve (1 segment = 4 points)
+ * WindowBezier("mywin", "10,50,30,10,70,90,90,50", 0xFFFFFF, 0, 2)
+ *
+ * -- Draw a compound curve (2 segments = 7 points)
+ * WindowBezier("mywin", "0,50,25,0,50,0,75,50,100,100,125,100,150,50", 0x00FF00, 0, 1)
+ *
+ * @see WindowLine, WindowPolygon, WindowArc
  */
 int L_WindowBezier(lua_State* L)
 {
@@ -770,8 +1084,33 @@ int L_WindowBezier(lua_State* L)
 /**
  * world.WindowFont(name, fontId, fontName, size, bold, italic, underline, strikeout)
  *
- * Text and Font Management
- * Create or update font
+ * Creates or updates a named font for use with WindowText.
+ * Fonts are stored per-miniwindow and referenced by fontId.
+ *
+ * @param name (string) Miniwindow name
+ * @param fontId (string) Unique font identifier for this window
+ * @param fontName (string) System font name (e.g., "Arial", "Courier New")
+ * @param size (number) Font size in points
+ * @param bold (boolean) true for bold weight
+ * @param italic (boolean) true for italic style
+ * @param underline (boolean) true for underlined text
+ * @param strikeout (boolean) true for strikethrough text
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchWindow: Window doesn't exist
+ *
+ * @example
+ * -- Create a 12pt bold Arial font
+ * WindowFont("mywin", "title", "Arial", 12, true, false, false, false)
+ *
+ * -- Create a monospace font for code
+ * WindowFont("mywin", "code", "Courier New", 10, false, false, false, false)
+ *
+ * -- Use the font to draw text
+ * WindowText("mywin", "title", "Hello World", 10, 10, 0, 0, 0xFFFFFF, false)
+ *
+ * @see WindowText, WindowTextWidth, WindowFontInfo, WindowFontList
  */
 int L_WindowFont(lua_State* L)
 {
@@ -801,8 +1140,36 @@ int L_WindowFont(lua_State* L)
 /**
  * world.WindowText(name, fontId, text, left, top, right, bottom, color, unicode)
  *
- * Text and Font Management
- * Draw text
+ * Draws text using a previously created font. Returns the text width
+ * to allow for measuring and positioning.
+ *
+ * If right and bottom are 0, text is drawn at the specified position
+ * without clipping. Otherwise, text is clipped to the rectangle.
+ *
+ * @param name (string) Miniwindow name
+ * @param fontId (string) Font identifier (from WindowFont)
+ * @param text (string) Text to draw
+ * @param left (number) Left position
+ * @param top (number) Top position
+ * @param right (number) Right clip boundary (0 = no clipping)
+ * @param bottom (number) Bottom clip boundary (0 = no clipping)
+ * @param color (number) Text color (BGR format)
+ * @param unicode (boolean) true if text is Unicode encoded
+ *
+ * @return (number) Width of the drawn text in pixels
+ *
+ * @example
+ * -- Simple text drawing
+ * WindowFont("mywin", "f", "Arial", 12, false, false, false, false)
+ * local width = WindowText("mywin", "f", "Hello!", 10, 10, 0, 0, 0xFFFFFF, false)
+ * Note("Text width: " .. width)
+ *
+ * -- Right-aligned text
+ * local text = "Score: 100"
+ * local tw = WindowTextWidth("mywin", "f", text, false)
+ * WindowText("mywin", "f", text, 190 - tw, 10, 0, 0, 0xFFFFFF, false)
+ *
+ * @see WindowFont, WindowTextWidth, WindowFontInfo
  */
 int L_WindowText(lua_State* L)
 {
@@ -833,8 +1200,24 @@ int L_WindowText(lua_State* L)
 /**
  * world.WindowTextWidth(name, fontId, text, unicode)
  *
- * Text and Font Management
- * Measure text width
+ * Measures the width of text without drawing it. Useful for layout
+ * calculations, centering, and right-alignment.
+ *
+ * @param name (string) Miniwindow name
+ * @param fontId (string) Font identifier (from WindowFont)
+ * @param text (string) Text to measure
+ * @param unicode (boolean) true if text is Unicode encoded
+ *
+ * @return (number) Width in pixels, or 0 if window/font not found
+ *
+ * @example
+ * -- Center text horizontally in a 200px window
+ * WindowFont("mywin", "f", "Arial", 12, false, false, false, false)
+ * local text = "Centered"
+ * local width = WindowTextWidth("mywin", "f", text, false)
+ * WindowText("mywin", "f", text, (200 - width) / 2, 10, 0, 0, 0xFFFFFF, false)
+ *
+ * @see WindowText, WindowFont, WindowFontInfo
  */
 int L_WindowTextWidth(lua_State* L)
 {
@@ -860,8 +1243,39 @@ int L_WindowTextWidth(lua_State* L)
 /**
  * world.WindowFontInfo(name, fontId, infoType)
  *
- * Text and Font Management
- * Get font information
+ * Returns information about a font in a miniwindow.
+ *
+ * Info types:
+ *   1 = Font height in pixels
+ *   2 = Ascent (baseline to top)
+ *   3 = Descent (baseline to bottom)
+ *   4 = Internal leading
+ *   5 = External leading
+ *   6 = Average character width
+ *   7 = Maximum character width
+ *   8 = Weight (400=normal, 700=bold)
+ *   9 = Pitch and family
+ *   10 = Character set
+ *   11 = Italic flag (boolean)
+ *   12 = Underline flag (boolean)
+ *   13 = Strikeout flag (boolean)
+ *   14 = Font name (string)
+ *   15 = True if fixed-width font
+ *
+ * @param name (string) Miniwindow name
+ * @param fontId (string) Font identifier
+ * @param infoType (number) Type of information (1-15)
+ *
+ * @return (varies) Requested information, or nil if font not found
+ *
+ * @example
+ * -- Get font height for line spacing
+ * local height = WindowFontInfo("mywin", "f", 1)
+ * for i = 0, 5 do
+ *     WindowText("mywin", "f", "Line " .. i, 10, i * height, 0, 0, 0xFFFFFF, false)
+ * end
+ *
+ * @see WindowFont, WindowText, WindowFontList
  */
 int L_WindowFontInfo(lua_State* L)
 {
@@ -910,11 +1324,21 @@ int L_WindowFontInfo(lua_State* L)
 /**
  * world.WindowFontList(name)
  *
- * Text and Font Management
- * Get list of all font IDs in miniwindow
+ * Returns a table of all font IDs defined in a miniwindow.
  *
- * @param name Miniwindow name
- * @return Table (array) of font IDs
+ * @param name (string) Miniwindow name
+ *
+ * @return (table) Array of font ID strings (1-indexed)
+ *
+ * @example
+ * -- List all fonts in the window
+ * local fonts = WindowFontList("mywin")
+ * for i, fontId in ipairs(fonts) do
+ *     local height = WindowFontInfo("mywin", fontId, 1)
+ *     Note("Font: " .. fontId .. " height: " .. height)
+ * end
+ *
+ * @see WindowFont, WindowFontInfo
  */
 int L_WindowFontList(lua_State* L)
 {
@@ -947,16 +1371,27 @@ int L_WindowFontList(lua_State* L)
  * world.WindowLoadImage(name, imageId, filename)
  *
  * Loads an image file into a miniwindow for later drawing.
+ * Supports PNG, BMP, JPG, GIF, and other common formats.
+ * Pass an empty filename to remove a previously loaded image.
  *
- * @param name - Miniwindow name
- * @param imageId - Unique ID for this image within the window
- * @param filename - Path to image file (PNG, BMP, JPG, etc.)
- * @return eOK on success, error code on failure
+ * @param name (string) Miniwindow name
+ * @param imageId (string) Unique ID to reference this image
+ * @param filename (string) Path to image file, or "" to remove
  *
- * The image is loaded into memory and cached with the given imageId.
- * You can then use WindowDrawImage to actually draw it.
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchWindow: Window doesn't exist
+ *   - eFileNotFound (30051): Image file not found or unreadable
  *
- * Based on methods_miniwindows.cpp:WindowLoadImage
+ * @example
+ * -- Load an image
+ * WindowLoadImage("mywin", "logo", "C:/Images/logo.png")
+ * WindowDrawImage("mywin", "logo", 10, 10, 0, 0, 1)
+ *
+ * -- Remove the image to free memory
+ * WindowLoadImage("mywin", "logo", "")
+ *
+ * @see WindowDrawImage, WindowImageInfo, WindowImageList, WindowLoadImageMemory
  */
 int L_WindowLoadImage(lua_State* L)
 {
@@ -1002,23 +1437,42 @@ int L_WindowLoadImage(lua_State* L)
 
 /**
  * world.WindowDrawImage(name, imageId, left, top, right, bottom, mode, srcLeft, srcTop, srcRight,
- * srcBottom)
+ *                       srcBottom)
  *
- * Image Operations
- * Draw a loaded image to the miniwindow with optional scaling and sprite sheet support.
+ * Draws a loaded image to the miniwindow with optional scaling and
+ * sprite sheet support. Source coordinates allow drawing a portion.
  *
- * @param name Miniwindow name
- * @param imageId Image identifier
- * @param left Destination left
- * @param top Destination top
- * @param right Destination right
- * @param bottom Destination bottom
- * @param mode Draw mode (1=copy, 2=transparent_copy)
- * @param srcLeft Source left (default 0)
- * @param srcTop Source top (default 0)
- * @param srcRight Source right (default 0 = full width)
- * @param srcBottom Source bottom (default 0 = full height)
- * @return Error code (eOK on success)
+ * Draw modes:
+ *   1 = Copy (opaque)
+ *   2 = Transparent copy (top-left pixel color is transparent)
+ *   3 = Stretch to fit destination rectangle
+ *
+ * @param name (string) Miniwindow name
+ * @param imageId (string) Image identifier (from WindowLoadImage)
+ * @param left (number) Destination left
+ * @param top (number) Destination top
+ * @param right (number) Destination right (0 = use image width)
+ * @param bottom (number) Destination bottom (0 = use image height)
+ * @param mode (number) Draw mode (1-3)
+ * @param srcLeft (number) Source left (default 0)
+ * @param srcTop (number) Source top (default 0)
+ * @param srcRight (number) Source right (default 0 = full width)
+ * @param srcBottom (number) Source bottom (default 0 = full height)
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchWindow: Window doesn't exist
+ *   - eImageNotInstalled: Image not found
+ *
+ * @example
+ * -- Draw image at position
+ * WindowLoadImage("mywin", "bg", "background.png")
+ * WindowDrawImage("mywin", "bg", 0, 0, 0, 0, 1)
+ *
+ * -- Draw a sprite from a sheet (extract 32x32 tile at row 2, col 3)
+ * WindowDrawImage("mywin", "sheet", 10, 10, 42, 42, 1, 64, 32, 96, 64)
+ *
+ * @see WindowLoadImage, WindowBlendImage, WindowDrawImageAlpha
  */
 int L_WindowDrawImage(lua_State* L)
 {
@@ -1050,24 +1504,41 @@ int L_WindowDrawImage(lua_State* L)
 
 /**
  * world.WindowBlendImage(name, imageId, left, top, right, bottom, mode, opacity, srcLeft, srcTop,
- * srcRight, srcBottom)
+ *                        srcRight, srcBottom)
  *
- * Image Operations
- * Draw a loaded image with opacity and blend modes for visual effects.
+ * Draws an image with opacity and blend modes for visual effects.
  *
- * @param name Miniwindow name
- * @param imageId Image identifier
- * @param left Destination left
- * @param top Destination top
- * @param right Destination right
- * @param bottom Destination bottom
- * @param mode Blend mode (1=normal, 2=multiply, 3=screen, 4=overlay)
- * @param opacity Opacity (0.0-1.0)
- * @param srcLeft Source left (default 0)
- * @param srcTop Source top (default 0)
- * @param srcRight Source right (default 0)
- * @param srcBottom Source bottom (default 0)
- * @return Error code (eOK on success)
+ * Blend modes:
+ *   1 = Normal (alpha blend)
+ *   2 = Multiply (darkens)
+ *   3 = Screen (lightens)
+ *   4 = Overlay (contrast)
+ *
+ * @param name (string) Miniwindow name
+ * @param imageId (string) Image identifier
+ * @param left (number) Destination left
+ * @param top (number) Destination top
+ * @param right (number) Destination right (0 = window width)
+ * @param bottom (number) Destination bottom (0 = window height)
+ * @param mode (number) Blend mode (1-4)
+ * @param opacity (number) Opacity from 0.0 (transparent) to 1.0 (opaque)
+ * @param srcLeft (number) Source left (default 0)
+ * @param srcTop (number) Source top (default 0)
+ * @param srcRight (number) Source right (default 0)
+ * @param srcBottom (number) Source bottom (default 0)
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchWindow: Window doesn't exist
+ *
+ * @example
+ * -- Draw semi-transparent image
+ * WindowBlendImage("mywin", "overlay", 0, 0, 0, 0, 1, 0.5, 0, 0, 0, 0)
+ *
+ * -- Apply darkening effect with multiply blend
+ * WindowBlendImage("mywin", "shadow", 0, 0, 0, 0, 2, 0.7, 0, 0, 0, 0)
+ *
+ * @see WindowDrawImage, WindowDrawImageAlpha, WindowMergeImageAlpha
  */
 int L_WindowBlendImage(lua_State* L)
 {
@@ -1101,13 +1572,23 @@ int L_WindowBlendImage(lua_State* L)
 /**
  * world.WindowImageFromWindow(name, imageId, srcWindowName)
  *
- * Image Operations
- * Copy the contents of another miniwindow as an image.
+ * Copies the contents of another miniwindow as an image.
+ * Useful for double-buffering or creating window snapshots.
  *
- * @param name Destination miniwindow name
- * @param imageId Image identifier to store under
- * @param srcWindowName Source miniwindow name
- * @return Error code (eOK on success)
+ * @param name (string) Destination miniwindow name
+ * @param imageId (string) Image identifier to store under
+ * @param srcWindowName (string) Source miniwindow name to copy from
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchWindow: Destination window doesn't exist
+ *
+ * @example
+ * -- Create a snapshot of another window
+ * WindowImageFromWindow("mywin", "snapshot", "otherwin")
+ * WindowDrawImage("mywin", "snapshot", 0, 0, 0, 0, 1)
+ *
+ * @see WindowLoadImage, WindowDrawImage
  */
 int L_WindowImageFromWindow(lua_State* L)
 {
@@ -1132,13 +1613,25 @@ int L_WindowImageFromWindow(lua_State* L)
 /**
  * world.WindowImageInfo(name, imageId, infoType)
  *
- * Image Operations
- * Get information about a loaded image.
+ * Returns information about a loaded image.
  *
- * @param name Miniwindow name
- * @param imageId Image identifier
- * @param infoType Info type (1=width, 2=height)
- * @return Requested info, or nil on error
+ * Info types:
+ *   1 = Image width in pixels
+ *   2 = Image height in pixels
+ *
+ * @param name (string) Miniwindow name
+ * @param imageId (string) Image identifier
+ * @param infoType (number) Type of information (1 or 2)
+ *
+ * @return (number) Requested info, or nil if image/window not found
+ *
+ * @example
+ * -- Get image dimensions
+ * local width = WindowImageInfo("mywin", "logo", 1)
+ * local height = WindowImageInfo("mywin", "logo", 2)
+ * Note("Image size: " .. width .. "x" .. height)
+ *
+ * @see WindowLoadImage, WindowImageList
  */
 int L_WindowImageInfo(lua_State* L)
 {
@@ -1167,11 +1660,22 @@ int L_WindowImageInfo(lua_State* L)
 /**
  * world.WindowImageList(name)
  *
- * Image Operations
- * Get list of all loaded image IDs in a miniwindow.
+ * Returns a table of all loaded image IDs in a miniwindow.
  *
- * @param name Miniwindow name
- * @return Table array of image IDs
+ * @param name (string) Miniwindow name
+ *
+ * @return (table) Array of image ID strings (1-indexed), or empty table
+ *
+ * @example
+ * -- List all images in the window
+ * local images = WindowImageList("mywin")
+ * for i, id in ipairs(images) do
+ *     local w = WindowImageInfo("mywin", id, 1)
+ *     local h = WindowImageInfo("mywin", id, 2)
+ *     Note("Image: " .. id .. " (" .. w .. "x" .. h .. ")")
+ * end
+ *
+ * @see WindowLoadImage, WindowImageInfo
  */
 int L_WindowImageList(lua_State* L)
 {
@@ -1201,12 +1705,25 @@ int L_WindowImageList(lua_State* L)
 /**
  * world.WindowWrite(name, filename)
  *
- * Image Operations
- * Save miniwindow to BMP or PNG file
+ * Saves the miniwindow contents to an image file.
+ * Supports BMP and PNG formats based on file extension.
  *
- * @param name Miniwindow name
- * @param filename Output file path (must end in .bmp or .png)
- * @return Error code (eOK on success)
+ * @param name (string) Miniwindow name
+ * @param filename (string) Output file path (must end in .bmp or .png)
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchWindow: Window doesn't exist
+ *
+ * @example
+ * -- Save window as PNG
+ * WindowWrite("mywin", "screenshot.png")
+ *
+ * -- Save with timestamp
+ * local filename = "capture_" .. os.date("%Y%m%d_%H%M%S") .. ".png"
+ * WindowWrite("mywin", filename)
+ *
+ * @see WindowCreate, WindowLoadImage
  */
 int L_WindowWrite(lua_State* L)
 {
@@ -1229,18 +1746,27 @@ int L_WindowWrite(lua_State* L)
 /**
  * world.WindowGetImageAlpha(name, imageId, left, top, right, bottom, srcLeft, srcTop)
  *
- * Image Operations
- * Extract alpha channel from image as grayscale
+ * Extracts the alpha channel from a 32-bit image and draws it
+ * as a grayscale image (white = opaque, black = transparent).
  *
- * @param name Miniwindow name
- * @param imageId Image identifier (must be 32-bit with alpha)
- * @param left Destination left coordinate
- * @param top Destination top coordinate
- * @param right Destination right coordinate (0 = window width)
- * @param bottom Destination bottom coordinate (0 = window height)
- * @param srcLeft Source left coordinate
- * @param srcTop Source top coordinate
- * @return Error code (eOK on success)
+ * @param name (string) Miniwindow name
+ * @param imageId (string) Image identifier (must have alpha channel)
+ * @param left (number) Destination left coordinate
+ * @param top (number) Destination top coordinate
+ * @param right (number) Destination right (0 = window width)
+ * @param bottom (number) Destination bottom (0 = window height)
+ * @param srcLeft (number) Source left coordinate
+ * @param srcTop (number) Source top coordinate
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchWindow: Window doesn't exist
+ *
+ * @example
+ * -- Visualize the alpha channel of an image
+ * WindowGetImageAlpha("mywin", "sprite", 0, 0, 0, 0, 0, 0)
+ *
+ * @see WindowDrawImageAlpha, WindowMergeImageAlpha
  */
 int L_WindowGetImageAlpha(lua_State* L)
 {
@@ -1270,19 +1796,32 @@ int L_WindowGetImageAlpha(lua_State* L)
 /**
  * world.WindowDrawImageAlpha(name, imageId, left, top, right, bottom, opacity, srcLeft, srcTop)
  *
- * Image Operations
- * Draw image with alpha channel blending
+ * Draws a 32-bit image using its embedded alpha channel for transparency.
+ * An additional opacity multiplier can be applied.
  *
- * @param name Miniwindow name
- * @param imageId Image identifier (must be 32-bit with alpha)
- * @param left Destination left coordinate
- * @param top Destination top coordinate
- * @param right Destination right coordinate (0 = window width)
- * @param bottom Destination bottom coordinate (0 = window height)
- * @param opacity Additional opacity multiplier (0.0=transparent, 1.0=opaque)
- * @param srcLeft Source left coordinate
- * @param srcTop Source top coordinate
- * @return Error code (eOK on success)
+ * @param name (string) Miniwindow name
+ * @param imageId (string) Image identifier (must have alpha channel)
+ * @param left (number) Destination left coordinate
+ * @param top (number) Destination top coordinate
+ * @param right (number) Destination right (0 = window width)
+ * @param bottom (number) Destination bottom (0 = window height)
+ * @param opacity (number) Additional opacity (0.0 = transparent, 1.0 = use image alpha)
+ * @param srcLeft (number) Source left coordinate
+ * @param srcTop (number) Source top coordinate
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchWindow: Window doesn't exist
+ *
+ * @example
+ * -- Draw PNG with transparency
+ * WindowLoadImage("mywin", "icon", "icon.png")
+ * WindowDrawImageAlpha("mywin", "icon", 10, 10, 0, 0, 1.0, 0, 0)
+ *
+ * -- Draw at 50% opacity
+ * WindowDrawImageAlpha("mywin", "icon", 10, 10, 0, 0, 0.5, 0, 0)
+ *
+ * @see WindowGetImageAlpha, WindowMergeImageAlpha, WindowBlendImage
  */
 int L_WindowDrawImageAlpha(lua_State* L)
 {
@@ -1312,25 +1851,36 @@ int L_WindowDrawImageAlpha(lua_State* L)
 
 /**
  * world.WindowMergeImageAlpha(name, imageId, maskId, left, top, right, bottom, mode, opacity,
- * srcLeft, srcTop, srcRight, srcBottom)
+ *                             srcLeft, srcTop, srcRight, srcBottom)
  *
- * Image Operations
- * Merge image with separate alpha mask
+ * Draws an image using a separate grayscale image as an alpha mask.
+ * White areas in the mask are opaque, black areas are transparent.
  *
- * @param name Miniwindow name
- * @param imageId Main image identifier
- * @param maskId Mask image identifier
- * @param left Destination left coordinate
- * @param top Destination top coordinate
- * @param right Destination right coordinate (0 = window width)
- * @param bottom Destination bottom coordinate (0 = window height)
- * @param mode Blend mode (0=normal, 1=color key transparency)
- * @param opacity Additional opacity multiplier (0.0-1.0)
- * @param srcLeft Source left coordinate
- * @param srcTop Source top coordinate
- * @param srcRight Source right coordinate
- * @param srcBottom Source bottom coordinate
- * @return Error code (eOK on success)
+ * @param name (string) Miniwindow name
+ * @param imageId (string) Main image identifier
+ * @param maskId (string) Mask image identifier (grayscale)
+ * @param left (number) Destination left coordinate
+ * @param top (number) Destination top coordinate
+ * @param right (number) Destination right (0 = window width)
+ * @param bottom (number) Destination bottom (0 = window height)
+ * @param mode (number) Blend mode (0 = normal, 1 = color key)
+ * @param opacity (number) Additional opacity (0.0-1.0)
+ * @param srcLeft (number) Source left coordinate
+ * @param srcTop (number) Source top coordinate
+ * @param srcRight (number) Source right coordinate
+ * @param srcBottom (number) Source bottom coordinate
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchWindow: Window doesn't exist
+ *
+ * @example
+ * -- Apply a mask to an image
+ * WindowLoadImage("mywin", "photo", "photo.jpg")
+ * WindowLoadImage("mywin", "mask", "mask.png")
+ * WindowMergeImageAlpha("mywin", "photo", "mask", 0, 0, 0, 0, 0, 1.0, 0, 0, 0, 0)
+ *
+ * @see WindowDrawImageAlpha, WindowGetImageAlpha
  */
 int L_WindowMergeImageAlpha(lua_State* L)
 {
@@ -1366,19 +1916,38 @@ int L_WindowMergeImageAlpha(lua_State* L)
 /**
  * world.WindowTransformImage(name, imageId, left, top, mode, mxx, mxy, myx, myy)
  *
- * Image Operations
- * Apply affine transformation to image (rotate, scale, skew)
+ * Applies an affine transformation to an image (rotate, scale, skew).
+ * Uses a 2x2 transformation matrix.
  *
- * @param name Miniwindow name
- * @param imageId Image identifier
- * @param left X translation offset
- * @param top Y translation offset
- * @param mode Draw mode (1=opaque, 3=transparent with color key)
- * @param mxx Transformation matrix [0][0] (cos θ for rotation)
- * @param mxy Transformation matrix [1][0] (sin θ for rotation)
- * @param myx Transformation matrix [0][1] (-sin θ for rotation)
- * @param myy Transformation matrix [1][1] (cos θ for rotation)
- * @return Error code (eOK on success)
+ * Common transformations:
+ *   Rotation by θ: mxx=cos(θ), mxy=sin(θ), myx=-sin(θ), myy=cos(θ)
+ *   Scale by s: mxx=s, mxy=0, myx=0, myy=s
+ *   Horizontal flip: mxx=-1, mxy=0, myx=0, myy=1
+ *
+ * @param name (string) Miniwindow name
+ * @param imageId (string) Image identifier
+ * @param left (number) X translation offset (destination position)
+ * @param top (number) Y translation offset (destination position)
+ * @param mode (number) Draw mode (1 = opaque, 3 = transparent)
+ * @param mxx (number) Matrix element [0][0]
+ * @param mxy (number) Matrix element [0][1]
+ * @param myx (number) Matrix element [1][0]
+ * @param myy (number) Matrix element [1][1]
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchWindow: Window doesn't exist
+ *
+ * @example
+ * -- Rotate image 45 degrees
+ * local angle = math.rad(45)
+ * local cos, sin = math.cos(angle), math.sin(angle)
+ * WindowTransformImage("mywin", "img", 100, 100, 1, cos, sin, -sin, cos)
+ *
+ * -- Scale image to 50%
+ * WindowTransformImage("mywin", "img", 0, 0, 1, 0.5, 0, 0, 0.5)
+ *
+ * @see WindowDrawImage, WindowBlendImage
  */
 int L_WindowTransformImage(lua_State* L)
 {
@@ -1409,17 +1978,46 @@ int L_WindowTransformImage(lua_State* L)
 /**
  * world.WindowFilter(name, left, top, right, bottom, operation, options)
  *
- * Image Operations
- * Apply pixel filter to rectangular region
+ * Applies a pixel filter to a rectangular region.
  *
- * @param name Miniwindow name
- * @param left Left coordinate
- * @param top Top coordinate
- * @param right Right coordinate (0 = window width)
- * @param bottom Bottom coordinate (0 = window height)
- * @param operation Filter type (1-27)
- * @param options Filter-specific parameter
- * @return Error code (eOK on success)
+ * Filter operations:
+ *   1 = Noise (options = amount)
+ *   2 = Monochrome (grayscale)
+ *   3 = Brightness (options = -100 to 100)
+ *   4 = Contrast (options = -100 to 100)
+ *   5 = Gamma correction (options = gamma value)
+ *   6 = Invert colors
+ *   7 = Red channel only
+ *   8 = Green channel only
+ *   9 = Blue channel only
+ *   10 = Average blur (options = radius)
+ *   11 = Sharpen
+ *   12 = Emboss (options = depth)
+ *   13 = Edge detection
+ *
+ * @param name (string) Miniwindow name
+ * @param left (number) Left coordinate
+ * @param top (number) Top coordinate
+ * @param right (number) Right coordinate (0 = window width)
+ * @param bottom (number) Bottom coordinate (0 = window height)
+ * @param operation (number) Filter type (1-27)
+ * @param options (number) Filter-specific parameter
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchWindow: Window doesn't exist
+ *
+ * @example
+ * -- Convert to grayscale
+ * WindowFilter("mywin", 0, 0, 0, 0, 2, 0)
+ *
+ * -- Increase brightness by 50
+ * WindowFilter("mywin", 0, 0, 0, 0, 3, 50)
+ *
+ * -- Apply blur with radius 3
+ * WindowFilter("mywin", 0, 0, 0, 0, 10, 3)
+ *
+ * @see WindowRectOp, WindowDrawImage
  */
 int L_WindowFilter(lua_State* L)
 {
@@ -1448,26 +2046,51 @@ int L_WindowFilter(lua_State* L)
 
 /**
  * world.WindowAddHotspot(name, hotspotId, left, top, right, bottom,
- *                         mouseOver, cancelMouseOver, mouseDown, cancelMouseDown,
- *                         mouseUp, tooltipText, cursor, flags)
+ *                        mouseOver, cancelMouseOver, mouseDown, cancelMouseDown,
+ *                        mouseUp, tooltipText, cursor, flags)
  *
- * Hotspot Management
  * Creates an interactive hotspot (clickable area) in a miniwindow.
+ * Hotspots respond to mouse events with Lua callback functions.
  *
- * Based on: CMUSHclientDoc::WindowAddHotspot from methods_miniwindows.cpp
+ * Cursor types:
+ *   0 = Arrow (default)
+ *   1 = Hand/pointer
+ *   6 = I-beam (text)
+ *   11 = Cross
  *
- * @param name Miniwindow name
- * @param hotspotId Unique identifier for this hotspot
- * @param left, top, right, bottom Hotspot rectangle (miniwindow-relative coordinates)
- * @param mouseOver Function to call when mouse enters hotspot
- * @param cancelMouseOver Function to call when mouse leaves hotspot
- * @param mouseDown Function to call when mouse button pressed in hotspot
- * @param cancelMouseDown Function to call when mouse released outside hotspot
- * @param mouseUp Function to call when mouse button released in hotspot
- * @param tooltipText Tooltip text to display
- * @param cursor Cursor type (0=arrow, 1=hand, etc.)
- * @param flags Hotspot flags
- * @return eOK (success), eNoSuchWindow if window doesn't exist
+ * @param name (string) Miniwindow name
+ * @param hotspotId (string) Unique identifier for this hotspot
+ * @param left (number) Left coordinate (0 or negative = relative to right edge)
+ * @param top (number) Top coordinate
+ * @param right (number) Right coordinate (0 or negative = window edge)
+ * @param bottom (number) Bottom coordinate (0 or negative = window edge)
+ * @param mouseOver (string) Function called when mouse enters
+ * @param cancelMouseOver (string) Function called when mouse leaves
+ * @param mouseDown (string) Function called on mouse button press
+ * @param cancelMouseDown (string) Function called if released outside
+ * @param mouseUp (string) Function called on mouse button release inside
+ * @param tooltipText (string) Tooltip to show on hover
+ * @param cursor (number) Cursor type to display
+ * @param flags (number) Hotspot behavior flags
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchWindow: Window doesn't exist
+ *
+ * @example
+ * -- Create a clickable button
+ * WindowAddHotspot("mywin", "btn1", 10, 10, 100, 40,
+ *     "", "",           -- mouse over/cancel
+ *     "", "",           -- mouse down/cancel
+ *     "OnButtonClick",  -- mouse up
+ *     "Click me!",      -- tooltip
+ *     1, 0)             -- hand cursor, no flags
+ *
+ * function OnButtonClick(flags, hotspotId)
+ *     Note("Button clicked!")
+ * end
+ *
+ * @see WindowDeleteHotspot, WindowMoveHotspot, WindowHotspotInfo, WindowDragHandler
  */
 int L_WindowAddHotspot(lua_State* L)
 {
@@ -1535,14 +2158,21 @@ int L_WindowAddHotspot(lua_State* L)
 /**
  * world.WindowDeleteHotspot(name, hotspotId)
  *
- * Hotspot Management
  * Deletes a specific hotspot from a miniwindow.
  *
- * Based on: CMUSHclientDoc::WindowDeleteHotspot from methods_miniwindows.cpp
+ * @param name (string) Miniwindow name
+ * @param hotspotId (string) Hotspot ID to delete
  *
- * @param name Miniwindow name
- * @param hotspotId Hotspot ID to delete
- * @return eOK (success), eNoSuchWindow, eNoSuchHotspot
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchWindow: Window doesn't exist
+ *   - eHotspotNotInstalled: Hotspot doesn't exist
+ *
+ * @example
+ * -- Remove a button
+ * WindowDeleteHotspot("mywin", "btn1")
+ *
+ * @see WindowAddHotspot, WindowDeleteAllHotspots, WindowHotspotList
  */
 int L_WindowDeleteHotspot(lua_State* L)
 {
@@ -1571,11 +2201,19 @@ int L_WindowDeleteHotspot(lua_State* L)
 /**
  * world.WindowDeleteAllHotspots(name)
  *
- * Hotspot Management
  * Deletes all hotspots from a miniwindow.
  *
- * @param name Miniwindow name
- * @return eOK (success), eNoSuchWindow
+ * @param name (string) Miniwindow name
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchWindow: Window doesn't exist
+ *
+ * @example
+ * -- Clear all hotspots before rebuilding UI
+ * WindowDeleteAllHotspots("mywin")
+ *
+ * @see WindowAddHotspot, WindowDeleteHotspot, WindowHotspotList
  */
 int L_WindowDeleteAllHotspots(lua_State* L)
 {
@@ -1597,15 +2235,22 @@ int L_WindowDeleteAllHotspots(lua_State* L)
 /**
  * world.WindowHotspotTooltip(name, hotspotId, tooltipText)
  *
- * Hotspot Management
- * Sets the tooltip text for a hotspot.
+ * Sets or updates the tooltip text for a hotspot.
  *
- * Based on: CMUSHclientDoc::WindowHotspotTooltip from methods_miniwindows.cpp
+ * @param name (string) Miniwindow name
+ * @param hotspotId (string) Hotspot ID
+ * @param tooltipText (string) New tooltip text
  *
- * @param name Miniwindow name
- * @param hotspotId Hotspot ID
- * @param tooltipText New tooltip text
- * @return eOK (success), eNoSuchWindow, eNoSuchHotspot
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchWindow: Window doesn't exist
+ *   - eHotspotNotInstalled: Hotspot doesn't exist
+ *
+ * @example
+ * -- Update tooltip dynamically
+ * WindowHotspotTooltip("mywin", "hp_bar", "HP: 50/100")
+ *
+ * @see WindowAddHotspot, WindowHotspotInfo
  */
 int L_WindowHotspotTooltip(lua_State* L)
 {
@@ -1635,18 +2280,32 @@ int L_WindowHotspotTooltip(lua_State* L)
 /**
  * world.WindowDragHandler(name, hotspotId, moveCallback, releaseCallback, flags)
  *
- * Hotspot Management
  * Sets up drag-and-drop handling for a miniwindow hotspot.
+ * The hotspot must already exist (created with WindowAddHotspot).
  *
- * Based on: CMUSHclientDoc::WindowDragHandler from methods_miniwindows.cpp
+ * @param name (string) Miniwindow name
+ * @param hotspotId (string) Hotspot ID to configure
+ * @param moveCallback (string) Function called during drag (on mouse move)
+ * @param releaseCallback (string) Function called when drag ends
+ * @param flags (number) Drag-and-drop flags
  *
- * @param name Miniwindow name
- * @param hotspotId Hotspot ID to configure
- * @param moveCallback Function to call during drag (on mouse move)
- * @param releaseCallback Function to call when drag ends (on mouse release)
- * @param flags Drag-and-drop flags
- * @return eOK (success), eNoSuchWindow if window doesn't exist, eHotspotNotInstalled if hotspot
- * doesn't exist
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchWindow: Window doesn't exist
+ *   - eHotspotNotInstalled: Hotspot doesn't exist
+ *
+ * @example
+ * -- Make a window draggable
+ * WindowAddHotspot("mywin", "drag", 0, 0, 0, 0, "", "", "", "", "", "", 0, 0)
+ * WindowDragHandler("mywin", "drag", "OnDrag", "OnDragEnd", 0)
+ *
+ * function OnDrag(flags, hotspotId, x, y)
+ *     local newX = WindowInfo("mywin", 10) + x
+ *     local newY = WindowInfo("mywin", 11) + y
+ *     WindowPosition("mywin", newX, newY, 0, 2)
+ * end
+ *
+ * @see WindowAddHotspot, WindowMoveHotspot, WindowScrollwheelHandler
  */
 int L_WindowDragHandler(lua_State* L)
 {
@@ -1684,30 +2343,37 @@ int L_WindowDragHandler(lua_State* L)
 /**
  * world.WindowMenu(name, x, y, menuString)
  *
- * Miniwindow Right-Click Menus
- * Shows a popup context menu and returns the selected item.
+ * Shows a popup context menu and returns the selected item number.
+ * Blocks until user selects an item or cancels.
  *
- * Based on: CMUSHclientDoc::WindowMenu from methods_miniwindows.cpp
+ * Menu prefix flags:
+ *   ">" - Start submenu (text is submenu title)
+ *   "<" - End submenu, return to parent
+ *   "+" - Checked item (checkmark shown)
+ *   "!" - Default/bold item
+ *   "^" - Disabled/grayed item
+ *   "-" - Separator line
+ *   "~" - Column break (not implemented)
  *
- * @param name Miniwindow name (or "" for world)
- * @param x X coordinate (screen coordinates)
- * @param y Y coordinate (screen coordinates)
- * @param menuString Pipe-separated menu items with prefix flags
- * @return Selected menu item text (empty string if canceled)
+ * @param name (string) Miniwindow name
+ * @param x (number) X coordinate (miniwindow-relative)
+ * @param y (number) Y coordinate (miniwindow-relative)
+ * @param menuString (string) Pipe-separated menu items with prefix flags
  *
- * Menu format (pipe-separated items with prefix flags):
- *   ">"  - Start a submenu (text after > is submenu title)
- *   "<"  - Go back up one submenu level
- *   "+" or "!" - Checked item (checkmark shown)
- *   "^"  - Disabled/grayed item
- *   "-"  - Separator line
- *   "~"  - Break to new column (not implemented)
+ * @return (string) Selected item's 1-based position number, or "" if canceled
  *
- * Examples:
- *   "Item1|Item2|Item3"              - Simple menu
- *   "Item1|-|Item2"                  - Menu with separator
- *   "+Checked|Unchecked"             - Menu with checkmark on first item
- *   ">Submenu|SubItem1|SubItem2|<|MainItem"  - Menu with submenu
+ * @example
+ * -- Simple menu
+ * local result = WindowMenu("mywin", 10, 10, "Attack|Defend|Run")
+ * if result == "1" then Note("Attack!") end
+ *
+ * -- Menu with separator and disabled item
+ * local result = WindowMenu("mywin", 10, 10, "New|Open|-|^Save|Save As")
+ *
+ * -- Menu with submenu
+ * local result = WindowMenu("mywin", 10, 10, "File|>Edit|Cut|Copy|Paste|<|Help")
+ *
+ * @see WindowAddHotspot
  */
 int L_WindowMenu(lua_State* L)
 {
@@ -1872,16 +2538,28 @@ int L_WindowMenu(lua_State* L)
 /**
  * world.WindowMoveHotspot(name, hotspotId, left, top, right, bottom)
  *
- * Hotspot Management
- * Moves/resizes an existing hotspot to a new location.
+ * Moves or resizes an existing hotspot to a new location.
  *
- * Based on: CMUSHclientDoc::WindowMoveHotspot from methods_miniwindows.cpp
+ * @param name (string) Miniwindow name
+ * @param hotspotId (string) Hotspot ID to move
+ * @param left (number) New left coordinate (0 or negative = relative to edge)
+ * @param top (number) New top coordinate
+ * @param right (number) New right coordinate (0 or negative = window edge)
+ * @param bottom (number) New bottom coordinate (0 or negative = window edge)
  *
- * @param name Miniwindow name
- * @param hotspotId Hotspot ID to move
- * @param left, top, right, bottom New rectangle (miniwindow-relative coordinates)
- * @return eOK (success), eNoSuchWindow if window doesn't exist, eHotspotNotInstalled if hotspot
- * doesn't exist
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchWindow: Window doesn't exist
+ *   - eHotspotNotInstalled: Hotspot doesn't exist
+ *
+ * @example
+ * -- Move button to new position
+ * WindowMoveHotspot("mywin", "btn1", 50, 50, 150, 80)
+ *
+ * -- Resize to cover entire window
+ * WindowMoveHotspot("mywin", "fullscreen", 0, 0, 0, 0)
+ *
+ * @see WindowAddHotspot, WindowHotspotInfo, WindowDragHandler
  */
 int L_WindowMoveHotspot(lua_State* L)
 {
@@ -1926,21 +2604,39 @@ int L_WindowMoveHotspot(lua_State* L)
 /**
  * world.WindowHotspotInfo(name, hotspotId, infoType)
  *
- * Hotspot Management
  * Gets information about a miniwindow hotspot.
  *
- * Based on: CMUSHclientDoc::WindowHotspotInfo from methods_miniwindows.cpp
+ * Info types:
+ *   1 = left coordinate
+ *   2 = top coordinate
+ *   3 = right coordinate
+ *   4 = bottom coordinate
+ *   5 = MouseOver callback name
+ *   6 = CancelMouseOver callback name
+ *   7 = MouseDown callback name
+ *   8 = CancelMouseDown callback name
+ *   9 = MouseUp callback name
+ *   10 = Tooltip text
+ *   11 = Cursor type
+ *   12 = Flags
+ *   13 = Drag move callback name
+ *   14 = Drag release callback name
+ *   15 = Drag flags
  *
- * @param name Miniwindow name
- * @param hotspotId Hotspot ID
- * @param infoType Type of information to retrieve (1-15)
- *   1 = left, 2 = top, 3 = right, 4 = bottom
- *   5 = MouseOver callback, 6 = CancelMouseOver callback
- *   7 = MouseDown callback, 8 = CancelMouseDown callback
- *   9 = MouseUp callback, 10 = TooltipText
- *   11 = cursor code, 12 = flags
- *   13 = MoveCallback (drag), 14 = ReleaseCallback (drag), 15 = drag flags
- * @return Varies by infoType, or nil if hotspot doesn't exist
+ * @param name (string) Miniwindow name
+ * @param hotspotId (string) Hotspot ID
+ * @param infoType (number) Type of information (1-15)
+ *
+ * @return (varies) Requested information, or nil if hotspot doesn't exist
+ *
+ * @example
+ * -- Get hotspot boundaries
+ * local left = WindowHotspotInfo("mywin", "btn1", 1)
+ * local top = WindowHotspotInfo("mywin", "btn1", 2)
+ * local right = WindowHotspotInfo("mywin", "btn1", 3)
+ * local bottom = WindowHotspotInfo("mywin", "btn1", 4)
+ *
+ * @see WindowAddHotspot, WindowMoveHotspot, WindowHotspotList
  */
 int L_WindowHotspotInfo(lua_State* L)
 {
@@ -2023,12 +2719,34 @@ int L_WindowHotspotInfo(lua_State* L)
 }
 
 /**
- * world.WindowScrollwheelHandler(name, hotspotId, moveCallback)
+ * world.WindowScrollwheelHandler(name, hotspotId, scrollCallback)
  *
- * Hotspot Management (STUB IMPLEMENTATION)
- * Sets up mouse wheel handling for a miniwindow hotspot.
+ * Sets up mouse scroll wheel handling for a hotspot.
+ * The hotspot must already exist (created with WindowAddHotspot).
  *
- * @return eOK (success)
+ * @param name (string) Miniwindow name
+ * @param hotspotId (string) Hotspot ID to configure
+ * @param scrollCallback (string) Function called on scroll wheel event
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchWindow: Window doesn't exist
+ *   - eHotspotNotInstalled: Hotspot doesn't exist
+ *
+ * @example
+ * -- Handle scroll events for zooming
+ * WindowAddHotspot("mywin", "scroll_area", 0, 0, 0, 0, "", "", "", "", "", "", 0, 0)
+ * WindowScrollwheelHandler("mywin", "scroll_area", "OnScroll")
+ *
+ * function OnScroll(flags, hotspotId, delta)
+ *     if delta > 0 then
+ *         Note("Scroll up")
+ *     else
+ *         Note("Scroll down")
+ *     end
+ * end
+ *
+ * @see WindowAddHotspot, WindowDragHandler
  */
 int L_WindowScrollwheelHandler(lua_State* L)
 {
@@ -2062,9 +2780,22 @@ int L_WindowScrollwheelHandler(lua_State* L)
 /**
  * world.WindowList()
  *
- * Returns a table of all miniwindow names.
+ * Returns a table of all miniwindow names in this world.
  *
- * @return Table of window names (strings)
+ * @return (table) Array of window name strings (1-indexed)
+ *
+ * @example
+ * -- List all windows
+ * local windows = WindowList()
+ * for i, name in ipairs(windows) do
+ *     local visible = WindowInfo(name, 5)
+ *     Note(name .. (visible and " (visible)" or " (hidden)"))
+ * end
+ *
+ * -- Count windows
+ * Note("Total windows: " .. #WindowList())
+ *
+ * @see WindowCreate, WindowDelete, WindowInfo
  */
 int L_WindowList(lua_State* L)
 {
@@ -2086,8 +2817,20 @@ int L_WindowList(lua_State* L)
  *
  * Returns a table of all hotspot IDs in a miniwindow.
  *
- * @param name Window name
- * @return Table of hotspot IDs (strings), or nil if window not found
+ * @param name (string) Miniwindow name
+ *
+ * @return (table) Array of hotspot ID strings (1-indexed), or nil if window not found
+ *
+ * @example
+ * -- List all hotspots in a window
+ * local hotspots = WindowHotspotList("mywin")
+ * if hotspots then
+ *     for i, id in ipairs(hotspots) do
+ *         Note("Hotspot: " .. id)
+ *     end
+ * end
+ *
+ * @see WindowAddHotspot, WindowDeleteHotspot, WindowHotspotInfo
  */
 int L_WindowHotspotList(lua_State* L)
 {
@@ -2117,12 +2860,37 @@ int L_WindowHotspotList(lua_State* L)
  * world.WindowCreateImage(name, imageId, row1, row2, row3, row4, row5, row6, row7, row8)
  *
  * Creates an 8x8 monochrome image from row bit patterns.
- * Each row is 8 bits where bit 7 is leftmost pixel.
+ * Each row is 8 bits where bit 7 is the leftmost pixel.
+ * Useful for creating small icons or patterns programmatically.
  *
- * @param name Window name
- * @param imageId Image identifier
- * @param row1-row8 Bit patterns for each row
- * @return Error code
+ * @param name (string) Miniwindow name
+ * @param imageId (string) Image identifier
+ * @param row1 (number) Bit pattern for row 1 (0-255)
+ * @param row2 (number) Bit pattern for row 2
+ * @param row3 (number) Bit pattern for row 3
+ * @param row4 (number) Bit pattern for row 4
+ * @param row5 (number) Bit pattern for row 5
+ * @param row6 (number) Bit pattern for row 6
+ * @param row7 (number) Bit pattern for row 7
+ * @param row8 (number) Bit pattern for row 8
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchWindow: Window doesn't exist
+ *
+ * @example
+ * -- Create a simple arrow pattern
+ * WindowCreateImage("mywin", "arrow",
+ *     0x18,  -- 00011000
+ *     0x3C,  -- 00111100
+ *     0x7E,  -- 01111110
+ *     0xFF,  -- 11111111
+ *     0x18,  -- 00011000
+ *     0x18,  -- 00011000
+ *     0x18,  -- 00011000
+ *     0x18)  -- 00011000
+ *
+ * @see WindowLoadImage, WindowImageOp
  */
 int L_WindowCreateImage(lua_State* L)
 {
@@ -2154,21 +2922,41 @@ int L_WindowCreateImage(lua_State* L)
 
 /**
  * world.WindowImageOp(name, action, left, top, right, bottom, penColor, penStyle, penWidth,
- * brushColor, imageId, ellipseWidth, ellipseHeight)
+ *                     brushColor, imageId, ellipseWidth, ellipseHeight)
  *
- * Draws shapes using an image as a brush pattern.
+ * Draws shapes using an image as a brush pattern for fills.
  *
- * @param name Window name
- * @param action Operation (1=frame rect, 2=fill rect, 3=round rect, 4=ellipse frame, 5=filled
- * ellipse)
- * @param left,top,right,bottom Coordinates
- * @param penColor Outline color
- * @param penStyle Pen style
- * @param penWidth Pen width
- * @param brushColor Background color
- * @param imageId Image for brush pattern
- * @param ellipseWidth,ellipseHeight Corner size for rounded rect
- * @return Error code
+ * Action codes:
+ *   1 = Frame rectangle
+ *   2 = Fill rectangle with image pattern
+ *   3 = Rounded rectangle
+ *   4 = Ellipse frame
+ *   5 = Filled ellipse with image pattern
+ *
+ * @param name (string) Miniwindow name
+ * @param action (number) Drawing operation (1-5)
+ * @param left (number) Left coordinate
+ * @param top (number) Top coordinate
+ * @param right (number) Right coordinate
+ * @param bottom (number) Bottom coordinate
+ * @param penColor (number) Outline color (BGR)
+ * @param penStyle (number) Pen style (0=solid, etc.)
+ * @param penWidth (number) Pen width in pixels
+ * @param brushColor (number) Background color (BGR)
+ * @param imageId (string) Image ID for brush pattern
+ * @param ellipseWidth (number) Corner width for rounded rect (optional)
+ * @param ellipseHeight (number) Corner height for rounded rect (optional)
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchWindow: Window doesn't exist
+ *
+ * @example
+ * -- Create a pattern image then use it as brush
+ * WindowCreateImage("mywin", "dots", 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55)
+ * WindowImageOp("mywin", 2, 10, 10, 100, 100, 0, 0, 0, 0xFFFFFF, "dots")
+ *
+ * @see WindowCreateImage, WindowRectOp, WindowCircleOp
  */
 int L_WindowImageOp(lua_State* L)
 {
@@ -2205,13 +2993,29 @@ int L_WindowImageOp(lua_State* L)
 /**
  * world.WindowLoadImageMemory(name, imageId, data, alpha)
  *
- * Loads an image from a string containing raw image data (PNG, BMP, JPG, etc.)
+ * Loads an image from a string containing raw image data.
+ * Supports PNG, BMP, JPG, GIF and other common formats.
+ * Useful for loading embedded images or images from network.
  *
- * @param name Window name
- * @param imageId Image identifier
- * @param data String containing raw image bytes
- * @param alpha (optional) Whether to preserve alpha channel
- * @return Error code
+ * @param name (string) Miniwindow name
+ * @param imageId (string) Image identifier
+ * @param data (string) Binary string containing image data
+ * @param alpha (boolean) true to preserve alpha channel (optional)
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchWindow: Window doesn't exist
+ *
+ * @example
+ * -- Load image from base64-encoded data
+ * local imgData = base64.decode(encodedPng)
+ * WindowLoadImageMemory("mywin", "icon", imgData, true)
+ *
+ * -- Load image from HTTP response
+ * -- (assumes you have image data in a string)
+ * WindowLoadImageMemory("mywin", "avatar", httpResponseBody, true)
+ *
+ * @see WindowLoadImage, WindowDrawImage
  */
 int L_WindowLoadImageMemory(lua_State* L)
 {

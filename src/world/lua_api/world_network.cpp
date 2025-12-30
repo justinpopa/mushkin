@@ -1,5 +1,7 @@
 /**
  * world_network.cpp - Network Functions
+ *
+ * Functions for sending data to the MUD server and managing connections.
  */
 
 #include "lua_common.h"
@@ -7,13 +9,21 @@
 /**
  * world.Send(text)
  *
- * Sends text to the MUD.
+ * Sends text to the MUD as if typed by the user. The text is processed through
+ * aliases and added to the command queue for paced sending.
  *
- * @param text Text to send to the MUD
- * @return Error code:
+ * @param text (string) Text to send to the MUD
+ *
+ * @return (number) Error code:
  *   - eOK (0): Success
  *   - eWorldClosed (30002): Not connected to MUD
  *   - eItemInUse (30063): Plugin is processing sent text
+ *
+ * @example
+ * Send("look")
+ * Send("say Hello, world!")
+ *
+ * @see SendImmediate, SendNoEcho, SendSpecial
  */
 int L_Send(lua_State* L)
 {
@@ -39,11 +49,21 @@ int L_Send(lua_State* L)
 /**
  * world.Connect()
  *
- * Initiates connection to the MUD.
+ * Initiates a connection to the MUD server using the world's configured
+ * host and port. The connection is asynchronous; use OnConnect callback
+ * or IsConnected() to check when connected.
  *
- * @return Error code:
- *   - eOK (0): Successfully initiated connection
+ * @return (number) Error code:
+ *   - eOK (0): Connection initiated
  *   - eWorldOpen (30001): Already connected
+ *
+ * @example
+ * if not IsConnected() then
+ *     Connect()
+ *     Note("Connecting...")
+ * end
+ *
+ * @see Disconnect, IsConnected
  */
 int L_Connect(lua_State* L)
 {
@@ -61,11 +81,18 @@ int L_Connect(lua_State* L)
 /**
  * world.Disconnect()
  *
- * Disconnects from the MUD.
+ * Disconnects from the MUD server. The OnDisconnect callback will be called
+ * when the disconnection is complete.
  *
- * @return Error code:
- *   - eOK (0): Successfully initiated disconnect
- *   - eWorldClosed (30002): Already disconnected or disconnecting
+ * @return (number) Error code:
+ *   - eOK (0): Disconnect initiated
+ *   - eWorldClosed (30002): Already disconnected
+ *
+ * @example
+ * Disconnect()
+ * Note("Disconnecting from server...")
+ *
+ * @see Connect, IsConnected
  */
 int L_Disconnect(lua_State* L)
 {
@@ -84,9 +111,18 @@ int L_Disconnect(lua_State* L)
 /**
  * world.IsConnected()
  *
- * Checks if connected to the MUD.
+ * Checks whether the client is currently connected to the MUD server.
  *
- * @return true if connected, false otherwise
+ * @return (boolean) True if connected, false otherwise
+ *
+ * @example
+ * if IsConnected() then
+ *     Send("quit")
+ * else
+ *     Note("Not connected")
+ * end
+ *
+ * @see Connect, Disconnect
  */
 int L_IsConnected(lua_State* L)
 {
@@ -99,14 +135,22 @@ int L_IsConnected(lua_State* L)
 /**
  * world.SendImmediate(text)
  *
- * Sends text to the MUD immediately, bypassing the command queue.
- * Uses the world's display and log settings for echo/log behavior.
+ * Sends text to the MUD immediately, bypassing the command queue. Use this
+ * when you need to send something urgently without waiting for queued commands.
+ * Echoing and logging follow the world's display settings.
  *
- * @param text Text to send to the MUD
- * @return Error code:
+ * @param text (string) Text to send to the MUD
+ *
+ * @return (number) Error code:
  *   - eOK (0): Success
  *   - eWorldClosed (30002): Not connected to MUD
  *   - eItemInUse (30063): Plugin is processing sent text
+ *
+ * @example
+ * -- Send urgent command immediately
+ * SendImmediate("flee")
+ *
+ * @see Send, SendNoEcho, SendSpecial
  */
 int L_SendImmediate(lua_State* L)
 {
@@ -132,13 +176,21 @@ int L_SendImmediate(lua_State* L)
 /**
  * world.SendNoEcho(text)
  *
- * Sends text to the MUD without echoing to output, without queueing, and without logging.
+ * Sends text to the MUD silently - no echo to output, no queueing, and no
+ * logging. Useful for sending sensitive data like passwords.
  *
- * @param text Text to send to the MUD
- * @return Error code:
+ * @param text (string) Text to send to the MUD
+ *
+ * @return (number) Error code:
  *   - eOK (0): Success
  *   - eWorldClosed (30002): Not connected to MUD
  *   - eItemInUse (30063): Plugin is processing sent text
+ *
+ * @example
+ * -- Send password without echoing
+ * SendNoEcho(password)
+ *
+ * @see Send, SendImmediate, SendSpecial
  */
 int L_SendNoEcho(lua_State* L)
 {
@@ -164,14 +216,22 @@ int L_SendNoEcho(lua_State* L)
 /**
  * world.SendPush(text)
  *
- * Sends text to the MUD and adds it to the command history (for recall).
- * Uses the world's display setting for echo, doesn't queue or log.
+ * Sends text to the MUD and adds it to the command history for later recall.
+ * The command can be retrieved with up-arrow. Uses world's echo setting,
+ * bypasses queue, and doesn't log.
  *
- * @param text Text to send to the MUD
- * @return Error code:
+ * @param text (string) Text to send to the MUD
+ *
+ * @return (number) Error code:
  *   - eOK (0): Success
  *   - eWorldClosed (30002): Not connected to MUD
  *   - eItemInUse (30063): Plugin is processing sent text
+ *
+ * @example
+ * -- Send and remember for history
+ * SendPush("cast 'fireball' dragon")
+ *
+ * @see Send, SendSpecial
  */
 int L_SendPush(lua_State* L)
 {
@@ -200,17 +260,30 @@ int L_SendPush(lua_State* L)
 /**
  * world.SendSpecial(text, echo, queue, log, history)
  *
- * Sends text to the MUD with full control over echoing, queueing, logging, and history.
+ * Sends text to the MUD with full control over all send options. This is the
+ * most flexible send function, allowing precise control over echoing, queueing,
+ * logging, and command history.
  *
- * @param text Text to send to the MUD
- * @param echo Whether to echo the text to the output window
- * @param queue Whether to queue the command (vs send immediately)
- * @param log Whether to log the command to the log file
- * @param history Whether to add the command to command history
- * @return Error code:
+ * @param text (string) Text to send to the MUD
+ * @param echo (boolean) True to echo to output window
+ * @param queue (boolean) True to use command queue, false for immediate
+ * @param log (boolean) True to log to log file
+ * @param history (boolean) True to add to command history
+ *
+ * @return (number) Error code:
  *   - eOK (0): Success
  *   - eWorldClosed (30002): Not connected to MUD
  *   - eItemInUse (30063): Plugin is processing sent text
+ *
+ * @example
+ * -- Send immediately, echo to output, don't log or add to history
+ * SendSpecial("look", true, false, false, false)
+ *
+ * @example
+ * -- Queue command, log it, but don't echo or add to history
+ * SendSpecial("tell admin " .. msg, false, true, true, false)
+ *
+ * @see Send, SendImmediate, SendNoEcho, SendPush
  */
 int L_SendSpecial(lua_State* L)
 {

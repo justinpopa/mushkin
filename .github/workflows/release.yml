@@ -262,3 +262,71 @@ jobs:
             3. First run: Right-click → Open (to bypass Gatekeeper)
           files: |
             artifacts/**/*
+
+  publish-wiki-docs:
+    name: Publish Lua API Docs
+    runs-on: ubuntu-latest
+    needs: [version, release]
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout main repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Generate documentation
+        run: |
+          python scripts/generate-lua-docs.py \
+            --version ${{ needs.version.outputs.version }} \
+            --update-versions-page
+
+      - name: Checkout wiki repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}.wiki
+          path: wiki
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Copy generated docs to wiki
+        run: |
+          # Copy all generated markdown files
+          cp docs/wiki/*.md wiki/
+
+          # Ensure Home.md exists with basic content
+          if [ ! -f wiki/Home.md ]; then
+            cat > wiki/Home.md << 'HOMEEOF'
+          # Mushkin Wiki
+
+          Welcome to the Mushkin documentation!
+
+          Mushkin is a modern MUD client built with Qt 6, designed as a cross-platform
+          port of MUSHclient with Lua scripting API compatibility.
+
+          ## Documentation
+
+          - [[API Versions]] - Lua API reference documentation by version
+
+          ## Links
+
+          - [GitHub Repository](https://github.com/${{ github.repository }})
+          - [Releases](https://github.com/${{ github.repository }}/releases)
+          - [Issues](https://github.com/${{ github.repository }}/issues)
+          HOMEEOF
+          fi
+
+      - name: Commit and push to wiki
+        run: |
+          cd wiki
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "docs: update Lua API docs for v${{ needs.version.outputs.version }}"
+            git push
+          fi
