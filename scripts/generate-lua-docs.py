@@ -37,6 +37,14 @@ class LuaFunction:
     category: str = ""
     source_file: str = ""
     line_number: int = 0
+    is_utils: bool = False  # True if this is a utils.* function
+
+    @property
+    def file_key(self) -> str:
+        """Returns the key used for filename generation (avoids case conflicts)."""
+        if self.is_utils:
+            return f"utils-{self.name}"
+        return self.name
 
 
 @dataclass
@@ -191,7 +199,8 @@ def extract_functions_from_file(filepath: Path) -> list[LuaFunction]:
         content = f.read()
 
     # Pattern to match docstring followed by function definition
-    pattern = r'/\*\*((?:[^*]|\*(?!/))*)\*/\s*\n\s*int\s+(L_\w+)\s*\(\s*lua_State'
+    # Handles both "int L_Foo" and "static int L_Foo"
+    pattern = r'/\*\*((?:[^*]|\*(?!/))*)\*/\s*\n\s*(?:static\s+)?int\s+(L_\w+)\s*\(\s*lua_State'
 
     for match in re.finditer(pattern, content, re.DOTALL):
         docstring = match.group(1)
@@ -204,10 +213,12 @@ def extract_functions_from_file(filepath: Path) -> list[LuaFunction]:
 
         # Extract Lua function name from signature or C function name
         signature = parsed['signature']
+        is_utils = False
         if signature:
-            name_match = re.match(r'(?:world|utils)\.(\w+)', signature)
+            name_match = re.match(r'(world|utils)\.(\w+)', signature)
             if name_match:
-                lua_name = name_match.group(1)
+                is_utils = name_match.group(1) == 'utils'
+                lua_name = name_match.group(2)
             else:
                 lua_name = c_func_name[2:] if c_func_name.startswith('L_') else c_func_name
         else:
@@ -223,7 +234,8 @@ def extract_functions_from_file(filepath: Path) -> list[LuaFunction]:
             examples=parsed['examples'],
             see_also=parsed['see_also'],
             source_file=filepath.name,
-            line_number=line_number
+            line_number=line_number,
+            is_utils=is_utils
         )
         functions.append(func)
 
@@ -233,9 +245,10 @@ def extract_functions_from_file(filepath: Path) -> list[LuaFunction]:
 def generate_function_page(func: LuaFunction, category: Category, version: str, all_functions: dict) -> str:
     """Generate markdown content for an individual function page."""
     version_suffix = f"-{version}" if version else ""
+    display_name = f"utils.{func.name}" if func.is_utils else func.name
 
     lines = [
-        f"# {func.name}",
+        f"# {display_name}",
         "",
         f"**Category:** [[{category.title}|Lua-API{version_suffix}-{category.name}]]",
         "",
@@ -288,10 +301,13 @@ def generate_function_page(func: LuaFunction, category: Category, version: str, 
         lines.append("")
         see_links = []
         for name in func.see_also:
-            # Check if this function exists in our docs
+            # Determine if this is a utils.* function
+            is_utils_ref = name.startswith('utils.')
             clean_name = name.replace('utils.', '').replace('world.', '')
-            if clean_name in all_functions:
-                see_links.append(f"[[{name}|Lua-API{version_suffix}-{clean_name}]]")
+            # Build the file_key to look up
+            file_key = f"utils-{clean_name}" if is_utils_ref else clean_name
+            if file_key in all_functions:
+                see_links.append(f"[[{name}|Lua-API{version_suffix}-{file_key}]]")
             else:
                 see_links.append(f"`{name}`")
         lines.append(", ".join(see_links))
@@ -328,7 +344,9 @@ def generate_category_page(category: Category, version: str) -> str:
         if len(desc) > 80:
             desc = desc[:77] + "..."
         desc = desc.replace('|', '\\|')
-        lines.append(f"| [[{func.name}|Lua-API{version_suffix}-{func.name}]] | {desc} |")
+        # Display name includes utils. prefix for clarity
+        display_name = f"utils.{func.name}" if func.is_utils else func.name
+        lines.append(f"| [{display_name}](Lua-API{version_suffix}-{func.file_key}) | {desc} |")
 
     lines.extend([
         "",
@@ -364,7 +382,7 @@ def generate_index_page(categories: dict[str, Category], version: str, all_funct
         cat = categories[cat_id]
         func_count = len(cat.functions)
         desc = cat.description.replace('|', '\\|')
-        lines.append(f"| [[{cat.title}|Lua-API{version_suffix}-{cat_id}]] | {func_count} | {desc} |")
+        lines.append(f"| [{cat.title}](Lua-API{version_suffix}-{cat_id}) | {func_count} | {desc} |")
 
     lines.extend([
         "",
@@ -383,7 +401,8 @@ def generate_index_page(categories: dict[str, Category], version: str, all_funct
             current_letter = first_letter
             lines.append(f"\n### {current_letter}\n")
 
-        lines.append(f"- [[{func.name}|Lua-API{version_suffix}-{func.name}]]")
+        display_name = f"utils.{func.name}" if func.is_utils else func.name
+        lines.append(f"- [[{display_name}|Lua-API{version_suffix}-{func.file_key}]]")
 
     lines.extend([
         "",
@@ -461,9 +480,9 @@ def generate_home_page(categories: dict[str, Category], version: str) -> str:
 
 | Getting Started | Scripting | Reference |
 |-----------------|-----------|-----------|
-| [[Installation]] | [[Quick Start]] | [[API Reference|Lua-API{version_suffix}]] |
-| [[Configuration]] | [[Plugins]] | [[API Versions]] |
-| [[Migrating from MUSHclient]] | [[MiniWindows]] | [[Building from Source]] |
+| [Installation](Installation) | [Quick Start](Quick-Start) | [API Reference](Lua-API{version_suffix}) |
+| [Configuration](Configuration) | [Plugins](Plugins) | [API Versions](API-Versions) |
+| [Migrating from MUSHclient](Migrating-from-MUSHclient) | [MiniWindows](MiniWindows) | [Building from Source](Building-from-Source) |
 
 ## Lua API Overview
 
@@ -471,14 +490,14 @@ Mushkin provides a comprehensive Lua API compatible with MUSHclient scripts:
 
 | Category | Functions | Description |
 |----------|-----------|-------------|
-| [[Output|Lua-API{version_suffix}-Output]] | {len(categories.get('Output', Category('','','')).functions)} | Display text, colors, ANSI |
-| [[Triggers|Lua-API{version_suffix}-Triggers]] | {len(categories.get('Triggers', Category('','','')).functions)} | Pattern matching on MUD output |
-| [[Aliases|Lua-API{version_suffix}-Aliases]] | {len(categories.get('Aliases', Category('','','')).functions)} | Command shortcuts and macros |
-| [[Timers|Lua-API{version_suffix}-Timers]] | {len(categories.get('Timers', Category('','','')).functions)} | Scheduled and repeating tasks |
-| [[MiniWindows|Lua-API{version_suffix}-MiniWindows]] | {len(categories.get('MiniWindows', Category('','','')).functions)} | Custom graphics overlays |
-| [[Database|Lua-API{version_suffix}-Database]] | {len(categories.get('Database', Category('','','')).functions)} | SQLite storage |
+| [Output](Lua-API{version_suffix}-Output) | {len(categories.get('Output', Category('','','')).functions)} | Display text, colors, ANSI |
+| [Triggers](Lua-API{version_suffix}-Triggers) | {len(categories.get('Triggers', Category('','','')).functions)} | Pattern matching on MUD output |
+| [Aliases](Lua-API{version_suffix}-Aliases) | {len(categories.get('Aliases', Category('','','')).functions)} | Command shortcuts and macros |
+| [Timers](Lua-API{version_suffix}-Timers) | {len(categories.get('Timers', Category('','','')).functions)} | Scheduled and repeating tasks |
+| [MiniWindows](Lua-API{version_suffix}-MiniWindows) | {len(categories.get('MiniWindows', Category('','','')).functions)} | Custom graphics overlays |
+| [Database](Lua-API{version_suffix}-Database) | {len(categories.get('Database', Category('','','')).functions)} | SQLite storage |
 
-[[View complete API Reference →|Lua-API{version_suffix}]]
+[View complete API Reference →](Lua-API{version_suffix})
 
 ## Getting Help
 
@@ -579,15 +598,15 @@ def main():
         for func in functions:
             func.category = cat_id
             categories[cat_id].functions.append(func)
-            all_functions[func.name] = func
+            all_functions[func.file_key] = func
 
         print(f"Extracted {len(functions)} functions from {filename}")
 
     # Generate individual function pages
-    for func_name, func in all_functions.items():
+    for file_key, func in all_functions.items():
         category = categories[func.category]
         content = generate_function_page(func, category, version, all_functions)
-        output_file = output_dir / f"Lua-API{version_suffix}-{func_name}.md"
+        output_file = output_dir / f"Lua-API{version_suffix}-{file_key}.md"
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(content)
 
