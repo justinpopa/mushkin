@@ -485,6 +485,19 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
                     value = (attrValue == "y" || attrValue == "1" || attrValue.toLower() == "true")
                                 ? 1.0
                                 : 0.0;
+                } else if (opt.iFlags & OPT_RGB_COLOUR) {
+                    // RGB colors can be numeric or named (e.g., "white", "black", "red")
+                    bool ok;
+                    value = attrValue.toDouble(&ok);
+                    if (!ok) {
+                        // Try parsing as color name
+                        QColor color(attrValue);
+                        if (color.isValid()) {
+                            // Convert to Windows COLORREF format (BGR)
+                            value = color.red() | (color.green() << 8) | (color.blue() << 16);
+                        }
+                        // If invalid, value stays 0 and will be skipped below
+                    }
                 } else {
                     value = attrValue.toDouble();
                 }
@@ -524,7 +537,11 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
                         if (opt.iFlags & OPT_DOUBLE) {
                             *reinterpret_cast<float*>(fieldPtr) = static_cast<float>(value);
                         } else if (opt.iFlags & OPT_RGB_COLOUR) {
-                            *reinterpret_cast<QRgb*>(fieldPtr) = static_cast<QRgb>(value);
+                            // For RGB colors, 0 might mean "use default" in old MUSHclient files
+                            // Only set if value is non-zero, otherwise keep the default
+                            if (value != 0.0) {
+                                *reinterpret_cast<QRgb*>(fieldPtr) = static_cast<QRgb>(value);
+                            }
                         } else {
                             *reinterpret_cast<qint32*>(fieldPtr) = static_cast<qint32>(value);
                         }

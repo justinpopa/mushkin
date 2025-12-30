@@ -110,6 +110,9 @@ class GlobalPreferencesDialog : public QDialog {
     QPushButton* m_browseWorldDir;
 
     // === General Page ===
+    // Theme section
+    QComboBox* m_themeMode;
+
     // Worlds section
     QCheckBox* m_autoConnectWorlds;
     QCheckBox* m_reconnectOnDisconnect;

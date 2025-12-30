@@ -2,4 +2,15 @@
     <qresource prefix="/data">
         <file>resources/names.txt</file>
     </qresource>
+    <qresource prefix="/icons">
+        <file alias="mushkin">resources/icons/mushkin.svg</file>
+        <file alias="file-plus">resources/icons/file-plus.svg</file>
+        <file alias="folder-open">resources/icons/folder-open.svg</file>
+        <file alias="device-floppy">resources/icons/device-floppy.svg</file>
+        <file alias="plug-connected">resources/icons/plug-connected.svg</file>
+        <file alias="plug-x">resources/icons/plug-x.svg</file>
+        <file alias="copy">resources/icons/copy.svg</file>
+        <file alias="clipboard">resources/icons/clipboard.svg</file>
+        <file alias="search">resources/icons/search.svg</file>
+    </qresource>
 </RCC>

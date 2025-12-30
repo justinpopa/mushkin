@@ -31,10 +31,7 @@
 #include <QXmlStreamWriter>
 #include <cstring> // for memcpy, strlen
 
-
-// BGR macro for Windows COLORREF compatibility (0x00BBGGRR)
-// Original MUSHclient used BGR format for all color APIs
-#define BGR(r, g, b) (static_cast<QRgb>((r) | ((g) << 8) | ((b) << 16)))
+#include "color_utils.h"
 
 // Default ANSI colors in BGR format (Windows COLORREF)
 // These match the original MUSHclient values shown in aardwolf_colors.lua
@@ -207,7 +204,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_strOnMXP_SetVariable = QString();
 
     // ========== Initialize hyperlinks ==========
-    m_iHyperlinkColour = qRgb(0, 0, 255); // Blue
+    m_iHyperlinkColour = BGR(0, 0, 255); // Blue
 
     // ========== Initialize misc flags ==========
     m_indent_paras = 0;
@@ -3175,7 +3172,7 @@ void WorldDocument::SplitStyleForURL(Line* line, size_t styleIdx, int urlStart, 
     auto urlStyle = std::make_unique<Style>();
     urlStyle->iLength = urlLength;
     urlStyle->iFlags = originalStyle->iFlags | ACTION_HYPERLINK | UNDERLINE;
-    urlStyle->iForeColour = qRgb(0, 0, 255); // Blue for URLs
+    urlStyle->iForeColour = BGR(0, 0, 255); // Blue for URLs
     urlStyle->iBackColour = originalStyle->iBackColour;
     urlStyle->pAction = action;
     newStyles.push_back(std::move(urlStyle));
@@ -3304,9 +3301,9 @@ void WorldDocument::clearCommandHistory()
  */
 void WorldDocument::note(const QString& text)
 {
-    // Use default note colors (or white on black if not set)
-    QRgb foreColor = m_bNotesInRGB ? m_iNoteColourFore : qRgb(255, 255, 255);
-    QRgb backColor = m_bNotesInRGB ? m_iNoteColourBack : qRgb(0, 0, 0);
+    // Use default note colors (or white on black if not set) - BGR format
+    QRgb foreColor = m_bNotesInRGB ? m_iNoteColourFore : BGR(255, 255, 255);
+    QRgb backColor = m_bNotesInRGB ? m_iNoteColourBack : BGR(0, 0, 0);
 
     colourNote(foreColor, backColor, text);
 }
@@ -3345,12 +3342,16 @@ void WorldDocument::colourNote(QRgb foreColor, QRgb backColor, const QString& te
     m_iForeColour = foreColor;
     m_iBackColour = backColor;
 
-    // Convert QString to UTF-8 and add to current line
-    QByteArray utf8 = text.toUtf8();
-    AddToLine(utf8.constData(), utf8.length());
+    // Split text on newlines and output each line separately
+    // This matches original MUSHclient behavior for multi-line notes
+    QStringList lines = text.split('\n');
+    for (int i = 0; i < lines.size(); ++i) {
+        QByteArray utf8 = lines[i].toUtf8();
+        AddToLine(utf8.constData(), utf8.length());
 
-    // Complete the note line (hard break with COMMENT flag)
-    StartNewLine(true, COMMENT);
+        // Complete each line (hard break with COMMENT flag)
+        StartNewLine(true, COMMENT);
+    }
 
     // Restore previous style for MUD output
     m_iFlags = savedFlags;
@@ -3390,11 +3391,20 @@ void WorldDocument::colourTell(QRgb foreColor, QRgb backColor, const QString& te
     m_iForeColour = foreColor;
     m_iBackColour = backColor;
 
-    // Convert QString to UTF-8 and add to current line
-    QByteArray utf8 = text.toUtf8();
-    AddToLine(utf8.constData(), utf8.length());
+    // Handle embedded newlines but don't add final newline
+    // This matches original MUSHclient behavior
+    QStringList lines = text.split('\n');
+    for (int i = 0; i < lines.size(); ++i) {
+        QByteArray utf8 = lines[i].toUtf8();
+        AddToLine(utf8.constData(), utf8.length());
 
-    // Restore previous style (no newline - caller must call note("") or StartNewLine)
+        // Add newline for all but the last segment
+        if (i < lines.size() - 1) {
+            StartNewLine(true, COMMENT);
+        }
+    }
+
+    // Restore previous style (no final newline - caller must call note("") or StartNewLine)
     m_iFlags = savedFlags;
     m_iForeColour = savedFore;
     m_iBackColour = savedBack;
@@ -3542,7 +3552,7 @@ void WorldDocument::loadScriptFile()
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         QString error = QString("Cannot open script file: %1").arg(m_strScriptFilename);
         qWarning() << error;
-        colourNote(qRgb(255, 0, 0), qRgb(0, 0, 0), error);
+        colourNote(BGR(255, 0, 0), BGR(0, 0, 0), error);
         return;
     }
 
@@ -3557,7 +3567,8 @@ void WorldDocument::loadScriptFile()
     bool error = m_ScriptEngine->parseLua(scriptCode, "Script file");
 
     if (error) {
-        colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0),
+        // Orange error text on black background
+        colourNote(BGR(255, 140, 0), BGR(0, 0, 0),
                    QString("Script file contains errors: %1").arg(m_strScriptFilename));
     } else {
         qCDebug(lcWorld) << "loadScriptFile: Script executed successfully";
@@ -3745,10 +3756,10 @@ void WorldDocument::showErrorLines(int lineNumber)
     int start = qMax(0, lineNumber - 4); // lineNumber is 1-based, so -4 gives us 3 lines before
     int end = qMin(lines.count(), lineNumber + 3);
 
-    // Display context
+    // Display context - orange error text on black background
     for (int i = start; i < end; i++) {
         QString prefix = (i + 1 == lineNumber) ? ">>> " : "    ";
-        colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0),
+        colourNote(BGR(255, 140, 0), BGR(0, 0, 0),
                    QString("%1%2: %3").arg(prefix).arg(i + 1).arg(lines[i]));
     }
 }

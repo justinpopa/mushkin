@@ -1,5 +1,6 @@
 #include "output_view.h"
 #include "../../text/action.h"
+#include "../../world/color_utils.h"
 #include "../../world/miniwindow.h"
 #include "../automation/plugin.h"
 #include "../text/line.h"
@@ -72,6 +73,9 @@ OutputView::OutputView(WorldDocument* doc, QWidget* parent)
 
     // Enable mouse tracking and set cursor for text selection
     setMouseTracking(true);
+
+    // Allow keyboard focus for copy shortcuts (Cmd+C / Ctrl+C)
+    setFocusPolicy(Qt::StrongFocus);
     setCursor(Qt::IBeamCursor);
 
     // Connect to document signals
@@ -124,29 +128,32 @@ void OutputView::setOutputFont(const QFont& font)
  */
 void OutputView::calculateMetrics()
 {
-    QFontMetrics fm(m_font);
+    // Use widget as paint device for DPI-aware font metrics (fixes HiDPI displays)
+    QFontMetrics fm(m_font, const_cast<OutputView*>(this));
     m_lineHeight = fm.height();
     m_charWidth = fm.horizontalAdvance('M'); // Width of average character
 
     // Calculate how many lines fit in current height
     // Use text rectangle height if one is explicitly configured, otherwise use widget height
+    // Subtract 1 to ensure there's always a full line height of buffer at the bottom
+    // (prevents clipping due to font descenders, anti-aliasing, etc.)
     if (m_lineHeight > 0) {
         // Only use text rectangle if it's explicitly configured AND doc is valid
         if (m_doc && haveTextRectangle()) {
             QRect textRect = getTextRectangle();
-            m_visibleLines = textRect.height() / m_lineHeight;
+            m_visibleLines = qMax(1, (textRect.height() / m_lineHeight) - 1);
             // Push computed rectangle to WorldDocument (for Lua API access)
             m_doc->m_computedTextRectangle = textRect;
         } else {
             // No text rectangle configured - use full widget height
-            m_visibleLines = height() / m_lineHeight;
+            m_visibleLines = qMax(1, (height() / m_lineHeight) - 1);
             // Store widget rect as computed rectangle
             if (m_doc) {
                 m_doc->m_computedTextRectangle = rect();
             }
         }
     } else {
-        m_visibleLines = 0;
+        m_visibleLines = 1; // Minimum 1 visible line
         if (m_doc) {
             m_doc->m_computedTextRectangle = QRect();
         }
@@ -299,13 +306,6 @@ void OutputView::wheelEvent(QWheelEvent* event)
     event->accept();
 }
 
-// Helper to convert BGR color value (Windows COLORREF) to QColor
-// All color values in MUSHclient Lua API use BGR format: 0x00BBGGRR
-static inline QColor bgrToQColor(quint32 bgr)
-{
-    return QColor(bgr & 0xFF, (bgr >> 8) & 0xFF, (bgr >> 16) & 0xFF);
-}
-
 /**
  * ansiToRgb - Convert ANSI index or BGR value to QColor
  *
@@ -428,7 +428,9 @@ void OutputView::paintEvent(QPaintEvent* event)
         int y = 0;
         if (!m_doc->m_lineList.isEmpty()) {
             int totalLines = m_doc->m_lineList.count();
-            m_scrollPos = qBound(0, m_scrollPos, qMax(0, totalLines - 1));
+            int maxScroll = qMax(0, totalLines - m_visibleLines);
+            // Clamp scroll position to valid range (was incorrectly using totalLines-1)
+            m_scrollPos = qBound(0, m_scrollPos, maxScroll);
 
             int firstLine = m_scrollPos;
             int lastLine = qMin(m_scrollPos + m_visibleLines, totalLines);
@@ -500,7 +502,8 @@ void OutputView::paintEvent(QPaintEvent* event)
             int totalLines = m_doc->m_lineList.count();
 
             // Clamp scroll position to valid range
-            m_scrollPos = qBound(0, m_scrollPos, qMax(0, totalLines - 1));
+            int maxScroll = qMax(0, totalLines - m_visibleLines);
+            m_scrollPos = qBound(0, m_scrollPos, maxScroll);
 
             int firstLine = m_scrollPos;
             int lastLine = qMin(m_scrollPos + m_visibleLines, totalLines);
@@ -638,10 +641,8 @@ void OutputView::drawLine(QPainter& painter, int y, Line* line, int lineIndex)
         painter.setFont(font);
         QFontMetrics fm(font);
 
-        QColor preambleFore =
-            QColor(qRed(cPreambleText), qGreen(cPreambleText), qBlue(cPreambleText));
-        QColor preambleBack =
-            QColor(qRed(cPreambleBack), qGreen(cPreambleBack), qBlue(cPreambleBack));
+        QColor preambleFore = bgrToQColor(cPreambleText);
+        QColor preambleBack = bgrToQColor(cPreambleBack);
 
         int preambleWidth = fm.horizontalAdvance(strPreamble);
 
@@ -772,6 +773,9 @@ void OutputView::mousePressEvent(QMouseEvent* event)
     if (mouseDownMiniWindow(event->pos(), event->button())) {
         return; // Miniwindow handled the event
     }
+
+    // Grab keyboard focus for copy shortcuts
+    setFocus();
 
     if (event->button() == Qt::LeftButton) {
         // Check for triple-click (third click after doubleClick)
@@ -1118,22 +1122,103 @@ void OutputView::positionToLineChar(const QPoint& pos, int& line, int& charOffse
         return;
     }
 
-    // Use font metrics to find character at X position (account for text rectangle offset)
-    QFontMetrics fm(m_font);
+    // Adjust X for text rectangle offset
+    int adjustedX = pos.x() - textRect.left();
     int x = 0;
-    charOffset = 0;
-    int adjustedX = pos.x() - textRect.left(); // Account for text rectangle left offset
 
-    for (int i = 0; i < pLine->len(); i++) {
-        QChar ch = QChar::fromLatin1(pLine->text()[i]);
-        int charWidth = fm.horizontalAdvance(ch);
-        if (x + charWidth / 2 > adjustedX) {
-            // Clicked on this character
-            charOffset = i;
-            return;
+    // Account for preamble width (must match drawLine logic)
+    QString strPreamble;
+    if (pLine->flags & COMMENT) {
+        strPreamble = m_doc->m_strOutputLinePreambleNotes;
+    } else if (pLine->flags & USER_INPUT) {
+        strPreamble = m_doc->m_strOutputLinePreambleInput;
+    } else {
+        strPreamble = m_doc->m_strOutputLinePreambleOutput;
+    }
+
+    if (!strPreamble.isEmpty()) {
+        // Expand time codes (simplified - matches drawLine)
+        strPreamble.replace("%e", "0.000000");
+        strPreamble.replace("%D", "0.000000");
+        strPreamble = m_doc->FormatTime(pLine->m_theTime, strPreamble, false);
+
+        // Use widget as paint device for accurate DPI-aware metrics
+        QFontMetrics fm(m_font, const_cast<OutputView*>(this));
+        x += fm.horizontalAdvance(strPreamble);
+    }
+
+    // If click is in preamble area, return position 0
+    if (adjustedX < x) {
+        charOffset = 0;
+        return;
+    }
+
+    // Iterate through styles (must match drawLine rendering)
+    int textPos = 0; // Byte position in line text
+    charOffset = 0;
+
+    for (const auto& style : pLine->styleList) {
+        if (!style || style->iLength == 0)
+            continue;
+
+        if (textPos >= pLine->len())
+            break;
+
+        int styleLength = qMin((int)style->iLength, pLine->len() - textPos);
+
+        // Apply same font attributes as drawLine
+        QFont font = m_font;
+        font.setBold(style->iFlags & HILITE);
+        font.setUnderline(style->iFlags & UNDERLINE);
+        font.setItalic(style->iFlags & BLINK);
+        font.setStrikeOut(style->iFlags & STRIKEOUT);
+        // Use widget as paint device for accurate DPI-aware metrics
+        QFontMetrics fm(font, const_cast<OutputView*>(this));
+
+        // Convert style text to QString using UTF-8 (matches drawLine)
+        QString styleText = QString::fromUtf8(pLine->text() + textPos, styleLength);
+
+        // Calculate byte length for each character (for proper byte offset tracking)
+        int bytePos = textPos;
+
+        for (int charIdx = 0; charIdx < styleText.length(); charIdx++) {
+            // Handle surrogate pairs the same way as drawLine
+            QString charText;
+            int charByteLen;
+
+            if (styleText[charIdx].isHighSurrogate() && charIdx + 1 < styleText.length() &&
+                styleText[charIdx + 1].isLowSurrogate()) {
+                // Surrogate pair (4-byte UTF-8 character like emoji)
+                charText = styleText.mid(charIdx, 2);
+                charByteLen = 4;
+                charIdx++; // Skip the low surrogate (same as drawLine)
+            } else {
+                charText = styleText[charIdx];
+                QChar ch = styleText[charIdx];
+                if (ch.unicode() < 0x80) {
+                    charByteLen = 1;
+                } else if (ch.unicode() < 0x800) {
+                    charByteLen = 2;
+                } else {
+                    charByteLen = 3;
+                }
+            }
+
+            // Measure character width (use QString, same as drawLine)
+            int charWidth = fm.horizontalAdvance(charText);
+
+            // Check if click is on this character
+            if (x + charWidth / 2 > adjustedX) {
+                charOffset = bytePos;
+                return;
+            }
+
+            x += charWidth;
+            bytePos += charByteLen;
+            charOffset = bytePos;
         }
-        x += charWidth;
-        charOffset = i + 1; // After this char
+
+        textPos += styleLength;
     }
 
     // Clicked beyond end of line

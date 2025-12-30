@@ -9,6 +9,8 @@
 #include <QRegularExpression>
 #include <QStringList>
 
+#include "color_utils.h"
+
 // Lua headers
 extern "C" {
 #include <lauxlib.h>
@@ -637,6 +639,22 @@ return re
         lua_pop(L, 1); // pop error message
     }
 
+    // Mark luacom as unavailable (Windows-only COM automation)
+    // This prevents "module not found" errors when plugins try to require it
+    // Plugins check: luacom = require "luacom"; if luacom then wshell = luacom.CreateObject(...)
+    // We provide a stub table where CreateObject returns nil, so plugins gracefully skip COM code
+    lua_getglobal(L, "package");
+    lua_getfield(L, -1, "loaded");
+    lua_newtable(L); // Create stub table
+    // Add CreateObject that returns nil
+    lua_pushcfunction(L, [](lua_State* L) -> int {
+        lua_pushnil(L);
+        return 1;
+    });
+    lua_setfield(L, -2, "CreateObject");
+    lua_setfield(L, -2, "luacom"); // package.loaded["luacom"] = stub table
+    lua_pop(L, 2);                 // pop loaded, package
+
     // TODO: Register additional libraries
     //    luaopen_rex(L);    // PCRE regex
     //    etc.
@@ -960,9 +978,10 @@ static void luaError(lua_State* L, const QString& event, const QString& name, Wo
 
     // Display in output window
     if (doc) {
-        doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0),
+        // Orange error text on black background (BGR format for MUSHclient compatibility)
+        doc->colourNote(BGR(255, 140, 0), BGR(0, 0, 0),
                         QString("=== %1: %2 ===").arg(event, name));
-        doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0), errorMsg);
+        doc->colourNote(BGR(255, 140, 0), BGR(0, 0, 0), errorMsg);
 
         // Show error lines (if we have a line number and script file)
         if (lineNumber > 0) {

@@ -14,6 +14,11 @@
 #include <QMessageBox>
 #include <QSplitter>
 #include <QVBoxLayout>
+#ifdef Q_OS_MACOS
+#include <QHBoxLayout>
+#include <QMdiSubWindow>
+#include <QToolButton>
+#endif
 
 /**
  * WorldWidget Constructor
@@ -25,7 +30,11 @@
  */
 WorldWidget::WorldWidget(QWidget* parent)
     : QWidget(parent), m_document(nullptr), m_splitter(nullptr), m_outputView(nullptr),
-      m_inputView(nullptr), m_infoBar(nullptr), m_modified(false), m_connected(false)
+      m_inputView(nullptr), m_infoBar(nullptr),
+#ifdef Q_OS_MACOS
+      m_titleBar(nullptr), m_titleLabel(nullptr),
+#endif
+      m_modified(false), m_connected(false)
 {
     // Create the world document
     m_document = new WorldDocument(this);
@@ -62,6 +71,62 @@ void WorldWidget::setupUi()
     QVBoxLayout* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
+
+#ifdef Q_OS_MACOS
+    // Create custom title bar for macOS (replaces QMdiSubWindow's native title bar)
+    m_titleBar = new QWidget(this);
+    m_titleBar->setFixedHeight(22);
+    m_titleBar->setStyleSheet("background-color: #383838; border-bottom: 1px solid #555;");
+
+    QHBoxLayout* titleLayout = new QHBoxLayout(m_titleBar);
+    titleLayout->setContentsMargins(8, 0, 4, 0);
+    titleLayout->setSpacing(4);
+
+    // Title label (will be updated in updateWindowTitle)
+    m_titleLabel = new QLabel("New World", m_titleBar);
+    m_titleLabel->setStyleSheet("color: #aaa; font-size: 12px;");
+    titleLayout->addWidget(m_titleLabel);
+    titleLayout->addStretch();
+
+    // Minimize button
+    QToolButton* minBtn = new QToolButton(m_titleBar);
+    minBtn->setFixedSize(16, 16);
+    minBtn->setText("−");
+    minBtn->setStyleSheet("QToolButton { border: 1px solid #555; border-radius: 2px; background: transparent; color: #888; font-size: 14px; } QToolButton:hover { background: #444; }");
+    connect(minBtn, &QToolButton::clicked, this, [this]() {
+        if (QMdiSubWindow* mdi = qobject_cast<QMdiSubWindow*>(parentWidget()))
+            mdi->showMinimized();
+    });
+    titleLayout->addWidget(minBtn);
+
+    // Maximize button
+    QToolButton* maxBtn = new QToolButton(m_titleBar);
+    maxBtn->setFixedSize(16, 16);
+    maxBtn->setText("□");
+    maxBtn->setStyleSheet("QToolButton { border: 1px solid #555; border-radius: 2px; background: transparent; color: #888; font-size: 11px; } QToolButton:hover { background: #444; }");
+    connect(maxBtn, &QToolButton::clicked, this, [this]() {
+        if (QMdiSubWindow* mdi = qobject_cast<QMdiSubWindow*>(parentWidget())) {
+            if (mdi->isMaximized())
+                mdi->showNormal();
+            else
+                mdi->showMaximized();
+        }
+    });
+    titleLayout->addWidget(maxBtn);
+
+    // Close button
+    QToolButton* closeBtn = new QToolButton(m_titleBar);
+    closeBtn->setFixedSize(16, 16);
+    closeBtn->setText("×");
+    closeBtn->setStyleSheet("QToolButton { border: 1px solid #555; border-radius: 2px; background: transparent; color: #888; font-size: 14px; } QToolButton:hover { background: #633; color: #faa; }");
+    connect(closeBtn, &QToolButton::clicked, this, [this]() {
+        if (QMdiSubWindow* mdi = qobject_cast<QMdiSubWindow*>(parentWidget()))
+            mdi->close();
+    });
+    titleLayout->addWidget(closeBtn);
+
+    layout->addWidget(m_titleBar);
+#endif
 
     // Create info bar (script-controllable status display)
     m_infoBar = new QLabel(this);
@@ -230,6 +295,13 @@ void WorldWidget::updateWindowTitle()
 
     setWindowTitle(title);
     emit windowTitleChanged(title);
+
+#ifdef Q_OS_MACOS
+    // Update custom title bar label
+    if (m_titleLabel) {
+        m_titleLabel->setText(title);
+    }
+#endif
 }
 
 /**

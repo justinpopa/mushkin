@@ -1,4 +1,5 @@
 #include "global_preferences_dialog.h"
+#include "../main_window.h"
 #include "../../storage/database.h"
 #include "../../storage/global_options.h"
 
@@ -273,6 +274,26 @@ QWidget* GlobalPreferencesDialog::createGeneralPage()
     QVBoxLayout* mainLayout = new QVBoxLayout(page);
     mainLayout->setContentsMargins(20, 20, 20, 20);
     mainLayout->setSpacing(0);
+
+    // === Theme ===
+    QLabel* themeHeader = new QLabel("<b>Theme</b>");
+    mainLayout->addWidget(themeHeader);
+    mainLayout->addSpacing(8);
+
+    QHBoxLayout* themeLayout = new QHBoxLayout();
+    themeLayout->addWidget(new QLabel("Application theme:"));
+    themeLayout->addSpacing(10);
+    m_themeMode = new QComboBox();
+    m_themeMode->addItem("Light");
+    m_themeMode->addItem("Dark");
+    m_themeMode->addItem("System");
+    m_themeMode->setToolTip("Choose the application color scheme.\n"
+                            "System follows your operating system's theme setting.");
+    themeLayout->addWidget(m_themeMode);
+    themeLayout->addStretch();
+    mainLayout->addLayout(themeLayout);
+
+    mainLayout->addSpacing(16);
 
     // === Worlds ===
     QLabel* worldsHeader = new QLabel("<b>Worlds</b>");
@@ -1194,6 +1215,7 @@ void GlobalPreferencesDialog::loadSettings()
     }
 
     // === General Page ===
+    m_themeMode->setCurrentIndex(db->getPreferenceInt("ThemeMode", ThemeSystem));
     m_autoConnectWorlds->setChecked(db->getPreferenceInt("AutoConnectWorlds", 1) != 0);
     m_reconnectOnDisconnect->setChecked(db->getPreferenceInt("ReconnectOnLinkFailure", 0) != 0);
     m_openWorldsMaximized->setChecked(db->getPreferenceInt("OpenWorldsMaximised", 0) != 0);
@@ -1366,6 +1388,7 @@ void GlobalPreferencesDialog::saveSettings()
     db->setPreference("WorldList", worlds.join("\n"));
 
     // === General Page ===
+    db->setPreferenceInt("ThemeMode", m_themeMode->currentIndex());
     db->setPreferenceInt("AutoConnectWorlds", m_autoConnectWorlds->isChecked() ? 1 : 0);
     db->setPreferenceInt("ReconnectOnLinkFailure", m_reconnectOnDisconnect->isChecked() ? 1 : 0);
     db->setPreferenceInt("OpenWorldsMaximised", m_openWorldsMaximized->isChecked() ? 1 : 0);
@@ -1508,6 +1531,13 @@ void GlobalPreferencesDialog::saveSettings()
 void GlobalPreferencesDialog::applySettings()
 {
     saveSettings();
+
+    // Apply theme changes to main window
+    MainWindow* mainWindow = qobject_cast<MainWindow*>(parentWidget());
+    if (mainWindow) {
+        mainWindow->applyTheme();
+    }
+
     qCDebug(lcDialog) << "GlobalPreferencesDialog::applySettings() - settings applied";
 }
 

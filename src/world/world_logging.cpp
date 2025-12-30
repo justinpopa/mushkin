@@ -15,6 +15,7 @@
 
 #include "../text/line.h"  // For Line and LOG_LINE flag
 #include "../text/style.h" // For Style
+#include "color_utils.h"
 #include "logging.h"
 #include "world_document.h"
 #include <QCoreApplication>
@@ -495,22 +496,24 @@ void WorldDocument::LogLineInHTMLcolour(Line* line)
                 WriteToLog("</font>");
             }
 
-            // Open new font color
+            // Open new font color - convert from BGR to RGB for HTML
+            QColor fore = bgrToQColor(colour1);
             WriteToLog(QString("<font color=\"#%1%2%3\">")
-                           .arg(qRed(colour1), 2, 16, QChar('0'))
-                           .arg(qGreen(colour1), 2, 16, QChar('0'))
-                           .arg(qBlue(colour1), 2, 16, QChar('0')));
+                           .arg(fore.red(), 2, 16, QChar('0'))
+                           .arg(fore.green(), 2, 16, QChar('0'))
+                           .arg(fore.blue(), 2, 16, QChar('0')));
             prevcolour = colour1;
 
             // Open span for background color (only if not black)
             if (colour2 != 0) {
+                QColor back = bgrToQColor(colour2);
                 WriteToLog(QString("<span style=\"color:#%1%2%3;background:#%4%5%6\">")
-                               .arg(qRed(colour1), 2, 16, QChar('0'))
-                               .arg(qGreen(colour1), 2, 16, QChar('0'))
-                               .arg(qBlue(colour1), 2, 16, QChar('0'))
-                               .arg(qRed(colour2), 2, 16, QChar('0'))
-                               .arg(qGreen(colour2), 2, 16, QChar('0'))
-                               .arg(qBlue(colour2), 2, 16, QChar('0')));
+                               .arg(fore.red(), 2, 16, QChar('0'))
+                               .arg(fore.green(), 2, 16, QChar('0'))
+                               .arg(fore.blue(), 2, 16, QChar('0'))
+                               .arg(back.red(), 2, 16, QChar('0'))
+                               .arg(back.green(), 2, 16, QChar('0'))
+                               .arg(back.blue(), 2, 16, QChar('0')));
                 bInSpan = true;
             }
 

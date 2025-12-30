@@ -65,6 +65,9 @@
 #include <QTimer>
 #include <QToolBar>
 #include <QVBoxLayout>
+#include <QPainter>
+#include <QStyleHints>
+#include <QSvgRenderer>
 #include <functional>
 
 MainWindow::MainWindow(QWidget* parent)
@@ -850,40 +853,26 @@ void MainWindow::createToolBars()
     m_mainToolBar->setObjectName("MainToolBar");
     m_mainToolBar->setMovable(true);
 
-    // Add icons to actions using Qt standard icons
-    QStyle* style = this->style();
-
-    m_newAction->setIcon(style->standardIcon(QStyle::SP_FileDialogNewFolder));
+    // Add actions to toolbar (icons set by updateToolbarIcons based on theme)
     m_mainToolBar->addAction(m_newAction);
-
-    m_openAction->setIcon(style->standardIcon(QStyle::SP_DialogOpenButton));
     m_mainToolBar->addAction(m_openAction);
-
-    m_saveAction->setIcon(style->standardIcon(QStyle::SP_DialogSaveButton));
     m_mainToolBar->addAction(m_saveAction);
 
     m_mainToolBar->addSeparator();
 
     // Connection actions
-    m_connectAction->setIcon(style->standardIcon(QStyle::SP_MediaPlay));
     m_mainToolBar->addAction(m_connectAction);
-
-    m_disconnectAction->setIcon(style->standardIcon(QStyle::SP_MediaStop));
     m_mainToolBar->addAction(m_disconnectAction);
 
     m_mainToolBar->addSeparator();
 
     // Edit actions
-    m_copyAction->setIcon(style->standardIcon(QStyle::SP_FileIcon));
     m_mainToolBar->addAction(m_copyAction);
-
-    m_pasteAction->setIcon(style->standardIcon(QStyle::SP_FileDialogDetailedView));
     m_mainToolBar->addAction(m_pasteAction);
 
     m_mainToolBar->addSeparator();
 
     // Find action
-    m_findAction->setIcon(style->standardIcon(QStyle::SP_FileDialogContentsView));
     m_mainToolBar->addAction(m_findAction);
 
     // Connect visibility toggle
@@ -896,6 +885,9 @@ void MainWindow::createToolBars()
 
     // Apply initial toolbar appearance preferences
     applyToolbarPreferences();
+
+    // Apply theme and update icons
+    applyTheme();
 }
 
 void MainWindow::createGameToolBar()
@@ -1116,6 +1108,87 @@ void MainWindow::applyToolbarPreferences()
             break;
     }
     m_activityToolBar->setToolButtonStyle(tbStyle);
+}
+
+void MainWindow::applyTheme()
+{
+    Database* db = Database::instance();
+    int mode = db->getPreferenceInt("ThemeMode", ThemeSystem);
+
+    qDebug() << "applyTheme: mode =" << mode << "(0=Light, 1=Dark, 2=System)";
+
+    // Use Qt 6's color scheme API to properly change appearance on macOS
+    Qt::ColorScheme scheme;
+    if (mode == ThemeLight) {
+        scheme = Qt::ColorScheme::Light;
+    } else if (mode == ThemeDark) {
+        scheme = Qt::ColorScheme::Dark;
+    } else {
+        scheme = Qt::ColorScheme::Unknown; // System/auto
+    }
+
+    // Set the color scheme - this properly changes appearance on macOS
+    QGuiApplication::styleHints()->setColorScheme(scheme);
+
+    qDebug() << "applyTheme: set color scheme to" << static_cast<int>(scheme);
+
+    // Update toolbar icons to match the new theme
+    updateToolbarIcons();
+}
+
+QIcon MainWindow::loadThemedIcon(const QString& name)
+{
+    // Read SVG from resources
+    QFile file(QString(":/icons/%1").arg(name));
+    if (!file.open(QIODevice::ReadOnly)) {
+        qWarning() << "Failed to load icon:" << name;
+        return QIcon();
+    }
+    QString svg = QString::fromUtf8(file.readAll());
+    file.close();
+
+    // Determine icon color based on effective color scheme
+    Database* db = Database::instance();
+    int mode = db->getPreferenceInt("ThemeMode", ThemeSystem);
+
+    bool useDark = false;
+    if (mode == ThemeDark) {
+        useDark = true;
+    } else if (mode == ThemeSystem) {
+        // Check system preference
+        auto colorScheme = QGuiApplication::styleHints()->colorScheme();
+        useDark = (colorScheme == Qt::ColorScheme::Dark);
+    }
+    // ThemeLight: useDark stays false
+
+    // Use light icons on dark backgrounds, dark icons on light backgrounds
+    QColor color = useDark ? QColor(255, 255, 255) : QColor(51, 51, 51);
+
+    // Replace stroke color
+    svg.replace("currentColor", color.name());
+
+    // Create icon from modified SVG
+    QSvgRenderer renderer(svg.toUtf8());
+    QPixmap pixmap(24, 24);
+    pixmap.fill(Qt::transparent);
+    QPainter painter(&pixmap);
+    renderer.render(&painter);
+    painter.end();
+
+    return QIcon(pixmap);
+}
+
+void MainWindow::updateToolbarIcons()
+{
+    // Update main toolbar action icons
+    m_newAction->setIcon(loadThemedIcon("file-plus"));
+    m_openAction->setIcon(loadThemedIcon("folder-open"));
+    m_saveAction->setIcon(loadThemedIcon("device-floppy"));
+    m_connectAction->setIcon(loadThemedIcon("plug-connected"));
+    m_disconnectAction->setIcon(loadThemedIcon("plug-x"));
+    m_copyAction->setIcon(loadThemedIcon("copy"));
+    m_pasteAction->setIcon(loadThemedIcon("clipboard"));
+    m_findAction->setIcon(loadThemedIcon("search"));
 }
 
 void MainWindow::sendGameCommand(const QString& command)
@@ -1650,6 +1723,11 @@ void MainWindow::newWorld()
     // Remove the system menu (that extra menu bar inside the MDI area)
     subWindow->setSystemMenu(nullptr);
 
+#ifdef Q_OS_MACOS
+    // On macOS, use frameless subwindow - WorldWidget has its own custom title bar
+    subWindow->setWindowFlags(Qt::FramelessWindowHint);
+#endif
+
     // Connect window title changes
     connect(worldWidget, &WorldWidget::windowTitleChanged, subWindow,
             &QMdiSubWindow::setWindowTitle);
@@ -1723,6 +1801,11 @@ void MainWindow::openWorld(const QString& filename)
 
     // Remove the system menu (that extra menu bar inside the MDI area)
     subWindow->setSystemMenu(nullptr);
+
+#ifdef Q_OS_MACOS
+    // On macOS, use frameless subwindow - WorldWidget has its own custom title bar
+    subWindow->setWindowFlags(Qt::FramelessWindowHint);
+#endif
 
     // Connect window title changes
     connect(worldWidget, &WorldWidget::windowTitleChanged, subWindow,
@@ -4016,6 +4099,16 @@ void MainWindow::createNotepadWindow(NotepadWidget* notepad)
 
     // Remove the system menu (that extra menu bar inside the MDI area)
     subWindow->setSystemMenu(nullptr);
+
+#ifdef Q_OS_MACOS
+    // On macOS, hide MDI subwindow control buttons via stylesheet
+    subWindow->setStyleSheet(
+        "QMdiSubWindow { border: 1px solid #444; }"
+        "QMdiSubWindow::title { background: #333; height: 20px; }"
+        "QMdiSubWindow::close-button, "
+        "QMdiSubWindow::normal-button, "
+        "QMdiSubWindow::shade-button { width: 0px; height: 0px; }");
+#endif
 
     // Store reference to MDI subwindow in notepad
     notepad->m_pMdiSubWindow = subWindow;

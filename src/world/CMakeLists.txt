@@ -1,6 +1,7 @@
 # World module - Core document and world state management
 # Includes Lua API (previously separate scripting module - merged to eliminate circular dependency)
 add_library(world STATIC
+    color_utils.h
     world_document.cpp
     world_document.h
     world_triggers.cpp
