@@ -74,6 +74,9 @@ FILE_CATEGORIES = {
     "world_speedwalk.cpp": ("Speedwalk", "Speedwalk Functions", "Functions for speedwalk/pathfinding."),
     "world_database.cpp": ("Database", "Database Functions", "Functions for SQLite database operations."),
     "world_plugins.cpp": ("Plugins", "Plugin Functions", "Functions for inter-plugin communication and plugin management."),
+    "world_settings.cpp": ("Settings", "Settings Functions", "Functions for getting and setting world options."),
+    "world_notepads.cpp": ("Notepads", "Notepad Functions", "Functions for creating and managing notepad windows."),
+    "world_sounds.cpp": ("Sounds", "Sound Functions", "Functions for playing sounds."),
     "lua_utils.cpp": ("Utils", "Utils Library", "The utils.* library functions."),
 }
 
