@@ -44,7 +44,17 @@
 /**
  * world.Hash(text)
  *
- * Computes SHA-256 hash of text.
+ * Computes SHA-256 hash of text and returns it as a hex string.
+ *
+ * @param text (string) String to hash (binary safe)
+ *
+ * @return (string) 64-character hex SHA-256 hash (lowercase)
+ *
+ * @example
+ * local hash = Hash("password123")
+ * Note("SHA-256: " .. hash)
+ *
+ * @see utils.md5, utils.sha256
  */
 int L_Hash(lua_State* L)
 {
@@ -64,9 +74,17 @@ int L_Hash(lua_State* L)
  * utils.md5(text)
  *
  * Computes MD5 hash of text and returns it as a hex string.
+ * Note: MD5 is not cryptographically secure; use SHA-256 for security.
  *
- * @param text String to hash (binary safe)
- * @return 32-character hex MD5 hash (lowercase)
+ * @param text (string) String to hash (binary safe)
+ *
+ * @return (string) 32-character hex MD5 hash (lowercase)
+ *
+ * @example
+ * local hash = utils.md5("hello world")
+ * Note("MD5: " .. hash)  -- "5eb63bbbe01eeed093cb22bb8f5acdc3"
+ *
+ * @see utils.sha256, Hash
  */
 int L_Utils_MD5(lua_State* L)
 {
@@ -86,9 +104,17 @@ int L_Utils_MD5(lua_State* L)
  * utils.sha256(text)
  *
  * Computes SHA-256 hash of text and returns it as a hex string.
+ * SHA-256 is cryptographically secure and suitable for password hashing.
  *
- * @param text String to hash (binary safe)
- * @return 64-character hex SHA-256 hash (lowercase)
+ * @param text (string) String to hash (binary safe)
+ *
+ * @return (string) 64-character hex SHA-256 hash (lowercase)
+ *
+ * @example
+ * local hash = utils.sha256("secret data")
+ * Note("SHA-256: " .. hash)
+ *
+ * @see utils.md5, Hash
  */
 int L_Utils_SHA256(lua_State* L)
 {
@@ -107,10 +133,18 @@ int L_Utils_SHA256(lua_State* L)
 /**
  * utils.base64encode(text)
  *
- * Encodes text to Base64.
+ * Encodes text to Base64 format. Useful for transmitting binary
+ * data as text or for basic obfuscation.
  *
- * @param text String to encode (binary safe)
- * @return Base64-encoded string
+ * @param text (string) String to encode (binary safe)
+ *
+ * @return (string) Base64-encoded string
+ *
+ * @example
+ * local encoded = utils.base64encode("Hello, World!")
+ * Note(encoded)  -- "SGVsbG8sIFdvcmxkIQ=="
+ *
+ * @see utils.base64decode, Base64Encode
  */
 int L_Utils_Base64Encode(lua_State* L)
 {
@@ -127,10 +161,17 @@ int L_Utils_Base64Encode(lua_State* L)
 /**
  * utils.base64decode(text)
  *
- * Decodes Base64 text.
+ * Decodes a Base64-encoded string back to its original form.
  *
- * @param text Base64-encoded string
- * @return Decoded string (binary safe)
+ * @param text (string) Base64-encoded string
+ *
+ * @return (string) Decoded string (binary safe)
+ *
+ * @example
+ * local decoded = utils.base64decode("SGVsbG8sIFdvcmxkIQ==")
+ * Note(decoded)  -- "Hello, World!"
+ *
+ * @see utils.base64encode, Base64Decode
  */
 int L_Utils_Base64Decode(lua_State* L)
 {
@@ -147,7 +188,16 @@ int L_Utils_Base64Decode(lua_State* L)
 /**
  * world.Base64Encode(text)
  *
- * Encodes text to Base64.
+ * Encodes text to Base64 format.
+ *
+ * @param text (string) String to encode (binary safe)
+ *
+ * @return (string) Base64-encoded string
+ *
+ * @example
+ * local encoded = Base64Encode("binary\x00data")
+ *
+ * @see Base64Decode, utils.base64encode
  */
 int L_Base64Encode(lua_State* L)
 {
@@ -164,7 +214,16 @@ int L_Base64Encode(lua_State* L)
 /**
  * world.Base64Decode(text)
  *
- * Decodes Base64 text.
+ * Decodes a Base64-encoded string.
+ *
+ * @param text (string) Base64-encoded string
+ *
+ * @return (string) Decoded string (binary safe)
+ *
+ * @example
+ * local original = Base64Decode(encoded)
+ *
+ * @see Base64Encode, utils.base64decode
  */
 int L_Base64Decode(lua_State* L)
 {
@@ -181,7 +240,15 @@ int L_Base64Decode(lua_State* L)
 /**
  * world.Trim(text)
  *
- * Trims whitespace from text.
+ * Removes leading and trailing whitespace from text.
+ *
+ * @param text (string) String to trim
+ *
+ * @return (string) Trimmed string
+ *
+ * @example
+ * local clean = Trim("  hello world  ")
+ * Note("[" .. clean .. "]")  -- "[hello world]"
  */
 int L_Trim(lua_State* L)
 {
@@ -196,7 +263,16 @@ int L_Trim(lua_State* L)
 /**
  * world.GetUniqueNumber()
  *
- * Gets a unique number for generating IDs.
+ * Returns a unique number based on timestamp and counter.
+ * Useful for generating unique identifiers.
+ *
+ * @return (number) Unique number that increases with each call
+ *
+ * @example
+ * local id = GetUniqueNumber()
+ * local timerName = "timer_" .. id
+ *
+ * @see GetUniqueID, CreateGUID
  */
 int L_GetUniqueNumber(lua_State* L)
 {
