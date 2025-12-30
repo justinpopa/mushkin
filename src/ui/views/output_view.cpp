@@ -73,6 +73,9 @@ OutputView::OutputView(WorldDocument* doc, QWidget* parent)
 
     // Enable mouse tracking and set cursor for text selection
     setMouseTracking(true);
+
+    // Allow keyboard focus for copy shortcuts (Cmd+C / Ctrl+C)
+    setFocusPolicy(Qt::StrongFocus);
     setCursor(Qt::IBeamCursor);
 
     // Connect to document signals
@@ -770,6 +773,9 @@ void OutputView::mousePressEvent(QMouseEvent* event)
     if (mouseDownMiniWindow(event->pos(), event->button())) {
         return; // Miniwindow handled the event
     }
+
+    // Grab keyboard focus for copy shortcuts
+    setFocus();
 
     if (event->button() == Qt::LeftButton) {
         // Check for triple-click (third click after doubleClick)
