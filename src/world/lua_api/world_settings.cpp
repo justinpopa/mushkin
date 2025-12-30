@@ -78,44 +78,41 @@ int L_AddFont(lua_State* L)
  * Returns information about the current world, connection, or client.
  * This is a comprehensive information function with 240+ info types.
  *
- * Common info types (strings):
- *   1 = Server address (hostname)
- *   2 = World name
- *   3 = Character name
- *   51 = Log filename
- *   54 = World file path
- *   56 = Application path
- *   66 = Application directory
- *   67 = World file directory
- *   68 = Working directory
- *   72 = Version string
- *
- * Common info types (numbers):
- *   101 = Port number
- *   102 = Bytes received
- *   103 = Bytes sent
- *   104 = Connect time (high)
- *   105 = Connect time (low)
- *   106 = Total lines received
- *   107 = Output window width (pixels)
- *   108 = Output window height (pixels)
- *   109 = Output window font height
- *   110 = Output window font width
- *   131 = Output buffer lines
- *   200 = Compress input (bool as number)
- *   201 = MXP enabled (bool as number)
- *   214 = MCCP active (bool as number)
- *   217 = MCCP version
- *   228 = Pueblo mode active
- *   244 = Triggers enabled
- *   245 = Aliases enabled
- *   246 = Timers enabled
- *   247 = Keypad shortcuts enabled
- *   280 = Output paused
- *
- * Connection state types:
- *   239 = Connected (1) or not (0)
- *   301 = Time connected in seconds
+ * Common info types:
+ * - 1: Server address (hostname)
+ * - 2: World name
+ * - 3: Character name
+ * - 8: Notes
+ * - 20: Output font name
+ * - 23: Input font name
+ * - 28: Script language
+ * - 35: Script filename
+ * - 51: Log filename
+ * - 54: World file path
+ * - 56: Application path
+ * - 61: IP address from connection
+ * - 63: Hostname
+ * - 66: Application directory
+ * - 67: World file directory
+ * - 68: Working directory
+ * - 72: Version string
+ * - 74: Sounds directory
+ * - 77: OS version
+ * - 101: Port number
+ * - 102: Bytes received
+ * - 103: Bytes sent
+ * - 106: Total lines received
+ * - 107: Output window width (pixels)
+ * - 108: Output window height (pixels)
+ * - 131: Output buffer lines
+ * - 201: MXP enabled
+ * - 214: MCCP active
+ * - 239: Connected (1 or 0)
+ * - 244: Triggers enabled
+ * - 245: Aliases enabled
+ * - 246: Timers enabled
+ * - 280: Output paused
+ * - 301: Time connected in seconds
  *
  * Use utils.infotypes() to get a table of all available info type constants.
  *
