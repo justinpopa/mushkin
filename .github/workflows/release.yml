@@ -47,8 +47,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install cmake ninja pcre luajit sqlite openssl
-          pip3 install aqtinstall --break-system-packages
+          brew install cmake ninja pcre luajit sqlite openssl aqtinstall
 
       - name: Cache Qt Static
         id: cache-qt

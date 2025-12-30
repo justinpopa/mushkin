@@ -30,8 +30,7 @@ For contributors and active development. This build links dynamically against Qt
 ```bash
 # Prerequisites
 xcode-select --install
-brew install cmake ninja pcre luajit sqlite openssl
-pip3 install aqtinstall
+brew install cmake ninja pcre luajit sqlite openssl aqtinstall
 
 # Clone and build
 git clone https://github.com/justinpopa/mushkin.git
@@ -48,8 +47,7 @@ open build/mushkin.app
 ```bash
 # Prerequisites
 xcode-select --install
-brew install cmake ninja pcre luajit sqlite openssl
-pip3 install aqtinstall
+brew install cmake ninja pcre luajit sqlite openssl aqtinstall
 
 # Build (first run ~60 min for Qt, subsequent runs ~2 min)
 git clone https://github.com/justinpopa/mushkin.git
