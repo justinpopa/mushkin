@@ -5,16 +5,19 @@ Lua API Documentation Generator
 Parses C++ source files to extract Lua API documentation and generates
 markdown files suitable for GitHub wiki.
 
+Output structure:
+  - Lua-API-{version}.md           - Master index with all categories
+  - Lua-API-{version}-{Category}.md - Category index with function list
+  - Lua-API-{version}-{Function}.md - Individual function pages
+
 Usage:
     python scripts/generate-lua-docs.py [--output-dir docs/wiki]
     python scripts/generate-lua-docs.py --version 0.1.0
-    python scripts/generate-lua-docs.py --version latest
 """
 
 import os
 import re
 import argparse
-import subprocess
 from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Optional
@@ -85,6 +88,7 @@ def parse_docstring(comment: str) -> dict:
 
     current_example = []
     in_example = False
+    in_return_list = False
 
     for i, line in enumerate(lines):
         # Remove comment markers and leading/trailing whitespace
@@ -101,6 +105,7 @@ def parse_docstring(comment: str) -> dict:
         param_match = re.match(r'@param\s+(\w+)\s+\(([^)]+)\)\s*(.*)', line)
         if param_match:
             in_example = False
+            in_return_list = False
             result['params'].append({
                 'name': param_match.group(1),
                 'type': param_match.group(2),
@@ -112,6 +117,7 @@ def parse_docstring(comment: str) -> dict:
         return_match = re.match(r'@return\s+\(([^)]+)\)\s*(.*)', line)
         if return_match:
             in_example = False
+            in_return_list = True
             result['returns'].append({
                 'type': return_match.group(1),
                 'desc': return_match.group(2).strip()
@@ -122,6 +128,7 @@ def parse_docstring(comment: str) -> dict:
         see_match = re.match(r'@see\s+(.*)', line)
         if see_match:
             in_example = False
+            in_return_list = False
             funcs = [f.strip() for f in see_match.group(1).split(',')]
             result['see_also'].extend(funcs)
             continue
@@ -132,6 +139,7 @@ def parse_docstring(comment: str) -> dict:
                 result['examples'].append('\n'.join(current_example))
             current_example = []
             in_example = True
+            in_return_list = False
             continue
 
         # If in example, collect code lines
@@ -145,15 +153,20 @@ def parse_docstring(comment: str) -> dict:
                 current_example.append(line)
                 continue
 
+        # Handle return value list items (indented with -)
+        if in_return_list and line.strip().startswith('-'):
+            if result['returns']:
+                result['returns'][-1]['desc'] += '\n  ' + line.strip()
+            continue
+
         # Skip empty lines at the start
         if not line.strip() and not result['description']:
             continue
 
-        # Skip lines that are just tag continuations (indented descriptions)
+        # Handle indented continuation lines for params/returns
         if line.startswith('  ') and (result['params'] or result['returns']):
-            # Append to last param/return description
-            if result['returns'] and not line.startswith('@'):
-                result['returns'][-1]['desc'] += ' ' + line.strip()
+            if in_return_list and result['returns'] and not line.startswith('@'):
+                result['returns'][-1]['desc'] += '\n  ' + line.strip()
             elif result['params'] and not line.startswith('@'):
                 result['params'][-1]['desc'] += ' ' + line.strip()
             continue
@@ -178,8 +191,6 @@ def extract_functions_from_file(filepath: Path) -> list[LuaFunction]:
         content = f.read()
 
     # Pattern to match docstring followed by function definition
-    # Matches: /** ... */ int L_FunctionName(lua_State* L)
-    # Use [^*] or *[^/] to avoid matching across multiple docstrings
     pattern = r'/\*\*((?:[^*]|\*(?!/))*)\*/\s*\n\s*int\s+(L_\w+)\s*\(\s*lua_State'
 
     for match in re.finditer(pattern, content, re.DOTALL):
@@ -194,12 +205,10 @@ def extract_functions_from_file(filepath: Path) -> list[LuaFunction]:
         # Extract Lua function name from signature or C function name
         signature = parsed['signature']
         if signature:
-            # Try to extract name from signature like "world.Note(text, ...)"
             name_match = re.match(r'(?:world|utils)\.(\w+)', signature)
             if name_match:
                 lua_name = name_match.group(1)
             else:
-                # Fall back to C function name without L_ prefix
                 lua_name = c_func_name[2:] if c_func_name.startswith('L_') else c_func_name
         else:
             lua_name = c_func_name[2:] if c_func_name.startswith('L_') else c_func_name
@@ -221,147 +230,197 @@ def extract_functions_from_file(filepath: Path) -> list[LuaFunction]:
     return functions
 
 
-def generate_category_page(category: Category) -> str:
-    """Generate markdown content for a category page."""
+def generate_function_page(func: LuaFunction, category: Category, version: str, all_functions: dict) -> str:
+    """Generate markdown content for an individual function page."""
+    version_suffix = f"-{version}" if version else ""
+
+    lines = [
+        f"# {func.name}",
+        "",
+        f"**Category:** [[{category.title}|Lua-API{version_suffix}-{category.name}]]",
+        "",
+        "```lua",
+        func.signature,
+        "```",
+        "",
+    ]
+
+    if func.description:
+        lines.append(func.description)
+        lines.append("")
+
+    # Parameters
+    if func.params:
+        lines.append("## Parameters")
+        lines.append("")
+        lines.append("| Name | Type | Description |")
+        lines.append("|------|------|-------------|")
+        for param in func.params:
+            desc = param['desc'].replace('|', '\\|').replace('\n', ' ')
+            lines.append(f"| `{param['name']}` | {param['type']} | {desc} |")
+        lines.append("")
+
+    # Returns
+    if func.returns:
+        lines.append("## Returns")
+        lines.append("")
+        for ret in func.returns:
+            # Handle multi-line return descriptions (error code lists)
+            desc_lines = ret['desc'].split('\n')
+            lines.append(f"**{ret['type']}**: {desc_lines[0]}")
+            for extra_line in desc_lines[1:]:
+                lines.append(extra_line)
+        lines.append("")
+
+    # Examples
+    if func.examples:
+        lines.append("## Example")
+        lines.append("")
+        for example in func.examples:
+            lines.append("```lua")
+            lines.append(example)
+            lines.append("```")
+            lines.append("")
+
+    # See Also - link to other function pages
+    if func.see_also:
+        lines.append("## See Also")
+        lines.append("")
+        see_links = []
+        for name in func.see_also:
+            # Check if this function exists in our docs
+            clean_name = name.replace('utils.', '').replace('world.', '')
+            if clean_name in all_functions:
+                see_links.append(f"[[{name}|Lua-API{version_suffix}-{clean_name}]]")
+            else:
+                see_links.append(f"`{name}`")
+        lines.append(", ".join(see_links))
+        lines.append("")
+
+    lines.extend([
+        "---",
+        "",
+        f"*Source: `{func.source_file}` line {func.line_number}*",
+    ])
+
+    return '\n'.join(lines)
+
+
+def generate_category_page(category: Category, version: str) -> str:
+    """Generate markdown content for a category index page."""
+    version_suffix = f"-{version}" if version else ""
+
     lines = [
         f"# {category.title}",
         "",
         category.description,
         "",
-        "## Functions",
+        f"**{len(category.functions)} functions**",
         "",
+        "| Function | Description |",
+        "|----------|-------------|",
     ]
 
-    # Table of contents
+    # Table of functions with links
     for func in sorted(category.functions, key=lambda f: f.name.lower()):
-        lines.append(f"- [{func.name}](#{func.name.lower()})")
-
-    lines.append("")
-    lines.append("---")
-    lines.append("")
-
-    # Function documentation
-    for func in sorted(category.functions, key=lambda f: f.name.lower()):
-        lines.extend([
-            f"## {func.name}",
-            "",
-            "```lua",
-            func.signature,
-            "```",
-            "",
-        ])
-
-        if func.description:
-            lines.append(func.description)
-            lines.append("")
-
-        # Parameters
-        if func.params:
-            lines.append("### Parameters")
-            lines.append("")
-            lines.append("| Name | Type | Description |")
-            lines.append("|------|------|-------------|")
-            for param in func.params:
-                desc = param['desc'].replace('|', '\\|')  # Escape pipes
-                lines.append(f"| `{param['name']}` | {param['type']} | {desc} |")
-            lines.append("")
-
-        # Returns
-        if func.returns:
-            lines.append("### Returns")
-            lines.append("")
-            for ret in func.returns:
-                lines.append(f"- **{ret['type']}**: {ret['desc']}")
-            lines.append("")
-
-        # Examples
-        if func.examples:
-            lines.append("### Example")
-            lines.append("")
-            for example in func.examples:
-                lines.append("```lua")
-                lines.append(example)
-                lines.append("```")
-                lines.append("")
-
-        # See Also
-        if func.see_also:
-            lines.append("### See Also")
-            lines.append("")
-            see_links = [f"[{name}](#{name.lower()})" for name in func.see_also]
-            lines.append(", ".join(see_links))
-            lines.append("")
-
-        lines.append("---")
-        lines.append("")
-
-    return '\n'.join(lines)
-
-
-def generate_index_page(categories: dict[str, Category], version: str = None) -> str:
-    """Generate the main index/sidebar page."""
-    version_suffix = f"-{version}" if version else ""
-    version_display = f" (v{version})" if version else ""
-
-    lines = [
-        f"# Lua API Reference{version_display}",
-        "",
-        "This documentation is automatically generated from the Mushkin source code.",
-        "",
-    ]
-
-    if version:
-        lines.extend([
-            f"**Version:** {version}",
-            "",
-            "See [[API Versions]] for other versions.",
-            "",
-        ])
-
-    lines.extend([
-        "## Categories",
-        "",
-    ])
-
-    for cat_id in sorted(categories.keys()):
-        cat = categories[cat_id]
-        func_count = len(cat.functions)
-        lines.append(f"- [[{cat.title}|Lua-API{version_suffix}-{cat_id}]] ({func_count} functions)")
+        # Get first sentence of description
+        desc = func.description.split('\n')[0] if func.description else ""
+        if len(desc) > 80:
+            desc = desc[:77] + "..."
+        desc = desc.replace('|', '\\|')
+        lines.append(f"| [[{func.name}|Lua-API{version_suffix}-{func.name}]] | {desc} |")
 
     lines.extend([
         "",
         "---",
         "",
-        f"*Generated automatically from source code.*",
+        f"[[Back to API Index|Lua-API{version_suffix}]]",
     ])
 
     return '\n'.join(lines)
 
 
-def generate_sidebar(categories: dict[str, Category], version: str = None, all_versions: list = None) -> str:
+def generate_index_page(categories: dict[str, Category], version: str, all_functions: dict) -> str:
+    """Generate the main index page."""
+    version_suffix = f"-{version}" if version else ""
+    version_display = f" v{version}" if version else ""
+
+    total_functions = sum(len(c.functions) for c in categories.values())
+
+    lines = [
+        f"# Lua API Reference{version_display}",
+        "",
+        "Complete API documentation for Mushkin's Lua scripting interface.",
+        "",
+        f"**{total_functions} functions** across **{len(categories)} categories**",
+        "",
+        "## Categories",
+        "",
+        "| Category | Functions | Description |",
+        "|----------|-----------|-------------|",
+    ]
+
+    for cat_id in sorted(categories.keys()):
+        cat = categories[cat_id]
+        func_count = len(cat.functions)
+        desc = cat.description.replace('|', '\\|')
+        lines.append(f"| [[{cat.title}|Lua-API{version_suffix}-{cat_id}]] | {func_count} | {desc} |")
+
+    lines.extend([
+        "",
+        "## All Functions (Alphabetical)",
+        "",
+    ])
+
+    # Alphabetical function index
+    all_funcs_sorted = sorted(all_functions.values(), key=lambda f: f.name.lower())
+
+    # Group by first letter
+    current_letter = ""
+    for func in all_funcs_sorted:
+        first_letter = func.name[0].upper()
+        if first_letter != current_letter:
+            current_letter = first_letter
+            lines.append(f"\n### {current_letter}\n")
+
+        lines.append(f"- [[{func.name}|Lua-API{version_suffix}-{func.name}]]")
+
+    lines.extend([
+        "",
+        "---",
+        "",
+        f"*Generated from source code on {datetime.now().strftime('%Y-%m-%d')}*",
+    ])
+
+    return '\n'.join(lines)
+
+
+def generate_sidebar(categories: dict[str, Category], version: str) -> str:
     """Generate GitHub wiki sidebar."""
     version_suffix = f"-{version}" if version else ""
 
     lines = [
-        "**Mushkin Wiki**",
+        "**Mushkin**",
         "",
         "- [[Home]]",
+        "- [[Getting Started]]",
         "",
         "**Lua API**",
         "",
-        "- [[API Versions]]",
+        f"- [[API Reference|Lua-API{version_suffix}]]",
     ]
 
-    if version:
-        lines.append(f"- [[v{version} Reference|Lua-API-{version}]]")
-        for cat_id in sorted(categories.keys()):
-            cat = categories[cat_id]
-            lines.append(f"  - [[{cat.title}|Lua-API-{version}-{cat_id}]]")
-    else:
-        lines.append("- [[Latest Reference|Lua-API]]")
-        for cat_id in sorted(categories.keys()):
-            cat = categories[cat_id]
-            lines.append(f"  - [[{cat.title}|Lua-API-{cat_id}]]")
+    for cat_id in sorted(categories.keys()):
+        cat = categories[cat_id]
+        lines.append(f"  - [[{cat.title}|Lua-API{version_suffix}-{cat_id}]]")
+
+    lines.extend([
+        "",
+        "**Resources**",
+        "",
+        "- [[API Versions]]",
+        "- [GitHub](https://github.com/user/mushkin)",
+    ])
 
     return '\n'.join(lines)
 
@@ -371,7 +430,7 @@ def generate_versions_page(versions: list, latest: str = None) -> str:
     lines = [
         "# API Versions",
         "",
-        "Mushkin maintains documentation for each release. Select a version below:",
+        "Documentation is preserved for each release.",
         "",
     ]
 
@@ -385,13 +444,6 @@ def generate_versions_page(versions: list, latest: str = None) -> str:
 
     for version in sorted(versions, reverse=True):
         lines.append(f"- [[v{version}|Lua-API-{version}]]")
-
-    lines.extend([
-        "",
-        "---",
-        "",
-        "*Documentation is generated at each release and preserved for reference.*",
-    ])
 
     return '\n'.join(lines)
 
@@ -416,9 +468,9 @@ def main():
     parser.add_argument('--utils-file', default='src/world/lua_utils.cpp',
                         help='Path to lua_utils.cpp for utils.* functions')
     parser.add_argument('--version', default=None,
-                        help='Version tag for docs (e.g., 0.1.0). If not specified, uses project version.')
-    parser.add_argument('--update-versions-page', action='store_true',
-                        help='Update the API-Versions.md page with this version')
+                        help='Version tag (e.g., 0.1.0). Defaults to project version.')
+    parser.add_argument('--update-versions', action='store_true',
+                        help='Update the API-Versions.md page')
     args = parser.parse_args()
 
     # Find project root
@@ -440,12 +492,12 @@ def main():
 
     # Initialize categories
     categories: dict[str, Category] = {}
+    all_functions: dict[str, LuaFunction] = {}
 
     # Process each source file
     for filename, (cat_id, title, desc) in FILE_CATEGORIES.items():
         filepath = source_dir / filename
         if not filepath.exists():
-            # Try utils file location
             if filename == "lua_utils.cpp":
                 filepath = utils_file
 
@@ -461,59 +513,67 @@ def main():
         for func in functions:
             func.category = cat_id
             categories[cat_id].functions.append(func)
+            all_functions[func.name] = func
 
         print(f"Extracted {len(functions)} functions from {filename}")
 
-    # Generate versioned category pages
+    # Generate individual function pages
+    for func_name, func in all_functions.items():
+        category = categories[func.category]
+        content = generate_function_page(func, category, version, all_functions)
+        output_file = output_dir / f"Lua-API{version_suffix}-{func_name}.md"
+        with open(output_file, 'w', encoding='utf-8') as f:
+            f.write(content)
+
+    print(f"Generated {len(all_functions)} function pages")
+
+    # Generate category index pages
     for cat_id, category in categories.items():
         if category.functions:
-            content = generate_category_page(category)
-            # Add version header to content
-            content = f"<!-- Version: {version} -->\n" + content
+            content = generate_category_page(category, version)
             output_file = output_dir / f"Lua-API{version_suffix}-{cat_id}.md"
             with open(output_file, 'w', encoding='utf-8') as f:
                 f.write(content)
-            print(f"Generated {output_file}")
+            print(f"Generated category page: {cat_id}")
 
-    # Generate versioned index page
-    index_content = generate_index_page(categories, version)
+    # Generate master index page
+    index_content = generate_index_page(categories, version, all_functions)
     index_file = output_dir / f"Lua-API{version_suffix}.md"
     with open(index_file, 'w', encoding='utf-8') as f:
         f.write(index_content)
-    print(f"Generated {index_file}")
+    print(f"Generated index: {index_file.name}")
+
+    # Generate sidebar
+    sidebar_content = generate_sidebar(categories, version)
+    sidebar_file = output_dir / "_Sidebar.md"
+    with open(sidebar_file, 'w', encoding='utf-8') as f:
+        f.write(sidebar_content)
+    print(f"Generated sidebar")
 
     # Update versions page if requested
-    if args.update_versions_page:
+    if args.update_versions:
         versions_file = output_dir / "API-Versions.md"
         existing_versions = []
 
-        # Read existing versions from page if it exists
         if versions_file.exists():
             content = versions_file.read_text()
-            # Extract versions from links like [[v0.1.0|Lua-API-0.1.0]]
             existing_versions = re.findall(r'\[\[v([0-9.]+)\|Lua-API-', content)
 
-        # Add current version if not already present
         if version not in existing_versions:
             existing_versions.append(version)
 
-        # Generate updated versions page
         versions_content = generate_versions_page(existing_versions, latest=version)
         with open(versions_file, 'w', encoding='utf-8') as f:
             f.write(versions_content)
-        print(f"Updated {versions_file}")
-
-        # Generate/update sidebar with latest version
-        sidebar_content = generate_sidebar(categories, version, existing_versions)
-        sidebar_file = output_dir / "_Sidebar.md"
-        with open(sidebar_file, 'w', encoding='utf-8') as f:
-            f.write(sidebar_content)
-        print(f"Generated {sidebar_file}")
+        print(f"Updated versions page")
 
     # Summary
-    total_functions = sum(len(c.functions) for c in categories.values())
-    print(f"\nTotal: {total_functions} functions documented across {len(categories)} categories")
+    print(f"\n{'='*50}")
+    print(f"Generated {len(all_functions)} function pages")
+    print(f"Generated {len(categories)} category pages")
+    print(f"Generated 1 index page + sidebar")
     print(f"Version: {version}")
+    print(f"Output: {output_dir}")
 
 
 if __name__ == '__main__':
