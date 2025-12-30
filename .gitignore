@@ -83,3 +83,4 @@ plugins/
 # Qt installations (from aqt)
 6.*/
 aqtinstall.log
+docs/wiki/

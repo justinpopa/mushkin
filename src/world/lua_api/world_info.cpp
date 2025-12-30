@@ -17,11 +17,16 @@
 /**
  * world.GetLineCount()
  *
- * Gets the total number of lines received from the MUD.
+ * Gets the total number of lines received from the MUD since connection.
+ * This count includes all lines, even those scrolled off the buffer.
  *
- * Based on methods_info.cpp
+ * @return (number) Total lines received since connection
  *
- * @return Number of lines received
+ * @example
+ * local lines = GetLineCount()
+ * Note("Received " .. lines .. " lines from MUD")
+ *
+ * @see GetLinesInBufferCount, GetReceivedBytes, GetConnectDuration
  */
 int L_GetLineCount(lua_State* L)
 {
@@ -33,11 +38,16 @@ int L_GetLineCount(lua_State* L)
 /**
  * world.GetSentBytes()
  *
- * Gets the total number of bytes sent to the MUD.
+ * Gets the total number of bytes sent to the MUD since connection.
+ * Useful for monitoring network traffic or implementing quotas.
  *
- * Based on methods_info.cpp
+ * @return (number) Total bytes sent to MUD
  *
- * @return Number of bytes sent
+ * @example
+ * local kb = GetSentBytes() / 1024
+ * Note("Sent " .. string.format("%.1f", kb) .. " KB to MUD")
+ *
+ * @see GetReceivedBytes, GetConnectDuration, GetLineCount
  */
 int L_GetSentBytes(lua_State* L)
 {
@@ -49,11 +59,16 @@ int L_GetSentBytes(lua_State* L)
 /**
  * world.GetReceivedBytes()
  *
- * Gets the total number of bytes received from the MUD.
+ * Gets the total number of bytes received from the MUD since connection.
+ * Useful for monitoring network traffic or bandwidth usage.
  *
- * Based on methods_info.cpp
+ * @return (number) Total bytes received from MUD
  *
- * @return Number of bytes received
+ * @example
+ * local kb = GetReceivedBytes() / 1024
+ * Note("Received " .. string.format("%.1f", kb) .. " KB from MUD")
+ *
+ * @see GetSentBytes, GetLineCount, GetConnectDuration
  */
 int L_GetReceivedBytes(lua_State* L)
 {
@@ -65,12 +80,18 @@ int L_GetReceivedBytes(lua_State* L)
 /**
  * world.GetConnectDuration()
  *
- * Gets the number of seconds connected to the MUD.
+ * Gets the number of seconds since connecting to the MUD.
  * Returns 0 if not currently connected.
  *
- * Based on methods_info.cpp
+ * @return (number) Seconds connected, or 0 if not connected
  *
- * @return Seconds connected (0 if not connected)
+ * @example
+ * local secs = GetConnectDuration()
+ * local hours = math.floor(secs / 3600)
+ * local mins = math.floor((secs % 3600) / 60)
+ * Note("Connected for " .. hours .. " hours, " .. mins .. " minutes")
+ *
+ * @see IsConnected, GetLineCount, GetReceivedBytes
  */
 int L_GetConnectDuration(lua_State* L)
 {
@@ -92,11 +113,16 @@ int L_GetConnectDuration(lua_State* L)
 /**
  * world.WorldAddress()
  *
- * Gets the MUD server address (hostname or IP).
+ * Gets the MUD server address (hostname or IP address) for the current world.
  *
- * Based on methods_info.cpp
+ * @return (string) Server address (hostname or IP)
  *
- * @return Server address string
+ * @example
+ * local addr = WorldAddress()
+ * local port = WorldPort()
+ * Note("Connected to " .. addr .. ":" .. port)
+ *
+ * @see WorldPort, WorldName, IsConnected
  */
 int L_WorldAddress(lua_State* L)
 {
@@ -109,11 +135,14 @@ int L_WorldAddress(lua_State* L)
 /**
  * world.WorldPort()
  *
- * Gets the MUD server port number.
+ * Gets the MUD server port number for the current world.
  *
- * Based on methods_info.cpp
+ * @return (number) Port number (typically 23 for Telnet or a custom port)
  *
- * @return Port number
+ * @example
+ * Note("Port: " .. WorldPort())
+ *
+ * @see WorldAddress, WorldName, IsConnected
  */
 int L_WorldPort(lua_State* L)
 {
@@ -125,12 +154,15 @@ int L_WorldPort(lua_State* L)
 /**
  * world.WorldName()
  *
- * Gets the world name. This is an alias for GetWorldName()
- * for backward compatibility with original MUSHclient.
+ * Gets the configured name of the current world.
+ * This is the display name set in world properties, not the server address.
  *
- * Based on methods_info.cpp
+ * @return (string) World name
  *
- * @return World name string
+ * @example
+ * Note("Playing on: " .. WorldName())
+ *
+ * @see WorldAddress, WorldPort, Version
  */
 int L_WorldName(lua_State* L)
 {
@@ -143,11 +175,15 @@ int L_WorldName(lua_State* L)
 /**
  * world.Version()
  *
- * Gets the MUSHclient version string.
+ * Gets the Mushkin (MUSHclient Qt) version string.
+ * Useful for checking compatibility or displaying in about dialogs.
  *
- * Based on methods_info.cpp
+ * @return (string) Version string (e.g., "0.1.0")
  *
- * @return Version string
+ * @example
+ * Note("Mushkin version: " .. Version())
+ *
+ * @see WorldName, WorldAddress
  */
 int L_Version(lua_State* L)
 {
@@ -158,12 +194,19 @@ int L_Version(lua_State* L)
 /**
  * world.GetLinesInBufferCount()
  *
- * Gets the actual number of lines currently in the output buffer.
- * This is different from GetLineCount() which returns total lines received.
+ * Gets the number of lines currently in the output scrollback buffer.
+ * Unlike GetLineCount() which counts all lines ever received, this returns
+ * only lines still available in memory (older lines are discarded when
+ * the buffer limit is reached).
  *
- * Based on methods_info.cpp
+ * @return (number) Lines currently in buffer
  *
- * @return Number of lines currently in scrollback buffer
+ * @example
+ * local inBuffer = GetLinesInBufferCount()
+ * local total = GetLineCount()
+ * Note("Buffer: " .. inBuffer .. " of " .. total .. " total lines")
+ *
+ * @see GetLineCount, GetRecentLines, GetLineInfo
  */
 int L_GetLinesInBufferCount(lua_State* L)
 {
@@ -175,13 +218,30 @@ int L_GetLinesInBufferCount(lua_State* L)
 /**
  * world.GetSysColor(index)
  *
- * Gets a system color value by index.
- * Maps Windows system color indices to Qt palette colors.
+ * Gets a system/theme color value by index. Maps Windows COLOR_* constants
+ * to Qt palette colors for cross-platform compatibility.
  *
- * Based on methods_info.cpp
+ * Common indices:
+ * - 0: Scrollbar
+ * - 1: Desktop/background
+ * - 5: Window background
+ * - 8: Window text
+ * - 13: Highlight/selection
+ * - 14: Highlighted text
+ * - 15: Button face
+ * - 18: Button text
  *
- * @param index System color index (Windows COLOR_* constants)
- * @return RGB color value (0xRRGGBB)
+ * @param index (number) Windows COLOR_* constant value
+ *
+ * @return (number) RGB color value (0xRRGGBB format)
+ *
+ * @example
+ * local bgColor = GetSysColor(5)  -- Window background
+ * local r = bit.band(bit.rshift(bgColor, 16), 0xFF)
+ * local g = bit.band(bit.rshift(bgColor, 8), 0xFF)
+ * local b = bit.band(bgColor, 0xFF)
+ *
+ * @see GetSystemMetrics, GetDeviceCaps, ColourNameToRGB
  */
 int L_GetSysColor(lua_State* L)
 {
@@ -255,13 +315,26 @@ int L_GetSysColor(lua_State* L)
 /**
  * world.GetSystemMetrics(index)
  *
- * Gets a system metric value by index.
- * Maps Windows system metric indices to Qt screen/widget metrics.
+ * Gets a system metric value by index. Maps Windows SM_* constants
+ * to Qt screen/widget metrics for cross-platform compatibility.
  *
- * Based on methods_info.cpp
+ * Common indices:
+ * - 0: SM_CXSCREEN - Screen width in pixels
+ * - 1: SM_CYSCREEN - Screen height in pixels
+ * - 2: SM_CXVSCROLL - Vertical scrollbar width
+ * - 3: SM_CYHSCROLL - Horizontal scrollbar height
+ * - 4: SM_CYCAPTION - Title bar height
  *
- * @param index System metric index (Windows SM_* constants)
- * @return Metric value in pixels
+ * @param index (number) Windows SM_* constant value
+ *
+ * @return (number) Metric value in pixels
+ *
+ * @example
+ * local screenWidth = GetSystemMetrics(0)
+ * local screenHeight = GetSystemMetrics(1)
+ * Note("Screen: " .. screenWidth .. "x" .. screenHeight)
+ *
+ * @see GetDeviceCaps, GetSysColor
  */
 int L_GetSystemMetrics(lua_State* L)
 {
@@ -326,13 +399,26 @@ int L_GetSystemMetrics(lua_State* L)
 /**
  * world.GetDeviceCaps(index)
  *
- * Gets device capabilities by index.
- * Maps Windows device capability indices to Qt screen metrics.
+ * Gets display device capabilities by index. Maps Windows device capability
+ * constants to Qt screen metrics for cross-platform compatibility.
  *
- * Based on methods_info.cpp
+ * Common indices:
+ * - 8: HORZRES - Horizontal resolution (pixels)
+ * - 10: VERTRES - Vertical resolution (pixels)
+ * - 12: BITSPIXEL - Color depth (bits per pixel)
+ * - 88: LOGPIXELSX - Horizontal DPI
+ * - 90: LOGPIXELSY - Vertical DPI
+ * - 116: VREFRESH - Vertical refresh rate (Hz)
  *
- * @param index Device capability index (Windows *DPI, *RES constants)
- * @return Capability value
+ * @param index (number) Windows device capability constant
+ *
+ * @return (number) Capability value
+ *
+ * @example
+ * local dpi = GetDeviceCaps(88)
+ * Note("Display DPI: " .. dpi)
+ *
+ * @see GetSystemMetrics, GetSysColor
  */
 int L_GetDeviceCaps(lua_State* L)
 {
@@ -467,13 +553,18 @@ int L_GetDeviceCaps(lua_State* L)
  * world.GetFrame()
  *
  * Gets the native window handle/ID for the main application window.
- * This can be used for platform-specific window operations.
+ * Can be used for platform-specific window operations or integration.
  *
- * Based on methods_output.cpp
+ * Returns the Qt window ID (winId), which on Windows corresponds to HWND,
+ * on macOS to NSView*, and on Linux/X11 to Window (XID).
  *
- * On Windows, this would return the HWND. In Qt, it returns the winId().
+ * @return (lightuserdata) Native window handle
  *
- * @return Window ID as a light userdata pointer
+ * @example
+ * local hwnd = GetFrame()
+ * -- Can be passed to external libraries that need window handle
+ *
+ * @see GetSystemMetrics, GetDeviceCaps
  */
 int L_GetFrame(lua_State* L)
 {
@@ -503,10 +594,18 @@ int L_GetFrame(lua_State* L)
  * world.GetSelectionStartLine()
  *
  * Gets the line number where the text selection starts in the output window.
+ * Use with GetSelectionEndLine to determine the selected range.
  *
- * Based on methods_info.cpp
+ * @return (number) Line number (1-based) where selection starts, 0 if no selection
  *
- * @return Line number (1-based) where selection starts, or 0 if no selection
+ * @example
+ * local startLine = GetSelectionStartLine()
+ * local endLine = GetSelectionEndLine()
+ * if startLine > 0 then
+ *     Note("Selected lines " .. startLine .. " to " .. endLine)
+ * end
+ *
+ * @see GetSelectionEndLine, GetSelectionStartColumn, GetSelectionEndColumn
  */
 int L_GetSelectionStartLine(lua_State* L)
 {
@@ -519,10 +618,15 @@ int L_GetSelectionStartLine(lua_State* L)
  * world.GetSelectionEndLine()
  *
  * Gets the line number where the text selection ends in the output window.
+ * Use with GetSelectionStartLine to determine the selected range.
  *
- * Based on methods_info.cpp
+ * @return (number) Line number (1-based) where selection ends, 0 if no selection
  *
- * @return Line number (1-based) where selection ends, or 0 if no selection
+ * @example
+ * local numLines = GetSelectionEndLine() - GetSelectionStartLine() + 1
+ * Note("Selected " .. numLines .. " lines")
+ *
+ * @see GetSelectionStartLine, GetSelectionStartColumn, GetSelectionEndColumn
  */
 int L_GetSelectionEndLine(lua_State* L)
 {
@@ -535,10 +639,16 @@ int L_GetSelectionEndLine(lua_State* L)
  * world.GetSelectionStartColumn()
  *
  * Gets the column where the text selection starts in the output window.
+ * Combined with line number, gives exact start position of selection.
  *
- * Based on methods_info.cpp
+ * @return (number) Column (1-based) where selection starts, 0 if no selection
  *
- * @return Column (1-based) where selection starts, or 0 if no selection
+ * @example
+ * local startCol = GetSelectionStartColumn()
+ * local startLine = GetSelectionStartLine()
+ * Note("Selection starts at line " .. startLine .. ", column " .. startCol)
+ *
+ * @see GetSelectionEndColumn, GetSelectionStartLine, GetSelectionEndLine
  */
 int L_GetSelectionStartColumn(lua_State* L)
 {
@@ -551,10 +661,16 @@ int L_GetSelectionStartColumn(lua_State* L)
  * world.GetSelectionEndColumn()
  *
  * Gets the column where the text selection ends in the output window.
+ * Combined with line number, gives exact end position of selection.
  *
- * Based on methods_info.cpp
+ * @return (number) Column (1-based) where selection ends, 0 if no selection
  *
- * @return Column (1-based) where selection ends, or 0 if no selection
+ * @example
+ * local endCol = GetSelectionEndColumn()
+ * local endLine = GetSelectionEndLine()
+ * Note("Selection ends at line " .. endLine .. ", column " .. endCol)
+ *
+ * @see GetSelectionStartColumn, GetSelectionStartLine, GetSelectionEndLine
  */
 int L_GetSelectionEndColumn(lua_State* L)
 {

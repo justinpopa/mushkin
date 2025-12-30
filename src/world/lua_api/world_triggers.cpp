@@ -23,19 +23,48 @@ extern "C" {
  * world.AddTrigger(name, match, response, flags, color, wildcard, sound_file, script, send_to,
  * sequence)
  *
- * Creates a new trigger.
+ * Creates a new trigger that matches incoming MUD output and performs an action.
+ * Triggers can change text colors, send commands, play sounds, or execute scripts.
  *
- * @param name Trigger label
- * @param match Pattern to match
- * @param response Text to send when triggered
- * @param flags Bit flags (enabled, regexp, etc.)
- * @param color Color to change text to (optional)
- * @param wildcard Unused (optional)
- * @param sound_file Sound file to play (optional)
- * @param script Script procedure to call (optional)
- * @param send_to Where to send response (optional, default 0)
- * @param sequence Sequence number (optional, default 100)
- * @return error code (eOK=0 on success)
+ * Flag values (combine with bitwise OR):
+ * - eEnabled (1): Trigger is active
+ * - eKeepEvaluating (8): Continue checking other triggers after match
+ * - eIgnoreAliasCase (32): Case-insensitive matching
+ * - eOmitFromLogFile (64): Don't log matched lines
+ * - eAliasRegularExpression (128): Use regex pattern
+ * - eExpandVariables (512): Expand @variables in response
+ * - eReplace (1024): Replace existing trigger with same name
+ * - eTemporary (16384): Delete when world closes
+ * - eAliasOmitFromOutput (65536): Don't display matched line
+ * - eAliasOneShot (32768): Delete after first match
+ *
+ * @param name (string) Unique trigger identifier
+ * @param match (string) Pattern to match against MUD output
+ * @param response (string) Text to send when triggered
+ * @param flags (number) Bitwise OR of flag constants
+ * @param color (number) Custom color index (optional, default 0)
+ * @param wildcard (number) Unused parameter for compatibility
+ * @param sound_file (string) Sound file path to play (optional)
+ * @param script (string) Script function name (optional)
+ * @param send_to (number) Send destination 0-14 (optional, default 0)
+ * @param sequence (number) Evaluation order 0-10000 (optional, default 100)
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eTriggerAlreadyExists: Trigger with this name exists
+ *   - eTriggerCannotBeEmpty: Match pattern is empty
+ *   - eTriggerSequenceOutOfRange: Sequence not 0-10000
+ *   - eTriggerSendToInvalid: Invalid send_to value
+ *
+ * @example
+ * -- Simple trigger to highlight health warnings
+ * AddTrigger("low_health", "You are bleeding", "", eEnabled, 0, 0, "", "", 0, 100)
+ *
+ * @example
+ * -- Regex trigger with script callback
+ * AddTrigger("mob_enters", "^(\\w+) arrives from", "", eEnabled + eAliasRegularExpression, 0, 0, "", "OnMobEnters", 0, 100)
+ *
+ * @see AddTriggerEx, DeleteTrigger, EnableTrigger, GetTrigger
  */
 int L_AddTrigger(lua_State* L)
 {
@@ -147,10 +176,20 @@ int L_AddTrigger(lua_State* L)
 /**
  * world.DeleteTrigger(name)
  *
- * Deletes a trigger.
+ * Permanently removes a trigger from the world. The trigger will no longer
+ * match incoming text after deletion.
  *
- * @param name Trigger label
- * @return error code (eOK=0 on success)
+ * @param name (string) Name of the trigger to delete
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eTriggerNotFound: No trigger with this name exists
+ *
+ * @example
+ * -- Remove a trigger when no longer needed
+ * DeleteTrigger("low_health")
+ *
+ * @see AddTrigger, DeleteTriggerGroup, DeleteTemporaryTriggers, IsTrigger
  */
 int L_DeleteTrigger(lua_State* L)
 {
@@ -169,10 +208,22 @@ int L_DeleteTrigger(lua_State* L)
 /**
  * world.IsTrigger(name)
  *
- * Checks if a trigger exists.
+ * Checks whether a trigger with the given name exists in the current world.
  *
- * @param name Trigger label
- * @return eOK if exists, eTriggerNotFound if not
+ * @param name (string) Name of the trigger to check
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Trigger exists
+ *   - eTriggerNotFound: No trigger with this name
+ *
+ * @example
+ * if IsTrigger("combat") == eOK then
+ *     Note("Combat trigger is defined")
+ * else
+ *     Note("Combat trigger not found")
+ * end
+ *
+ * @see AddTrigger, GetTrigger, GetTriggerList
  */
 int L_IsTrigger(lua_State* L)
 {
@@ -189,11 +240,29 @@ int L_IsTrigger(lua_State* L)
 /**
  * world.GetTrigger(name)
  *
- * Gets trigger details.
+ * Retrieves complete details about a trigger including its pattern,
+ * response text, flags, colors, and script. Returns multiple values.
  *
- * @param name Trigger label
- * @return error_code, match_text, response_text, flags, colour, wildcard, sound_file, script_name
- *         Returns just error_code if trigger not found
+ * @param name (string) Name of the trigger to retrieve
+ *
+ * @return (number, string, string, number, number, number, string, string) Multiple values:
+ *   1. Error code (eOK on success, eTriggerNotFound if not found)
+ *   2. Match pattern (the regex or text pattern)
+ *   3. Response text (what gets sent when matched)
+ *   4. Flags (bitwise OR of trigger flags)
+ *   5. Colour index (-1 for no change)
+ *   6. Clipboard wildcard number
+ *   7. Sound file path
+ *   8. Script function name
+ *
+ * @example
+ * local code, match, response, flags, color, wc, sound, script = GetTrigger("combat")
+ * if code == eOK then
+ *     Note("Pattern: " .. match)
+ *     Note("Response: " .. response)
+ * end
+ *
+ * @see AddTrigger, GetTriggerInfo, GetTriggerOption, IsTrigger
  */
 int L_GetTrigger(lua_State* L)
 {
@@ -242,11 +311,25 @@ int L_GetTrigger(lua_State* L)
 /**
  * world.EnableTrigger(name, enabled)
  *
- * Enables or disables a trigger.
+ * Enables or disables a trigger without deleting it. Disabled triggers
+ * remain in memory but won't match incoming text until re-enabled.
  *
- * @param name Trigger label
- * @param enabled true to enable, false to disable
- * @return error code (eOK=0 on success)
+ * @param name (string) Name of the trigger to enable/disable
+ * @param enabled (boolean) True to enable, false to disable
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eTriggerNotFound: No trigger with this name exists
+ *
+ * @example
+ * -- Disable combat triggers when not fighting
+ * EnableTrigger("auto_attack", false)
+ *
+ * @example
+ * -- Re-enable when combat starts
+ * EnableTrigger("auto_attack", true)
+ *
+ * @see AddTrigger, EnableTriggerGroup, GetTriggerInfo
  */
 int L_EnableTrigger(lua_State* L)
 {
@@ -268,34 +351,68 @@ int L_EnableTrigger(lua_State* L)
 /**
  * world.GetTriggerInfo(name, info_type)
  *
- * Gets information about a trigger.
- * Matches original MUSHclient info type mappings.
+ * Gets specific information about a trigger using numeric info type codes.
+ * MUSHclient-compatible function for querying individual trigger properties.
  *
  * Info types:
- *   1 = trigger pattern         21 = times matched
- *   2 = contents (send text)    22 = when matched (date)
- *   3 = sound_to_play           23 = temporary
- *   4 = script (strProcedure)   24 = included
- *   5 = omit_from_log           25 = lowercase_wildcard
- *   6 = omit_from_output        26 = group
- *   7 = keep_evaluating         27 = variable
- *   8 = enabled                 28 = user option
- *   9 = regexp                  29 = other foreground
- *  10 = ignore_case             30 = other background
- *  11 = repeat                  31 = regexp match count
- *  12 = sound_if_inactive       32 = last matching string
- *  13 = expand_variables        33 = executing script
- *  14 = clipboard_arg           34 = has script (dispid)
- *  15 = send_to                 35 = regexp error
- *  16 = sequence                36 = one_shot
- *  17 = match style             37 = regexp time
- *  18 = new style               38 = regexp attempts
- *  19 = colour                  101-110 = wildcards
- *  20 = invocation count
+ * - 1: Trigger pattern (string)
+ * - 2: Response/send text (string)
+ * - 3: Sound file path (string)
+ * - 4: Script procedure name (string)
+ * - 5: Omit from log (boolean)
+ * - 6: Omit from output (boolean)
+ * - 7: Keep evaluating (boolean)
+ * - 8: Enabled (boolean)
+ * - 9: Is regexp (boolean)
+ * - 10: Ignore case (boolean)
+ * - 11: Repeat on same line (boolean)
+ * - 12: Play sound if inactive (boolean)
+ * - 13: Expand variables (boolean)
+ * - 14: Clipboard wildcard argument (number)
+ * - 15: Send-to destination (number)
+ * - 16: Sequence number (number)
+ * - 17: Match style (number)
+ * - 18: New style (number)
+ * - 19: Colour index (number)
+ * - 20: Invocation count (number)
+ * - 21: Times matched (number)
+ * - 22: When last matched (Unix timestamp)
+ * - 23: Is temporary (boolean)
+ * - 24: Is included (boolean)
+ * - 25: Lowercase wildcard (boolean)
+ * - 26: Group name (string)
+ * - 27: Variable name (string)
+ * - 28: User option (number)
+ * - 29: Other foreground color (number)
+ * - 30: Other background color (number)
+ * - 31: Regexp match count (number)
+ * - 32: Last matching string (string)
+ * - 33: Currently executing script (boolean)
+ * - 34: Has script (boolean)
+ * - 35: Regexp error code (number)
+ * - 36: One-shot (boolean)
+ * - 37: Regexp execution time (number)
+ * - 38: Regexp match attempts (number)
+ * - 101-109: Wildcards 1-9 (string)
+ * - 110: Wildcard 0 / entire match (string)
  *
- * @param name Trigger label
- * @param info_type Type of information to get
- * @return Information value or nil if not found
+ * @param name (string) Name of the trigger
+ * @param info_type (number) Type of information to retrieve (1-38, 101-110)
+ *
+ * @return (varies) Requested info, or nil if trigger not found
+ *
+ * @example
+ * -- Check if trigger is enabled
+ * local enabled = GetTriggerInfo("combat", 8)
+ * if enabled then
+ *     Note("Combat trigger is enabled")
+ * end
+ *
+ * @example
+ * -- Get wildcard from last match
+ * local target = GetTriggerInfo("mob_enters", 101)
+ *
+ * @see GetTrigger, GetTriggerOption, SetTriggerOption
  */
 int L_GetTriggerInfo(lua_State* L)
 {
@@ -489,9 +606,19 @@ int L_GetTriggerInfo(lua_State* L)
 /**
  * world.GetTriggerList()
  *
- * Gets a list of all trigger names.
+ * Returns an array of all trigger names defined in the current world.
+ * Useful for iterating over all triggers or checking what triggers exist.
  *
- * @return Table (array) of trigger names
+ * @return (table) Array of trigger name strings, or empty table if no triggers
+ *
+ * @example
+ * local triggers = GetTriggerList()
+ * Note("Found " .. #triggers .. " triggers:")
+ * for i, name in ipairs(triggers) do
+ *     Note("  " .. name)
+ * end
+ *
+ * @see GetTrigger, GetTriggerInfo, IsTrigger, GetPluginTriggerList
  */
 int L_GetTriggerList(lua_State* L)
 {
@@ -509,13 +636,22 @@ int L_GetTriggerList(lua_State* L)
 }
 
 /**
- * GetPluginTriggerList - Get array of all trigger names in plugin
+ * world.GetPluginTriggerList(pluginID)
  *
- * Lua signature: triggers = GetPluginTriggerList(pluginID)
+ * Returns an array of all trigger names defined in a specific plugin.
+ * Allows inspection of triggers from other plugins.
  *
- * Returns: Lua table (array) of trigger names
+ * @param pluginID (string) Plugin ID (GUID format)
  *
- * Based on methods_plugins.cpp
+ * @return (table) Array of trigger name strings, or empty table if plugin not found
+ *
+ * @example
+ * local triggers = GetPluginTriggerList("abc12345-1234-1234-1234-123456789012")
+ * for i, name in ipairs(triggers) do
+ *     Note("Plugin trigger: " .. name)
+ * end
+ *
+ * @see GetTriggerList, GetPluginTriggerInfo, GetPluginTriggerOption, GetPluginList
  */
 int L_GetPluginTriggerList(lua_State* L)
 {
@@ -539,15 +675,22 @@ int L_GetPluginTriggerList(lua_State* L)
 }
 
 /**
- * GetPluginTriggerInfo - Get trigger info from plugin
+ * world.GetPluginTriggerInfo(pluginID, triggerName, infoType)
  *
- * Lua signature: value = GetPluginTriggerInfo(pluginID, triggerName, infoType)
+ * Gets specific information about a trigger in another plugin.
+ * Uses the same info type codes as GetTriggerInfo.
  *
- * Returns: Varies by infoType
+ * @param pluginID (string) Plugin ID (GUID format)
+ * @param triggerName (string) Name of the trigger in the plugin
+ * @param infoType (number) Type of information to retrieve (see GetTriggerInfo)
  *
- * Uses GET_PLUGIN_STUFF pattern to access another plugin's trigger
+ * @return (varies) Requested info, or nil if plugin/trigger not found
  *
- * Based on methods_plugins.cpp
+ * @example
+ * -- Check if a plugin's trigger is enabled
+ * local enabled = GetPluginTriggerInfo(pluginID, "combat", 8)
+ *
+ * @see GetTriggerInfo, GetPluginTriggerList, GetPluginTriggerOption
  */
 int L_GetPluginTriggerInfo(lua_State* L)
 {
@@ -756,13 +899,21 @@ int L_GetPluginTriggerInfo(lua_State* L)
 }
 
 /**
- * GetPluginTriggerOption - Get trigger option from plugin
+ * world.GetPluginTriggerOption(pluginID, triggerName, optionName)
  *
- * Lua signature: value = GetPluginTriggerOption(pluginID, triggerName, optionName)
+ * Gets an option value for a trigger in another plugin.
+ * Uses the same option names as GetTriggerOption.
  *
- * Returns: Varies by option
+ * @param pluginID (string) Plugin ID (GUID format)
+ * @param triggerName (string) Name of the trigger in the plugin
+ * @param optionName (string) Option name (see GetTriggerOption for valid names)
  *
- * Based on methods_plugins.cpp
+ * @return (varies) Option value, or nil if plugin/trigger not found
+ *
+ * @example
+ * local seq = GetPluginTriggerOption(pluginID, "combat", "sequence")
+ *
+ * @see GetTriggerOption, GetPluginTriggerList, GetPluginTriggerInfo
  */
 int L_GetPluginTriggerOption(lua_State* L)
 {
@@ -815,11 +966,28 @@ int L_GetPluginTriggerOption(lua_State* L)
 /**
  * world.StopEvaluatingTriggers(all_plugins)
  *
- * Stops processing triggers for the current line.
- * Based on CMUSHclientDoc::StopEvaluatingTriggers() from methods_triggers.cpp
+ * Stops evaluating triggers for the current line of MUD output.
+ * Call this from within a trigger script to prevent other triggers
+ * from matching the same line.
  *
- * @param all_plugins Optional boolean - if true, stops triggers in all plugins, not just current
- * @return no return value
+ * @param all_plugins (boolean) If true, stops triggers in all plugins;
+ *   if false/omitted, only stops triggers in the current plugin (optional)
+ *
+ * @return (none) No return value
+ *
+ * @example
+ * -- In a trigger script, stop other triggers from matching
+ * function OnImportantLine(name, line, wildcards)
+ *     -- Process this line exclusively
+ *     Note("Got important line: " .. line)
+ *     StopEvaluatingTriggers()  -- No other triggers will match
+ * end
+ *
+ * @example
+ * -- Stop all plugins from evaluating triggers
+ * StopEvaluatingTriggers(true)
+ *
+ * @see AddTrigger, EnableTrigger, EnableTriggerGroup
  */
 int L_StopEvaluatingTriggers(lua_State* L)
 {
@@ -840,12 +1008,24 @@ int L_StopEvaluatingTriggers(lua_State* L)
 /**
  * world.EnableTriggerGroup(group_name, enabled)
  *
- * Enables or disables all triggers in a group.
- * Based on CMUSHclientDoc::EnableTriggerGroup() from methods_triggers.cpp
+ * Enables or disables all triggers that belong to a named group.
+ * Groups provide a way to organize related triggers and control them together.
  *
- * @param group_name Name of the trigger group
- * @param enabled Optional boolean - defaults to true
- * @return Number of triggers affected
+ * @param group_name (string) Name of the trigger group
+ * @param enabled (boolean) True to enable all, false to disable all (optional, defaults to true)
+ *
+ * @return (number) Count of triggers affected
+ *
+ * @example
+ * -- Disable all combat triggers
+ * local count = EnableTriggerGroup("combat", false)
+ * Note("Disabled " .. count .. " combat triggers")
+ *
+ * @example
+ * -- Enable all triggers in the "healing" group
+ * EnableTriggerGroup("healing", true)
+ *
+ * @see EnableTrigger, DeleteTriggerGroup, SetTriggerOption
  */
 int L_EnableTriggerGroup(lua_State* L)
 {
@@ -891,12 +1071,33 @@ int L_EnableTriggerGroup(lua_State* L)
 /**
  * world.GetTriggerOption(trigger_name, option_name)
  *
- * Gets an option value for a trigger.
- * Based on CMUSHclientDoc::GetTriggerOption() from methods_triggers.cpp
+ * Gets an option value for a trigger using named option strings.
+ * More readable alternative to GetTriggerInfo's numeric codes.
  *
- * @param trigger_name Name of the trigger
- * @param option_name Name of the option to get
- * @return Option value or nil if not found
+ * Numeric options: clipboard_arg, colour_change_type, custom_colour,
+ *   lines_to_match, match_style, new_style, other_text_colour,
+ *   other_back_colour, send_to, sequence, user
+ * Boolean options: enabled, expand_variables, ignore_case, keep_evaluating,
+ *   multi_line, omit_from_log, omit_from_output, regexp, repeat,
+ *   sound_if_inactive, lowercase_wildcard, temporary, one_shot
+ * String options: group, match, script, sound, send, variable
+ *
+ * @param trigger_name (string) Name of the trigger
+ * @param option_name (string) Name of the option (case-insensitive)
+ *
+ * @return (varies) Option value, or nil if trigger/option not found
+ *
+ * @example
+ * -- Get the sequence number of a trigger
+ * local seq = GetTriggerOption("combat", "sequence")
+ *
+ * @example
+ * -- Check if trigger uses regexp
+ * if GetTriggerOption("mob_enters", "regexp") then
+ *     Note("Trigger uses regular expressions")
+ * end
+ *
+ * @see SetTriggerOption, GetTriggerInfo, GetTrigger
  */
 int L_GetTriggerOption(lua_State* L)
 {
@@ -994,13 +1195,39 @@ int L_GetTriggerOption(lua_State* L)
 /**
  * world.SetTriggerOption(trigger_name, option_name, value)
  *
- * Sets an option value for a trigger.
- * Based on CMUSHclientDoc::SetTriggerOption() from methods_triggers.cpp
+ * Sets an option value for a trigger using named option strings.
+ * Changes take effect immediately for subsequent trigger matching.
  *
- * @param trigger_name Name of the trigger
- * @param option_name Name of the option to set
- * @param value New value for the option
- * @return Error code (eOK=0 on success)
+ * Numeric options: clipboard_arg, colour_change_type, custom_colour,
+ *   lines_to_match, match_style, new_style, other_text_colour,
+ *   other_back_colour, send_to, sequence, user
+ * Boolean options: enabled, expand_variables, ignore_case, keep_evaluating,
+ *   multi_line, omit_from_log, omit_from_output, repeat, sound_if_inactive,
+ *   lowercase_wildcard, temporary, one_shot
+ * String options: group, match, script, sound, send, variable
+ *
+ * Note: The "regexp" option cannot be changed after creation.
+ *
+ * @param trigger_name (string) Name of the trigger
+ * @param option_name (string) Name of the option (case-insensitive)
+ * @param value (varies) New value for the option
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eTriggerNotFound: No trigger with this name
+ *   - eTriggerCannotBeEmpty: Tried to set empty match pattern
+ *   - eUnknownOption: Invalid option name
+ *   - ePluginCannotSetOption: Option cannot be modified (regexp)
+ *
+ * @example
+ * -- Change trigger sequence for priority
+ * SetTriggerOption("combat", "sequence", 50)
+ *
+ * @example
+ * -- Update the response text
+ * SetTriggerOption("combat", "send", "flee")
+ *
+ * @see GetTriggerOption, EnableTrigger, AddTrigger
  */
 int L_SetTriggerOption(lua_State* L)
 {
@@ -1122,20 +1349,39 @@ int L_SetTriggerOption(lua_State* L)
  * world.AddTriggerEx(name, match, response, flags, color, wildcard, sound_file, script, send_to,
  * sequence)
  *
- * Extended version of AddTrigger with more parameters.
- * Based on CMUSHclientDoc::AddTriggerEx() from methods_triggers.cpp
+ * Extended version of AddTrigger with all parameters required.
+ * Provides explicit control over all trigger options.
  *
- * @param name Trigger label
- * @param match Pattern to match
- * @param response Text to send when triggered
- * @param flags Bit flags (enabled, regexp, etc.)
- * @param color Color to change text to
- * @param wildcard Wildcard to copy to clipboard (0-10)
- * @param sound_file Sound file to play
- * @param script Script procedure to call
- * @param send_to Where to send response
- * @param sequence Sequence number
- * @return error code (eOK=0 on success)
+ * Flag values: Same as AddTrigger, plus:
+ * - eLowercaseWildcard (4096): Convert wildcards to lowercase
+ * - eTriggerOneShot (32768): Delete after first match
+ *
+ * @param name (string) Unique trigger identifier
+ * @param match (string) Pattern to match against MUD output
+ * @param response (string) Text to send when triggered
+ * @param flags (number) Bitwise OR of flag constants
+ * @param color (number) Custom color index for matched text
+ * @param wildcard (number) Wildcard number to copy to clipboard (0-10)
+ * @param sound_file (string) Sound file path to play on match
+ * @param script (string) Script function name to call
+ * @param send_to (number) Send destination 0-14
+ * @param sequence (number) Evaluation order 0-10000
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eTriggerAlreadyExists: Trigger with this name exists
+ *   - eTriggerCannotBeEmpty: Match pattern is empty
+ *   - eTriggerSequenceOutOfRange: Sequence not 0-10000
+ *   - eTriggerSendToInvalid: Invalid send_to value
+ *   - eBadRegularExpression: Invalid regex pattern
+ *
+ * @example
+ * -- Full trigger with all options
+ * AddTriggerEx("mob_kill", "^You killed (\\w+)$", "loot corpse",
+ *     eEnabled + eTriggerRegularExpression, -1, 1, "kill.wav",
+ *     "OnKill", 0, 100)
+ *
+ * @see AddTrigger, DeleteTrigger, GetTrigger
  */
 int L_AddTriggerEx(lua_State* L)
 {
@@ -1249,10 +1495,19 @@ int L_AddTriggerEx(lua_State* L)
 /**
  * world.DeleteTriggerGroup(groupName)
  *
- * Deletes all triggers in a group.
+ * Permanently deletes all triggers that belong to a named group.
+ * Useful for cleaning up related triggers together.
  *
- * @param groupName Trigger group name
- * @return Count of triggers deleted
+ * @param groupName (string) Name of the trigger group
+ *
+ * @return (number) Count of triggers deleted
+ *
+ * @example
+ * -- Remove all combat triggers
+ * local count = DeleteTriggerGroup("combat")
+ * Note("Deleted " .. count .. " combat triggers")
+ *
+ * @see DeleteTrigger, DeleteTemporaryTriggers, EnableTriggerGroup
  */
 int L_DeleteTriggerGroup(lua_State* L)
 {
@@ -1281,9 +1536,18 @@ int L_DeleteTriggerGroup(lua_State* L)
 /**
  * world.DeleteTemporaryTriggers()
  *
- * Deletes all temporary triggers.
+ * Deletes all triggers that were created with the eTemporary flag.
+ * Temporary triggers are normally deleted when the world closes, but
+ * this allows manual cleanup at any time.
  *
- * @return Count of triggers deleted
+ * @return (number) Count of triggers deleted
+ *
+ * @example
+ * -- Clean up temporary triggers
+ * local count = DeleteTemporaryTriggers()
+ * Note("Removed " .. count .. " temporary triggers")
+ *
+ * @see DeleteTrigger, DeleteTriggerGroup, AddTrigger
  */
 int L_DeleteTemporaryTriggers(lua_State* L)
 {

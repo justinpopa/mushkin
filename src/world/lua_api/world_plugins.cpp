@@ -36,33 +36,41 @@ extern int callLuaWithTraceBack(lua_State* L, int nArgs, int nResults);
 // ========== Plugin Functions ==========
 
 /**
- * CallPlugin - Call function in another plugin's Lua environment
+ * world.CallPlugin(pluginID, routine, ...)
  *
- * Lua signature: status, ... = CallPlugin(pluginID, routine, ...)
+ * Calls a function in another plugin's Lua environment. Enables cross-plugin
+ * communication for modular plugin architectures.
  *
- * @param pluginID - Plugin GUID
- * @param routine - Function name to call (can be nested like "foo.bar.baz")
- * @param ... - Arguments to pass (nil, boolean, number, string only)
+ * Only simple types can be passed: nil, boolean, number, and string. Tables
+ * and functions cannot be transferred between plugin states.
  *
- * Returns:
- *   On success: eOK (0), followed by return values from called function
- *   On error: error_code, error_message[, lua_error]
+ * Supports nested function names (e.g., "module.submodule.func").
  *
- * Error codes:
- *   eNoSuchRoutine (-32) - Function name empty or function not found
- *   eNoSuchPlugin (-30) - Plugin not installed
- *   ePluginDisabled (-31) - Plugin is disabled
- *   eBadParameter (-1) - Cannot pass argument type
- *   eErrorCallingPluginRoutine (-33) - Runtime error (includes Lua error as 3rd return)
+ * @param pluginID (string) Target plugin's GUID
+ * @param routine (string) Function name to call (supports dot notation)
  *
- * Features:
- * - Cross-plugin communication with type safety
- * - Handles self-calls efficiently (no stack copying)
- * - Preserves plugin context during call
- * - Supports nested function names (e.g., "module.submodule.func")
- * - Only transfers simple types (nil, boolean, number, string)
+ * @return (number) Error code as first value:
+ *   - eOK (0): Success, followed by function return values
+ *   - eNoSuchPlugin (30030): Plugin not installed
+ *   - ePluginDisabled (30031): Plugin is disabled
+ *   - eNoSuchRoutine (30032): Function not found or empty name
+ *   - eBadParameter (30001): Cannot pass argument type (tables, functions)
+ *   - eErrorCallingPluginRoutine (30033): Runtime error (3rd return has Lua error)
+ * @return On error: error message string
+ * @return On runtime error: Lua error string as third value
  *
- * Based on CMUSHclientDoc::CallPlugin() from methods_plugins.cpp
+ * @example
+ * -- Call a function in another plugin
+ * local status, result = CallPlugin("abc123...", "GetStatus")
+ * if status == 0 then
+ *     Note("Status: " .. tostring(result))
+ * end
+ *
+ * @example
+ * -- Call nested function with arguments
+ * local status, x, y = CallPlugin("abc123...", "map.GetPosition", "player")
+ *
+ * @see GetPluginInfo, BroadcastPlugin, PluginSupports
  */
 int L_CallPlugin(lua_State* L)
 {
@@ -253,13 +261,19 @@ int L_CallPlugin(lua_State* L)
 }
 
 /**
- * GetPluginID - Get current plugin's GUID
+ * world.GetPluginID()
  *
- * Lua signature: id = GetPluginID()
+ * Returns the GUID (unique identifier) of the current plugin. Use this to
+ * identify your plugin when communicating with other plugins or when storing
+ * plugin-specific data.
  *
- * Returns: String or empty string if not in plugin context
+ * @return (string) Plugin GUID, or empty string if not called from a plugin
  *
- * Based on methods_plugins.cpp
+ * @example
+ * local myID = GetPluginID()
+ * Note("This plugin's ID: " .. myID)
+ *
+ * @see GetPluginName, GetPluginInfo
  */
 int L_GetPluginID(lua_State* L)
 {
@@ -279,13 +293,18 @@ int L_GetPluginID(lua_State* L)
 }
 
 /**
- * GetPluginName - Get current plugin's name
+ * world.GetPluginName()
  *
- * Lua signature: name = GetPluginName()
+ * Returns the human-readable name of the current plugin as defined in the
+ * plugin's XML file.
  *
- * Returns: String or empty string if not in plugin context
+ * @return (string) Plugin name, or empty string if not called from a plugin
  *
- * Based on methods_plugins.cpp
+ * @example
+ * local name = GetPluginName()
+ * Note("Running in: " .. name)
+ *
+ * @see GetPluginID, GetPluginInfo
  */
 int L_GetPluginName(lua_State* L)
 {
@@ -302,13 +321,21 @@ int L_GetPluginName(lua_State* L)
 }
 
 /**
- * GetPluginList - Get array of all installed plugin IDs
+ * world.GetPluginList()
  *
- * Lua signature: plugin_ids = GetPluginList()
+ * Returns a list of all installed plugin GUIDs. Use with GetPluginInfo to
+ * enumerate and inspect all plugins in the world.
  *
- * Returns: Lua table (array) of GUID strings
+ * @return (table) Array of plugin GUID strings (may be empty if no plugins)
  *
- * Based on methods_plugins.cpp
+ * @example
+ * local plugins = GetPluginList()
+ * for i, id in ipairs(plugins) do
+ *     local name = GetPluginInfo(id, 1)  -- 1 = name
+ *     Note(i .. ": " .. name .. " (" .. id .. ")")
+ * end
+ *
+ * @see GetPluginInfo, IsPluginInstalled
  */
 int L_GetPluginList(lua_State* L)
 {
@@ -328,13 +355,23 @@ int L_GetPluginList(lua_State* L)
 }
 
 /**
- * IsPluginInstalled - Check if plugin exists
+ * world.IsPluginInstalled(pluginID)
  *
- * Lua signature: installed = IsPluginInstalled(pluginID)
+ * Checks whether a plugin with the given GUID is installed (regardless of
+ * whether it's enabled or disabled).
  *
- * Returns: Boolean (true if installed)
+ * @param pluginID (string) Plugin GUID to check
  *
- * Based on methods_plugins.cpp
+ * @return (boolean) True if plugin is installed, false otherwise
+ *
+ * @example
+ * if IsPluginInstalled("abc123...") then
+ *     CallPlugin("abc123...", "Initialize")
+ * else
+ *     Note("Required plugin not found!")
+ * end
+ *
+ * @see GetPluginList, GetPluginInfo
  */
 int L_IsPluginInstalled(lua_State* L)
 {
@@ -349,25 +386,55 @@ int L_IsPluginInstalled(lua_State* L)
 }
 
 /**
- * GetPluginInfo - Get plugin metadata by info type number
+ * world.GetPluginInfo(pluginID, infoType)
  *
- * Lua signature: value = GetPluginInfo(pluginID, infoType)
+ * Retrieves metadata about a plugin. The return type varies based on the
+ * info type requested.
  *
- * Returns: Varies by infoType (string, number, boolean, or nil)
+ * Info types:
+ * - 1: Name (string)
+ * - 2: Author (string)
+ * - 3: Description (string)
+ * - 4: Script filename (string)
+ * - 5: Script language (string)
+ * - 6: Source file path (string)
+ * - 7: Plugin ID/GUID (string)
+ * - 8: Purpose (string)
+ * - 9: Trigger count (number)
+ * - 10: Alias count (number)
+ * - 11: Timer count (number)
+ * - 12: Variable count (number)
+ * - 13: Date written (string, ISO format)
+ * - 14: Date modified (string, ISO format)
+ * - 15: Save state flag (boolean)
+ * - 16: Scripting enabled (boolean)
+ * - 17: Plugin enabled (boolean)
+ * - 18: Required version (number)
+ * - 19: Plugin version (number)
+ * - 20: Plugin directory with trailing slash (string)
+ * - 21: Load order (number)
+ * - 22: Date installed (string, ISO format)
+ * - 23: Calling plugin ID (string)
+ * - 24: Script time taken in seconds (number)
+ * - 25: Sequence number (number)
  *
- * Info types (25 total):
- *  1: Name           11: Timer count        21: Load order
- *  2: Author         12: Variable count     22: Date installed
- *  3: Description    13: Date written       23: Calling plugin ID
- *  4: Script         14: Date modified      24: Script time taken
- *  5: Language       15: Save state flag    25: Sequence
- *  6: Source path    16: Scripting enabled
- *  7: ID (GUID)      17: Enabled
- *  8: Purpose        18: Required version
- *  9: Trigger count  19: Version
- * 10: Alias count    20: Directory
+ * @param pluginID (string) Plugin GUID to query
+ * @param infoType (number) Type of information to retrieve (1-25)
  *
- * Based on methods_plugins.cpp
+ * @return Value of requested info (type varies), or nil if plugin not found
+ *
+ * @example
+ * local id = GetPluginID()
+ * local name = GetPluginInfo(id, 1)
+ * local version = GetPluginInfo(id, 19)
+ * Note(name .. " v" .. version)
+ *
+ * @example
+ * -- Get plugin's directory for file operations
+ * local dir = GetPluginInfo(GetPluginID(), 20)
+ * local filepath = dir .. "data.txt"
+ *
+ * @see GetPluginList, IsPluginInstalled, GetPluginID
  */
 int L_GetPluginInfo(lua_State* L)
 {
@@ -521,13 +588,25 @@ int L_GetPluginInfo(lua_State* L)
 }
 
 /**
- * LoadPlugin - Load plugin from XML file
+ * world.LoadPlugin(filepath)
  *
- * Lua signature: error_code = LoadPlugin(filepath)
+ * Loads a plugin from an XML file. The plugin's OnPluginInstall callback
+ * will be called if the load is successful.
  *
- * Returns: Integer error code (eOK=0, ePluginFileNotFound, eProblemsLoadingPlugin)
+ * @param filepath (string) Path to the plugin XML file
  *
- * Based on methods_plugins.cpp
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - ePluginFileNotFound (30034): File not found
+ *   - eProblemsLoadingPlugin (30035): Parse error or other loading problem
+ *
+ * @example
+ * local result = LoadPlugin("plugins/myplugin.xml")
+ * if result == 0 then
+ *     Note("Plugin loaded successfully")
+ * end
+ *
+ * @see UnloadPlugin, ReloadPlugin, EnablePlugin
  */
 int L_LoadPlugin(lua_State* L)
 {
@@ -561,15 +640,27 @@ int L_LoadPlugin(lua_State* L)
 }
 
 /**
- * ReloadPlugin - Unload and reload plugin (for development)
+ * world.ReloadPlugin(pluginID)
  *
- * Lua signature: error_code = ReloadPlugin(pluginID)
+ * Unloads and reloads a plugin from its original file. Useful during plugin
+ * development to pick up code changes without restarting. The plugin's
+ * OnPluginClose and OnPluginInstall callbacks are called.
  *
- * Returns: Integer error code
+ * Note: A plugin cannot reload itself.
  *
- * Safety: Cannot reload self (returns eBadParameter)
+ * @param pluginID (string) GUID of the plugin to reload
  *
- * Based on methods_plugins.cpp
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchPlugin (30030): Plugin not found
+ *   - eBadParameter (30001): Cannot reload self
+ *   - ePluginFileNotFound (30034): Original file not found
+ *
+ * @example
+ * -- Reload another plugin during development
+ * ReloadPlugin("abc123...")
+ *
+ * @see LoadPlugin, UnloadPlugin
  */
 int L_ReloadPlugin(lua_State* L)
 {
@@ -610,15 +701,28 @@ int L_ReloadPlugin(lua_State* L)
 }
 
 /**
- * UnloadPlugin - Unload and delete plugin
+ * world.UnloadPlugin(pluginID)
  *
- * Lua signature: error_code = UnloadPlugin(pluginID)
+ * Unloads and removes a plugin from memory. The plugin's OnPluginClose
+ * callback is called before unloading.
  *
- * Returns: Integer error code
+ * Note: A plugin cannot unload itself.
  *
- * Safety: Cannot unload self (returns eBadParameter)
+ * @param pluginID (string) GUID of the plugin to unload
  *
- * Based on methods_plugins.cpp
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchPlugin (30030): Plugin not found
+ *   - eBadParameter (30001): Cannot unload self
+ *
+ * @example
+ * -- Unload a plugin
+ * local result = UnloadPlugin("abc123...")
+ * if result == 0 then
+ *     Note("Plugin unloaded")
+ * end
+ *
+ * @see LoadPlugin, ReloadPlugin
  */
 int L_UnloadPlugin(lua_State* L)
 {
@@ -648,15 +752,26 @@ int L_UnloadPlugin(lua_State* L)
 }
 
 /**
- * EnablePlugin - Enable or disable plugin
+ * world.EnablePlugin(pluginID, enabled)
  *
- * Lua signature: error_code = EnablePlugin(pluginID, enabled)
+ * Enables or disables a plugin. When disabled, a plugin's triggers, aliases,
+ * and timers don't fire, but the plugin remains loaded. Calls the plugin's
+ * OnPluginEnable or OnPluginDisable callback.
  *
- * Returns: Integer error code
+ * @param pluginID (string) GUID of the plugin
+ * @param enabled (boolean) True to enable, false to disable
  *
- * Calls OnPluginEnable or OnPluginDisable callback
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNoSuchPlugin (30030): Plugin not found
  *
- * Based on methods_plugins.cpp
+ * @example
+ * -- Disable a plugin temporarily
+ * EnablePlugin("abc123...", false)
+ * -- ... do something ...
+ * EnablePlugin("abc123...", true)
+ *
+ * @see GetPluginInfo, LoadPlugin
  */
 int L_EnablePlugin(lua_State* L)
 {
@@ -682,13 +797,25 @@ int L_EnablePlugin(lua_State* L)
 }
 
 /**
- * PluginSupports - Check if plugin has a function
+ * world.PluginSupports(pluginID, routine)
  *
- * Lua signature: error_code = PluginSupports(pluginID, routine)
+ * Checks if a plugin has a specific function defined in its Lua environment.
+ * Use this to check for optional callbacks before calling them with CallPlugin.
  *
- * Returns: Integer error code (eOK if exists, eNoSuchRoutine if not)
+ * @param pluginID (string) GUID of the plugin to check
+ * @param routine (string) Name of the function to look for
  *
- * Based on methods_plugins.cpp
+ * @return (number) Error code:
+ *   - eOK (0): Function exists
+ *   - eNoSuchPlugin (30030): Plugin not found
+ *   - eNoSuchRoutine (30032): Function not found
+ *
+ * @example
+ * if PluginSupports("abc123...", "OnCustomEvent") == 0 then
+ *     CallPlugin("abc123...", "OnCustomEvent", data)
+ * end
+ *
+ * @see CallPlugin, GetPluginInfo
  */
 int L_PluginSupports(lua_State* L)
 {
@@ -723,15 +850,33 @@ int L_PluginSupports(lua_State* L)
 }
 
 /**
- * BroadcastPlugin - Send message to all plugins (pub/sub pattern)
+ * world.BroadcastPlugin(message, text)
  *
- * Lua signature: count = BroadcastPlugin(message, text)
+ * Sends a message to all enabled plugins (publish/subscribe pattern). Each
+ * plugin's OnPluginBroadcast callback is called with the message code, sender
+ * information, and text.
  *
- * Returns: Integer count of plugins that received message
+ * The sender plugin does not receive its own broadcast.
  *
- * Calls OnPluginBroadcast callback with (message, senderID, senderName, text)
+ * @param message (number) Numeric message code (user-defined)
+ * @param text (string) Additional text data (optional, defaults to empty)
  *
- * Based on methods_plugins.cpp
+ * @return (number) Count of plugins that received the message
+ *
+ * @example
+ * -- Notify all plugins that combat started
+ * local COMBAT_START = 1001
+ * BroadcastPlugin(COMBAT_START, target_name)
+ *
+ * @example
+ * -- In receiving plugin's OnPluginBroadcast:
+ * function OnPluginBroadcast(msg, id, name, text)
+ *     if msg == 1001 then
+ *         Note("Combat started by " .. name .. " against " .. text)
+ *     end
+ * end
+ *
+ * @see CallPlugin, GetPluginList
  */
 int L_BroadcastPlugin(lua_State* L)
 {
@@ -780,16 +925,25 @@ int L_BroadcastPlugin(lua_State* L)
 }
 
 /**
- * SendPkt - Send raw packet to MUD
+ * world.SendPkt(packet)
  *
- * Lua signature: error_code = SendPkt(packet_string)
+ * Sends raw bytes directly to the MUD server without any processing. This is
+ * used for implementing telnet protocols like GMCP, MSDP, etc. The packet can
+ * include null bytes and other binary data.
  *
- * Returns: Integer error code (eOK, eWorldClosed)
+ * @param packet (string) Raw bytes to send (can include nulls)
  *
- * Sends raw bytes to server (can include nulls)
- * Used by GMCP and other telnet protocol implementations
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eWorldClosed (30002): Not connected to MUD
  *
- * Based on lua_methods.cpp and methods_utilities.cpp
+ * @example
+ * -- Send a GMCP packet (IAC SB GMCP ... IAC SE)
+ * local IAC, SB, SE, GMCP = 255, 250, 240, 201
+ * local data = "Core.Hello {\"client\":\"MyClient\"}"
+ * SendPkt(string.char(IAC, SB, GMCP) .. data .. string.char(IAC, SE))
+ *
+ * @see Send, Execute
  */
 int L_SendPkt(lua_State* L)
 {
@@ -813,15 +967,26 @@ int L_SendPkt(lua_State* L)
 }
 
 /**
- * SaveState - Save current plugin's state to file
+ * world.SaveState()
  *
- * Lua signature: error_code = SaveState()
+ * Saves the current plugin's variables and state to its state file. The state
+ * file is automatically loaded when the plugin is next loaded, allowing
+ * persistent storage of plugin data.
  *
- * Returns: Integer error code (eOK, eNotAPlugin, ePluginCouldNotSaveState)
+ * Must be called from within a plugin context.
  *
- * Safety: Checks m_bSavingStateNow flag to prevent infinite recursion
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eNotAPlugin (30036): Not called from a plugin
+ *   - ePluginCouldNotSaveState (30037): Save failed (disk error, etc.)
  *
- * Based on methods_plugins.cpp
+ * @example
+ * -- Save important data before disconnecting
+ * SetVariable("last_room", current_room)
+ * SetVariable("gold", tostring(gold_count))
+ * SaveState()
+ *
+ * @see GetVariable, SetVariable
  */
 int L_SaveState(lua_State* L)
 {
@@ -851,15 +1016,25 @@ int L_SaveState(lua_State* L)
 }
 
 /**
- * GetPluginVariable - Get variable from plugin's VariableMap
+ * world.GetPluginVariable(pluginID, variableName)
  *
- * Lua signature: value = GetPluginVariable(pluginID, variableName)
+ * Retrieves a variable's value from another plugin's variable storage. This
+ * allows plugins to share data without direct function calls.
  *
- * Returns: String value or nil
+ * @param pluginID (string) GUID of the plugin to read from
+ * @param variableName (string) Name of the variable to retrieve
  *
- * Uses GET_PLUGIN_STUFF pattern: sets m_CurrentPlugin, calls GetVariable, restores
+ * @return (string) Variable value, or nil if not found or plugin doesn't exist
  *
- * Based on methods_plugins.cpp
+ * @example
+ * -- Read a value from another plugin
+ * local mapPlugin = "abc123..."
+ * local currentRoom = GetPluginVariable(mapPlugin, "current_room")
+ * if currentRoom then
+ *     Note("You are in: " .. currentRoom)
+ * end
+ *
+ * @see GetPluginVariableList, GetVariable, CallPlugin
  */
 int L_GetPluginVariable(lua_State* L)
 {
@@ -895,13 +1070,24 @@ int L_GetPluginVariable(lua_State* L)
 }
 
 /**
- * GetPluginVariableList - Get array of all variable names in plugin
+ * world.GetPluginVariableList(pluginID)
  *
- * Lua signature: vars = GetPluginVariableList(pluginID)
+ * Returns a list of all variable names stored in another plugin. Use with
+ * GetPluginVariable to iterate over a plugin's shared data.
  *
- * Returns: Lua table (array) of variable names
+ * @param pluginID (string) GUID of the plugin
  *
- * Based on methods_plugins.cpp
+ * @return (table) Array of variable name strings, or empty table if plugin not found
+ *
+ * @example
+ * -- List all variables in another plugin
+ * local vars = GetPluginVariableList("abc123...")
+ * for i, name in ipairs(vars) do
+ *     local value = GetPluginVariable("abc123...", name)
+ *     Note(name .. " = " .. tostring(value))
+ * end
+ *
+ * @see GetPluginVariable, GetVariableList
  */
 int L_GetPluginVariableList(lua_State* L)
 {

@@ -1,5 +1,9 @@
 /**
  * world_variables.cpp - Variable Functions
+ *
+ * Variables provide persistent key-value storage that survives across sessions.
+ * When called from a plugin, variables are scoped to that plugin's namespace.
+ * When called from world script, variables are stored in the world's global namespace.
  */
 
 #include "lua_common.h"
@@ -7,8 +11,22 @@
 /**
  * world.GetVariable(name)
  *
- * Gets a variable value.
- * When called from a plugin, gets from plugin's variable map.
+ * Retrieves the value of a stored variable.
+ *
+ * @param name (string) The variable name to look up
+ *
+ * @return (string) The variable's value if it exists
+ * @return (nil) If the variable does not exist or has no value
+ *
+ * @example
+ * local hp = GetVariable("current_hp")
+ * if hp then
+ *     print("HP: " .. hp)
+ * else
+ *     print("HP not set")
+ * end
+ *
+ * @see SetVariable, DeleteVariable, GetVariableList
  */
 int L_GetVariable(lua_State* L)
 {
@@ -42,10 +60,24 @@ int L_GetVariable(lua_State* L)
 /**
  * world.SetVariable(name, value)
  *
- * Sets a variable value.
- * When called from a plugin, stores in plugin's variable map.
+ * Stores a value in a named variable. Creates the variable if it doesn't exist,
+ * or updates the existing value if it does.
  *
- * @return eOK (0) on success, eInvalidObjectLabel (30008) if name is invalid
+ * Variable names must be valid identifiers (alphanumeric and underscore, not
+ * starting with a digit). Leading/trailing whitespace is trimmed automatically.
+ *
+ * @param name (string) The variable name (must be a valid identifier)
+ * @param value (string) The value to store
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eInvalidObjectLabel (30008): Invalid variable name
+ *
+ * @example
+ * SetVariable("player_name", "Gandalf")
+ * SetVariable("current_hp", "100")  -- Note: values are always strings
+ *
+ * @see GetVariable, DeleteVariable, GetVariableList
  */
 int L_SetVariable(lua_State* L)
 {
@@ -91,11 +123,25 @@ int L_SetVariable(lua_State* L)
 /**
  * world.DeleteVariable(name)
  *
- * Deletes a variable.
- * When called from a plugin, deletes from plugin's variable map.
+ * Removes a variable from storage. The variable will no longer exist after
+ * this call, and GetVariable will return nil for it.
  *
- * @return eOK (0) on success, eInvalidObjectLabel (30008) if name is invalid,
- *         eVariableNotFound (30019) if variable doesn't exist
+ * @param name (string) The variable name to delete
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Successfully deleted
+ *   - eInvalidObjectLabel (30008): Invalid variable name
+ *   - eVariableNotFound (30019): Variable does not exist
+ *
+ * @example
+ * local result = DeleteVariable("temp_data")
+ * if result == 0 then
+ *     print("Variable deleted")
+ * elseif result == 30019 then
+ *     print("Variable didn't exist")
+ * end
+ *
+ * @see GetVariable, SetVariable, GetVariableList
  */
 int L_DeleteVariable(lua_State* L)
 {
@@ -135,8 +181,25 @@ int L_DeleteVariable(lua_State* L)
 /**
  * world.GetVariableList()
  *
- * Gets list of all variable names.
- * When called from a plugin, gets from plugin's variable map.
+ * Returns a list of all variable names in the current scope. Useful for
+ * iterating over all stored variables or debugging.
+ *
+ * @return (table) An array of variable names (strings), indexed 1 to n.
+ *   Returns an empty table if no variables exist.
+ *
+ * @example
+ * local vars = GetVariableList()
+ * for i, name in ipairs(vars) do
+ *     print(name .. " = " .. (GetVariable(name) or "nil"))
+ * end
+ *
+ * @example
+ * -- Check if any variables exist
+ * if #GetVariableList() == 0 then
+ *     print("No variables stored")
+ * end
+ *
+ * @see GetVariable, SetVariable, DeleteVariable
  */
 int L_GetVariableList(lua_State* L)
 {
