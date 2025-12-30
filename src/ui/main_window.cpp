@@ -1184,8 +1184,8 @@ void MainWindow::updateToolbarIcons()
     m_newAction->setIcon(loadThemedIcon("file-plus"));
     m_openAction->setIcon(loadThemedIcon("folder-open"));
     m_saveAction->setIcon(loadThemedIcon("device-floppy"));
-    m_connectAction->setIcon(loadThemedIcon("player-play"));
-    m_disconnectAction->setIcon(loadThemedIcon("player-stop"));
+    m_connectAction->setIcon(loadThemedIcon("plug-connected"));
+    m_disconnectAction->setIcon(loadThemedIcon("plug-x"));
     m_copyAction->setIcon(loadThemedIcon("copy"));
     m_pasteAction->setIcon(loadThemedIcon("clipboard"));
     m_findAction->setIcon(loadThemedIcon("search"));
