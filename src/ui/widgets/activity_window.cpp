@@ -10,7 +10,7 @@
 #include "../../storage/database.h"
 #include "../../storage/global_options.h"
 #include "../main_window.h"
-#include "../views/world_widget.h"
+#include "views/world_widget.h"
 #include "world_document.h"
 
 ActivityWindow::ActivityWindow(MainWindow* mainWindow)

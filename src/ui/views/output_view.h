@@ -9,6 +9,8 @@
 #include <QWidget>
 #include <memory>
 
+#include "world/view_interfaces.h"
+
 // Forward declarations
 class WorldDocument;
 class Line;
@@ -35,12 +37,25 @@ class Action;
  * Based on original MUSHclient's CSendView (sendvw.cpp) which used
  * custom CDC/GDI drawing.
  */
-class OutputView : public QWidget {
+class OutputView : public QWidget, public IOutputView {
     Q_OBJECT
 
   public:
     explicit OutputView(WorldDocument* doc, QWidget* parent = nullptr);
     ~OutputView() override;
+
+    // ========== IOutputView Interface Implementation ==========
+    int viewHeight() const override { return height(); }
+    int viewWidth() const override { return width(); }
+    int getScrollPositionPixels() const override { return m_scrollPos * m_lineHeight; }
+    QPoint mapToGlobal(const QPoint& pos) const override { return QWidget::mapToGlobal(pos); }
+    void setViewCursor(const QCursor& cursor) override { setCursor(cursor); }
+    void requestUpdate() override { update(); }
+    QWidget* parentWindow() const override { return window(); }
+    void reloadBackgroundImage() override;
+    void reloadForegroundImage() override;
+    bool isFrozen() const override { return m_freeze; }
+    void setFrozen(bool frozen) override;
 
   public slots:
     /**
@@ -162,18 +177,6 @@ class OutputView : public QWidget {
     QRect getTextRectangle(bool includeBorder = false) const;
 
     /**
-     * getScrollPositionPixels - Get current scroll position in pixels
-     *
-     * Converts line-based scroll position to pixel position for GetInfo(296).
-     *
-     * @return Scroll position in pixels (Y coordinate)
-     */
-    int getScrollPositionPixels() const
-    {
-        return m_scrollPos * m_lineHeight;
-    }
-
-    /**
      * recalculateMetrics - Public method to trigger metrics recalculation
      *
      * Text Rectangle Architecture
@@ -187,42 +190,12 @@ class OutputView : public QWidget {
     }
 
     /**
-     * reloadBackgroundImage - Reload background image from WorldDocument path
-     *
-     * Called when SetBackgroundImage Lua function changes the image.
-     * Loads the image from m_strBackgroundImageName and triggers repaint.
-     */
-    void reloadBackgroundImage();
-
-    /**
-     * reloadForegroundImage - Reload foreground image from WorldDocument path
-     *
-     * Called when SetForegroundImage Lua function changes the image.
-     * Loads the image from m_strForegroundImageName and triggers repaint.
-     */
-    void reloadForegroundImage();
-
-    /**
      * Freeze/Pause Control
      *
      * When frozen, auto-scrolling is disabled and new lines are counted
      * but the view doesn't scroll to show them.
+     * Note: isFrozen() and setFrozen() are in IOutputView interface above.
      */
-
-    /**
-     * isFrozen - Check if output is frozen
-     * @return true if output is frozen
-     */
-    bool isFrozen() const
-    {
-        return m_freeze;
-    }
-
-    /**
-     * setFrozen - Set freeze state
-     * @param frozen true to freeze, false to unfreeze
-     */
-    void setFrozen(bool frozen);
 
     /**
      * toggleFreeze - Toggle freeze state

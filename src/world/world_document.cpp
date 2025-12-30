@@ -8,9 +8,8 @@
 #include "../text/action.h"
 #include "../text/line.h"
 #include "../text/style.h"
-#include "../ui/views/input_view.h"
-#include "../ui/views/output_view.h"
 #include "accelerator_manager.h"
+#include "view_interfaces.h"
 #include "logging.h"
 #include "script_engine.h"
 #include "world_socket.h"
@@ -1941,9 +1940,14 @@ qint32 WorldDocument::DiscardQueue()
  *
  * @param inputView The input view to set as active
  */
-void WorldDocument::setActiveInputView(InputView* inputView)
+void WorldDocument::setActiveInputView(IInputView* inputView)
 {
     m_pActiveInputView = inputView;
+}
+
+void WorldDocument::setActiveOutputView(IOutputView* outputView)
+{
+    m_pActiveOutputView = outputView;
 }
 
 /**
@@ -1961,7 +1965,7 @@ QString WorldDocument::GetCommand() const
         return QString();
     }
 
-    return m_pActiveInputView->text();
+    return m_pActiveInputView->inputText();
 }
 
 /**
@@ -1981,12 +1985,12 @@ qint32 WorldDocument::SetCommand(const QString& text)
         return 0; // eOK - no input view to set
     }
 
-    QString current = m_pActiveInputView->text();
+    QString current = m_pActiveInputView->inputText();
     if (!current.isEmpty()) {
         return 30011; // eCommandNotEmpty
     }
 
-    m_pActiveInputView->setText(text);
+    m_pActiveInputView->setInputText(text);
     // TODO: Notify plugins of command change
     return 0; // eOK
 }
@@ -2009,7 +2013,7 @@ qint32 WorldDocument::SetCommandSelection(qint32 first, qint32 last)
         return 0; // eOK - no input view to modify
     }
 
-    int textLen = m_pActiveInputView->text().length();
+    int textLen = m_pActiveInputView->inputText().length();
 
     // Convert from 1-based to 0-based
     int start = first - 1;
@@ -2020,15 +2024,12 @@ qint32 WorldDocument::SetCommandSelection(qint32 first, qint32 last)
         end = textLen;
     }
 
-    // Clamp to valid range to avoid Qt warnings
+    // Clamp to valid range
     start = qBound(0, start, textLen);
     end = qBound(0, end, textLen);
 
-    // Use QTextCursor for QPlainTextEdit selection
-    QTextCursor cursor = m_pActiveInputView->textCursor();
-    cursor.setPosition(start);
-    cursor.setPosition(end, QTextCursor::KeepAnchor);
-    m_pActiveInputView->setTextCursor(cursor);
+    // Use interface method for selection
+    m_pActiveInputView->setSelection(start, end - start);
 
     return 0; // eOK
 }
@@ -2063,8 +2064,8 @@ QString WorldDocument::PushCommand()
         return QString();
     }
 
-    QString command = m_pActiveInputView->text();
-    m_pActiveInputView->clear();
+    QString command = m_pActiveInputView->inputText();
+    m_pActiveInputView->clearInput();
     // TODO: Notify plugins of command change
     return command;
 }
@@ -3787,7 +3788,7 @@ void WorldDocument::showErrorLines(int lineNumber)
 void WorldDocument::Repaint()
 {
     if (m_pActiveOutputView) {
-        m_pActiveOutputView->update();
+        m_pActiveOutputView->requestUpdate();
     }
 }
 

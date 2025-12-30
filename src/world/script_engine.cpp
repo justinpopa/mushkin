@@ -248,9 +248,9 @@ void ScriptEngine::openLua()
 
     // 5. Set up Lua package.path (issue #4)
     // Use only relative paths for portability - no system paths
-    // MUSHclient also includes absolute exe_dir paths (the ! notation in luaconf.h),
-    // but we intentionally omit those to avoid the portability issues they cause
     lua_getglobal(L, "package");
+
+    QString appDir = QCoreApplication::applicationDirPath();
 
     QStringList luaPaths = {
         "./?.lua",
@@ -284,8 +284,6 @@ void ScriptEngine::openLua()
     // We replace the default cpath entirely - no system paths
     // App bundle paths are needed for bundled modules like LuaSocket
     lua_getglobal(L, "package");
-
-    QString appDir = QCoreApplication::applicationDirPath();
 
 #ifdef Q_OS_WIN
     QString libExt = "dll";

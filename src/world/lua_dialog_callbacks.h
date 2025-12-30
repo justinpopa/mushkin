@@ -64,43 +64,6 @@ InputBoxDialogFunc getInputBoxDialogCallback();
 
 } // namespace LuaDialogCallbacks
 
-// Forward declaration for WorldDocument (used by view callbacks)
-class WorldDocument;
-
-/**
- * Callback types for view updates
- * These allow world module to trigger UI updates without linking against ui module
- */
-namespace ViewUpdateCallbacks {
-
-// Reload background/foreground image in output view
-using ReloadBackgroundImageFunc = std::function<void(WorldDocument*)>;
-using ReloadForegroundImageFunc = std::function<void(WorldDocument*)>;
-
-// Set freeze/pause state on output view
-using SetFreezeFunc = std::function<void(WorldDocument*, bool)>;
-
-// Get freeze state from output view
-using GetFreezeFunc = std::function<bool(WorldDocument*)>;
-
-/**
- * Register callbacks - called by ui module at startup
- */
-void setReloadBackgroundImageCallback(ReloadBackgroundImageFunc callback);
-void setReloadForegroundImageCallback(ReloadForegroundImageFunc callback);
-void setSetFreezeCallback(SetFreezeFunc callback);
-void setGetFreezeCallback(GetFreezeFunc callback);
-
-/**
- * Get callbacks - called by world module
- */
-ReloadBackgroundImageFunc getReloadBackgroundImageCallback();
-ReloadForegroundImageFunc getReloadForegroundImageCallback();
-SetFreezeFunc getSetFreezeCallback();
-GetFreezeFunc getGetFreezeCallback();
-
-} // namespace ViewUpdateCallbacks
-
 /**
  * Callback types for toolbar control
  * These allow world module to control toolbars without linking against ui module
