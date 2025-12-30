@@ -6846,22 +6846,25 @@ function test_window_write()
     -- Draw something on the window so it has content
     world.WindowRectOp("write_test", 0, 10, 10, 50, 50, 0x00FF00, 0)
 
+    -- Use relative paths for cross-platform compatibility (Windows doesn't have /tmp)
     -- Test writing to PNG file
-    local png_path = "/tmp/mushkin_test_window.png"
+    local png_path = "mushkin_test_window.png"
     local result = world.WindowWrite("write_test", png_path)
     check(result == 0, "WindowWrite to PNG should return 0 on success")
+    os.remove(png_path)  -- Clean up
 
     -- Test writing to BMP file
-    local bmp_path = "/tmp/mushkin_test_window.bmp"
+    local bmp_path = "mushkin_test_window.bmp"
     result = world.WindowWrite("write_test", bmp_path)
     check(result == 0, "WindowWrite to BMP should return 0 on success")
+    os.remove(bmp_path)  -- Clean up
 
     -- Test with non-existent window (should return error eNoSuchWindow=30073)
-    result = world.WindowWrite("nonexistent_window", "/tmp/test.png")
+    result = world.WindowWrite("nonexistent_window", "test.png")
     check(result == 30073, "WindowWrite with non-existent window should return 30073")
 
     -- Test with invalid file extension (should return error)
-    result = world.WindowWrite("write_test", "/tmp/test.txt")
+    result = world.WindowWrite("write_test", "test.txt")
     check(result ~= 0, "WindowWrite with invalid extension should return error")
 
     world.WindowDelete("write_test")
@@ -7091,18 +7094,19 @@ function test_save_notepad()
     -- Create a notepad with test content
     world.SendToNotepad("SaveTest", "This is test content\nLine 2\nLine 3")
 
+    -- Use relative paths for cross-platform compatibility (Windows doesn't have /tmp)
     -- Test 1: SaveNotepad returns eNoSuchNotepad (30075) for non-existent notepad
-    local result = world.SaveNotepad("NonExistent", "/tmp/test.txt", true)
+    local result = world.SaveNotepad("NonExistent", "test_notepad_nonexistent.txt", true)
     check(type(result) == "number", "SaveNotepad should return a number")
     check(result == 30075, "SaveNotepad should return eNoSuchNotepad (30075) for non-existent notepad")
 
     -- Test 2: SaveNotepad with valid notepad (returns eOK = 0 on success)
-    local temp_file = "/tmp/mushkin_test_notepad_save_" .. os.time() .. ".txt"
+    local temp_file = "mushkin_test_notepad_save_" .. os.time() .. ".txt"
     result = world.SaveNotepad("SaveTest", temp_file, true)
     check(result == 0, "SaveNotepad should return eOK (0) on success")
 
     -- Test 3: SaveNotepad with replaceExisting=false on existing file
-    local temp_file2 = "/tmp/mushkin_test_notepad_save2_" .. os.time() .. ".txt"
+    local temp_file2 = "mushkin_test_notepad_save2_" .. os.time() .. ".txt"
     result = world.SaveNotepad("SaveTest", temp_file2, true)
     check(result == 0, "First SaveNotepad should succeed")
 
@@ -7114,7 +7118,7 @@ function test_save_notepad()
     check(result ~= 0, "SaveNotepad with empty filename should fail")
 
     -- Test 5: SaveNotepad with default replaceExisting parameter
-    local temp_file3 = "/tmp/mushkin_test_notepad_save3_" .. os.time() .. ".txt"
+    local temp_file3 = "mushkin_test_notepad_save3_" .. os.time() .. ".txt"
     result = world.SaveNotepad("SaveTest", temp_file3)
     check(result == 0, "SaveNotepad with default replaceExisting should succeed")
 
