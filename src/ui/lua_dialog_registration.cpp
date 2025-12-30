@@ -106,47 +106,6 @@ static std::pair<bool, QString> inputBoxDialogImpl(const QString& title, const Q
 }
 
 /**
- * Reload background image callback implementation
- */
-static void reloadBackgroundImageImpl(WorldDocument* pDoc)
-{
-    if (pDoc && pDoc->m_pActiveOutputView) {
-        pDoc->m_pActiveOutputView->reloadBackgroundImage();
-    }
-}
-
-/**
- * Reload foreground image callback implementation
- */
-static void reloadForegroundImageImpl(WorldDocument* pDoc)
-{
-    if (pDoc && pDoc->m_pActiveOutputView) {
-        pDoc->m_pActiveOutputView->reloadForegroundImage();
-    }
-}
-
-/**
- * Set freeze callback implementation
- */
-static void setFreezeImpl(WorldDocument* pDoc, bool frozen)
-{
-    if (pDoc && pDoc->m_pActiveOutputView) {
-        pDoc->m_pActiveOutputView->setFrozen(frozen);
-    }
-}
-
-/**
- * Get freeze callback implementation
- */
-static bool getFreezeImpl(WorldDocument* pDoc)
-{
-    if (pDoc && pDoc->m_pActiveOutputView) {
-        return pDoc->m_pActiveOutputView->isFrozen();
-    }
-    return false;
-}
-
-/**
  * Get MainWindow instance
  */
 static MainWindow* getMainWindow()
@@ -241,12 +200,6 @@ void registerDialogCallbacks()
     LuaDialogCallbacks::setListDialogCallback(listDialogImpl);
     LuaDialogCallbacks::setMultiListDialogCallback(multiListDialogImpl);
     LuaDialogCallbacks::setInputBoxDialogCallback(inputBoxDialogImpl);
-
-    // Register view update callbacks
-    ViewUpdateCallbacks::setReloadBackgroundImageCallback(reloadBackgroundImageImpl);
-    ViewUpdateCallbacks::setReloadForegroundImageCallback(reloadForegroundImageImpl);
-    ViewUpdateCallbacks::setSetFreezeCallback(setFreezeImpl);
-    ViewUpdateCallbacks::setGetFreezeCallback(getFreezeImpl);
 
     // Register toolbar callbacks
     ToolbarCallbacks::setSetToolBarPositionCallback(setToolBarPositionImpl);

@@ -15,7 +15,6 @@
 #include "../../automation/sendto.h"
 #include "../../automation/timer.h"
 #include "../../automation/trigger.h"
-#include "../../ui/views/output_view.h"
 #include "../../world/config_options.h"
 #include "../../world/world_document.h"
 #include "../script_engine.h"

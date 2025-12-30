@@ -8,8 +8,8 @@
  */
 
 #include "../../automation/plugin.h"
-#include "../../ui/views/output_view.h"
 #include "../../world/miniwindow.h"
+#include "../../world/view_interfaces.h"
 #include "../../world/world_document.h"
 #include "../script_engine.h"
 #include <QMenu>

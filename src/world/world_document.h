@@ -42,8 +42,8 @@ class Alias;              //
 class Timer;              //
 class Plugin;             //
 class Variable;           //
-class OutputView;         // for miniwindow signal connection
-class InputView;          // Command input widget
+class IOutputView;        // Interface for output view (see view_interfaces.h)
+class IInputView;         // Interface for input view (see view_interfaces.h)
 class NotepadWidget;      // Notepad window
 class RemoteAccessServer; // Remote access server for telnet connections
 class AcceleratorManager; // Keyboard accelerator management
@@ -842,8 +842,8 @@ class WorldDocument : public QObject {
     QString m_strLastSelectedVariable;
 
     // ========== View Pointers (will be replaced with Qt equivalents) ==========
-    class InputView* m_pActiveInputView; // Track active input widget
-    OutputView* m_pActiveOutputView;     // OutputView for miniwindow signal connection
+    IInputView* m_pActiveInputView;  // Active input view (interface pointer)
+    IOutputView* m_pActiveOutputView; // Active output view (interface pointer)
 
     // ========== Text Selection State ==========
     // Selection coordinates (0-based internally, converted to 1-based for Lua API)
@@ -1373,11 +1373,10 @@ class WorldDocument : public QObject {
                           int urlLength, const QString& url);
 
     // ========== Command Window Helpers ==========
-    void setActiveInputView(InputView* inputView);
-    InputView* activeInputView() const
-    {
-        return m_pActiveInputView;
-    }
+    void setActiveInputView(IInputView* inputView);
+    void setActiveOutputView(IOutputView* outputView);
+    IInputView* activeInputView() const { return m_pActiveInputView; }
+    IOutputView* activeOutputView() const { return m_pActiveOutputView; }
 
     QString GetCommand() const;
     qint32 SetCommand(const QString& text);

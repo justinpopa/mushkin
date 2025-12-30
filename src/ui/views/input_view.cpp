@@ -3,7 +3,7 @@
 #include "../../world/color_utils.h"
 #include "../../world/lua_api/lua_registration.h"
 #include "../../world/script_engine.h"
-#include "../dialogs/complete_word_dialog.h"
+#include "dialogs/complete_word_dialog.h"
 #include "../text/line.h"
 #include "../world/world_document.h"
 #include "logging.h"
@@ -66,6 +66,18 @@ void InputView::setCursorPosition(int pos)
 
     QTextCursor cursor = textCursor();
     cursor.setPosition(pos);
+    setTextCursor(cursor);
+}
+
+void InputView::setSelection(int start, int length)
+{
+    int textLen = toPlainText().length();
+    start = qBound(0, start, textLen);
+    int end = qBound(start, start + length, textLen);
+
+    QTextCursor cursor = textCursor();
+    cursor.setPosition(start);
+    cursor.setPosition(end, QTextCursor::KeepAnchor);
     setTextCursor(cursor);
 }
 
