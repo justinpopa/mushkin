@@ -289,9 +289,13 @@ int L_GetUniqueNumber(lua_State* L)
  * Returns a 24-character unique hex ID suitable for plugin IDs.
  * Based on UUID hashed with SHA-1, matching original MUSHclient.
  *
- * Example: "3e7dedcf168620e8f3e7d3a6"
+ * @return (string) 24-character lowercase hex ID
  *
- * @return string - 24-character hex ID
+ * @example
+ * local pluginId = GetUniqueID()
+ * Note("Plugin ID: " .. pluginId)  -- e.g., "3e7dedcf168620e8f3e7d3a6"
+ *
+ * @see CreateGUID, GetUniqueNumber
  */
 int L_GetUniqueID(lua_State* L)
 {
@@ -304,11 +308,19 @@ int L_GetUniqueID(lua_State* L)
 /**
  * world.CreateGUID()
  *
- * Creates a GUID in standard format with dashes.
+ * Creates a UUID/GUID in standard RFC 4122 format with dashes.
+ * Suitable for unique identifiers, database keys, or tracking IDs.
  *
- * Example: "550E8400-E29B-41D4-A716-446655440000"
+ * @return (string) 36-character GUID: XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
  *
- * @return string - GUID in format XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
+ * @example
+ * local guid = CreateGUID()
+ * Note("New GUID: " .. guid)  -- e.g., "550E8400-E29B-41D4-A716-446655440000"
+ *
+ * -- Use as unique database key
+ * DatabaseExec(db, "INSERT INTO sessions (id) VALUES ('" .. guid .. "')")
+ *
+ * @see GetUniqueID, GetUniqueNumber
  */
 int L_CreateGUID(lua_State* L)
 {
@@ -321,12 +333,29 @@ int L_CreateGUID(lua_State* L)
 /**
  * world.Execute(command)
  *
- * Executes a command as if typed by the user.
+ * Executes a command as if typed by the user. The command is processed
+ * through the normal command pipeline including alias expansion and
+ * command stacking (semicolon separation).
  *
- * Calls ON_PLUGIN_COMMAND callback before sending. If a plugin returns false,
- * the command is not sent.
+ * Before execution, calls ON_PLUGIN_COMMAND callback for all plugins.
+ * If any plugin returns false, the command is not sent.
  *
- * Based on CMUSHclientDoc::Execute() in methods_commands.cpp
+ * @param command (string) Command to execute
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *
+ * @example
+ * -- Execute a simple command
+ * Execute("look")
+ *
+ * -- Execute multiple commands (if command stacking enabled)
+ * Execute("north;look;inventory")
+ *
+ * -- Trigger an alias
+ * Execute("heal self")  -- Will match alias patterns
+ *
+ * @see Send, SendNoEcho, DoCommand
  */
 int L_Execute(lua_State* L)
 {
@@ -356,22 +385,36 @@ int L_Execute(lua_State* L)
 /**
  * world.GetGlobalOption(name)
  *
- * Gets a global option value from the preferences database.
+ * Gets a global application option value from the preferences database.
+ * These are application-wide settings, not per-world options.
  *
- * GetGlobalOption()
+ * @param name (string) Option name (case-insensitive)
  *
- * Numeric options return integers, string options return strings.
- * Returns nil if option not found.
+ * @return (number|string|nil) Option value or nil if not found
  *
- * Common options:
- * - "AutoConnectWorlds" (int): Auto-connect worlds on startup
- * - "ConfirmBeforeClosingWorld" (int): Confirm before closing world
- * - "DefaultLogFileDirectory" (string): Default log file directory
- * - "PluginsDirectory" (string): Plugins directory path
- * - etc. (see GlobalOptionsTable in original)
+ * Common numeric options:
+ *   - "AutoConnectWorlds": Auto-connect worlds on startup (0/1)
+ *   - "ConfirmBeforeClosingWorld": Confirm before closing (0/1)
+ *   - "AlwaysOnTop": Keep window on top (0/1)
+ *   - "TrayIcon": Show system tray icon (0/1)
+ *   - "SmoothScrolling": Enable smooth scrolling (0/1)
  *
- * @param name Option name (case-insensitive)
- * @return Option value (int or string) or nil if not found
+ * Common string options:
+ *   - "DefaultLogFileDirectory": Default log file directory
+ *   - "DefaultWorldFileDirectory": Default world file directory
+ *   - "PluginsDirectory": Plugins directory path
+ *   - "DefaultInputFont": Input font name
+ *   - "DefaultOutputFont": Output font name
+ *
+ * @example
+ * local logDir = GetGlobalOption("DefaultLogFileDirectory")
+ * Note("Logs saved to: " .. (logDir or "not set"))
+ *
+ * if GetGlobalOption("AutoConnectWorlds") == 1 then
+ *     Note("Auto-connect is enabled")
+ * end
+ *
+ * @see GetGlobalOptionList, GetOption, SetOption
  */
 int L_GetGlobalOption(lua_State* L)
 {
@@ -461,10 +504,19 @@ int L_GetGlobalOption(lua_State* L)
  * world.GetGlobalOptionList()
  *
  * Returns a list of all available global option names.
+ * Use GetGlobalOption() to retrieve values for these options.
  *
- * GetGlobalOption()
+ * @return (table) Array of option name strings (1-indexed)
  *
- * @return Lua array of option name strings
+ * @example
+ * -- List all available global options
+ * local options = GetGlobalOptionList()
+ * for i, name in ipairs(options) do
+ *     local value = GetGlobalOption(name)
+ *     Note(name .. " = " .. tostring(value))
+ * end
+ *
+ * @see GetGlobalOption
  */
 int L_GetGlobalOptionList(lua_State* L)
 {
@@ -570,15 +622,36 @@ int L_GetGlobalOptionList(lua_State* L)
  * world.AcceleratorTo(key_string, script, send_to)
  *
  * Registers a keyboard accelerator (hotkey) that executes a script.
+ * The script is routed to the specified destination type.
  *
- * @param key_string Accelerator key (e.g., "Ctrl+A", "PageUp", "F1")
- * @param script Script to execute when key is pressed
- * @param send_to Where to send the script (sendto.script, sendto.world, etc.)
- * @return Error code (eOK on success, eBadParameter on invalid key)
+ * @param key_string (string) Key combination (e.g., "Ctrl+A", "F1", "PageUp")
+ *   Format: [Ctrl+][Alt+][Shift+]Key
+ *   Valid keys: A-Z, 0-9, F1-F12, PageUp, PageDown, Home, End, Insert, Delete
+ * @param script (string) Script or command to execute when key is pressed
+ * @param send_to (number) Destination for the script:
+ *   - sendto.world (0): Send to MUD
+ *   - sendto.command (1): Put in command window
+ *   - sendto.output (2): Display in output
+ *   - sendto.status (3): Show in status line
+ *   - sendto.notepad (4): Send to notepad
+ *   - sendto.script (12): Execute as Lua script
+ *   - sendto.scriptaliasafteraliases (14): Execute after alias processing
  *
- * Example: AcceleratorTo("Ctrl+F5", "doSomething()", sendto.script)
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eBadParameter (30): Invalid key string
  *
- * Based on methods_accelerators.cpp from original MUSHclient.
+ * @example
+ * -- Run a Lua function when F5 is pressed
+ * AcceleratorTo("F5", "myHealFunction()", sendto.script)
+ *
+ * -- Send "look" to MUD when Ctrl+L is pressed
+ * AcceleratorTo("Ctrl+L", "look", sendto.world)
+ *
+ * -- Complex key combination
+ * AcceleratorTo("Ctrl+Shift+S", "saveState()", sendto.script)
+ *
+ * @see Accelerator, AcceleratorList
  */
 int L_AcceleratorTo(lua_State* L)
 {
@@ -605,16 +678,32 @@ int L_AcceleratorTo(lua_State* L)
  * world.Accelerator(key_string, send_string)
  *
  * Registers a keyboard accelerator that executes a command.
- * This is a convenience wrapper for AcceleratorTo with sendto.execute.
+ * Convenience wrapper for AcceleratorTo with sendto.execute (12).
+ * The command is executed as if typed by the user.
  *
- * @param key_string Accelerator key (e.g., "Ctrl+A", "PageUp", "F1")
- * @param send_string Command to execute (empty string to remove accelerator)
- * @return Error code (eOK on success, eBadParameter on invalid key)
+ * @param key_string (string) Key combination (e.g., "Ctrl+A", "F1", "PageUp")
+ * @param send_string (string) Command to execute. Empty string removes the accelerator.
  *
- * Example: Accelerator("F5", "look")
- *          Accelerator("Ctrl+S", "save")
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eBadParameter (30): Invalid key string
  *
- * Based on methods_accelerators.cpp from original MUSHclient.
+ * @example
+ * -- Quick direction keys
+ * Accelerator("Numpad8", "north")
+ * Accelerator("Numpad2", "south")
+ * Accelerator("Numpad4", "west")
+ * Accelerator("Numpad6", "east")
+ *
+ * -- Action shortcuts
+ * Accelerator("F1", "look")
+ * Accelerator("F2", "inventory")
+ * Accelerator("F3", "score")
+ *
+ * -- Remove an accelerator
+ * Accelerator("F1", "")
+ *
+ * @see AcceleratorTo, AcceleratorList
  */
 int L_Accelerator(lua_State* L)
 {
@@ -641,13 +730,29 @@ int L_Accelerator(lua_State* L)
 /**
  * world.AcceleratorList()
  *
- * Returns a table of all registered accelerators.
+ * Returns a table of all registered keyboard accelerators.
+ * Includes accelerators from all plugins and the world itself.
  *
- * @return Array of strings in format "Key = Command" or "Key = Command\t[sendto]"
+ * @return (table) Array of strings describing each accelerator:
+ *   - Format: "Key = Command" for sendto.execute accelerators
+ *   - Format: "Key = Command\t[sendto]" for other types
  *
- * Example: for i, v in ipairs(AcceleratorList()) do print(v) end
+ * @example
+ * -- List all accelerators
+ * local accel = AcceleratorList()
+ * Note("Registered accelerators: " .. #accel)
+ * for i, v in ipairs(accel) do
+ *     Note("  " .. v)
+ * end
  *
- * Based on methods_accelerators.cpp from original MUSHclient.
+ * -- Output might show:
+ * -- Registered accelerators: 4
+ * --   F1 = look
+ * --   F2 = inventory
+ * --   Ctrl+F5 = doHealing()	[12]
+ * --   PageUp = scroll up	[1]
+ *
+ * @see Accelerator, AcceleratorTo
  */
 int L_AcceleratorList(lua_State* L)
 {
@@ -676,16 +781,38 @@ int L_AcceleratorList(lua_State* L)
 /**
  * world.EditDistance(source, target)
  *
- * Calculates the Levenshtein edit distance between two strings.
+ * Calculates the Damerau-Levenshtein edit distance between two strings.
  * This is the minimum number of single-character edits (insertions,
- * deletions, substitutions, or transpositions) needed to change one
- * string into another.
+ * deletions, substitutions, or transpositions) needed to transform
+ * one string into another.
  *
- * Based on Utilities.cpp (Levenshtein distance with transposition)
+ * Useful for fuzzy string matching, spell checking, and finding
+ * similar commands or names.
  *
- * @param source First string
- * @param target Second string
- * @return Number of edits needed (maximum 20 characters compared)
+ * @param source (string) First string to compare
+ * @param target (string) Second string to compare
+ *
+ * @return (number) Number of edits needed (0 if identical)
+ *   Note: Only first 20 characters are compared for performance.
+ *
+ * @example
+ * -- Check similarity
+ * local dist = EditDistance("hello", "hallo")
+ * Note("Distance: " .. dist)  -- Output: 1
+ *
+ * -- Find closest match to user input
+ * local commands = {"attack", "cast", "look", "inventory"}
+ * local input = "atack"  -- typo
+ * local closest, minDist = nil, 999
+ * for _, cmd in ipairs(commands) do
+ *     local d = EditDistance(input, cmd)
+ *     if d < minDist then
+ *         closest, minDist = cmd, d
+ *     end
+ * end
+ * Note("Did you mean: " .. closest)  -- Output: attack
+ *
+ * @see utils.md5, utils.sha256
  */
 int L_EditDistance(lua_State* L)
 {
@@ -761,16 +888,31 @@ int L_EditDistance(lua_State* L)
 /**
  * world.OpenBrowser(url)
  *
- * Opens a URL in the default web browser.
- * Only allows http://, https://, and mailto: URLs for security.
+ * Opens a URL in the system's default web browser.
+ * For security, only http://, https://, and mailto: URLs are allowed.
  *
- * Based on methods_utilities.cpp
+ * @param url (string) URL to open
  *
- * @param url URL to open
- * @return Error code:
+ * @return (number) Error code:
  *   - eOK (0): Success
- *   - eBadParameter (8): Invalid or empty URL
- *   - eCouldNotOpenFile (30009): Failed to open
+ *   - eBadParameter (30): Invalid, empty, or disallowed URL scheme
+ *   - eCouldNotOpenFile (30009): System failed to open URL
+ *
+ * @example
+ * -- Open a website
+ * OpenBrowser("https://www.mudconnect.com")
+ *
+ * -- Open email client
+ * OpenBrowser("mailto:support@example.com")
+ *
+ * -- MXP-style link handler
+ * function OnMXPLink(url)
+ *     if url:match("^https?://") then
+ *         OpenBrowser(url)
+ *     end
+ * end
+ *
+ * @see Execute
  */
 int L_OpenBrowser(lua_State* L)
 {
@@ -799,12 +941,24 @@ int L_OpenBrowser(lua_State* L)
 /**
  * world.ChangeDir(path)
  *
- * Changes the current working directory.
+ * Changes the current working directory for the application.
+ * Affects relative paths in subsequent file operations.
  *
- * Based on methods_utilities.cpp
+ * @param path (string) Directory path to change to (absolute or relative)
  *
- * @param path Path to change to
- * @return true if successful, false otherwise
+ * @return (boolean) true if successful, false if directory doesn't exist
+ *
+ * @example
+ * -- Change to plugin directory
+ * local success = ChangeDir(GetPluginInfo(GetPluginID(), 20))
+ * if success then
+ *     Note("Changed to plugin directory")
+ * end
+ *
+ * -- Use absolute path
+ * ChangeDir("/Users/player/muds/data")
+ *
+ * @see GetInfo
  */
 int L_ChangeDir(lua_State* L)
 {
@@ -820,13 +974,14 @@ int L_ChangeDir(lua_State* L)
  * world.TranslateDebug(message)
  *
  * Calls a Debug function in a translator Lua script (if loaded).
- * This feature is not implemented in the Qt version.
+ * Note: This feature is not implemented in the Qt version.
  *
- * Based on methods_utilities.cpp
+ * @param message (string) Debug message to pass to translator
  *
- * @param message Debug message
- * @return Status code:
- *   - 1: No translator script loaded
+ * @return (number) Status code:
+ *   - 1: No translator script loaded (always returns this in Qt version)
+ *
+ * @see Trace, TraceOut
  */
 int L_TranslateDebug(lua_State* L)
 {
@@ -840,14 +995,36 @@ int L_TranslateDebug(lua_State* L)
  * world.ImportXML(xml_string)
  *
  * Imports triggers, aliases, timers, and variables from an XML string.
- * Useful for migrating scripts and automation from existing MUSHclient files.
- * Does NOT import world configuration options (name, server, port, etc.)
+ * Useful for migrating automation from existing MUSHclient files or
+ * sharing configurations between worlds.
  *
- * Based on methods_xml.cpp
+ * Note: Does NOT import world configuration options (name, server, port, etc.)
  *
- * @param xml_string XML content as a string
- * @return Number of items imported (triggers + aliases + timers + variables)
- *         Returns -1 if XML is invalid or parsing fails
+ * @param xml_string (string) XML content in MUSHclient format
+ *
+ * @return (number) Number of items imported (triggers + aliases + timers + variables)
+ *   Returns -1 if XML is invalid or parsing fails.
+ *
+ * @example
+ * -- Import from file
+ * local file = io.open("my_triggers.xml", "r")
+ * if file then
+ *     local xml = file:read("*all")
+ *     file:close()
+ *     local count = ImportXML(xml)
+ *     Note("Imported " .. count .. " items")
+ * end
+ *
+ * -- Import inline XML
+ * local xml = [[
+ * <triggers>
+ *   <trigger name="hp_warning" match="HP: (\d+)" ...>
+ *   </trigger>
+ * </triggers>
+ * ]]
+ * ImportXML(xml)
+ *
+ * @see ExportXML
  */
 int L_ImportXML(lua_State* L)
 {
@@ -866,15 +1043,36 @@ int L_ImportXML(lua_State* L)
  * world.ExportXML(flags, comment)
  *
  * Exports triggers, aliases, timers, and variables to an XML string.
- * Useful for sharing or backing up automation items.
+ * Useful for sharing configurations or backing up automation items.
  *
- * Based on methods_xml.cpp
+ * @param flags (number, optional) Bitmask of item types to export:
+ *   - 1: triggers
+ *   - 2: aliases
+ *   - 4: timers
+ *   - 8: macros
+ *   - 16: variables
+ *   - 32: colours
+ *   - 64: keypad
+ *   - 128: printing
+ *   Default: all (255)
+ * @param comment (string, optional) Comment to include in XML header
  *
- * @param flags Bitmask of item types to export (optional, default all):
- *              1 = triggers, 2 = aliases, 4 = timers, 8 = macros,
- *              16 = variables, 32 = colours, 64 = keypad, 128 = printing
- * @param comment Optional comment to include in XML header
- * @return XML string containing the exported items
+ * @return (string) XML string containing the exported items
+ *
+ * @example
+ * -- Export all automation items
+ * local xml = ExportXML()
+ * local file = io.open("backup.xml", "w")
+ * file:write(xml)
+ * file:close()
+ *
+ * -- Export only triggers and aliases
+ * local xml = ExportXML(1 + 2, "Combat automation v1.0")
+ *
+ * -- Export triggers for sharing
+ * local triggers_only = ExportXML(1, "Trigger pack by MyName")
+ *
+ * @see ImportXML
  */
 int L_ExportXML(lua_State* L)
 {
@@ -1082,13 +1280,28 @@ int L_ResetIP(lua_State* L)
 /**
  * world.StripANSI(message)
  *
- * Strips ANSI escape sequences from text (color codes, cursor movement, etc.).
- * Removes ESC[...m sequences commonly used in MUD output.
+ * Strips ANSI escape sequences from text. Removes ESC[...m sequences
+ * commonly used for colors and formatting in MUD output.
  *
- * Based on Utilities.cpp StripAnsi()
+ * Useful for logging, searching, or processing MUD text without formatting.
  *
- * @param message Text to strip ANSI codes from
- * @return Text with ANSI codes removed
+ * @param message (string) Text containing ANSI escape codes
+ *
+ * @return (string) Text with all ANSI codes removed
+ *
+ * @example
+ * -- Strip colors from MUD output for logging
+ * local raw_text = "\27[31mYou are hurt!\27[0m"
+ * local clean = StripANSI(raw_text)
+ * Note(clean)  -- Output: "You are hurt!"
+ *
+ * -- Process text for pattern matching
+ * function OnTriggerMatch(name, line, wildcards)
+ *     local clean_line = StripANSI(line)
+ *     -- Now pattern match without color codes
+ * end
+ *
+ * @see FixupEscapeSequences, FixupHTML
  */
 int L_StripANSI(lua_State* L)
 {
@@ -1143,12 +1356,37 @@ int L_StripANSI(lua_State* L)
  * world.FixupEscapeSequences(source)
  *
  * Converts C-style escape sequences to actual characters.
- * Supports: \n \r \t \a \b \f \v \\ \' \" \? \xhh
+ * Useful when reading configuration files or processing user input
+ * that may contain literal escape notation.
  *
- * Based on Utilities.cpp FixupEscapeSequences()
+ * Supported escape sequences:
+ *   - \n: newline
+ *   - \r: carriage return
+ *   - \t: tab
+ *   - \a: alert (bell)
+ *   - \b: backspace
+ *   - \f: form feed
+ *   - \v: vertical tab
+ *   - \\: backslash
+ *   - \': single quote
+ *   - \": double quote
+ *   - \?: question mark
+ *   - \xhh: hex character (e.g., \x1B for ESC)
  *
- * @param source Text containing escape sequences
- * @return Text with escape sequences converted
+ * @param source (string) Text containing escape sequences
+ *
+ * @return (string) Text with escape sequences converted to actual characters
+ *
+ * @example
+ * local text = FixupEscapeSequences("Hello\\nWorld")
+ * Note(text)  -- Output: Hello
+ *             --         World
+ *
+ * -- Insert special characters
+ * local bell = FixupEscapeSequences("\\a")  -- Bell character
+ * local esc = FixupEscapeSequences("\\x1B[31m")  -- ANSI red
+ *
+ * @see StripANSI, FixupHTML
  */
 int L_FixupEscapeSequences(lua_State* L)
 {
@@ -1241,13 +1479,30 @@ int L_FixupEscapeSequences(lua_State* L)
 /**
  * world.FixupHTML(string_to_convert)
  *
- * HTML entity encoding - converts special characters to HTML entities.
- * < → &lt;, > → &gt;, & → &amp;, " → &quot;
+ * HTML entity encoding - converts special characters to HTML entities
+ * to prevent XSS vulnerabilities and ensure proper display.
  *
- * Based on Utilities.cpp FixHTMLString()
+ * Conversions:
+ *   - < → &lt;
+ *   - > → &gt;
+ *   - & → &amp;
+ *   - " → &quot;
  *
- * @param string_to_convert Text to encode
- * @return HTML-safe text
+ * @param string_to_convert (string) Text to encode
+ *
+ * @return (string) HTML-safe encoded text
+ *
+ * @example
+ * -- Escape user input for HTML display
+ * local userInput = "<script>alert('xss')</script>"
+ * local safe = FixupHTML(userInput)
+ * Note(safe)  -- Output: &lt;script&gt;alert('xss')&lt;/script&gt;
+ *
+ * -- Use in MXP/HTML output
+ * local name = "Player<1>"
+ * Tell(FixupHTML(name) .. " says hello")
+ *
+ * @see StripANSI, FixupEscapeSequences
  */
 int L_FixupHTML(lua_State* L)
 {
@@ -1284,13 +1539,27 @@ int L_FixupHTML(lua_State* L)
 /**
  * world.MakeRegularExpression(text)
  *
- * Converts literal text to a regular expression by escaping special regex characters.
- * Useful for creating regex patterns from user input.
+ * Converts literal text to a regular expression by escaping special
+ * regex metacharacters. The result anchors the pattern to match the
+ * entire line (adds ^ at start and $ at end).
  *
- * Based on Utilities.cpp ConvertToRegularExpression()
+ * Escapes: . * + ? ^ $ { } [ ] ( ) | \
  *
- * @param text Literal text to convert
- * @return Regular expression pattern
+ * @param text (string) Literal text to convert
+ *
+ * @return (string) Regular expression pattern with escaped metacharacters
+ *
+ * @example
+ * -- User wants to match literal "[HP: 100]"
+ * local literal = "[HP: 100]"
+ * local pattern = MakeRegularExpression(literal)
+ * Note(pattern)  -- Output: ^\[HP: 100\]$
+ *
+ * -- Use escaped pattern in trigger
+ * local userText = GetVariable("match_text")
+ * AddTrigger("user_match", MakeRegularExpression(userText), ...)
+ *
+ * @see AddTrigger, AddAlias
  */
 int L_MakeRegularExpression(lua_State* L)
 {
@@ -1337,13 +1606,32 @@ int L_MakeRegularExpression(lua_State* L)
 /**
  * world.EnableGroup(group_name, enabled)
  *
- * Enables or disables all triggers, aliases, and timers in a group.
+ * Enables or disables all triggers, aliases, and timers in a named group.
+ * Groups provide a convenient way to organize related automation items.
  *
- * Based on methods_utilities.cpp EnableGroup
+ * @param group_name (string) Name of the group (case-sensitive)
+ * @param enabled (boolean, optional) true to enable, false to disable. Default: true
  *
- * @param group_name Name of the group
- * @param enabled true to enable, false to disable
- * @return Total count of items affected (triggers + aliases + timers)
+ * @return (number) Total count of items affected (triggers + aliases + timers)
+ *
+ * @example
+ * -- Disable combat automation when out of combat
+ * function OnCombatEnd()
+ *     local count = EnableGroup("combat", false)
+ *     Note("Disabled " .. count .. " combat items")
+ * end
+ *
+ * -- Re-enable when combat starts
+ * function OnCombatStart()
+ *     EnableGroup("combat", true)
+ * end
+ *
+ * -- Toggle a group
+ * local enabled = GetVariable("social_enabled") == "1"
+ * EnableGroup("social_triggers", not enabled)
+ * SetVariable("social_enabled", enabled and "0" or "1")
+ *
+ * @see DeleteGroup, EnableTriggerGroup, EnableAliasGroup, EnableTimerGroup
  */
 int L_EnableGroup(lua_State* L)
 {
@@ -1394,12 +1682,27 @@ int L_EnableGroup(lua_State* L)
 /**
  * world.DeleteGroup(group_name)
  *
- * Deletes all triggers, aliases, and timers in a group.
+ * Deletes all triggers, aliases, and timers in a named group.
+ * This permanently removes all items in the group - use with caution.
  *
- * Based on methods_utilities.cpp DeleteGroup
+ * @param group_name (string) Name of the group to delete (case-sensitive)
  *
- * @param group_name Name of the group
- * @return Total count of items deleted (triggers + aliases + timers)
+ * @return (number) Total count of items deleted (triggers + aliases + timers)
+ *
+ * @example
+ * -- Clean up temporary automation
+ * local count = DeleteGroup("temp_quest")
+ * Note("Cleaned up " .. count .. " quest items")
+ *
+ * -- Uninstall a feature
+ * function UninstallCombatModule()
+ *     DeleteGroup("combat_triggers")
+ *     DeleteGroup("combat_aliases")
+ *     DeleteGroup("combat_timers")
+ *     Note("Combat module removed")
+ * end
+ *
+ * @see EnableGroup, DeleteTrigger, DeleteAlias, DeleteTimer
  */
 int L_DeleteGroup(lua_State* L)
 {
@@ -1462,7 +1765,26 @@ int L_DeleteGroup(lua_State* L)
  * world.GetClipboard()
  *
  * Returns the current contents of the system clipboard as a string.
- * Returns empty string if clipboard is empty or doesn't contain text.
+ * Only retrieves text content; other clipboard formats are ignored.
+ *
+ * @return (string) Clipboard text, or empty string if no text available
+ *
+ * @example
+ * -- Get clipboard contents
+ * local text = GetClipboard()
+ * if text ~= "" then
+ *     Note("Clipboard: " .. text)
+ * else
+ *     Note("Clipboard is empty")
+ * end
+ *
+ * -- Execute clipboard contents as command
+ * local cmd = GetClipboard()
+ * if cmd ~= "" then
+ *     Execute(cmd)
+ * end
+ *
+ * @see SetClipboard
  */
 int L_GetClipboard(lua_State* L)
 {
@@ -1476,6 +1798,22 @@ int L_GetClipboard(lua_State* L)
  * world.SetClipboard(text)
  *
  * Sets the system clipboard contents to the specified text.
+ * Replaces any existing clipboard content.
+ *
+ * @param text (string) Text to copy to clipboard
+ *
+ * @example
+ * -- Copy MUD output to clipboard
+ * function OnTriggerMatch(name, line, wildcards)
+ *     SetClipboard(line)
+ *     Note("Line copied to clipboard!")
+ * end
+ *
+ * -- Copy formatted data
+ * local data = string.format("HP: %d/%d  MP: %d/%d", hp, maxhp, mp, maxmp)
+ * SetClipboard(data)
+ *
+ * @see GetClipboard
  */
 int L_SetClipboard(lua_State* L)
 {
@@ -1488,8 +1826,31 @@ int L_SetClipboard(lua_State* L)
 /**
  * world.ErrorDesc(code)
  *
- * Returns a text description for an error code.
- * See error_code table for defined error codes.
+ * Returns a human-readable description for an error code.
+ * Useful for debugging and displaying meaningful error messages.
+ *
+ * @param code (number) Error code returned by API functions
+ *
+ * @return (string) Description of the error, or "Unknown error code: N"
+ *
+ * Common error codes:
+ *   - 0 (eOK): No error
+ *   - 9 (eTriggerNotFound): Trigger not found
+ *   - 14 (eAliasNotFound): Alias not found
+ *   - 25 (eTimerNotFound): Timer not found
+ *   - 27 (eVariableNotFound): Variable not found
+ *   - 30 (eBadParameter): Bad parameter
+ *   - 32 (ePluginNotInstalled): Plugin not found
+ *   - 34 (eMiniWindowNotFound): Miniwindow not found
+ *
+ * @example
+ * local result = DeleteTrigger("nonexistent")
+ * if result ~= error_code.eOK then
+ *     Note("Error: " .. ErrorDesc(result))
+ *     -- Output: "Error: Trigger not found"
+ * end
+ *
+ * @see error_code
  */
 int L_ErrorDesc(lua_State* L)
 {
@@ -1557,13 +1918,30 @@ int L_ErrorDesc(lua_State* L)
 /**
  * world.Replace(source, search_for, replace_with, multiple)
  *
- * Replaces occurrences of search_for with replace_with in source.
+ * Replaces occurrences of a substring with another string.
+ * Case-sensitive matching.
  *
- * @param source The source string to search
- * @param search_for The string to search for
- * @param replace_with The replacement string
- * @param multiple If true, replace all occurrences; if false, only first (default false)
- * @return The modified string
+ * @param source (string) The source string to search
+ * @param search_for (string) The string to search for
+ * @param replace_with (string) The replacement string
+ * @param multiple (boolean, optional) true to replace all occurrences,
+ *   false to replace only the first. Default: false
+ *
+ * @return (string) The modified string
+ *
+ * @example
+ * -- Replace first occurrence
+ * local text = Replace("hello hello", "hello", "hi")
+ * Note(text)  -- Output: "hi hello"
+ *
+ * -- Replace all occurrences
+ * local text = Replace("hello hello", "hello", "hi", true)
+ * Note(text)  -- Output: "hi hi"
+ *
+ * -- Clean up MUD output
+ * local clean = Replace(line, "  ", " ", true)  -- Remove double spaces
+ *
+ * @see string.gsub
  */
 int L_Replace(lua_State* L)
 {
@@ -1596,13 +1974,39 @@ int L_Replace(lua_State* L)
 /**
  * world.Menu(items, default)
  *
- * Displays a popup menu and returns the selected item.
+ * Displays a popup menu at the cursor position and returns the selected item.
+ * Useful for creating context menus or option selection dialogs.
  *
- * @param items Pipe-separated list of menu items (e.g., "Take|Wield|Drop")
- *              Use "-" for a separator
- *              Use "!" prefix for a checkmarked item (e.g., "!Option")
- * @param default Optional default/selected item
- * @return Selected item text (trimmed), or empty string if canceled
+ * @param items (string) Pipe-separated list of menu items
+ *   Special formatting:
+ *   - Use "-" for a separator line
+ *   - Use "!" prefix for a checkmarked item (e.g., "!Option")
+ * @param default (string, optional) Item to highlight initially
+ *
+ * @return (string) Selected item text (trimmed), or empty string if canceled
+ *
+ * @example
+ * -- Simple menu
+ * local choice = Menu("Attack|Cast Spell|Flee|Cancel")
+ * if choice == "Attack" then
+ *     Send("kill mob")
+ * elseif choice == "Cast Spell" then
+ *     Send("cast fireball mob")
+ * end
+ *
+ * -- Menu with separators and checkmarks
+ * local opts = "!Auto-attack|-|Enable triggers|Disable triggers|-|Cancel"
+ * local selected = Menu(opts)
+ *
+ * -- Inventory item actions
+ * function OnItemClick(item)
+ *     local action = Menu("Take|Wield|Drop|-|Examine")
+ *     if action ~= "" then
+ *         Send(action:lower() .. " " .. item)
+ *     end
+ * end
+ *
+ * @see WindowMenu
  */
 int L_Menu(lua_State* L)
 {
@@ -1677,7 +2081,28 @@ int L_Menu(lua_State* L)
  * world.PasteCommand(text)
  *
  * Pastes text into the command input at the current cursor position.
- * Returns the text that was replaced (if any).
+ * Useful for inserting generated text or completions into the command line.
+ *
+ * @param text (string) Text to insert into command input
+ *
+ * @return (string) Text that was replaced (empty if no selection)
+ *
+ * @example
+ * -- Insert target name
+ * PasteCommand("goblin")
+ *
+ * -- Auto-complete from history
+ * function CompleteFromHistory(partial)
+ *     local history = GetCommandList(100)
+ *     for i, cmd in ipairs(history) do
+ *         if cmd:sub(1, #partial) == partial then
+ *             PasteCommand(cmd:sub(#partial + 1))
+ *             break
+ *         end
+ *     end
+ * end
+ *
+ * @see GetCommand, SetCommand, SelectCommand
  */
 int L_PasteCommand(lua_State* L)
 {
@@ -1695,9 +2120,30 @@ int L_PasteCommand(lua_State* L)
  * world.GetCommandList(count)
  *
  * Returns a table of recent commands from history.
+ * Commands are returned oldest to newest.
  *
- * @param count Number of commands to return (optional, default all)
- * @return Table of command strings
+ * @param count (number, optional) Maximum number of commands to return.
+ *   Default: 0 (all commands)
+ *
+ * @return (table) Array of command strings (1-indexed)
+ *
+ * @example
+ * -- Get last 10 commands
+ * local history = GetCommandList(10)
+ * for i, cmd in ipairs(history) do
+ *     Note(i .. ": " .. cmd)
+ * end
+ *
+ * -- Find last attack command
+ * local history = GetCommandList()
+ * for i = #history, 1, -1 do
+ *     if history[i]:match("^attack ") then
+ *         Note("Last attack: " .. history[i])
+ *         break
+ *     end
+ * end
+ *
+ * @see DeleteCommandHistory, PushCommand
  */
 int L_GetCommandList(lua_State* L)
 {
@@ -1727,6 +2173,19 @@ int L_GetCommandList(lua_State* L)
  * world.SelectCommand()
  *
  * Selects all text in the command input window.
+ * The selected text can then be replaced by typing or using PasteCommand.
+ *
+ * @example
+ * -- Select all and prepare for replacement
+ * SelectCommand()
+ * PasteCommand("new command")
+ *
+ * -- Copy command to clipboard
+ * SelectCommand()
+ * local cmd = GetCommand()
+ * SetClipboard(cmd)
+ *
+ * @see GetCommand, SetCommand, PasteCommand
  */
 int L_SelectCommand(lua_State* L)
 {
@@ -1738,7 +2197,25 @@ int L_SelectCommand(lua_State* L)
 /**
  * world.GetQueue()
  *
- * Returns a table of queued commands (from speedwalking, etc.)
+ * Returns a table of queued commands waiting to be sent.
+ * Commands may be queued from speedwalking, pacing, or other sources.
+ *
+ * @return (table) Array of command strings in queue (1-indexed)
+ *
+ * @example
+ * -- Show queue status
+ * local queue = GetQueue()
+ * Note("Commands in queue: " .. #queue)
+ * for i, cmd in ipairs(queue) do
+ *     Note("  " .. i .. ": " .. cmd)
+ * end
+ *
+ * -- Check if queue is empty before adding more
+ * if #GetQueue() == 0 then
+ *     DoAfterSpecial(1, "check_status()", sendto.script)
+ * end
+ *
+ * @see DoAfter, DoAfterSpecial, Speedwalk
  */
 int L_GetQueue(lua_State* L)
 {
@@ -1791,15 +2268,35 @@ static bool isValidCompletionName(const char* str)
  * world.ShiftTabCompleteItem(item)
  *
  * Adds or manages items for the Shift+Tab completion menu.
+ * This allows plugins to add custom completions for user convenience.
  *
- * Based on CMUSHclientDoc::ShiftTabCompleteItem() from methods_commands.cpp
+ * @param item (string) Item to add or special command:
+ *   - "<clear>": Clear all extra completion items
+ *   - "<functions>": Enable showing Lua functions in menu
+ *   - "<nofunctions>": Disable showing Lua functions in menu
+ *   - Other: Add this as a completion item (must be valid name: starts with
+ *     letter, contains only alphanumeric, underscore, hyphen, or period)
  *
- * @param item Special values:
- *             - "<clear>": Clear the extra items list
- *             - "<functions>": Enable showing Lua functions in menu
- *             - "<nofunctions>": Disable showing Lua functions in menu
- *             - Other: Add this item to the completion list (must be valid name)
- * @return eOK (0) on success, eBadParameter if invalid
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eBadParameter (30): Invalid item (empty, too long, or invalid characters)
+ *
+ * @example
+ * -- Add custom completions for mob names
+ * ShiftTabCompleteItem("goblin.warrior")
+ * ShiftTabCompleteItem("goblin.shaman")
+ * ShiftTabCompleteItem("orc-chief")
+ *
+ * -- Clear and rebuild the list
+ * ShiftTabCompleteItem("<clear>")
+ * for _, name in ipairs(mob_names) do
+ *     ShiftTabCompleteItem(name)
+ * end
+ *
+ * -- Disable function suggestions for simpler menu
+ * ShiftTabCompleteItem("<nofunctions>")
+ *
+ * @see GetCommand
  */
 int L_ShiftTabCompleteItem(lua_State* L)
 {
@@ -1836,11 +2333,27 @@ int L_ShiftTabCompleteItem(lua_State* L)
 /**
  * world.GetTriggerWildcard(name, wildcard)
  *
- * Returns the value of a named wildcard from the last trigger match.
+ * Returns the value of a wildcard from the last trigger match.
+ * Wildcards are captured groups from the trigger's regex pattern.
  *
- * @param name Trigger name
- * @param wildcard Wildcard name (e.g., "1", "2", or named capture like "player")
- * @return Wildcard value, or nil if not found
+ * @param name (string) Trigger name (case-insensitive)
+ * @param wildcard (string) Wildcard identifier:
+ *   - Numeric: "0" (full match), "1", "2", ... (capture groups)
+ *   - Named: Named capture group name
+ *
+ * @return (string|nil) Wildcard value, or nil if trigger/wildcard not found
+ *
+ * @example
+ * -- Trigger pattern: "HP: (\d+)/(\d+)"
+ * -- Get captured values later
+ * local current = GetTriggerWildcard("hp_trigger", "1")
+ * local max = GetTriggerWildcard("hp_trigger", "2")
+ * Note("HP: " .. current .. "/" .. max)
+ *
+ * -- Get full matched text
+ * local full = GetTriggerWildcard("hp_trigger", "0")
+ *
+ * @see GetAliasWildcard, AddTrigger
  */
 int L_GetTriggerWildcard(lua_State* L)
 {
@@ -1878,11 +2391,24 @@ int L_GetTriggerWildcard(lua_State* L)
 /**
  * world.GetAliasWildcard(name, wildcard)
  *
- * Returns the value of a named wildcard from the last alias match.
+ * Returns the value of a wildcard from the last alias match.
+ * Wildcards are captured groups from the alias's regex pattern.
  *
- * @param name Alias name
- * @param wildcard Wildcard name (e.g., "1", "2", or named capture)
- * @return Wildcard value, or nil if not found
+ * @param name (string) Alias name (case-insensitive)
+ * @param wildcard (string) Wildcard identifier:
+ *   - Numeric: "0" (full match), "1", "2", ... (capture groups)
+ *   - Named: Named capture group name
+ *
+ * @return (string|nil) Wildcard value, or nil if alias/wildcard not found
+ *
+ * @example
+ * -- Alias pattern: "^cast (\w+) (?:at |on )?(.*)$"
+ * -- Later retrieve values
+ * local spell = GetAliasWildcard("cast_alias", "1")
+ * local target = GetAliasWildcard("cast_alias", "2")
+ * Note("Casting " .. spell .. " at " .. target)
+ *
+ * @see GetTriggerWildcard, AddAlias
  */
 int L_GetAliasWildcard(lua_State* L)
 {
@@ -1920,8 +2446,17 @@ int L_GetAliasWildcard(lua_State* L)
 /**
  * world.Trace()
  *
- * Returns the current trace setting (true/false).
- * Can also toggle trace mode if called with no return value expectation.
+ * Returns the current trace setting.
+ * Trace mode outputs detailed information about script execution.
+ *
+ * @return (boolean) true if tracing is enabled, false otherwise
+ *
+ * @example
+ * if Trace() then
+ *     Note("Tracing is currently enabled")
+ * end
+ *
+ * @see SetTrace, GetTrace, TraceOut
  */
 int L_Trace(lua_State* L)
 {
@@ -1934,9 +2469,23 @@ int L_Trace(lua_State* L)
  * world.TraceOut(message)
  *
  * Outputs a message to the trace output (if tracing is enabled).
+ * The message is routed through the ON_PLUGIN_TRACE callback,
+ * allowing plugins to intercept and handle trace output.
  *
- * Uses the Trace() function which supports ON_PLUGIN_TRACE callback.
- * If a plugin handles the trace message, it won't be displayed.
+ * @param message (string) Message to output to trace
+ *
+ * @example
+ * -- Debug output only shown when tracing
+ * TraceOut("Processing line: " .. line)
+ * TraceOut("Match found at position " .. pos)
+ *
+ * -- Conditional debug info
+ * if debugging then
+ *     SetTrace(true)
+ *     TraceOut("Entering combat mode")
+ * end
+ *
+ * @see Trace, SetTrace, GetTrace
  */
 int L_TraceOut(lua_State* L)
 {
@@ -1953,7 +2502,13 @@ int L_TraceOut(lua_State* L)
  * world.Debug(command)
  *
  * Executes a debug command.
- * Currently a stub - returns empty string.
+ * Note: This is a stub for compatibility - not implemented in Qt version.
+ *
+ * @param command (string) Debug command
+ *
+ * @return (string) Empty string (not implemented)
+ *
+ * @see Trace, TraceOut
  */
 int L_Debug(lua_State* L)
 {
@@ -1967,6 +2522,10 @@ int L_Debug(lua_State* L)
  *
  * Returns the current trace setting.
  * Alias for Trace().
+ *
+ * @return (boolean) true if tracing is enabled, false otherwise
+ *
+ * @see Trace, SetTrace, TraceOut
  */
 int L_GetTrace(lua_State* L)
 {
@@ -1979,8 +2538,22 @@ int L_GetTrace(lua_State* L)
  * world.SetTrace(enable)
  *
  * Enables or disables trace mode.
- * Outputs "Trace on" or "Trace off" message when state changes.
- * Based on methods_tracing.cpp in original MUSHclient.
+ * Outputs "TRACE: Trace on" or "TRACE: Trace off" message when state changes.
+ *
+ * When trace is enabled, detailed script execution information is logged.
+ *
+ * @param enable (boolean) true to enable tracing, false to disable
+ *
+ * @example
+ * -- Enable tracing for debugging
+ * SetTrace(true)
+ * -- ... run problematic code ...
+ * SetTrace(false)
+ *
+ * -- Toggle trace mode
+ * SetTrace(not Trace())
+ *
+ * @see Trace, GetTrace, TraceOut
  */
 int L_SetTrace(lua_State* L)
 {
@@ -2007,6 +2580,16 @@ int L_SetTrace(lua_State* L)
  * world.GetEchoInput()
  *
  * Returns whether input echoing is enabled.
+ * When enabled, commands you type are displayed in the output window.
+ *
+ * @return (boolean) true if input echoing is enabled
+ *
+ * @example
+ * if GetEchoInput() then
+ *     Note("Input echo is ON")
+ * end
+ *
+ * @see SetEchoInput
  */
 int L_GetEchoInput(lua_State* L)
 {
@@ -2019,6 +2602,17 @@ int L_GetEchoInput(lua_State* L)
  * world.SetEchoInput(enable)
  *
  * Enables or disables input echoing.
+ * When enabled, commands you type are displayed in the output window.
+ *
+ * @param enable (boolean) true to enable input echo, false to disable
+ *
+ * @example
+ * -- Disable echo for password entry
+ * SetEchoInput(false)
+ * Send(password)
+ * SetEchoInput(true)
+ *
+ * @see GetEchoInput
  */
 int L_SetEchoInput(lua_State* L)
 {
@@ -2032,6 +2626,15 @@ int L_SetEchoInput(lua_State* L)
  * world.GetSpeedWalkDelay()
  *
  * Returns the speedwalk delay in milliseconds.
+ * This is the delay between sending each command during speedwalk.
+ *
+ * @return (number) Delay in milliseconds between speedwalk commands
+ *
+ * @example
+ * local delay = GetSpeedWalkDelay()
+ * Note("Speedwalk delay: " .. delay .. "ms")
+ *
+ * @see SetSpeedWalkDelay, Speedwalk
  */
 int L_GetSpeedWalkDelay(lua_State* L)
 {
@@ -2044,7 +2647,23 @@ int L_GetSpeedWalkDelay(lua_State* L)
  * world.SetSpeedWalkDelay(delay)
  *
  * Sets the speedwalk delay in milliseconds.
- * Note: Original MUSHclient also called ChangeTimerRate on timer window.
+ * Lower values make speedwalk faster, higher values add more delay.
+ *
+ * @param delay (number) Delay in milliseconds between speedwalk commands
+ *
+ * @example
+ * -- Fast speedwalk
+ * SetSpeedWalkDelay(100)
+ *
+ * -- Slow, cautious speedwalk
+ * SetSpeedWalkDelay(1000)
+ *
+ * -- Adjust based on lag
+ * if GetInfo(248) > 500 then  -- If lag is high
+ *     SetSpeedWalkDelay(2000)
+ * end
+ *
+ * @see GetSpeedWalkDelay, Speedwalk
  */
 int L_SetSpeedWalkDelay(lua_State* L)
 {
@@ -2058,10 +2677,32 @@ int L_SetSpeedWalkDelay(lua_State* L)
 /**
  * world.EvaluateSpeedwalk(speedwalk)
  *
- * Parses speedwalk notation and expands to commands.
- * E.g., "3n2e" becomes "north\nnorth\nnorth\neast\neast\n"
+ * Parses speedwalk notation and expands it to individual movement commands.
+ * Speedwalk notation uses shorthand for multiple directional commands.
  *
- * Returns expanded string or error starting with "*"
+ * Format: [count]direction repeated, e.g., "3n2e" means "n n n e e"
+ *
+ * Direction codes: n(orth), s(outh), e(ast), w(est),
+ *                  u(p), d(own), ne, nw, se, sw
+ *
+ * @param speedwalk (string) Speedwalk notation string
+ *
+ * @return (string) Newline-separated movement commands, or error starting with "*"
+ *
+ * @example
+ * local expanded = EvaluateSpeedwalk("3n2e")
+ * -- Returns: "north\nnorth\nnorth\neast\neast\n"
+ *
+ * local path = EvaluateSpeedwalk("n3e2su")
+ * -- Returns: "north\neast\neast\neast\nsouth\nsouth\nup\n"
+ *
+ * -- Check for errors
+ * local result = EvaluateSpeedwalk("3x")  -- Invalid direction
+ * if result:sub(1,1) == "*" then
+ *     Note("Error: " .. result)
+ * end
+ *
+ * @see ReverseSpeedwalk, RemoveBacktracks, Speedwalk
  */
 int L_EvaluateSpeedwalk(lua_State* L)
 {
@@ -2075,10 +2716,22 @@ int L_EvaluateSpeedwalk(lua_State* L)
 /**
  * world.ReverseSpeedwalk(speedwalk)
  *
- * Reverses a speedwalk string.
- * E.g., "3noe" becomes "cw3s" (directions reversed, order reversed)
+ * Reverses a speedwalk string to create the return path.
+ * Each direction is reversed (n→s, e→w, u→d, etc.) and the order is flipped.
  *
- * Returns reversed speedwalk or error starting with "*"
+ * @param speedwalk (string) Speedwalk notation string
+ *
+ * @return (string) Reversed speedwalk string, or error starting with "*"
+ *
+ * @example
+ * local back = ReverseSpeedwalk("3n2e")
+ * -- Returns: "2w3s" (2 west, 3 south)
+ *
+ * -- Store path and return path
+ * local path_to = "3neu"
+ * local path_back = ReverseSpeedwalk(path_to)  -- "dsw3"
+ *
+ * @see EvaluateSpeedwalk, RemoveBacktracks, Speedwalk
  */
 int L_ReverseSpeedwalk(lua_State* L)
 {
@@ -2092,10 +2745,26 @@ int L_ReverseSpeedwalk(lua_State* L)
 /**
  * world.RemoveBacktracks(speedwalk)
  *
- * Removes redundant back-and-forth movements from speedwalk.
- * E.g., "nsew" (n-s cancel, e-w cancel) becomes empty.
+ * Removes redundant back-and-forth movements from a speedwalk string.
+ * Opposite directions that cancel each other out are removed.
  *
- * Returns optimized speedwalk or error starting with "*"
+ * @param speedwalk (string) Speedwalk notation string
+ *
+ * @return (string) Optimized speedwalk string, or error starting with "*"
+ *
+ * @example
+ * local optimized = RemoveBacktracks("nsew")
+ * -- Returns: "" (north-south and east-west cancel out)
+ *
+ * local optimized = RemoveBacktracks("3n2sne")
+ * -- Returns: "nne" (3n-2s = 1n, plus ne)
+ *
+ * -- Optimize recorded paths
+ * local path = recorded_movements
+ * path = RemoveBacktracks(path)
+ * Note("Optimized path: " .. path)
+ *
+ * @see EvaluateSpeedwalk, ReverseSpeedwalk, Speedwalk
  */
 int L_RemoveBacktracks(lua_State* L)
 {
@@ -2112,9 +2781,16 @@ int L_RemoveBacktracks(lua_State* L)
  * world.Activate()
  *
  * Activates (brings to front) the world's window.
- * Emits a signal that the UI can connect to.
+ * Useful for drawing attention to important events.
  *
- * Based on L_Activate
+ * @example
+ * -- Bring window to front on important event
+ * function OnCombatStart()
+ *     Activate()
+ *     PlaySound("combat.wav")
+ * end
+ *
+ * @see ActivateClient, FlashIcon
  */
 int L_Activate(lua_State* L)
 {
@@ -2127,9 +2803,17 @@ int L_Activate(lua_State* L)
  * world.ActivateClient()
  *
  * Activates (brings to front) the main application window.
- * Emits a signal that the UI can connect to.
+ * Similar to Activate() but focuses the entire application.
  *
- * Based on L_ActivateClient
+ * @example
+ * -- Alert user when they receive a tell
+ * function OnTellReceived(sender, message)
+ *     ActivateClient()
+ *     FlashIcon()
+ *     Note("Tell from " .. sender .. ": " .. message)
+ * end
+ *
+ * @see Activate, FlashIcon
  */
 int L_ActivateClient(lua_State* L)
 {
@@ -2142,10 +2826,18 @@ int L_ActivateClient(lua_State* L)
  * world.GetWorldID()
  *
  * Returns the unique identifier (GUID) for this world.
+ * Each world has a unique ID that persists across sessions.
  *
- * @return World ID string
+ * @return (string) World ID as a GUID string
  *
- * Based on L_GetWorldID
+ * @example
+ * local id = GetWorldID()
+ * Note("World ID: " .. id)
+ *
+ * -- Use for world-specific settings
+ * SetVariable("world_" .. GetWorldID() .. "_setting", value)
+ *
+ * @see GetWorldList, GetWorldIdList
  */
 int L_GetWorldID(lua_State* L)
 {
@@ -2159,11 +2851,17 @@ int L_GetWorldID(lua_State* L)
  * world.GetWorldList()
  *
  * Returns a table of all open world names.
- * In single-world mode, returns a table with just this world's name.
+ * Note: In the Qt version, returns only the current world name.
  *
- * @return Table of world names (1-indexed)
+ * @return (table) Array of world names (1-indexed)
  *
- * Based on L_GetWorldList
+ * @example
+ * local worlds = GetWorldList()
+ * for i, name in ipairs(worlds) do
+ *     Note("World " .. i .. ": " .. name)
+ * end
+ *
+ * @see GetWorldIdList, GetWorldID
  */
 int L_GetWorldList(lua_State* L)
 {
@@ -2184,11 +2882,17 @@ int L_GetWorldList(lua_State* L)
  * world.GetWorldIdList()
  *
  * Returns a table of all open world IDs.
- * In single-world mode, returns a table with just this world's ID.
+ * Note: In the Qt version, returns only the current world ID.
  *
- * @return Table of world IDs (1-indexed)
+ * @return (table) Array of world ID strings (1-indexed)
  *
- * Based on L_GetWorldIdList
+ * @example
+ * local ids = GetWorldIdList()
+ * for i, id in ipairs(ids) do
+ *     Note("World ID " .. i .. ": " .. id)
+ * end
+ *
+ * @see GetWorldList, GetWorldID
  */
 int L_GetWorldIdList(lua_State* L)
 {
@@ -2211,10 +2915,16 @@ int L_GetWorldIdList(lua_State* L)
  * world.GetLogInput()
  *
  * Returns whether input logging is enabled.
+ * When enabled, commands you send are written to the log file.
  *
- * Based on methods_logging.cpp GetLogInput
+ * @return (boolean) true if input logging is enabled
  *
- * @return true if input logging is enabled, false otherwise
+ * @example
+ * if GetLogInput() then
+ *     Note("Your commands are being logged")
+ * end
+ *
+ * @see SetLogInput, GetLogOutput, GetLogNotes
  */
 int L_GetLogInput(lua_State* L)
 {
@@ -2227,11 +2937,20 @@ int L_GetLogInput(lua_State* L)
  * world.SetLogInput(enable)
  *
  * Enables or disables input logging.
- * When enabled, sent commands are written to the log file.
+ * When enabled, commands you send are written to the log file.
  *
- * Based on methods_logging.cpp SetLogInput
+ * @param enable (boolean, optional) true to enable, false to disable. Default: true
  *
- * @param enable true to enable input logging, false to disable
+ * @example
+ * -- Enable logging of commands
+ * SetLogInput(true)
+ *
+ * -- Disable command logging for privacy
+ * SetLogInput(false)
+ * Send(password)
+ * SetLogInput(true)
+ *
+ * @see GetLogInput, SetLogOutput, SetLogNotes
  */
 int L_SetLogInput(lua_State* L)
 {
@@ -2246,11 +2965,16 @@ int L_SetLogInput(lua_State* L)
  * world.GetLogNotes()
  *
  * Returns whether notes logging is enabled.
- * Notes are text from Note, ColourNote, etc. script functions.
+ * Notes are text from Note(), ColourNote(), etc. script functions.
  *
- * Based on methods_logging.cpp GetLogNotes
+ * @return (boolean) true if notes logging is enabled
  *
- * @return true if notes logging is enabled, false otherwise
+ * @example
+ * if GetLogNotes() then
+ *     Note("Script notes are being logged")
+ * end
+ *
+ * @see SetLogNotes, GetLogInput, GetLogOutput
  */
 int L_GetLogNotes(lua_State* L)
 {
@@ -2263,11 +2987,18 @@ int L_GetLogNotes(lua_State* L)
  * world.SetLogNotes(enable)
  *
  * Enables or disables notes logging.
- * When enabled, script note output is written to the log file.
+ * When enabled, Note(), ColourNote(), etc. output is written to the log file.
  *
- * Based on methods_logging.cpp SetLogNotes
+ * @param enable (boolean, optional) true to enable, false to disable. Default: true
  *
- * @param enable true to enable notes logging, false to disable
+ * @example
+ * -- Include script output in log
+ * SetLogNotes(true)
+ *
+ * -- Exclude script output from log
+ * SetLogNotes(false)
+ *
+ * @see GetLogNotes, SetLogInput, SetLogOutput
  */
 int L_SetLogNotes(lua_State* L)
 {
@@ -2282,10 +3013,16 @@ int L_SetLogNotes(lua_State* L)
  * world.GetLogOutput()
  *
  * Returns whether MUD output logging is enabled.
+ * When enabled, lines received from the MUD are written to the log file.
  *
- * Based on methods_logging.cpp GetLogOutput
+ * @return (boolean) true if output logging is enabled
  *
- * @return true if output logging is enabled, false otherwise
+ * @example
+ * if GetLogOutput() then
+ *     Note("MUD output is being logged")
+ * end
+ *
+ * @see SetLogOutput, GetLogInput, GetLogNotes
  */
 int L_GetLogOutput(lua_State* L)
 {
@@ -2300,9 +3037,18 @@ int L_GetLogOutput(lua_State* L)
  * Enables or disables MUD output logging.
  * When enabled, lines received from the MUD are written to the log file.
  *
- * Based on methods_logging.cpp SetLogOutput
+ * @param enable (boolean, optional) true to enable, false to disable. Default: true
  *
- * @param enable true to enable output logging, false to disable
+ * @example
+ * -- Enable logging of MUD output
+ * SetLogOutput(true)
+ *
+ * -- Temporarily disable output logging
+ * SetLogOutput(false)
+ * -- ... spam section ...
+ * SetLogOutput(true)
+ *
+ * @see GetLogOutput, SetLogInput, SetLogNotes
  */
 int L_SetLogOutput(lua_State* L)
 {
@@ -2317,16 +3063,24 @@ int L_SetLogOutput(lua_State* L)
  * world.LogSend(message, ...)
  *
  * Sends a message to the MUD and logs it regardless of log_input setting.
- * Useful when you want to ensure specific commands are always logged.
+ * Useful when you want to ensure specific important commands are always logged.
  * Multiple arguments are concatenated together.
  *
- * Based on methods_sending.cpp LogSend
+ * @param message (string) Message(s) to send and log (concatenated)
  *
- * @param message Message(s) to send and log (concatenated)
- * @return Error code:
+ * @return (number) Error code:
  *   - eOK (0): Success
  *   - eWorldClosed (30002): Not connected to MUD
  *   - eItemInUse (30063): Plugin is processing sent text
+ *
+ * @example
+ * -- Always log important commands even if input logging is off
+ * LogSend("say I need help!")
+ *
+ * -- Log a command with values
+ * LogSend("deposit ", gold_amount, " gold")
+ *
+ * @see Send, SetLogInput
  */
 int L_LogSend(lua_State* L)
 {
@@ -2362,10 +3116,17 @@ int L_LogSend(lua_State* L)
  * world.GetNotes()
  *
  * Returns the world's notes/comments text.
+ * These are the free-form notes stored with the world file.
  *
- * Based on methods_info.cpp GetNotes
+ * @return (string) World notes text
  *
- * @return Notes string
+ * @example
+ * local notes = GetNotes()
+ * if notes ~= "" then
+ *     Note("World notes:\n" .. notes)
+ * end
+ *
+ * @see SetNotes
  */
 int L_GetNotes(lua_State* L)
 {
@@ -2379,11 +3140,18 @@ int L_GetNotes(lua_State* L)
  * world.SetNotes(notes)
  *
  * Sets the world's notes/comments text.
- * Marks the document as modified.
+ * Marks the document as modified (will prompt to save on exit).
  *
- * Based on methods_utilities.cpp SetNotes
+ * @param notes (string) New notes text
  *
- * @param notes New notes text
+ * @example
+ * SetNotes("This world is for testing combat scripts")
+ *
+ * -- Append to existing notes
+ * local current = GetNotes()
+ * SetNotes(current .. "\n" .. os.date() .. ": Session started")
+ *
+ * @see GetNotes
  */
 int L_SetNotes(lua_State* L)
 {
@@ -2400,8 +3168,14 @@ int L_SetNotes(lua_State* L)
  * world.DeleteCommandHistory()
  *
  * Clears all command history.
+ * The up/down arrow recall will be empty after this.
  *
- * Based on methods_commands.cpp DeleteCommandHistory
+ * @example
+ * -- Clear history for privacy
+ * DeleteCommandHistory()
+ * Note("Command history cleared")
+ *
+ * @see GetCommandList
  */
 int L_DeleteCommandHistory(lua_State* L)
 {
@@ -2415,10 +3189,21 @@ int L_DeleteCommandHistory(lua_State* L)
  *
  * Gets the current command from the input field, adds it to history,
  * clears the input field, and returns the command text.
+ * Useful for capturing user input before processing it.
  *
- * Based on methods_commands.cpp PushCommand
+ * @return (string) The command text that was in the input field
  *
- * @return The command text that was in the input field
+ * @example
+ * -- Capture and process command
+ * local cmd = PushCommand()
+ * if cmd:sub(1,1) == "/" then
+ *     -- Process as local command
+ *     processLocalCommand(cmd:sub(2))
+ * else
+ *     Send(cmd)
+ * end
+ *
+ * @see GetCommand, SetCommand, GetCommandList
  */
 int L_PushCommand(lua_State* L)
 {
@@ -2435,11 +3220,19 @@ int L_PushCommand(lua_State* L)
  * world.SetChanged(changed)
  *
  * Sets the document's modified flag.
- * If called with no argument, defaults to true (marking as changed).
+ * When true, will prompt to save on exit.
  *
- * Based on methods_utilities.cpp SetChanged
+ * @param changed (boolean, optional) true to mark as modified, false to mark as saved.
+ *   Default: true
  *
- * @param changed true to mark as modified, false to mark as saved (defaults to true)
+ * @example
+ * -- Mark world as needing save
+ * SetChanged(true)
+ *
+ * -- Mark world as saved (suppress save prompt)
+ * SetChanged(false)
+ *
+ * @see Save
  */
 int L_SetChanged(lua_State* L)
 {
@@ -2459,11 +3252,23 @@ static QRandomGenerator s_mtRng;
  * world.MtSrand(seed)
  *
  * Seeds the Mersenne Twister random number generator.
- * Can accept a single seed value or a table of seed values.
+ * Useful for reproducible random sequences in testing or procedural content.
  *
- * Based on methods_utilities.cpp MtSrand
+ * @param seed (number|table, optional) Seed value or table of seed values.
+ *   If table, values are XOR'd together. Default: current time in milliseconds.
  *
- * @param seed Seed value (number) or table of seed values
+ * @example
+ * -- Seed with specific value for reproducible results
+ * MtSrand(12345)
+ * local r1 = MtRand()  -- Always same value for seed 12345
+ *
+ * -- Seed with current time (default behavior)
+ * MtSrand()
+ *
+ * -- Seed with multiple values
+ * MtSrand({os.time(), GetUniqueNumber(), 42})
+ *
+ * @see MtRand
  */
 int L_MtSrand(lua_State* L)
 {
@@ -2491,11 +3296,24 @@ int L_MtSrand(lua_State* L)
  * world.MtRand()
  *
  * Returns a random number from the Mersenne Twister RNG.
- * Returns a double in the range [0, 1).
+ * The Mersenne Twister provides high-quality random numbers with a very
+ * long period (2^19937 - 1).
  *
- * Based on methods_utilities.cpp MtRand
+ * @return (number) Random double in range [0, 1)
  *
- * @return Random double in [0, 1)
+ * @example
+ * -- Random float
+ * local r = MtRand()  -- 0.0 to 0.999...
+ *
+ * -- Random integer 1-100
+ * local d100 = math.floor(MtRand() * 100) + 1
+ *
+ * -- Random percentage check
+ * if MtRand() < 0.25 then
+ *     Note("25% chance occurred!")
+ * end
+ *
+ * @see MtSrand
  */
 int L_MtRand(lua_State* L)
 {
@@ -2511,13 +3329,26 @@ int L_MtRand(lua_State* L)
 /**
  * world.GetHostAddress(hostname)
  *
- * Looks up IP addresses for a given hostname.
- * Returns a table of IP address strings.
+ * Looks up IP addresses for a given hostname (DNS resolution).
+ * Returns IPv4 addresses only to match original MUSHclient behavior.
  *
- * Based on methods_info.cpp GetHostAddress
+ * @param hostname (string) Hostname to look up (e.g., "example.com")
  *
- * @param hostname Hostname to look up
- * @return Table of IP address strings (1-indexed)
+ * @return (table) Array of IP address strings (1-indexed), empty if not found
+ *
+ * @example
+ * local addrs = GetHostAddress("google.com")
+ * for i, ip in ipairs(addrs) do
+ *     Note("IP " .. i .. ": " .. ip)
+ * end
+ *
+ * -- Check if hostname resolves
+ * local ips = GetHostAddress("myserver.com")
+ * if #ips == 0 then
+ *     Note("Could not resolve hostname")
+ * end
+ *
+ * @see GetHostName
  */
 int L_GetHostAddress(lua_State* L)
 {
@@ -2548,13 +3379,22 @@ int L_GetHostAddress(lua_State* L)
 /**
  * world.GetHostName(ipAddress)
  *
- * Looks up hostname for a given IP address (reverse DNS).
+ * Looks up hostname for a given IP address (reverse DNS lookup).
  * Returns the hostname string or empty string if not found.
  *
- * Based on methods_info.cpp GetHostName which uses gethostbyaddr()
+ * @param ipAddress (string) IPv4 address to look up (e.g., "8.8.8.8")
  *
- * @param ipAddress IP address to look up
- * @return Hostname string
+ * @return (string) Hostname, or empty string if not found
+ *
+ * @example
+ * local name = GetHostName("8.8.8.8")
+ * if name ~= "" then
+ *     Note("Hostname: " .. name)  -- e.g., "dns.google"
+ * else
+ *     Note("No reverse DNS entry")
+ * end
+ *
+ * @see GetHostAddress
  */
 int L_GetHostName(lua_State* L)
 {
@@ -2595,11 +3435,21 @@ int L_GetHostName(lua_State* L)
  * world.GetScriptTime()
  *
  * Returns the total time spent executing scripts in seconds.
- * Useful for performance profiling.
+ * Useful for performance profiling and identifying slow scripts.
  *
- * Based on methods_info.cpp GetScriptTime
+ * @return (number) Total script execution time in seconds (double precision)
  *
- * @return Time in seconds (double)
+ * @example
+ * local before = GetScriptTime()
+ * -- Run expensive operation
+ * expensiveFunction()
+ * local after = GetScriptTime()
+ * Note(string.format("Operation took %.3f seconds", after - before))
+ *
+ * -- Monitor total script time
+ * Note("Total script time: " .. GetScriptTime() .. " seconds")
+ *
+ * @see GetInfo
  */
 int L_GetScriptTime(lua_State* L)
 {
@@ -2616,8 +3466,21 @@ int L_GetScriptTime(lua_State* L)
  * world.FlashIcon()
  *
  * Flashes the application icon in the taskbar to get user attention.
+ * Useful for alerting the user to important events when the window is minimized.
  *
- * Based on methods_output.cpp FlashIcon
+ * @example
+ * -- Alert on important tells
+ * function OnTellReceived(sender, message)
+ *     FlashIcon()
+ *     PlaySound("tell.wav")
+ * end
+ *
+ * -- Alert when combat ends
+ * function OnCombatEnd()
+ *     FlashIcon()
+ * end
+ *
+ * @see Activate, ActivateClient
  */
 int L_FlashIcon(lua_State* L)
 {
@@ -2635,9 +3498,17 @@ int L_FlashIcon(lua_State* L)
 /**
  * world.Redraw()
  *
- * Forces a redraw of all views.
+ * Forces a redraw of all views and miniwindows.
+ * Useful after making changes that need immediate visual update.
  *
- * Based on methods_output.cpp Redraw
+ * @example
+ * -- Update display after batch changes
+ * WindowCreate("mywin", 0, 0, 200, 100, 1, 0, 0)
+ * WindowRectOp("mywin", 2, 0, 0, 200, 100, 0xFF0000)
+ * WindowText("mywin", "font", "Hello", 10, 10, 0, 0, 0xFFFFFF)
+ * Redraw()  -- Force immediate display update
+ *
+ * @see Repaint
  */
 int L_Redraw(lua_State* L)
 {
@@ -2650,10 +3521,20 @@ int L_Redraw(lua_State* L)
  * world.Pause(flag)
  *
  * Pauses or resumes output display (freeze mode).
+ * When paused, new MUD output is buffered but not displayed.
  *
- * Based on methods_output.cpp Pause
+ * @param flag (boolean, optional) true to pause, false to resume. Default: true
  *
- * @param flag true to pause (default), false to resume
+ * @example
+ * -- Pause during intense spam
+ * Pause(true)
+ * DoAfterSpecial(5, "Pause(false)", sendto.script)  -- Resume in 5 seconds
+ *
+ * -- Toggle pause
+ * local paused = GetOption("freeze") == 1
+ * Pause(not paused)
+ *
+ * @see Redraw
  */
 int L_Pause(lua_State* L)
 {
@@ -2672,12 +3553,19 @@ int L_Pause(lua_State* L)
 /**
  * world.SetTitle(...)
  *
- * Sets the world window title.
- * All arguments are concatenated (matches original concatArgs behavior).
+ * Sets the world window/tab title.
+ * All arguments are concatenated to form the title.
  *
- * Based on methods_output.cpp SetTitle
+ * @param ... (string) Title parts (concatenated)
  *
- * @param ... Title parts (concatenated)
+ * @example
+ * -- Simple title
+ * SetTitle("My MUD - ", character_name)
+ *
+ * -- Show status in title
+ * SetTitle(world_name, " - HP: ", hp, "/", maxhp)
+ *
+ * @see SetMainTitle
  */
 int L_SetTitle(lua_State* L)
 {
@@ -2692,11 +3580,15 @@ int L_SetTitle(lua_State* L)
  * world.SetMainTitle(...)
  *
  * Sets the main application window title.
- * All arguments are concatenated (matches original concatArgs behavior).
+ * All arguments are concatenated to form the title.
  *
- * Based on methods_output.cpp SetMainTitle
+ * @param ... (string) Title parts (concatenated)
  *
- * @param ... Title parts (concatenated)
+ * @example
+ * -- Custom application title
+ * SetMainTitle("Mushkin - ", character_name, " @ ", server_name)
+ *
+ * @see SetTitle
  */
 int L_SetMainTitle(lua_State* L)
 {
@@ -3738,11 +4630,28 @@ int L_FilterPixel(lua_State* L)
  * world.Save(name)
  *
  * Saves the current world to disk.
+ * Triggers ON_PLUGIN_WORLD_SAVE callback for all plugins.
  *
- * @param name (optional) File path to save to. If empty, uses current world path.
- * @return true on success, false on failure
+ * @param name (string, optional) File path to save to. If empty or nil, uses
+ *   current world path. If world is new/unsaved, shows Save As dialog.
  *
- * Based on CMUSHclientDoc::Save
+ * @return (boolean) true on success, false on failure or cancel
+ *
+ * @example
+ * -- Save to current file
+ * if Save() then
+ *     Note("World saved successfully")
+ * end
+ *
+ * -- Save to specific file
+ * Save("/path/to/backup.mcl")
+ *
+ * -- Auto-save on disconnect
+ * function OnDisconnect()
+ *     Save()
+ * end
+ *
+ * @see SetChanged
  */
 int L_Save(lua_State* L)
 {
