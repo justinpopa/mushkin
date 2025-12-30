@@ -339,10 +339,10 @@ def generate_category_page(category: Category, version: str) -> str:
 
     # Table of functions with links
     for func in sorted(category.functions, key=lambda f: f.name.lower()):
-        # Get first sentence of description
+        # Get first sentence of description (up to first period)
         desc = func.description.split('\n')[0] if func.description else ""
-        if len(desc) > 80:
-            desc = desc[:77] + "..."
+        if '. ' in desc:
+            desc = desc.split('. ')[0] + '.'
         desc = desc.replace('|', '\\|')
         # Display name includes utils. prefix for clarity
         display_name = f"utils.{func.name}" if func.is_utils else func.name
