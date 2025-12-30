@@ -76,47 +76,233 @@ int L_AddFont(lua_State* L)
  * world.GetInfo(type)
  *
  * Returns information about the current world, connection, or client.
- * This is a comprehensive information function with 240+ info types.
  *
- * Common info types:
- * - 1: Server address (hostname)
+ * String info types (1-89):
+ * - 1: Server address (hostname/IP)
  * - 2: World name
  * - 3: Character name
+ * - 4: Logging file preamble
+ * - 5: Logging file postamble
+ * - 6: Logging line preamble
+ * - 7: Logging line postamble
  * - 8: Notes
+ * - 9: New activity sound
+ * - 10: Script editor
+ * - 11: Log file preamble
+ * - 12: Log file postamble
+ * - 13: Log line preamble (input)
+ * - 14: Log line preamble (notes)
+ * - 15: Log line preamble (output)
+ * - 16: Log line postamble (input)
+ * - 17: Log line postamble (notes)
+ * - 18: Log line postamble (output)
+ * - 19: Speed walk filler
  * - 20: Output font name
+ * - 21: Speed walk prefix
+ * - 22: Connect text
  * - 23: Input font name
+ * - 24: Paste postamble
+ * - 25: Paste preamble
+ * - 26: Paste line postamble
+ * - 27: Paste line preamble
  * - 28: Script language
+ * - 29: OnWorldOpen callback
+ * - 30: OnWorldClose callback
+ * - 31: OnWorldConnect callback
+ * - 32: OnWorldDisconnect callback
+ * - 33: OnWorldGetFocus callback
+ * - 34: OnWorldLoseFocus callback
  * - 35: Script filename
+ * - 36: Script prefix
+ * - 37: Auto-say string
+ * - 38: Override prefix
+ * - 39: Tab completion defaults
+ * - 40: Auto-log filename
+ * - 41: Recall line preamble
+ * - 42: Terminal identification
+ * - 43: Mapping failure message
+ * - 44: OnMXP_Start callback
+ * - 45: OnMXP_Stop callback
+ * - 46: OnMXP_Error callback
+ * - 47: OnMXP_OpenTag callback
+ * - 48: OnMXP_CloseTag callback
+ * - 49: OnMXP_SetVariable callback
+ * - 50: Beep sound
  * - 51: Log filename
+ * - 52: Last immediate expression
+ * - 53: Status message
  * - 54: World file path
- * - 56: Application path
- * - 61: IP address from connection
+ * - 55: Window title
+ * - 56: Application executable path
+ * - 57: Default world file directory
+ * - 58: Default log file directory
+ * - 59: Scripts directory
+ * - 60: Plugins directory (global)
+ * - 61: IP address from socket connection
+ * - 62: Proxy server (removed)
  * - 63: Hostname
+ * - 64: Current directory with trailing slash
+ * - 65: OnWorldSave callback
  * - 66: Application directory
  * - 67: World file directory
  * - 68: Working directory
+ * - 69: Translator file
+ * - 70: Locale
+ * - 71: Fixed pitch font
  * - 72: Version string
+ * - 73: Build date/time
  * - 74: Sounds directory
+ * - 75: IAC subnegotiation data
+ * - 76: Special font
  * - 77: OS version
- * - 101: Port number
- * - 102: Bytes received
- * - 103: Bytes sent
- * - 106: Total lines received
- * - 107: Output window width (pixels)
- * - 108: Output window height (pixels)
- * - 131: Output buffer lines
- * - 201: MXP enabled
- * - 214: MCCP active
- * - 239: Connected (1 or 0)
- * - 244: Triggers enabled
- * - 245: Aliases enabled
- * - 246: Timers enabled
- * - 280: Output paused
- * - 301: Time connected in seconds
+ * - 78: Foreground image
+ * - 79: Background image
+ * - 80: PNG library version
+ * - 81: PNG header version
+ * - 82: Preferences database name
+ * - 83: SQLite version
+ * - 84: File browsing directory
+ * - 85: Default state files directory
+ * - 86: Word under menu
+ * - 87: Last command sent
+ * - 88: Window title (individual world)
+ * - 89: Main window title
  *
- * Use utils.infotypes() to get a table of all available info type constants.
+ * Boolean flags (101-125):
+ * - 101: No echo (IAC WILL ECHO received)
+ * - 102: Debug incoming packets
+ * - 103: Compress (MCCP active)
+ * - 104: MXP active
+ * - 105: Pueblo active
+ * - 106: Not connected
+ * - 107: Connecting
+ * - 108: Disconnect OK
+ * - 109: Trace enabled
+ * - 110: Script file changed
+ * - 111: World modified
+ * - 112: Mapping enabled
+ * - 113: Window open
+ * - 114: Current view frozen
+ * - 115: Translator Lua available
+ * - 118: Variables changed
+ * - 119: Script engine exists
+ * - 120: Scroll bar wanted
+ * - 121: Performance counter available
+ * - 122: SQLite threadsafe
+ * - 123: Doing simulate
+ * - 124: Line omitted from output
+ * - 125: Full screen mode
  *
- * @param type (number) Info type number (1-300+)
+ * Counts and dimensions (201-310):
+ * - 201: Total lines received
+ * - 202: New lines (unread)
+ * - 203: Total lines sent
+ * - 204: Input packet count
+ * - 205: Output packet count
+ * - 206: Total uncompressed bytes (MCCP)
+ * - 207: Total compressed bytes (MCCP)
+ * - 208: MCCP type (0=none, 1=v1, 2=v2)
+ * - 209: MXP errors
+ * - 210: MXP tags processed
+ * - 211: MXP entities processed
+ * - 212: Output font height
+ * - 213: Output font width
+ * - 214: Input font height
+ * - 215: Input font width
+ * - 216: Bytes received
+ * - 217: Bytes sent
+ * - 218: Count of variables
+ * - 219: Count of triggers
+ * - 220: Count of timers
+ * - 221: Count of aliases
+ * - 222: Count of queued commands
+ * - 223: Count of mapper items
+ * - 224: Count of lines in output window
+ * - 225: Count of custom MXP elements
+ * - 226: Count of custom MXP entities
+ * - 227: Connection phase
+ * - 228: IP address (as integer)
+ * - 229: Proxy type (always 0)
+ * - 230: Execution depth (script call depth)
+ * - 231: Log file size
+ * - 232: High-resolution timer (seconds since epoch)
+ * - 233: Time doing triggers (seconds)
+ * - 234: Time doing aliases (seconds)
+ * - 235: Number of world windows open
+ * - 236: Command selection start column
+ * - 237: Command selection end column
+ * - 238: Window placement flags
+ * - 239: Current action source
+ * - 240: Average character width
+ * - 241: Character height
+ * - 242: UTF-8 error count
+ * - 243: Fixed pitch font size
+ * - 244: Triggers evaluated count
+ * - 245: Triggers matched count
+ * - 246: Aliases evaluated count
+ * - 247: Aliases matched count
+ * - 248: Timers fired count
+ * - 249: Main window client height
+ * - 250: Main window client width
+ * - 251: Main toolbar height
+ * - 252: Main toolbar width
+ * - 253: Game toolbar height
+ * - 254: Game toolbar width
+ * - 255: Activity toolbar height
+ * - 256: Activity toolbar width
+ * - 257: Info bar height
+ * - 258: Info bar width
+ * - 259: Status bar height
+ * - 260: Status bar width
+ * - 261: World window non-client height
+ * - 262: World window non-client width
+ * - 263: World window client height
+ * - 264: World window client width
+ * - 265: OS major version
+ * - 266: OS minor version
+ * - 267: OS build number
+ * - 268: OS platform ID
+ * - 269: Foreground mode
+ * - 270: Background mode
+ * - 271: Background colour
+ * - 272: Text rectangle left
+ * - 273: Text rectangle top
+ * - 274: Text rectangle right
+ * - 275: Text rectangle bottom
+ * - 276: Text rectangle border offset
+ * - 277: Text rectangle border width
+ * - 278: Text rectangle outside fill colour
+ * - 279: Text rectangle outside fill style
+ * - 280: Output window client height
+ * - 281: Output window client width
+ * - 282: Text rectangle border colour
+ * - 283: Last mouse X position
+ * - 284: Last mouse Y position
+ * - 285: Is output window available
+ * - 286: Triggers matched this session
+ * - 287: Aliases matched this session
+ * - 288: Timers fired this session
+ * - 289: Last line with IAC GA
+ * - 290: Actual text rectangle left
+ * - 291: Actual text rectangle top
+ * - 292: Actual text rectangle right
+ * - 293: Actual text rectangle bottom
+ * - 294: Scroll bar max position
+ * - 295: Scroll bar page size
+ * - 296: Output window scroll bar position
+ * - 297: Horizontal scroll bar position
+ * - 298: Horizontal scroll bar max position
+ * - 299: Horizontal scroll bar page size
+ * - 300: Commands in history buffer
+ * - 301: Number of sent packets
+ * - 302: Connect time (seconds since connected)
+ * - 303: Number of MXP elements
+ * - 304: Locale
+ * - 305: Client start time
+ * - 306: World start time
+ * - 310: Newlines received count
+ *
+ * @param type (number) Info type number (1-310)
  *
  * @return (varies) String, number, or nil depending on the info type
  *
@@ -125,12 +311,12 @@ int L_AddFont(lua_State* L)
  * local name = GetInfo(2)
  *
  * -- Check if connected
- * if GetInfo(239) == 1 then
+ * if GetInfo(106) == false then
  *     Note("Connected to " .. GetInfo(1))
  * end
  *
  * -- Get connection duration
- * local seconds = GetInfo(301)
+ * local seconds = GetInfo(302)
  * Note("Connected for " .. seconds .. " seconds")
  *
  * @see utils.infotypes, GetOption, GetAlphaOption
