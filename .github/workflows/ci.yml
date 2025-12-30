@@ -4,6 +4,10 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   QT_VERSION: "6.9.3"
 
@@ -54,13 +58,12 @@ jobs:
       - name: Install dependencies (macOS)
         if: matrix.os == 'macOS'
         run: |
-          brew install cmake ninja pcre luajit sqlite openssl
-          pip3 install aqtinstall --break-system-packages
+          brew install cmake ninja pcre luajit sqlite openssl aqtinstall
 
       - name: Install Qt (macOS)
         if: matrix.os == 'macOS'
         run: |
-          python3 -m aqt install-qt mac desktop ${{ env.QT_VERSION }} -m qtmultimedia --outputdir $HOME/Qt
+          aqt install-qt mac desktop ${{ env.QT_VERSION }} -m qtmultimedia --outputdir $HOME/Qt
           echo "Qt6_DIR=$HOME/Qt/${{ env.QT_VERSION }}/macos/lib/cmake/Qt6" >> $GITHUB_ENV
           echo "$HOME/Qt/${{ env.QT_VERSION }}/macos/bin" >> $GITHUB_PATH
 
