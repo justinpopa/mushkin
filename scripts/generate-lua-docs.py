@@ -395,26 +395,6 @@ def generate_index_page(categories: dict[str, Category], version: str, all_funct
 
     lines.extend([
         "",
-        "## All Functions (Alphabetical)",
-        "",
-    ])
-
-    # Alphabetical function index
-    all_funcs_sorted = sorted(all_functions.values(), key=lambda f: f.name.lower())
-
-    # Group by first letter
-    current_letter = ""
-    for func in all_funcs_sorted:
-        first_letter = func.name[0].upper()
-        if first_letter != current_letter:
-            current_letter = first_letter
-            lines.append(f"\n### {current_letter}\n")
-
-        display_name = f"utils.{func.name}" if func.is_utils else func.name
-        lines.append(f"- [[{display_name}|Lua-API{version_suffix}-{func.file_key}]]")
-
-    lines.extend([
-        "",
         "---",
         "",
         f"*Generated from source code on {datetime.now().strftime('%Y-%m-%d')}*",
