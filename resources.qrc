@@ -3,6 +3,7 @@
         <file>resources/names.txt</file>
     </qresource>
     <qresource prefix="/icons">
+        <file alias="mushkin">resources/icons/mushkin.svg</file>
         <file alias="file-plus">resources/icons/file-plus.svg</file>
         <file alias="folder-open">resources/icons/folder-open.svg</file>
         <file alias="device-floppy">resources/icons/device-floppy.svg</file>
