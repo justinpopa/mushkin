@@ -10,6 +10,7 @@
 #include "../../automation/plugin.h"
 #include "../../storage/database.h"
 #include "../../world/config_options.h"
+#include "../../world/view_interfaces.h"
 #include "../../world/world_document.h"
 #include "../lua_dialog_callbacks.h"
 #include "../script_engine.h"
@@ -1304,13 +1305,13 @@ int L_GetInfo(lua_State* L)
 
         case 263: // World window client height
             if (pDoc->m_pActiveOutputView) {
-                lua_pushinteger(L, pDoc->m_pActiveOutputView->height());
+                lua_pushinteger(L, pDoc->m_pActiveOutputView->viewHeight());
             }
             break;
 
         case 264: // World window client width
             if (pDoc->m_pActiveOutputView) {
-                lua_pushinteger(L, pDoc->m_pActiveOutputView->width());
+                lua_pushinteger(L, pDoc->m_pActiveOutputView->viewWidth());
             }
             break;
 
@@ -1387,7 +1388,7 @@ int L_GetInfo(lua_State* L)
         case 280: // Output window client height
             // Based on: methods_info.cpp
             if (pDoc->m_pActiveOutputView) {
-                lua_pushinteger(L, pDoc->m_pActiveOutputView->height());
+                lua_pushinteger(L, pDoc->m_pActiveOutputView->viewHeight());
             }
             // Note: returns nil if view doesn't exist - matches original behavior
             break;
@@ -1395,7 +1396,7 @@ int L_GetInfo(lua_State* L)
         case 281: // Output window client width
             // Based on: methods_info.cpp
             if (pDoc->m_pActiveOutputView) {
-                lua_pushinteger(L, pDoc->m_pActiveOutputView->width());
+                lua_pushinteger(L, pDoc->m_pActiveOutputView->viewWidth());
             }
             // Note: returns nil if view doesn't exist - matches original behavior
             break;
@@ -1996,10 +1997,9 @@ int L_SetBackgroundImage(lua_State* L)
     pDoc->m_strBackgroundImageName = QString::fromUtf8(filename);
     pDoc->m_iBackgroundMode = mode;
 
-    // Tell OutputView to reload the image via callback (avoids ui module dependency)
-    auto callback = ViewUpdateCallbacks::getReloadBackgroundImageCallback();
-    if (callback) {
-        callback(pDoc);
+    // Tell OutputView to reload the image via interface method
+    if (pDoc->m_pActiveOutputView) {
+        pDoc->m_pActiveOutputView->reloadBackgroundImage();
     }
 
     lua_pushinteger(L, eOK);
@@ -2142,7 +2142,7 @@ int L_SetCursor(lua_State* L)
 
     // Set cursor on the output view (if it exists)
     if (pDoc && pDoc->m_pActiveOutputView) {
-        pDoc->m_pActiveOutputView->setCursor(QCursor(qtCursor));
+        pDoc->m_pActiveOutputView->setViewCursor(QCursor(qtCursor));
     }
 
     lua_pushinteger(L, eOK);

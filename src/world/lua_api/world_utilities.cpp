@@ -8,6 +8,7 @@
 #include "../../utils/name_generator.h"
 #include "../accelerator_manager.h"
 #include "../lua_dialog_callbacks.h"
+#include "../view_interfaces.h"
 #include "../xml_serialization.h"
 #include "lua_common.h"
 #include <QApplication>
@@ -3542,10 +3543,9 @@ int L_Pause(lua_State* L)
     // Default to true (pause) if no argument provided - matches original optboolean(L, 1, 1)
     bool pause = lua_isnone(L, 1) ? true : lua_toboolean(L, 1);
 
-    // Set freeze state via callback (avoids ui module dependency)
-    auto callback = ViewUpdateCallbacks::getSetFreezeCallback();
-    if (callback) {
-        callback(pDoc, pause);
+    // Set freeze state via interface method
+    if (pDoc->m_pActiveOutputView) {
+        pDoc->m_pActiveOutputView->setFrozen(pause);
     }
     return 0;
 }
@@ -3860,10 +3860,9 @@ int L_SetForegroundImage(lua_State* L)
     pDoc->m_strForegroundImageName = QString::fromUtf8(filename);
     pDoc->m_iForegroundMode = mode;
 
-    // Tell OutputView to reload the image via callback (avoids ui module dependency)
-    auto callback = ViewUpdateCallbacks::getReloadForegroundImageCallback();
-    if (callback) {
-        callback(pDoc);
+    // Tell OutputView to reload the image via interface method
+    if (pDoc->m_pActiveOutputView) {
+        pDoc->m_pActiveOutputView->reloadForegroundImage();
     }
 
     lua_pushinteger(L, eOK);

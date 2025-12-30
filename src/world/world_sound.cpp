@@ -40,8 +40,8 @@
  *   - And many more formats supported by FFmpeg
  */
 
-#include "../ui/views/output_view.h"
 #include "lua_api/lua_common.h" // For error codes: eOK, eCannotPlaySound
+#include "view_interfaces.h"
 #include "world_document.h"
 #include <QAudioEngine>
 #include <QAudioListener>
@@ -444,7 +444,7 @@ bool WorldDocument::IsWindowActive()
     if (!m_pActiveOutputView)
         return false;
 
-    QWidget* window = m_pActiveOutputView->window();
+    QWidget* window = m_pActiveOutputView->parentWindow();
     if (!window)
         return false;
 

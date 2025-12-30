@@ -128,58 +128,6 @@ InputBoxDialogFunc getInputBoxDialogCallback()
 
 } // namespace LuaDialogCallbacks
 
-namespace ViewUpdateCallbacks {
-
-// Static storage for callbacks
-static ReloadBackgroundImageFunc s_reloadBackgroundImageCallback = nullptr;
-static ReloadForegroundImageFunc s_reloadForegroundImageCallback = nullptr;
-static SetFreezeFunc s_setFreezeCallback = nullptr;
-static GetFreezeFunc s_getFreezeCallback = nullptr;
-
-// Setter functions
-void setReloadBackgroundImageCallback(ReloadBackgroundImageFunc callback)
-{
-    s_reloadBackgroundImageCallback = callback;
-}
-
-void setReloadForegroundImageCallback(ReloadForegroundImageFunc callback)
-{
-    s_reloadForegroundImageCallback = callback;
-}
-
-void setSetFreezeCallback(SetFreezeFunc callback)
-{
-    s_setFreezeCallback = callback;
-}
-
-void setGetFreezeCallback(GetFreezeFunc callback)
-{
-    s_getFreezeCallback = callback;
-}
-
-// Getter functions
-ReloadBackgroundImageFunc getReloadBackgroundImageCallback()
-{
-    return s_reloadBackgroundImageCallback;
-}
-
-ReloadForegroundImageFunc getReloadForegroundImageCallback()
-{
-    return s_reloadForegroundImageCallback;
-}
-
-SetFreezeFunc getSetFreezeCallback()
-{
-    return s_setFreezeCallback;
-}
-
-GetFreezeFunc getGetFreezeCallback()
-{
-    return s_getFreezeCallback;
-}
-
-} // namespace ViewUpdateCallbacks
-
 namespace ToolbarCallbacks {
 
 // Static storage for callbacks
