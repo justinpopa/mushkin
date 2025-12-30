@@ -10,6 +10,7 @@
 #include "../src/text/action.h"
 #include "../src/text/line.h"
 #include "../src/text/style.h"
+#include "../src/world/color_utils.h"
 #include "../src/world/world_document.h"
 #include <QCoreApplication>
 #include <gtest/gtest.h>
@@ -337,8 +338,8 @@ TEST_F(URLDetectionTest, HyperlinkStyleAttributes)
             EXPECT_NE(line->styleList[i]->iFlags & ACTION_HYPERLINK, 0);
             EXPECT_NE(line->styleList[i]->iFlags & UNDERLINE, 0);
 
-            // Should be blue color
-            EXPECT_EQ(line->styleList[i]->iForeColour, qRgb(0, 0, 255));
+            // Should be blue color (stored as BGR/COLORREF)
+            EXPECT_EQ(line->styleList[i]->iForeColour, BGR(0, 0, 255));
 
             // Should have an Action object
             ASSERT_NE(line->styleList[i]->pAction, nullptr);

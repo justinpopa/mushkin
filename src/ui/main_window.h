@@ -87,6 +87,13 @@ class MainWindow : public QMainWindow {
      */
     void changeEvent(QEvent* event) override;
 
+  public slots:
+    /**
+     * Apply theme based on preferences (light/dark/system)
+     * Called when theme preference changes
+     */
+    void applyTheme();
+
   private slots:
     // File menu actions
     void newWorld();
@@ -259,6 +266,16 @@ class MainWindow : public QMainWindow {
      * Apply toolbar appearance preferences (flat style, button style)
      */
     void applyToolbarPreferences();
+
+    /**
+     * Update toolbar icons based on current theme
+     */
+    void updateToolbarIcons();
+
+    /**
+     * Load an SVG icon and colorize it based on current palette
+     */
+    QIcon loadThemedIcon(const QString& name);
 
     /**
      * Create the info bar (dockable bar with rich text display)

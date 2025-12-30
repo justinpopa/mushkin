@@ -60,11 +60,17 @@ set_target_properties(mushkin PROPERTIES
 
 # macOS bundle settings
 if(APPLE)
+    # Set the icon file as a source (gets copied into bundle Resources)
+    set(MACOS_ICON "${CMAKE_SOURCE_DIR}/resources/mushkin.icns")
+    set_source_files_properties(${MACOS_ICON} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
+    target_sources(mushkin PRIVATE ${MACOS_ICON})
+
     set_target_properties(mushkin PROPERTIES
         MACOSX_BUNDLE ${BUILD_APP_BUNDLE}
         MACOSX_BUNDLE_GUI_IDENTIFIER "com.mushkin.app"
         MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
         MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
+        MACOSX_BUNDLE_ICON_FILE "mushkin.icns"
         # Set rpath so bundled Qt frameworks can be found at runtime
         # This is critical for self-contained app bundles
         INSTALL_RPATH "@executable_path/../Frameworks"

@@ -25,6 +25,9 @@
 
 class QSettings;
 
+// Theme mode enumeration
+enum ThemeMode { ThemeLight = 0, ThemeDark = 1, ThemeSystem = 2 };
+
 /**
  * GlobalOptions - Singleton class for application-wide preferences
  *
@@ -445,6 +448,16 @@ class GlobalOptions {
         m_trayIcon = v;
     }
 
+    // Theme (0=Light, 1=Dark, 2=System)
+    int themeMode() const
+    {
+        return m_themeMode;
+    }
+    void setThemeMode(int v)
+    {
+        m_themeMode = v;
+    }
+
     // ========================================================================
     // STRING OPTIONS
     // ========================================================================
@@ -691,6 +704,7 @@ class GlobalOptions {
     int m_windowTabsStyle = 0;
     int m_iconPlacement = 0; // ICON_PLACEMENT_TASKBAR
     int m_trayIcon = 0;
+    int m_themeMode = ThemeSystem; // Default to system theme
 
     // ========================================================================
     // STRING MEMBERS (with defaults)

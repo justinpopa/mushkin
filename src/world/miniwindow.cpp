@@ -1,5 +1,6 @@
 #include "miniwindow.h"
 #include "../world/world_document.h"
+#include "color_utils.h"
 #include <QColor>
 #include <QDebug>
 #include <QFontMetrics>
@@ -24,32 +25,6 @@ enum {
     eHotspotNotInstalled = 30072,
     eNoSuchWindow = 30073,
 };
-
-// Helper to convert BGR color value to QColor
-// Mushkin Lua API uses BGR format (Windows COLORREF): 0x00BBGGRR
-// This matches original MUSHclient for compatibility with existing plugins
-// The high byte (alpha) is ignored for drawing - we always use full opacity
-static inline QColor bgrToColor(quint32 bgr)
-{
-    return QColor(bgr & 0xFF, (bgr >> 8) & 0xFF, (bgr >> 16) & 0xFF);
-}
-
-// Helper to convert BGR to QRgb (for QImage::setPixel)
-// Input: 0x00BBGGRR (BGR), Output: 0xFFRRGGBB (ARGB with full alpha)
-static inline QRgb bgrToQRgb(quint32 bgr)
-{
-    int r = bgr & 0xFF;
-    int g = (bgr >> 8) & 0xFF;
-    int b = (bgr >> 16) & 0xFF;
-    return qRgba(r, g, b, 255);
-}
-
-// Helper to convert QRgb (ARGB) back to BGR for return to Lua
-// Input: 0xAARRGGBB, Output: 0x00BBGGRR
-static inline quint32 qRgbToBgr(QRgb argb)
-{
-    return qRed(argb) | (qGreen(argb) << 8) | (qBlue(argb) << 16);
-}
 
 // Helper to create a pen with Windows GDI-compatible dash patterns
 // Windows GDI cosmetic pens (width 0 or 1) render dash patterns as nearly solid

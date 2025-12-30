@@ -138,6 +138,7 @@ target_link_libraries(ui PUBLIC
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    Qt6::Svg
     world          # For WorldDocument, MiniWindow, and XML serialization
     storage        # For Database class
     text           # For Line and Style classes

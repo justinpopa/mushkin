@@ -3,11 +3,8 @@
  */
 
 #include "lua_common.h"
+#include "../color_utils.h"
 #include <QColorDialog>
-
-// Helper macro to create BGR color value (Windows COLORREF format: 0x00BBGGRR)
-// This matches original MUSHclient for compatibility with existing plugins
-#define BGR(r, g, b) (static_cast<quint32>((r) | ((g) << 8) | ((b) << 16)))
 
 /**
  * ColourNameToRGB - Convert color name to BGR value

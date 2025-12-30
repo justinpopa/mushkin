@@ -7,6 +7,7 @@
 #include <QDir>
 #include <QDirIterator>
 #include <QFontDatabase>
+#include <QIcon>
 #include <cstdlib>
 
 // Static Qt Plugin Imports (Windows only)
@@ -91,6 +92,9 @@ int main(int argc, char* argv[])
     QApplication::setApplicationVersion("5.0.0");
     QApplication::setOrganizationName("Gammon");
     QApplication::setOrganizationDomain("gammon.com.au");
+
+    // Set application icon (SVG for window icon - macOS uses .icns for dock/Finder)
+    QApplication::setWindowIcon(QIcon(":/icons/mushkin"));
 
     // Set up LUA_PATH and LUA_CPATH environment variables for Lua module loading
     // This is critical for llthreads2 and other libraries that create fresh Lua states,

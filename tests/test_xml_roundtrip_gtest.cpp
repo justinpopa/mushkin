@@ -8,6 +8,7 @@
 #include "../src/automation/alias.h"
 #include "../src/automation/timer.h"
 #include "../src/automation/trigger.h"
+#include "../src/world/color_utils.h"
 #include "../src/world/world_document.h"
 #include "../src/world/xml_serialization.h"
 #include <QCoreApplication>
@@ -194,9 +195,9 @@ TEST_F(XmlRoundtripTest, TriggerCustomColors)
     // Set custom color (should save as +1)
     trigger->colour = 42;
 
-    // Set RGB colors (should save as hex names)
-    trigger->iOtherForeground = qRgb(255, 128, 64);
-    trigger->iOtherBackground = qRgb(32, 64, 128);
+    // Set BGR colors (MUSHclient COLORREF format, should save as hex RGB names)
+    trigger->iOtherForeground = BGR(255, 128, 64);  // Will save as #FF8040
+    trigger->iOtherBackground = BGR(32, 64, 128);   // Will save as #204080
 
     doc1->addTrigger("color_trigger", std::unique_ptr<Trigger>(trigger));
 
@@ -285,8 +286,8 @@ TEST_F(XmlRoundtripTest, TriggerCompleteRoundtrip)
     trigger->iStyle = 0x0001 | 0x0004;
     trigger->iMatch = (5 << 4) | (2 << 8) | 0x0001 | 0x4000;
     trigger->colour = 42;
-    trigger->iOtherForeground = qRgb(255, 128, 64);
-    trigger->iOtherBackground = qRgb(32, 64, 128);
+    trigger->iOtherForeground = BGR(255, 128, 64);  // Stored as BGR/COLORREF
+    trigger->iOtherBackground = BGR(32, 64, 128);   // Stored as BGR/COLORREF
     trigger->iUserOption = 123;
 
     doc1->addTrigger("complete_trigger", std::unique_ptr<Trigger>(trigger));

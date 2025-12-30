@@ -7,6 +7,7 @@
  */
 
 #include "lua_api/lua_common.h"
+#include "color_utils.h"
 #include "lua_dialog_callbacks.h"
 #include "script_engine.h"
 #include "world_document.h"
@@ -547,10 +548,12 @@ static int L_utils_filepicker(lua_State* L)
  */
 static int L_utils_colourpicker(lua_State* L)
 {
+    // Lua passes colors in BGR format (MUSHclient COLORREF)
     int initialColor = luaL_optinteger(L, 1, 0xFFFFFF);
     const char* title = luaL_optstring(L, 2, "Select Color");
 
-    QColor initial(qRed(initialColor), qGreen(initialColor), qBlue(initialColor));
+    // Convert BGR to QColor for the dialog
+    QColor initial = bgrToQColor(initialColor);
     QColor color = QColorDialog::getColor(initial, nullptr, QString::fromUtf8(title));
 
     if (!color.isValid()) {
@@ -558,7 +561,8 @@ static int L_utils_colourpicker(lua_State* L)
         return 1;
     }
 
-    lua_pushinteger(L, qRgb(color.red(), color.green(), color.blue()));
+    // Return color in BGR format for Lua
+    lua_pushinteger(L, BGR(color.red(), color.green(), color.blue()));
     return 1;
 }
 

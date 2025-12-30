@@ -106,6 +106,7 @@ void GlobalOptions::load()
     m_windowTabsStyle = settings->value("WindowTabsStyle", 0).toInt();
     m_iconPlacement = settings->value("IconPlacement", 0).toInt();
     m_trayIcon = settings->value("TrayIcon", 0).toInt();
+    m_themeMode = settings->value("ThemeMode", ThemeSystem).toInt();
 
     // ========================================================================
     // LOAD STRING OPTIONS
@@ -193,6 +194,7 @@ void GlobalOptions::save()
     settings->setValue("WindowTabsStyle", m_windowTabsStyle);
     settings->setValue("IconPlacement", m_iconPlacement);
     settings->setValue("TrayIcon", m_trayIcon);
+    settings->setValue("ThemeMode", m_themeMode);
 
     // ========================================================================
     // SAVE STRING OPTIONS
@@ -269,6 +271,7 @@ void GlobalOptions::resetToDefaults()
     m_windowTabsStyle = 0;
     m_iconPlacement = 0;
     m_trayIcon = 0;
+    m_themeMode = ThemeSystem;
 
     // String options
     m_defaultLogFileDirectory = "./logs/";

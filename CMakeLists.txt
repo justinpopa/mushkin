@@ -66,6 +66,7 @@ find_package(Qt6 REQUIRED COMPONENTS
     Widgets
     Network
     Sql
+    Svg
 )
 
 # Qt6::Multimedia for sound playback, Qt6::SpatialAudio for stereo panning

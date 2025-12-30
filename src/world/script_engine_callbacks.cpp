@@ -14,6 +14,7 @@
 #include <QStringList>
 
 #include "logging.h"
+#include "color_utils.h"
 
 // Lua headers
 extern "C" {
@@ -181,13 +182,13 @@ static void luaError(lua_State* L, const QString& event, const QString& procedur
     qWarning() << "  Context:" << context;
     qWarning() << "  Message:" << errorMsg;
 
-    // Display in output window
+    // Display in output window - orange error text on black background
     if (doc) {
-        doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0), QString("=== %1 ===").arg(event));
+        doc->colourNote(BGR(255, 140, 0), BGR(0, 0, 0), QString("=== %1 ===").arg(event));
         if (!context.isEmpty()) {
-            doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0), context);
+            doc->colourNote(BGR(255, 140, 0), BGR(0, 0, 0), context);
         }
-        doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0), errorMsg);
+        doc->colourNote(BGR(255, 140, 0), BGR(0, 0, 0), errorMsg);
     }
 }
 
