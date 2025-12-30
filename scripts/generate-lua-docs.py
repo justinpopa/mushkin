@@ -27,6 +27,10 @@ class LuaFunction:
     name: str
     signature: str = ""
     description: str = ""
+    params: list = field(default_factory=list)      # List of (name, type, desc)
+    returns: list = field(default_factory=list)     # List of (type, desc)
+    examples: list = field(default_factory=list)    # List of code examples
+    see_also: list = field(default_factory=list)    # List of related function names
     category: str = ""
     source_file: str = ""
     line_number: int = 0
@@ -58,37 +62,112 @@ FILE_CATEGORIES = {
     "world_commands.cpp": ("Commands", "Command Functions", "Functions for command queue management."),
     "world_speedwalk.cpp": ("Speedwalk", "Speedwalk Functions", "Functions for speedwalk/pathfinding."),
     "world_database.cpp": ("Database", "Database Functions", "Functions for SQLite database operations."),
+    "world_plugins.cpp": ("Plugins", "Plugin Functions", "Functions for inter-plugin communication and plugin management."),
     "lua_utils.cpp": ("Utils", "Utils Library", "The utils.* library functions."),
 }
 
 
-def parse_docstring(comment: str) -> tuple[str, str]:
+def parse_docstring(comment: str) -> dict:
     """
-    Parse a docstring comment to extract signature and description.
+    Parse a docstring comment to extract all documentation elements.
 
-    Returns (signature, description)
+    Returns dict with: signature, description, params, returns, examples, see_also
     """
     lines = comment.strip().split('\n')
-    signature = ""
-    description_lines = []
+    result = {
+        'signature': '',
+        'description': [],
+        'params': [],
+        'returns': [],
+        'examples': [],
+        'see_also': []
+    }
+
+    current_example = []
+    in_example = False
 
     for i, line in enumerate(lines):
         # Remove comment markers and leading/trailing whitespace
         line = re.sub(r'^\s*\*\s?', '', line)
         line = re.sub(r'^/\*\*\s*', '', line)
         line = re.sub(r'\s*\*/$', '', line)
-        line = line.strip()
-
-        if not line:
-            continue
 
         # First non-empty line with world. or utils. is the signature
-        if i == 0 and ('world.' in line or 'utils.' in line or '(' in line):
-            signature = line
-        else:
-            description_lines.append(line)
+        if not result['signature'] and ('world.' in line or 'utils.' in line):
+            result['signature'] = line.strip()
+            continue
 
-    return signature, '\n'.join(description_lines).strip()
+        # Parse @param - format: @param name (type) description
+        param_match = re.match(r'@param\s+(\w+)\s+\(([^)]+)\)\s*(.*)', line)
+        if param_match:
+            in_example = False
+            result['params'].append({
+                'name': param_match.group(1),
+                'type': param_match.group(2),
+                'desc': param_match.group(3).strip()
+            })
+            continue
+
+        # Parse @return - format: @return (type) description
+        return_match = re.match(r'@return\s+\(([^)]+)\)\s*(.*)', line)
+        if return_match:
+            in_example = False
+            result['returns'].append({
+                'type': return_match.group(1),
+                'desc': return_match.group(2).strip()
+            })
+            continue
+
+        # Parse @see - format: @see Func1, Func2, Func3
+        see_match = re.match(r'@see\s+(.*)', line)
+        if see_match:
+            in_example = False
+            funcs = [f.strip() for f in see_match.group(1).split(',')]
+            result['see_also'].extend(funcs)
+            continue
+
+        # Parse @example - starts a code block
+        if line.strip() == '@example':
+            if current_example:
+                result['examples'].append('\n'.join(current_example))
+            current_example = []
+            in_example = True
+            continue
+
+        # If in example, collect code lines
+        if in_example:
+            if line.startswith('@') or (not line and not current_example):
+                if current_example:
+                    result['examples'].append('\n'.join(current_example))
+                    current_example = []
+                in_example = False
+            else:
+                current_example.append(line)
+                continue
+
+        # Skip empty lines at the start
+        if not line.strip() and not result['description']:
+            continue
+
+        # Skip lines that are just tag continuations (indented descriptions)
+        if line.startswith('  ') and (result['params'] or result['returns']):
+            # Append to last param/return description
+            if result['returns'] and not line.startswith('@'):
+                result['returns'][-1]['desc'] += ' ' + line.strip()
+            elif result['params'] and not line.startswith('@'):
+                result['params'][-1]['desc'] += ' ' + line.strip()
+            continue
+
+        # Regular description line
+        if not line.startswith('@'):
+            result['description'].append(line.strip())
+
+    # Capture final example if any
+    if current_example:
+        result['examples'].append('\n'.join(current_example))
+
+    result['description'] = '\n'.join(result['description']).strip()
+    return result
 
 
 def extract_functions_from_file(filepath: Path) -> list[LuaFunction]:
@@ -100,7 +179,8 @@ def extract_functions_from_file(filepath: Path) -> list[LuaFunction]:
 
     # Pattern to match docstring followed by function definition
     # Matches: /** ... */ int L_FunctionName(lua_State* L)
-    pattern = r'/\*\*(.*?)\*/\s*int\s+(L_\w+)\s*\(\s*lua_State'
+    # Use [^*] or *[^/] to avoid matching across multiple docstrings
+    pattern = r'/\*\*((?:[^*]|\*(?!/))*)\*/\s*\n\s*int\s+(L_\w+)\s*\(\s*lua_State'
 
     for match in re.finditer(pattern, content, re.DOTALL):
         docstring = match.group(1)
@@ -109,9 +189,10 @@ def extract_functions_from_file(filepath: Path) -> list[LuaFunction]:
         # Get line number
         line_number = content[:match.start()].count('\n') + 1
 
-        signature, description = parse_docstring(docstring)
+        parsed = parse_docstring(docstring)
 
         # Extract Lua function name from signature or C function name
+        signature = parsed['signature']
         if signature:
             # Try to extract name from signature like "world.Note(text, ...)"
             name_match = re.match(r'(?:world|utils)\.(\w+)', signature)
@@ -127,7 +208,11 @@ def extract_functions_from_file(filepath: Path) -> list[LuaFunction]:
         func = LuaFunction(
             name=lua_name,
             signature=signature,
-            description=description,
+            description=parsed['description'],
+            params=parsed['params'],
+            returns=parsed['returns'],
+            examples=parsed['examples'],
+            see_also=parsed['see_also'],
             source_file=filepath.name,
             line_number=line_number
         )
@@ -168,6 +253,43 @@ def generate_category_page(category: Category) -> str:
 
         if func.description:
             lines.append(func.description)
+            lines.append("")
+
+        # Parameters
+        if func.params:
+            lines.append("### Parameters")
+            lines.append("")
+            lines.append("| Name | Type | Description |")
+            lines.append("|------|------|-------------|")
+            for param in func.params:
+                desc = param['desc'].replace('|', '\\|')  # Escape pipes
+                lines.append(f"| `{param['name']}` | {param['type']} | {desc} |")
+            lines.append("")
+
+        # Returns
+        if func.returns:
+            lines.append("### Returns")
+            lines.append("")
+            for ret in func.returns:
+                lines.append(f"- **{ret['type']}**: {ret['desc']}")
+            lines.append("")
+
+        # Examples
+        if func.examples:
+            lines.append("### Example")
+            lines.append("")
+            for example in func.examples:
+                lines.append("```lua")
+                lines.append(example)
+                lines.append("```")
+                lines.append("")
+
+        # See Also
+        if func.see_also:
+            lines.append("### See Also")
+            lines.append("")
+            see_links = [f"[{name}](#{name.lower()})" for name in func.see_also]
+            lines.append(", ".join(see_links))
             lines.append("")
 
         lines.append("---")
