@@ -1,5 +1,6 @@
 #include "storage/database.h"
 
+#include "../utils/app_paths.h"
 #include "logging.h"
 #include <QCoreApplication>
 #include <QDebug>
@@ -51,7 +52,7 @@ bool Database::open()
 
     if (!QFile::exists(m_dbPath)) {
         // Fall back to application directory
-        m_dbPath = QCoreApplication::applicationDirPath() + "/" + filename;
+        m_dbPath = AppPaths::getAppDirectory() + "/" + filename;
         qCDebug(lcStorage) << "Trying application directory:" << m_dbPath;
     }
 

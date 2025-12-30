@@ -8,6 +8,7 @@
 
 #include "xml_serialization.h"
 #include "../storage/database.h"
+#include "../utils/app_paths.h"
 #include "config_options.h"
 #include "logging.h"
 #include "plugin.h" // For Plugin member access
@@ -58,7 +59,7 @@ QString resolvePluginPath(const QString& pluginPath, const QString& worldFilePat
     // If pluginsDir is relative, resolve against application directory
     // (where the binary is located, not current working directory)
     if (!QDir::isAbsolutePath(pluginsDir)) {
-        pluginsDir = QDir(QCoreApplication::applicationDirPath()).absoluteFilePath(pluginsDir);
+        pluginsDir = QDir(AppPaths::getAppDirectory()).absoluteFilePath(pluginsDir);
     }
 
     // Clean up the path (removes . and .., normalizes slashes)
@@ -67,7 +68,7 @@ QString resolvePluginPath(const QString& pluginPath, const QString& worldFilePat
     // Handle special placeholders (like original MUSHclient)
     path.replace("$PLUGINSDEFAULTDIR", QDir(pluginsDir).absolutePath());
     path.replace("$WORLDDIR", worldDir);
-    path.replace("$PROGRAMDIR", QCoreApplication::applicationDirPath());
+    path.replace("$PROGRAMDIR", AppPaths::getAppDirectory());
 
     // If absolute after placeholder replacement, use directly
     if (QDir::isAbsolutePath(path)) {
