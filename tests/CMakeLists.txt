@@ -14,6 +14,7 @@ target_link_libraries(test-pipeline-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    world       # Listed explicitly before ui to handle circular dependency (world needs OutputView from ui)
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 

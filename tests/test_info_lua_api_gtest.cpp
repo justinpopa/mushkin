@@ -199,9 +199,9 @@ TEST_F(LuaApiTest, InfoClear)
 
     // Verify everything was reset to defaults
     EXPECT_TRUE(doc->m_infoBarText.isEmpty()) << "Info bar text should be empty";
-    // InfoClear uses qRgb() which includes alpha channel
-    EXPECT_EQ(doc->m_infoBarTextColor, qRgb(0, 0, 0)) << "Text color should be black";
-    EXPECT_EQ(doc->m_infoBarBackColor, qRgb(255, 255, 255)) << "Background color should be white";
+    // Colors stored without alpha channel
+    EXPECT_EQ(doc->m_infoBarTextColor, 0x000000u) << "Text color should be black";
+    EXPECT_EQ(doc->m_infoBarBackColor, 0xFFFFFFu) << "Background color should be white";
     EXPECT_EQ(doc->m_infoBarFontName, QString("Courier New")) << "Font should be Courier New";
     EXPECT_EQ(doc->m_infoBarFontSize, 10) << "Font size should be 10";
     EXPECT_EQ(doc->m_infoBarFontStyle, 0) << "Font style should be 0 (normal)";
