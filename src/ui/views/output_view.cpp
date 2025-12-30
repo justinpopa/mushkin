@@ -125,29 +125,32 @@ void OutputView::setOutputFont(const QFont& font)
  */
 void OutputView::calculateMetrics()
 {
-    QFontMetrics fm(m_font);
+    // Use widget as paint device for DPI-aware font metrics (fixes HiDPI displays)
+    QFontMetrics fm(m_font, const_cast<OutputView*>(this));
     m_lineHeight = fm.height();
     m_charWidth = fm.horizontalAdvance('M'); // Width of average character
 
     // Calculate how many lines fit in current height
     // Use text rectangle height if one is explicitly configured, otherwise use widget height
+    // Subtract 1 to ensure there's always a full line height of buffer at the bottom
+    // (prevents clipping due to font descenders, anti-aliasing, etc.)
     if (m_lineHeight > 0) {
         // Only use text rectangle if it's explicitly configured AND doc is valid
         if (m_doc && haveTextRectangle()) {
             QRect textRect = getTextRectangle();
-            m_visibleLines = textRect.height() / m_lineHeight;
+            m_visibleLines = qMax(1, (textRect.height() / m_lineHeight) - 1);
             // Push computed rectangle to WorldDocument (for Lua API access)
             m_doc->m_computedTextRectangle = textRect;
         } else {
             // No text rectangle configured - use full widget height
-            m_visibleLines = height() / m_lineHeight;
+            m_visibleLines = qMax(1, (height() / m_lineHeight) - 1);
             // Store widget rect as computed rectangle
             if (m_doc) {
                 m_doc->m_computedTextRectangle = rect();
             }
         }
     } else {
-        m_visibleLines = 0;
+        m_visibleLines = 1; // Minimum 1 visible line
         if (m_doc) {
             m_doc->m_computedTextRectangle = QRect();
         }
@@ -422,7 +425,9 @@ void OutputView::paintEvent(QPaintEvent* event)
         int y = 0;
         if (!m_doc->m_lineList.isEmpty()) {
             int totalLines = m_doc->m_lineList.count();
-            m_scrollPos = qBound(0, m_scrollPos, qMax(0, totalLines - 1));
+            int maxScroll = qMax(0, totalLines - m_visibleLines);
+            // Clamp scroll position to valid range (was incorrectly using totalLines-1)
+            m_scrollPos = qBound(0, m_scrollPos, maxScroll);
 
             int firstLine = m_scrollPos;
             int lastLine = qMin(m_scrollPos + m_visibleLines, totalLines);
@@ -494,7 +499,8 @@ void OutputView::paintEvent(QPaintEvent* event)
             int totalLines = m_doc->m_lineList.count();
 
             // Clamp scroll position to valid range
-            m_scrollPos = qBound(0, m_scrollPos, qMax(0, totalLines - 1));
+            int maxScroll = qMax(0, totalLines - m_visibleLines);
+            m_scrollPos = qBound(0, m_scrollPos, maxScroll);
 
             int firstLine = m_scrollPos;
             int lastLine = qMin(m_scrollPos + m_visibleLines, totalLines);
