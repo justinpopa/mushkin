@@ -10,6 +10,7 @@
 
 #include "../src/text/line.h"
 #include "../src/text/style.h"
+#include "../src/world/color_utils.h"
 #include "../src/world/world_document.h"
 #include <QCoreApplication>
 #include <QFile>
@@ -454,16 +455,16 @@ TEST_F(LineLoggingTest, HTMLColorLogging)
     auto style1 = std::make_unique<Style>();
     style1->iLength = 20; // "Red <text> on black,"
     style1->iFlags = COLOUR_RGB;
-    style1->iForeColour = qRgb(255, 0, 0); // Red
-    style1->iBackColour = qRgb(0, 0, 0);   // Black
+    style1->iForeColour = BGR(255, 0, 0); // Red (stored as BGR/COLORREF)
+    style1->iBackColour = BGR(0, 0, 0);   // Black
     line->styleList.push_back(std::move(style1));
 
     // Style 2: " Yellow on Blue" - yellow foreground, blue background, underlined
     auto style2 = std::make_unique<Style>();
     style2->iLength = 16; // " Yellow on Blue"
     style2->iFlags = COLOUR_RGB | UNDERLINE;
-    style2->iForeColour = qRgb(255, 255, 0); // Yellow
-    style2->iBackColour = qRgb(0, 0, 255);   // Blue (not black, so span needed)
+    style2->iForeColour = BGR(255, 255, 0); // Yellow (stored as BGR/COLORREF)
+    style2->iBackColour = BGR(0, 0, 255);   // Blue (not black, so span needed)
     line->styleList.push_back(std::move(style2));
 
     doc->logCompletedLine(line);
