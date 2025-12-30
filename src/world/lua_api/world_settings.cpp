@@ -75,16 +75,68 @@ int L_AddFont(lua_State* L)
 /**
  * world.GetInfo(type)
  *
- * Gets information about the world.
+ * Returns information about the current world, connection, or client.
+ * This is a comprehensive information function with 240+ info types.
  *
- * Info types:
- *   1 = World name
- *   2 = World address (host:port)
- *   3 = World IP
- *   20 = Connected (boolean)
+ * Common info types (strings):
+ *   1 = Server address (hostname)
+ *   2 = World name
+ *   3 = Character name
+ *   51 = Log filename
+ *   54 = World file path
+ *   56 = Application path
+ *   66 = Application directory
+ *   67 = World file directory
+ *   68 = Working directory
+ *   72 = Version string
  *
- * @param type Info type number
- * @return Requested information
+ * Common info types (numbers):
+ *   101 = Port number
+ *   102 = Bytes received
+ *   103 = Bytes sent
+ *   104 = Connect time (high)
+ *   105 = Connect time (low)
+ *   106 = Total lines received
+ *   107 = Output window width (pixels)
+ *   108 = Output window height (pixels)
+ *   109 = Output window font height
+ *   110 = Output window font width
+ *   131 = Output buffer lines
+ *   200 = Compress input (bool as number)
+ *   201 = MXP enabled (bool as number)
+ *   214 = MCCP active (bool as number)
+ *   217 = MCCP version
+ *   228 = Pueblo mode active
+ *   244 = Triggers enabled
+ *   245 = Aliases enabled
+ *   246 = Timers enabled
+ *   247 = Keypad shortcuts enabled
+ *   280 = Output paused
+ *
+ * Connection state types:
+ *   239 = Connected (1) or not (0)
+ *   301 = Time connected in seconds
+ *
+ * Use utils.infotypes() to get a table of all available info type constants.
+ *
+ * @param type (number) Info type number (1-300+)
+ *
+ * @return (varies) String, number, or nil depending on the info type
+ *
+ * @example
+ * -- Get world name
+ * local name = GetInfo(2)
+ *
+ * -- Check if connected
+ * if GetInfo(239) == 1 then
+ *     Note("Connected to " .. GetInfo(1))
+ * end
+ *
+ * -- Get connection duration
+ * local seconds = GetInfo(301)
+ * Note("Connected for " .. seconds .. " seconds")
+ *
+ * @see utils.infotypes, GetOption, GetAlphaOption
  */
 int L_GetInfo(lua_State* L)
 {
