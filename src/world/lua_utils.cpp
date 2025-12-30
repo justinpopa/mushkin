@@ -7,6 +7,7 @@
  */
 
 #include "lua_api/lua_common.h"
+#include "../utils/app_paths.h"
 #include "color_utils.h"
 #include "lua_dialog_callbacks.h"
 #include "script_engine.h"
@@ -1185,7 +1186,7 @@ static int L_utils_info(lua_State* L)
     lua_rawset(L, -3);
 
     // Application directory
-    QString appDir = QCoreApplication::applicationDirPath();
+    QString appDir = AppPaths::getAppDirectory();
     lua_pushstring(L, "app_directory");
     lua_pushstring(L, appDir.toUtf8().constData());
     lua_rawset(L, -3);

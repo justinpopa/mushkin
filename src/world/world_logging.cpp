@@ -18,6 +18,7 @@
 #include "color_utils.h"
 #include "logging.h"
 #include "world_document.h"
+#include "../utils/app_paths.h"
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QDebug>
@@ -104,7 +105,7 @@ QString WorldDocument::FormatTime(const QDateTime& dt, const QString& pattern, b
 
     // %F becomes default world files directory
     // TODO: Get from application settings when implemented
-    QString worldFilesDir = QCoreApplication::applicationDirPath() + "/worlds";
+    QString worldFilesDir = AppPaths::getAppDirectory() + "/worlds";
     if (forHTML) {
         worldFilesDir = FixHTMLString(worldFilesDir);
     }
@@ -112,7 +113,7 @@ QString WorldDocument::FormatTime(const QDateTime& dt, const QString& pattern, b
 
     // %L becomes default log files directory
     // TODO: Get from application settings when implemented
-    QString logFilesDir = QCoreApplication::applicationDirPath() + "/logs";
+    QString logFilesDir = AppPaths::getAppDirectory() + "/logs";
     if (forHTML) {
         logFilesDir = FixHTMLString(logFilesDir);
     }

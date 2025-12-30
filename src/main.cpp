@@ -2,6 +2,7 @@
 #include "storage/global_options.h"
 #include "ui/lua_dialog_registration.h"
 #include "ui/main_window.h"
+#include "utils/app_paths.h"
 #include "utils/logging.h"
 #include <QApplication>
 #include <QDir>
@@ -24,7 +25,7 @@ Q_IMPORT_PLUGIN(QWindowsIntegrationPlugin)
 // Note: .fon (Windows bitmap fonts) are NOT supported by Qt on macOS/Linux
 static void loadLocalFonts()
 {
-    QString appDir = QCoreApplication::applicationDirPath();
+    QString appDir = AppPaths::getAppDirectory();
 
     // Font file extensions that Qt supports
     QStringList fontExtensions = {"*.ttf", "*.otf", "*.ttc"};
@@ -99,7 +100,7 @@ int main(int argc, char* argv[])
     // Set up LUA_PATH and LUA_CPATH environment variables for Lua module loading
     // This is critical for llthreads2 and other libraries that create fresh Lua states,
     // as they don't inherit our custom package.path settings from script_engine.cpp
-    QString appDir = QCoreApplication::applicationDirPath();
+    QString exeDir = AppPaths::getExecutableDirectory();
 #ifdef Q_OS_WIN
     QString luaPathSep = ";";
     QString libExt = "dll";
@@ -123,11 +124,11 @@ int main(int argc, char* argv[])
     // Include relative paths for user modules
     // No system paths (issue #4)
     QStringList luaCPaths = {
-        // App bundle paths (for bundled C modules like LuaSocket)
-        appDir + "/lib/?." + libExt,
-        appDir + "/lib/?/core." + libExt,
-        appDir + "/lua/?." + libExt,
-        appDir + "/lua/?/core." + libExt,
+        // Executable paths (for bundled C modules like LuaSocket)
+        exeDir + "/lib/?." + libExt,
+        exeDir + "/lib/?/core." + libExt,
+        exeDir + "/lua/?." + libExt,
+        exeDir + "/lua/?/core." + libExt,
         // Relative paths (for user C modules)
         "./lib/?." + libExt,
         "./lib/?/core." + libExt,

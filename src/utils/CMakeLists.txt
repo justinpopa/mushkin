@@ -1,4 +1,6 @@
 add_library(utils STATIC
+    app_paths.cpp
+    app_paths.h
     name_generator.cpp
     name_generator.h
     logging.cpp
