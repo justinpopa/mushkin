@@ -1,5 +1,8 @@
 /**
  * world_colors.cpp - Color Functions
+ *
+ * Functions for color conversion, manipulation, and palette management.
+ * Colors use BGR format (0x00BBGGRR) for MUSHclient compatibility.
  */
 
 #include "lua_common.h"
@@ -219,7 +222,21 @@ QString RGBColourToName(QRgb bgr)
 /**
  * world.ColourNameToRGB(name)
  *
- * Converts color name to RGB value.
+ * Converts a color name to its BGR integer value. Supports X11/HTML color names
+ * ("red", "blue", "darkgreen") and hex strings ("#FF0000", "0xFF0000").
+ *
+ * Returns BGR format (0x00BBGGRR) for MUSHclient compatibility.
+ *
+ * @param name (string) Color name or hex string (case-insensitive)
+ *
+ * @return (number) BGR color value (0x00BBGGRR format)
+ *
+ * @example
+ * local red = ColourNameToRGB("red")
+ * local blue = ColourNameToRGB("#0000FF")
+ * ColourNote(red, 0, "Red text!")
+ *
+ * @see RGBColourToName, AdjustColour
  */
 int L_ColourNameToRGB(lua_State* L)
 {
@@ -232,7 +249,22 @@ int L_ColourNameToRGB(lua_State* L)
 /**
  * world.RGBColourToName(rgb)
  *
- * Converts RGB value to color name.
+ * Converts a BGR color value back to its color name. Only works for standard
+ * X11/HTML colors; custom colors return an empty string.
+ *
+ * @param rgb (number) BGR color value (0x00BBGGRR format)
+ *
+ * @return (string) Color name (e.g., "red", "blue"), or empty string if not a named color
+ *
+ * @example
+ * local name = RGBColourToName(255)  -- Returns "red"
+ * if name ~= "" then
+ *     Note("Color name: " .. name)
+ * else
+ *     Note("Custom color")
+ * end
+ *
+ * @see ColourNameToRGB
  */
 int L_RGBColourToName(lua_State* L)
 {
@@ -245,7 +277,19 @@ int L_RGBColourToName(lua_State* L)
 /**
  * world.GetNormalColour(whichColour)
  *
- * Gets normal ANSI color value (1-8).
+ * Gets the normal (non-bold) ANSI color value from the world's color palette.
+ * These are the base 8 ANSI colors (black, red, green, yellow, blue, magenta,
+ * cyan, white).
+ *
+ * @param whichColour (number) Color index 1-8 (1=black, 2=red, 3=green, etc.)
+ *
+ * @return (number) BGR color value, or 0 if index out of range
+ *
+ * @example
+ * local red = GetNormalColour(2)  -- Get normal red
+ * Note("Normal red is: " .. red)
+ *
+ * @see GetBoldColour, SetNormalColour
  */
 int L_GetNormalColour(lua_State* L)
 {
@@ -264,7 +308,18 @@ int L_GetNormalColour(lua_State* L)
 /**
  * world.GetBoldColour(whichColour)
  *
- * Gets bold ANSI color value (1-8).
+ * Gets the bold (high-intensity) ANSI color value from the world's color palette.
+ * These are the bright versions of the 8 ANSI colors, used when bold/bright
+ * attribute is active.
+ *
+ * @param whichColour (number) Color index 1-8 (1=bright black, 2=bright red, etc.)
+ *
+ * @return (number) BGR color value, or 0 if index out of range
+ *
+ * @example
+ * local brightRed = GetBoldColour(2)  -- Get bold/bright red
+ *
+ * @see GetNormalColour, SetBoldColour
  */
 int L_GetBoldColour(lua_State* L)
 {
@@ -283,7 +338,18 @@ int L_GetBoldColour(lua_State* L)
 /**
  * world.SetNormalColour(whichColour, rgb)
  *
- * Sets normal ANSI color value (1-8).
+ * Sets a normal (non-bold) ANSI color in the world's color palette.
+ *
+ * @param whichColour (number) Color index 1-8 (1=black, 2=red, etc.)
+ * @param rgb (number) BGR color value (0x00BBGGRR format)
+ *
+ * @return Nothing
+ *
+ * @example
+ * -- Make normal red darker
+ * SetNormalColour(2, ColourNameToRGB("darkred"))
+ *
+ * @see GetNormalColour, SetBoldColour
  */
 int L_SetNormalColour(lua_State* L)
 {
@@ -301,7 +367,18 @@ int L_SetNormalColour(lua_State* L)
 /**
  * world.SetBoldColour(whichColour, rgb)
  *
- * Sets bold ANSI color value (1-8).
+ * Sets a bold (high-intensity) ANSI color in the world's color palette.
+ *
+ * @param whichColour (number) Color index 1-8 (1=bright black, 2=bright red, etc.)
+ * @param rgb (number) BGR color value (0x00BBGGRR format)
+ *
+ * @return Nothing
+ *
+ * @example
+ * -- Make bold red even brighter
+ * SetBoldColour(2, 0x0000FF)  -- Pure red
+ *
+ * @see GetBoldColour, SetNormalColour
  */
 int L_SetBoldColour(lua_State* L)
 {
@@ -319,7 +396,19 @@ int L_SetBoldColour(lua_State* L)
 /**
  * world.SetCustomColourText(whichColour, rgb)
  *
- * Sets custom text color value (1-16).
+ * Sets the foreground (text) color for a custom color slot. Custom colors
+ * are used for Note() output and trigger highlighting.
+ *
+ * @param whichColour (number) Custom color index 1-16
+ * @param rgb (number) BGR color value (0x00BBGGRR format)
+ *
+ * @return Nothing
+ *
+ * @example
+ * -- Set custom color 1 to gold text
+ * SetCustomColourText(1, ColourNameToRGB("gold"))
+ *
+ * @see GetCustomColourText, SetCustomColourBackground
  */
 int L_SetCustomColourText(lua_State* L)
 {
@@ -337,7 +426,19 @@ int L_SetCustomColourText(lua_State* L)
 /**
  * world.SetCustomColourBackground(whichColour, rgb)
  *
- * Sets custom background color value (1-16).
+ * Sets the background color for a custom color slot. Custom colors are used
+ * for Note() output and trigger highlighting.
+ *
+ * @param whichColour (number) Custom color index 1-16
+ * @param rgb (number) BGR color value (0x00BBGGRR format)
+ *
+ * @return Nothing
+ *
+ * @example
+ * -- Set custom color 1 background to dark blue
+ * SetCustomColourBackground(1, ColourNameToRGB("navy"))
+ *
+ * @see GetCustomColourBackground, SetCustomColourText
  */
 int L_SetCustomColourBackground(lua_State* L)
 {
@@ -355,10 +456,17 @@ int L_SetCustomColourBackground(lua_State* L)
 /**
  * world.GetCustomColourText(whichColour)
  *
- * Gets custom text color value (1-16).
+ * Gets the foreground (text) color for a custom color slot.
  *
- * @param whichColour Index of custom color (1-16)
- * @return RGB color value, or 0 if out of range
+ * @param whichColour (number) Custom color index 1-16
+ *
+ * @return (number) BGR color value, or 0 if index out of range
+ *
+ * @example
+ * local textColor = GetCustomColourText(1)
+ * Note("Custom 1 text color: " .. textColor)
+ *
+ * @see SetCustomColourText, GetCustomColourBackground
  */
 int L_GetCustomColourText(lua_State* L)
 {
@@ -377,10 +485,16 @@ int L_GetCustomColourText(lua_State* L)
 /**
  * world.GetCustomColourBackground(whichColour)
  *
- * Gets custom background color value (1-16).
+ * Gets the background color for a custom color slot.
  *
- * @param whichColour Index of custom color (1-16)
- * @return RGB color value, or 0 if out of range
+ * @param whichColour (number) Custom color index 1-16
+ *
+ * @return (number) BGR color value, or 0 if index out of range
+ *
+ * @example
+ * local backColor = GetCustomColourBackground(1)
+ *
+ * @see SetCustomColourBackground, GetCustomColourText
  */
 int L_GetCustomColourBackground(lua_State* L)
 {
@@ -399,13 +513,21 @@ int L_GetCustomColourBackground(lua_State* L)
 /**
  * world.SetCustomColourName(whichColour, name)
  *
- * Sets the display name for a custom color slot.
+ * Sets the display name for a custom color slot. This name appears in the
+ * color configuration UI to help identify the purpose of each custom color.
  *
- * Based on methods_colours.cpp
+ * @param whichColour (number) Custom color index 1-16
+ * @param name (string) Display name for the color (1-30 characters)
  *
- * @param whichColour Index of custom color (1-16)
- * @param name Name for the color (1-30 characters)
- * @return eOK (0) on success, error code otherwise
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eBadParameter (30001): Index out of range or name too long
+ *
+ * @example
+ * SetCustomColourName(1, "Combat Alert")
+ * SetCustomColourName(2, "Channel Chat")
+ *
+ * @see GetCustomColourText, SetCustomColourText
  */
 int L_SetCustomColourName(lua_State* L)
 {
@@ -423,12 +545,22 @@ int L_SetCustomColourName(lua_State* L)
 /**
  * world.PickColour(suggested)
  *
- * Opens a color picker dialog for the user to select a color.
+ * Opens a system color picker dialog for the user to select a color. This is
+ * useful for letting users customize plugin colors interactively.
  *
- * Based on methods_colours.cpp
+ * @param suggested (number) Initial color to display (BGR format), or -1 for default white
  *
- * @param suggested Suggested color (BGR value - Windows COLORREF), or -1 for no suggestion
- * @return Selected BGR color value, or -1 if canceled
+ * @return (number) Selected BGR color value, or -1 if the user cancelled
+ *
+ * @example
+ * local currentColor = GetCustomColourText(1)
+ * local newColor = PickColour(currentColor)
+ * if newColor ~= -1 then
+ *     SetCustomColourText(1, newColor)
+ *     Note("Color updated!")
+ * end
+ *
+ * @see ColourNameToRGB, AdjustColour
  */
 int L_PickColour(lua_State* L)
 {
@@ -463,19 +595,28 @@ int L_PickColour(lua_State* L)
 /**
  * world.AdjustColour(colour, method)
  *
- * Adjusts a color value using various methods.
+ * Adjusts a color value using various transformation methods. Useful for
+ * creating color variations (hover effects, disabled states, etc.).
  *
- * Based on Utilities.cpp
+ * Adjustment methods:
+ * - 0: No change (returns input color)
+ * - 1: Invert (flip all color channels)
+ * - 2: Lighter (increase luminance by 2%)
+ * - 3: Darker (decrease luminance by 2%)
+ * - 4: Less saturation (decrease by 5%)
+ * - 5: More saturation (increase by 5%)
  *
- * @param colour BGR color value (0x00BBGGRR format - Windows COLORREF)
- * @param method Adjustment method:
- *   - 0: No change
- *   - 1: Invert
- *   - 2: Lighter (increase luminance by 2%)
- *   - 3: Darker (decrease luminance by 2%)
- *   - 4: Less saturation (decrease by 5%)
- *   - 5: More saturation (increase by 5%)
- * @return Adjusted BGR color value
+ * @param colour (number) BGR color value (0x00BBGGRR format)
+ * @param method (number) Adjustment method (0-5)
+ *
+ * @return (number) Adjusted BGR color value
+ *
+ * @example
+ * local red = ColourNameToRGB("red")
+ * local darkRed = AdjustColour(red, 3)  -- Darker
+ * local invertedRed = AdjustColour(red, 1)  -- Inverted (cyan)
+ *
+ * @see ColourNameToRGB, PickColour
  */
 int L_AdjustColour(lua_State* L)
 {

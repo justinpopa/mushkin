@@ -23,14 +23,45 @@ extern "C" {
 /**
  * world.AddAlias(name, match, response, flags, script)
  *
- * Creates a new alias.
+ * Creates a new alias that matches user input and performs an action.
+ * Aliases can send text, execute scripts, or queue commands.
  *
- * @param name Alias label
- * @param match Pattern to match
- * @param response Text to send when triggered
- * @param flags Bit flags (enabled, regexp, etc.)
- * @param script Script procedure to call (optional)
- * @return error code (eOK=0 on success)
+ * Flag values (combine with bitwise OR):
+ * - eEnabled (1): Alias is active
+ * - eKeepEvaluating (8): Continue checking other aliases after match
+ * - eIgnoreAliasCase (32): Case-insensitive matching
+ * - eOmitFromLogFile (64): Don't log alias matches
+ * - eAliasRegularExpression (128): Use regex pattern
+ * - eExpandVariables (512): Expand @variables in response
+ * - eReplace (1024): Replace existing alias with same name
+ * - eAliasSpeedWalk (2048): Treat response as speedwalk
+ * - eAliasQueue (4096): Queue response instead of sending
+ * - eAliasMenu (8192): Show in alias menu
+ * - eTemporary (16384): Delete when world closes
+ * - eAliasOmitFromOutput (65536): Don't show matched command
+ * - eAliasOneShot (32768): Delete after first match
+ *
+ * @param name (string) Unique alias identifier
+ * @param match (string) Pattern to match against user input
+ * @param response (string) Text to send or script to execute
+ * @param flags (number) Bitwise OR of flag constants
+ * @param script (string) Script function name (optional)
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eAliasAlreadyExists: Alias with this name exists (and eReplace not set)
+ *   - eAliasCannotBeEmpty: Match pattern is empty
+ *   - eInvalidObjectLabel: Invalid alias name
+ *
+ * @example
+ * -- Simple alias to send a command
+ * AddAlias("heal", "^heal$", "cast 'cure light'", eEnabled, "")
+ *
+ * @example
+ * -- Regex alias with script callback
+ * AddAlias("target", "^t (.+)$", "", eEnabled + eAliasRegularExpression, "OnTarget")
+ *
+ * @see DeleteAlias, EnableAlias, GetAlias, IsAlias
  */
 int L_AddAlias(lua_State* L)
 {
@@ -135,10 +166,20 @@ int L_AddAlias(lua_State* L)
 /**
  * world.DeleteAlias(name)
  *
- * Deletes an alias.
+ * Permanently removes an alias from the world. The alias will no longer
+ * match user input after deletion.
  *
- * @param name Alias label
- * @return error code (eOK=0 on success)
+ * @param name (string) Name of the alias to delete
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eAliasNotFound: No alias with this name exists
+ *
+ * @example
+ * -- Remove an alias when no longer needed
+ * DeleteAlias("target")
+ *
+ * @see AddAlias, DeleteAliasGroup, DeleteTemporaryAliases, IsAlias
  */
 int L_DeleteAlias(lua_State* L)
 {
@@ -157,10 +198,22 @@ int L_DeleteAlias(lua_State* L)
 /**
  * world.IsAlias(name)
  *
- * Checks if an alias exists.
+ * Checks whether an alias with the given name exists in the current world.
  *
- * @param name Alias label
- * @return eOK if exists, eAliasNotFound if not
+ * @param name (string) Name of the alias to check
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Alias exists
+ *   - eAliasNotFound: No alias with this name
+ *
+ * @example
+ * if IsAlias("heal") == eOK then
+ *     Note("Heal alias is defined")
+ * else
+ *     Note("Heal alias not found")
+ * end
+ *
+ * @see AddAlias, GetAlias, GetAliasList
  */
 int L_IsAlias(lua_State* L)
 {
@@ -177,11 +230,26 @@ int L_IsAlias(lua_State* L)
 /**
  * world.GetAlias(name)
  *
- * Gets alias details.
+ * Retrieves complete details about an alias including its pattern,
+ * response text, flags, and script name. Returns multiple values.
  *
- * @param name Alias label
- * @return error_code, match_text, response_text, flags, script_name
- *         Returns just error_code if alias not found
+ * @param name (string) Name of the alias to retrieve
+ *
+ * @return (number, string, string, number, string) Multiple values:
+ *   1. Error code (eOK on success, eAliasNotFound if not found)
+ *   2. Match pattern (the regex or text pattern)
+ *   3. Response text (what gets sent when matched)
+ *   4. Flags (bitwise OR of alias flags)
+ *   5. Script name (function to call, empty if none)
+ *
+ * @example
+ * local code, match, response, flags, script = GetAlias("heal")
+ * if code == eOK then
+ *     Note("Pattern: " .. match)
+ *     Note("Response: " .. response)
+ * end
+ *
+ * @see AddAlias, GetAliasInfo, GetAliasOption, IsAlias
  */
 int L_GetAlias(lua_State* L)
 {
@@ -227,11 +295,25 @@ int L_GetAlias(lua_State* L)
 /**
  * world.EnableAlias(name, enabled)
  *
- * Enables or disables an alias.
+ * Enables or disables an alias without deleting it. Disabled aliases
+ * remain in memory but won't match user input until re-enabled.
  *
- * @param name Alias label
- * @param enabled true to enable, false to disable
- * @return error code (eOK=0 on success)
+ * @param name (string) Name of the alias to enable/disable
+ * @param enabled (boolean) True to enable, false to disable
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eAliasNotFound: No alias with this name exists
+ *
+ * @example
+ * -- Disable combat aliases when not fighting
+ * EnableAlias("attack", false)
+ *
+ * @example
+ * -- Re-enable when combat starts
+ * EnableAlias("attack", true)
+ *
+ * @see AddAlias, EnableAliasGroup, GetAliasInfo
  */
 int L_EnableAlias(lua_State* L)
 {
@@ -253,31 +335,61 @@ int L_EnableAlias(lua_State* L)
 /**
  * world.GetAliasInfo(name, info_type)
  *
- * Gets information about an alias.
- * Matches original MUSHclient info type mappings.
+ * Gets specific information about an alias using numeric info type codes.
+ * MUSHclient-compatible function for querying individual alias properties.
  *
  * Info types:
- *   1 = name (pattern)          18 = send_to
- *   2 = contents (send text)    19 = keep_evaluating
- *   3 = script (strProcedure)   20 = sequence
- *   4 = omit_from_log           21 = echo_alias
- *   5 = omit_from_output        22 = omit_from_command_history
- *   6 = enabled                 23 = user option
- *   7 = regexp                  24 = regexp match count
- *   8 = ignore_case             25 = last matching string
- *   9 = expand_variables        26 = executing script
- *  10 = invocation count        27 = has script (dispid)
- *  11 = times matched           28 = regexp error
- *  12 = menu                    29 = one_shot
- *  13 = when matched (date)     30 = regexp time
- *  14 = temporary               31 = regexp attempts
- *  15 = included                101-110 = wildcards
- *  16 = group
- *  17 = variable
+ * - 1: Match pattern (string)
+ * - 2: Response/send text (string)
+ * - 3: Script procedure name (string)
+ * - 4: Omit from log (boolean)
+ * - 5: Omit from output (boolean)
+ * - 6: Enabled (boolean)
+ * - 7: Is regexp (boolean)
+ * - 8: Ignore case (boolean)
+ * - 9: Expand variables (boolean)
+ * - 10: Invocation count (number)
+ * - 11: Times matched (number)
+ * - 12: Is menu item (boolean)
+ * - 13: When last matched (Unix timestamp)
+ * - 14: Is temporary (boolean)
+ * - 15: Is included (boolean)
+ * - 16: Group name (string)
+ * - 17: Variable name (string)
+ * - 18: Send-to destination (number)
+ * - 19: Keep evaluating (boolean)
+ * - 20: Sequence number (number)
+ * - 21: Echo alias (boolean)
+ * - 22: Omit from command history (boolean)
+ * - 23: User option (number)
+ * - 24: Regexp match count (number)
+ * - 25: Last matching string (string)
+ * - 26: Currently executing script (boolean)
+ * - 27: Has script (boolean)
+ * - 28: Regexp error code (number)
+ * - 29: One-shot (boolean)
+ * - 30: Regexp execution time (number)
+ * - 31: Regexp match attempts (number)
+ * - 101-109: Wildcards 1-9 (string)
+ * - 110: Wildcard 0 / entire match (string)
  *
- * @param name Alias label
- * @param info_type Type of information to get
- * @return Information value or nil if not found
+ * @param name (string) Name of the alias
+ * @param info_type (number) Type of information to retrieve (1-31, 101-110)
+ *
+ * @return (varies) Requested info, or nil if alias not found
+ *
+ * @example
+ * -- Check if alias is enabled
+ * local enabled = GetAliasInfo("heal", 6)
+ * if enabled then
+ *     Note("Heal alias is enabled")
+ * end
+ *
+ * @example
+ * -- Get wildcard from last match
+ * local wildcard1 = GetAliasInfo("target", 101)
+ *
+ * @see GetAlias, GetAliasOption, SetAliasOption
  */
 int L_GetAliasInfo(lua_State* L)
 {
@@ -448,9 +560,19 @@ int L_GetAliasInfo(lua_State* L)
 /**
  * world.GetAliasList()
  *
- * Gets a list of all alias names.
+ * Returns an array of all alias names defined in the current world.
+ * Useful for iterating over all aliases or checking what aliases exist.
  *
- * @return Table (array) of alias names
+ * @return (table) Array of alias name strings, or empty table if no aliases
+ *
+ * @example
+ * local aliases = GetAliasList()
+ * Note("Found " .. #aliases .. " aliases:")
+ * for i, name in ipairs(aliases) do
+ *     Note("  " .. name)
+ * end
+ *
+ * @see GetAlias, GetAliasInfo, IsAlias, GetPluginAliasList
  */
 int L_GetAliasList(lua_State* L)
 {
@@ -468,13 +590,22 @@ int L_GetAliasList(lua_State* L)
 }
 
 /**
- * GetPluginAliasList - Get array of all alias names in plugin
+ * world.GetPluginAliasList(pluginID)
  *
- * Lua signature: aliases = GetPluginAliasList(pluginID)
+ * Returns an array of all alias names defined in a specific plugin.
+ * Allows inspection of aliases from other plugins.
  *
- * Returns: Lua table (array) of alias names
+ * @param pluginID (string) Plugin ID (GUID format)
  *
- * Based on methods_plugins.cpp
+ * @return (table) Array of alias name strings, or empty table if plugin not found
+ *
+ * @example
+ * local aliases = GetPluginAliasList("abc12345-1234-1234-1234-123456789012")
+ * for i, name in ipairs(aliases) do
+ *     Note("Plugin alias: " .. name)
+ * end
+ *
+ * @see GetAliasList, GetPluginAliasInfo, GetPluginAliasOption, GetPluginList
  */
 int L_GetPluginAliasList(lua_State* L)
 {
@@ -498,13 +629,22 @@ int L_GetPluginAliasList(lua_State* L)
 }
 
 /**
- * GetPluginAliasInfo - Get alias info from plugin
+ * world.GetPluginAliasInfo(pluginID, aliasName, infoType)
  *
- * Lua signature: value = GetPluginAliasInfo(pluginID, aliasName, infoType)
+ * Gets specific information about an alias in another plugin.
+ * Uses the same info type codes as GetAliasInfo.
  *
- * Returns: Varies by infoType
+ * @param pluginID (string) Plugin ID (GUID format)
+ * @param aliasName (string) Name of the alias in the plugin
+ * @param infoType (number) Type of information to retrieve (see GetAliasInfo)
  *
- * Based on methods_plugins.cpp
+ * @return (varies) Requested info, or nil if plugin/alias not found
+ *
+ * @example
+ * -- Check if a plugin's alias is enabled
+ * local enabled = GetPluginAliasInfo(pluginID, "combat", 6)
+ *
+ * @see GetAliasInfo, GetPluginAliasList, GetPluginAliasOption
  */
 int L_GetPluginAliasInfo(lua_State* L)
 {
@@ -690,13 +830,21 @@ int L_GetPluginAliasInfo(lua_State* L)
 }
 
 /**
- * GetPluginAliasOption - Get alias option from plugin
+ * world.GetPluginAliasOption(pluginID, aliasName, optionName)
  *
- * Lua signature: value = GetPluginAliasOption(pluginID, aliasName, optionName)
+ * Gets an option value for an alias in another plugin.
+ * Uses the same option names as GetAliasOption.
  *
- * Returns: Varies by option
+ * @param pluginID (string) Plugin ID (GUID format)
+ * @param aliasName (string) Name of the alias in the plugin
+ * @param optionName (string) Option name (see GetAliasOption for valid names)
  *
- * Based on methods_plugins.cpp
+ * @return (varies) Option value, or nil if plugin/alias not found
+ *
+ * @example
+ * local seq = GetPluginAliasOption(pluginID, "heal", "sequence")
+ *
+ * @see GetAliasOption, GetPluginAliasList, GetPluginAliasInfo
  */
 int L_GetPluginAliasOption(lua_State* L)
 {
@@ -749,12 +897,31 @@ int L_GetPluginAliasOption(lua_State* L)
 /**
  * world.GetAliasOption(alias_name, option_name)
  *
- * Gets an option value for an alias.
- * Based on CMUSHclientDoc::GetAliasOption() from methods_aliases.cpp
+ * Gets an option value for an alias using named option strings.
+ * More readable alternative to GetAliasInfo's numeric codes.
  *
- * @param alias_name Name of the alias
- * @param option_name Name of the option to get
- * @return Option value or nil if not found
+ * Numeric options: send_to, sequence, user
+ * Boolean options: enabled, expand_variables, ignore_case, omit_from_log,
+ *   omit_from_command_history, omit_from_output, regexp, menu,
+ *   keep_evaluating, echo_alias, temporary, one_shot
+ * String options: group, match, script, send, variable
+ *
+ * @param alias_name (string) Name of the alias
+ * @param option_name (string) Name of the option (case-insensitive)
+ *
+ * @return (varies) Option value, or nil if alias/option not found
+ *
+ * @example
+ * -- Get the sequence number of an alias
+ * local seq = GetAliasOption("heal", "sequence")
+ *
+ * @example
+ * -- Check if alias uses regexp
+ * if GetAliasOption("target", "regexp") then
+ *     Note("Target uses regular expressions")
+ * end
+ *
+ * @see SetAliasOption, GetAliasInfo, GetAlias
  */
 int L_GetAliasOption(lua_State* L)
 {
@@ -831,13 +998,37 @@ int L_GetAliasOption(lua_State* L)
 /**
  * world.SetAliasOption(alias_name, option_name, value)
  *
- * Sets an option value for an alias.
- * Based on CMUSHclientDoc::SetAliasOption() from methods_aliases.cpp
+ * Sets an option value for an alias using named option strings.
+ * Changes take effect immediately for subsequent alias matches.
  *
- * @param alias_name Name of the alias
- * @param option_name Name of the option to set
- * @param value New value for the option
- * @return Error code (eOK=0 on success)
+ * Numeric options: send_to, sequence, user
+ * Boolean options: enabled, expand_variables, ignore_case, omit_from_log,
+ *   omit_from_command_history, omit_from_output, menu, keep_evaluating,
+ *   echo_alias, temporary, one_shot
+ * String options: group, match, script, send, variable
+ *
+ * Note: The "regexp" option cannot be changed after creation.
+ *
+ * @param alias_name (string) Name of the alias
+ * @param option_name (string) Name of the option (case-insensitive)
+ * @param value (varies) New value for the option
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eAliasNotFound: No alias with this name
+ *   - eAliasCannotBeEmpty: Tried to set empty match pattern
+ *   - eUnknownOption: Invalid option name
+ *   - ePluginCannotSetOption: Option cannot be modified (regexp)
+ *
+ * @example
+ * -- Change alias sequence for priority
+ * SetAliasOption("heal", "sequence", 50)
+ *
+ * @example
+ * -- Update the response text
+ * SetAliasOption("heal", "send", "cast 'cure critical'")
+ *
+ * @see GetAliasOption, EnableAlias, AddAlias
  */
 int L_SetAliasOption(lua_State* L)
 {
@@ -933,11 +1124,24 @@ int L_SetAliasOption(lua_State* L)
 /**
  * world.EnableAliasGroup(groupName, enabled)
  *
- * Enables or disables all aliases in a group.
+ * Enables or disables all aliases that belong to a named group.
+ * Groups provide a way to organize related aliases and control them together.
  *
- * @param groupName Alias group name
- * @param enabled True to enable, false to disable
- * @return Count of aliases affected
+ * @param groupName (string) Name of the alias group
+ * @param enabled (boolean) True to enable all, false to disable all
+ *
+ * @return (number) Count of aliases affected
+ *
+ * @example
+ * -- Disable all combat aliases
+ * local count = EnableAliasGroup("combat", false)
+ * Note("Disabled " .. count .. " combat aliases")
+ *
+ * @example
+ * -- Enable all aliases in the "movement" group
+ * EnableAliasGroup("movement", true)
+ *
+ * @see EnableAlias, DeleteAliasGroup, SetAliasOption
  */
 int L_EnableAliasGroup(lua_State* L)
 {
@@ -964,10 +1168,19 @@ int L_EnableAliasGroup(lua_State* L)
 /**
  * world.DeleteAliasGroup(groupName)
  *
- * Deletes all aliases in a group.
+ * Permanently deletes all aliases that belong to a named group.
+ * Useful for cleaning up related aliases together.
  *
- * @param groupName Alias group name
- * @return Count of aliases deleted
+ * @param groupName (string) Name of the alias group
+ *
+ * @return (number) Count of aliases deleted
+ *
+ * @example
+ * -- Remove all combat aliases
+ * local count = DeleteAliasGroup("combat")
+ * Note("Deleted " .. count .. " combat aliases")
+ *
+ * @see DeleteAlias, DeleteTemporaryAliases, EnableAliasGroup
  */
 int L_DeleteAliasGroup(lua_State* L)
 {
@@ -996,9 +1209,18 @@ int L_DeleteAliasGroup(lua_State* L)
 /**
  * world.DeleteTemporaryAliases()
  *
- * Deletes all temporary aliases.
+ * Deletes all aliases that were created with the eTemporary flag.
+ * Temporary aliases are normally deleted when the world closes, but
+ * this allows manual cleanup at any time.
  *
- * @return Count of aliases deleted
+ * @return (number) Count of aliases deleted
+ *
+ * @example
+ * -- Clean up temporary aliases
+ * local count = DeleteTemporaryAliases()
+ * Note("Removed " .. count .. " temporary aliases")
+ *
+ * @see DeleteAlias, DeleteAliasGroup, AddAlias
  */
 int L_DeleteTemporaryAliases(lua_State* L)
 {

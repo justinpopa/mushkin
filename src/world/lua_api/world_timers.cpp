@@ -28,16 +28,45 @@ extern "C" {
 /**
  * world.AddTimer(name, hour, minute, second, text, flags, scriptName)
  *
- * Creates a new timer.
+ * Creates a new timer that fires after an interval or at a specific time.
+ * Timers can send commands, display notes, or execute scripts.
  *
- * @param name Timer label (must be unique)
- * @param hour Hour component (0-23 for at-time, or interval hours)
- * @param minute Minute component (0-59)
- * @param second Second component (0-59.999...)
- * @param text Text to send when timer fires
- * @param flags Timer flags (eTimerEnabled, eTimerAtTime, etc.)
- * @param scriptName Optional script function to call (default: "")
- * @return error code (eOK=0 on success)
+ * Timer types:
+ * - Interval: Fires every hour:minute:second (default)
+ * - At-time: Fires once daily at hour:minute:second (set eTimerAtTime flag)
+ *
+ * Flag values (combine with bitwise OR):
+ * - eTimerEnabled (1): Timer is active
+ * - eTimerAtTime (2): Fire at specific time instead of interval
+ * - eTimerOneShot (4): Delete after firing once
+ * - eTimerTemporary (16): Delete when world closes
+ * - eTimerActiveWhenClosed (32): Fire even when world is closed
+ * - eTimerReplace (1024): Replace existing timer with same name
+ * - eTimerSpeedWalk (8192): Treat text as speedwalk
+ * - eTimerNote (16384): Display text as note instead of sending
+ *
+ * @param name (string) Unique timer identifier
+ * @param hour (number) Hour component 0-23
+ * @param minute (number) Minute component 0-59
+ * @param second (number) Second component 0-59.999
+ * @param text (string) Text to send/display when timer fires
+ * @param flags (number) Bitwise OR of flag constants
+ * @param scriptName (string) Script function to call (optional)
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eTimerAlreadyExists: Timer with this name exists
+ *   - eTimeInvalid: Invalid time values
+ *
+ * @example
+ * -- Timer that fires every 30 seconds
+ * AddTimer("keepalive", 0, 0, 30, "look", eTimerEnabled, "")
+ *
+ * @example
+ * -- Timer that fires at 6:00 PM daily with script callback
+ * AddTimer("daily", 18, 0, 0, "", eTimerEnabled + eTimerAtTime, "OnDailyReset")
+ *
+ * @see DeleteTimer, EnableTimer, GetTimer, DoAfter
  */
 int L_AddTimer(lua_State* L)
 {
@@ -187,10 +216,18 @@ int L_AddTimer(lua_State* L)
 /**
  * world.DeleteTimer(name)
  *
- * Deletes a timer.
+ * Permanently removes a timer from the world. The timer will no longer fire.
  *
- * @param name Timer label
- * @return error code (eOK=0 on success)
+ * @param name (string) Name of the timer to delete
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eTimerNotFound: No timer with this name exists
+ *
+ * @example
+ * DeleteTimer("keepalive")
+ *
+ * @see AddTimer, DeleteTimerGroup, DeleteTemporaryTimers, IsTimer
  */
 int L_DeleteTimer(lua_State* L)
 {
@@ -220,11 +257,21 @@ int L_DeleteTimer(lua_State* L)
 /**
  * world.EnableTimer(name, enabled)
  *
- * Enables or disables a timer.
+ * Enables or disables a timer without deleting it. Disabled timers
+ * remain in memory but won't fire until re-enabled.
  *
- * @param name Timer label
- * @param enabled true to enable, false to disable
- * @return error code (eOK=0 on success)
+ * @param name (string) Name of the timer to enable/disable
+ * @param enabled (boolean) True to enable, false to disable
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eTimerNotFound: No timer with this name exists
+ *
+ * @example
+ * -- Pause a timer temporarily
+ * EnableTimer("keepalive", false)
+ *
+ * @see AddTimer, EnableTimerGroup, GetTimerInfo, ResetTimer
  */
 int L_EnableTimer(lua_State* L)
 {
@@ -257,10 +304,20 @@ int L_EnableTimer(lua_State* L)
 /**
  * world.IsTimer(name)
  *
- * Checks if a timer exists.
+ * Checks whether a timer with the given name exists in the current world.
  *
- * @param name Timer label
- * @return error code (eOK=0 if exists, eTimerNotFound if not)
+ * @param name (string) Name of the timer to check
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Timer exists
+ *   - eTimerNotFound: No timer with this name
+ *
+ * @example
+ * if IsTimer("keepalive") == eOK then
+ *     Note("Keepalive timer exists")
+ * end
+ *
+ * @see AddTimer, GetTimer, GetTimerList
  */
 int L_IsTimer(lua_State* L)
 {
@@ -293,11 +350,27 @@ int L_IsTimer(lua_State* L)
 /**
  * world.GetTimer(name)
  *
- * Gets timer details.
+ * Retrieves complete details about a timer including its timing,
+ * response text, flags, and script. Returns multiple values.
  *
- * @param name Timer label
- * @return error_code, hour, minute, second, response_text, flags, script_name
- *         Returns just error_code if timer not found
+ * @param name (string) Name of the timer to retrieve
+ *
+ * @return (number, number, number, number, string, number, string) Multiple values:
+ *   1. Error code (eOK on success, eTimerNotFound if not found)
+ *   2. Hour component
+ *   3. Minute component
+ *   4. Second component (as float)
+ *   5. Response text
+ *   6. Flags (bitwise OR of timer flags)
+ *   7. Script function name
+ *
+ * @example
+ * local code, hour, minute, second, text, flags, script = GetTimer("keepalive")
+ * if code == eOK then
+ *     Note("Timer fires every " .. hour .. ":" .. minute .. ":" .. second)
+ * end
+ *
+ * @see AddTimer, GetTimerInfo, GetTimerOption, IsTimer
  */
 int L_GetTimer(lua_State* L)
 {
@@ -363,27 +436,48 @@ int L_GetTimer(lua_State* L)
 /**
  * world.GetTimerInfo(name, info_type)
  *
- * Gets information about a timer.
+ * Gets specific information about a timer using numeric info type codes.
+ * MUSHclient-compatible function for querying individual timer properties.
  *
  * Info types:
- *   1 = hour                    15 = group
- *   2 = minute                  16 = variable
- *   3 = second                  17 = user option
- *   4 = contents (send text)    18 = executing script
- *   5 = script (strProcedure)   19 = has script (dispid)
- *   6 = omit_from_log           20 = invocation count
- *   7 = enabled                 21 = times matched
- *   8 = at_time                 22 = when matched (date)
- *   9 = one_shot                23 = send_to
- *  10 = temporary               24 = active_when_closed
- *  11 = interval_hour           25 = time_to_next_fire
- *  12 = interval_minute         26 = at_time_string
- *  13 = interval_second
- *  14 = sequence
+ * - 1: Hour (number) - at-time or interval hour
+ * - 2: Minute (number)
+ * - 3: Second (number)
+ * - 4: Contents/send text (string)
+ * - 5: Script procedure name (string)
+ * - 6: Omit from log (boolean)
+ * - 7: Enabled (boolean)
+ * - 8: Is at-time timer (boolean)
+ * - 9: One-shot (boolean)
+ * - 10: Temporary (boolean)
+ * - 11: Interval hour (number)
+ * - 12: Interval minute (number)
+ * - 13: Interval second (number)
+ * - 14: Sequence/create order (number)
+ * - 15: Group name (string)
+ * - 16: Variable name (string)
+ * - 17: User option (number)
+ * - 18: Currently executing script (boolean)
+ * - 19: Has script (boolean)
+ * - 20: Invocation count (number)
+ * - 21: Times matched (number)
+ * - 22: When last fired (Unix timestamp)
+ * - 23: Send-to destination (number)
+ * - 24: Active when closed (boolean)
+ * - 25: Seconds until next fire (number)
+ * - 26: At-time formatted string (string)
  *
- * @param name Timer label
- * @param info_type Type of information to get
- * @return Information value or nil if not found
+ * @param name (string) Name of the timer
+ * @param info_type (number) Type of information to retrieve (1-26)
+ *
+ * @return (varies) Requested info, or nil if timer not found
+ *
+ * @example
+ * -- Get seconds until timer fires
+ * local secs = GetTimerInfo("keepalive", 25)
+ * Note("Timer fires in " .. secs .. " seconds")
+ *
+ * @see GetTimer, GetTimerOption, SetTimerOption
  */
 int L_GetTimerInfo(lua_State* L)
 {
@@ -551,9 +645,19 @@ int L_GetTimerInfo(lua_State* L)
 /**
  * world.GetTimerList()
  *
- * Gets a list of all timer names.
+ * Returns an array of all timer names defined in the current world.
+ * Useful for iterating over all timers or checking what timers exist.
  *
- * @return Table (array) of timer names
+ * @return (table) Array of timer name strings, or empty table if no timers
+ *
+ * @example
+ * local timers = GetTimerList()
+ * Note("Found " .. #timers .. " timers:")
+ * for i, name in ipairs(timers) do
+ *     Note("  " .. name)
+ * end
+ *
+ * @see GetTimer, GetTimerInfo, IsTimer, GetPluginTimerList
  */
 int L_GetTimerList(lua_State* L)
 {
@@ -573,10 +677,20 @@ int L_GetTimerList(lua_State* L)
 /**
  * world.ResetTimer(name)
  *
- * Resets a timer to fire again from now.
+ * Resets a timer to fire again from the current time. For interval timers,
+ * this restarts the countdown. For at-time timers, recalculates next fire.
  *
- * @param name Timer label
- * @return error code (eOK=0 on success)
+ * @param name (string) Name of the timer to reset
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eTimerNotFound: No timer with this name exists
+ *
+ * @example
+ * -- Reset timer when player does something
+ * ResetTimer("idle_timeout")
+ *
+ * @see AddTimer, EnableTimer, ResetTimers
  */
 int L_ResetTimer(lua_State* L)
 {
@@ -610,7 +724,18 @@ int L_ResetTimer(lua_State* L)
 /**
  * world.ResetTimers()
  *
- * Resets all timers to fire again from now.
+ * Resets all timers in the current world to fire again from the current time.
+ * Useful after reconnecting or resuming a session.
+ *
+ * @return (none) No return value
+ *
+ * @example
+ * -- Reset all timers on connect
+ * function OnConnect()
+ *     ResetTimers()
+ * end
+ *
+ * @see ResetTimer, AddTimer, EnableTimerGroup
  */
 int L_ResetTimers(lua_State* L)
 {
@@ -627,11 +752,27 @@ int L_ResetTimers(lua_State* L)
 /**
  * world.DoAfter(seconds, text)
  *
- * Creates a temporary one-shot timer that sends text after a delay.
+ * Creates a temporary one-shot timer that sends text to the MUD after a delay.
+ * Simplest way to delay sending a command. Timer auto-deletes after firing.
  *
- * @param seconds Delay in seconds
- * @param text Text to send to MUD
- * @return error code (eOK=0 on success)
+ * @param seconds (number) Delay in seconds before sending
+ * @param text (string) Text to send to MUD
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eTimeInvalid: Seconds <= 0
+ *
+ * @example
+ * -- Send "look" after 5 seconds
+ * DoAfter(5, "look")
+ *
+ * @example
+ * -- Multiple delayed commands
+ * DoAfter(1, "north")
+ * DoAfter(2, "east")
+ * DoAfter(3, "get sword")
+ *
+ * @see DoAfterSpecial, DoAfterNote, DoAfterSpeedWalk, AddTimer
  */
 int L_DoAfter(lua_State* L)
 {
@@ -670,17 +811,41 @@ int L_DoAfter(lua_State* L)
 }
 
 /**
- * DoAfterSpecial(seconds, text, sendto)
+ * world.DoAfterSpecial(seconds, text, sendto)
  *
  * Creates a temporary one-shot timer with a specified destination.
+ * More flexible than DoAfter - can send to script, output, speedwalk, etc.
  *
- * Timer System
- * Based on DoAfterSpecial() from methods_timers.cpp
+ * Send-to values:
+ * - 0: World (send as command)
+ * - 1: Command (queue command)
+ * - 2: Output (display as note)
+ * - 4: Status bar
+ * - 5: Notepad (append)
+ * - 6: Notepad (replace)
+ * - 8: Variable
+ * - 9: Execute (Lua)
+ * - 10: Script (call function)
+ * - 11: Speedwalk
  *
- * @param seconds Delay in seconds (0.1 to 86399)
- * @param text Text/code to execute
- * @param sendto Destination (0-14): 0=world, 10=script, etc.
- * @return error code (eOK=0 on success)
+ * @param seconds (number) Delay in seconds (0.1 to 86399)
+ * @param text (string) Text/code to execute
+ * @param sendto (number) Destination (0-14)
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eTimeInvalid: Seconds out of range
+ *   - eBadParameter: Invalid sendto value
+ *
+ * @example
+ * -- Execute Lua code after 5 seconds
+ * DoAfterSpecial(5, "Note('Timer fired!')", 9)
+ *
+ * @example
+ * -- Display note after 10 seconds
+ * DoAfterSpecial(10, "Remember to check inventory!", 2)
+ *
+ * @see DoAfter, DoAfterNote, DoAfterSpeedWalk, AddTimer
  */
 int L_DoAfterSpecial(lua_State* L)
 {
@@ -739,10 +904,20 @@ int L_DoAfterSpecial(lua_State* L)
  * world.DoAfterNote(seconds, text)
  *
  * Creates a temporary one-shot timer that displays a note after a delay.
+ * Equivalent to DoAfterSpecial(seconds, text, 2).
  *
- * @param seconds Delay in seconds
- * @param text Text to display as note
- * @return error code (eOK=0 on success)
+ * @param seconds (number) Delay in seconds before displaying
+ * @param text (string) Text to display as note
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eTimeInvalid: Seconds <= 0
+ *
+ * @example
+ * -- Remind player after 60 seconds
+ * DoAfterNote(60, "Don't forget to save!")
+ *
+ * @see DoAfter, DoAfterSpecial, DoAfterSpeedWalk
  */
 int L_DoAfterNote(lua_State* L)
 {
@@ -784,10 +959,20 @@ int L_DoAfterNote(lua_State* L)
  * world.DoAfterSpeedWalk(seconds, text)
  *
  * Creates a temporary one-shot timer that executes a speedwalk after a delay.
+ * Equivalent to DoAfterSpecial(seconds, text, 11).
  *
- * @param seconds Delay in seconds
- * @param text Speedwalk string
- * @return error code (eOK=0 on success)
+ * @param seconds (number) Delay in seconds before speedwalking
+ * @param text (string) Speedwalk string (e.g., "3n2e4s")
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eTimeInvalid: Seconds <= 0
+ *
+ * @example
+ * -- Start speedwalk after 2 seconds
+ * DoAfterSpeedWalk(2, "5n3w2s")
+ *
+ * @see DoAfter, DoAfterNote, DoAfterSpecial, SpeedWalk
  */
 int L_DoAfterSpeedWalk(lua_State* L)
 {
@@ -828,11 +1013,20 @@ int L_DoAfterSpeedWalk(lua_State* L)
 /**
  * world.EnableTimerGroup(groupName, enabled)
  *
- * Enables or disables all timers in a group.
+ * Enables or disables all timers that belong to a named group.
+ * Groups provide a way to organize related timers and control them together.
  *
- * @param groupName Timer group name
- * @param enabled true to enable, false to disable
- * @return Count of timers affected
+ * @param groupName (string) Name of the timer group
+ * @param enabled (boolean) True to enable all, false to disable all
+ *
+ * @return (number) Count of timers affected
+ *
+ * @example
+ * -- Disable all combat timers
+ * local count = EnableTimerGroup("combat", false)
+ * Note("Disabled " .. count .. " combat timers")
+ *
+ * @see EnableTimer, DeleteTimerGroup, SetTimerOption
  */
 int L_EnableTimerGroup(lua_State* L)
 {
@@ -859,10 +1053,19 @@ int L_EnableTimerGroup(lua_State* L)
 /**
  * world.DeleteTimerGroup(groupName)
  *
- * Deletes all timers in a group.
+ * Permanently deletes all timers that belong to a named group.
+ * Useful for cleaning up related timers together.
  *
- * @param groupName Timer group name
- * @return Count of timers deleted
+ * @param groupName (string) Name of the timer group
+ *
+ * @return (number) Count of timers deleted
+ *
+ * @example
+ * -- Remove all combat timers
+ * local count = DeleteTimerGroup("combat")
+ * Note("Deleted " .. count .. " combat timers")
+ *
+ * @see DeleteTimer, DeleteTemporaryTimers, EnableTimerGroup
  */
 int L_DeleteTimerGroup(lua_State* L)
 {
@@ -891,9 +1094,18 @@ int L_DeleteTimerGroup(lua_State* L)
 /**
  * world.DeleteTemporaryTimers()
  *
- * Deletes all temporary timers.
+ * Deletes all timers that were created with the eTimerTemporary flag.
+ * Temporary timers are normally deleted when the world closes, but
+ * this allows manual cleanup at any time.
  *
- * @return Count of timers deleted
+ * @return (number) Count of timers deleted
+ *
+ * @example
+ * -- Clean up temporary timers
+ * local count = DeleteTemporaryTimers()
+ * Note("Removed " .. count .. " temporary timers")
+ *
+ * @see DeleteTimer, DeleteTimerGroup, AddTimer
  */
 int L_DeleteTemporaryTimers(lua_State* L)
 {
@@ -919,11 +1131,27 @@ int L_DeleteTemporaryTimers(lua_State* L)
 /**
  * world.GetTimerOption(name, optionName)
  *
- * Gets a timer option by name (alternative to GetTimerInfo).
+ * Gets a timer option value using named option strings.
+ * More readable alternative to GetTimerInfo's numeric codes.
  *
- * @param name Timer label
- * @param optionName Option name (e.g., "hour", "minute", "enabled")
- * @return Option value or nil if not found
+ * Numeric options: hour, minute, second, send_to, offset_hour,
+ *   offset_minute, offset_second, user
+ * Boolean options: enabled, at_time, one_shot, temporary,
+ *   active_when_closed, omit_from_output, omit_from_log
+ * String options: script, send, group, variable
+ *
+ * @param name (string) Name of the timer
+ * @param optionName (string) Name of the option (case-insensitive)
+ *
+ * @return (varies) Option value, or nil if timer/option not found
+ *
+ * @example
+ * -- Check if timer is enabled
+ * if GetTimerOption("keepalive", "enabled") then
+ *     Note("Keepalive timer is active")
+ * end
+ *
+ * @see SetTimerOption, GetTimerInfo, GetTimer
  */
 int L_GetTimerOption(lua_State* L)
 {
@@ -1017,12 +1245,33 @@ int L_GetTimerOption(lua_State* L)
 /**
  * world.SetTimerOption(name, optionName, value)
  *
- * Sets a timer option by name.
+ * Sets a timer option value using named option strings.
+ * Changes take effect immediately. Time-related changes recalculate fire time.
  *
- * @param name Timer label
- * @param optionName Option name (e.g., "hour", "minute", "enabled")
- * @param value New value
- * @return error code (eOK=0 on success)
+ * Numeric options: hour, minute, second, send_to, offset_hour,
+ *   offset_minute, offset_second, user
+ * Boolean options: enabled, at_time, one_shot, temporary,
+ *   active_when_closed, omit_from_output, omit_from_log
+ * String options: script, send, group, variable
+ *
+ * @param name (string) Name of the timer
+ * @param optionName (string) Name of the option (case-insensitive)
+ * @param value (varies) New value for the option
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success
+ *   - eTimerNotFound: No timer with this name
+ *   - eTimeInvalid: Invalid time value
+ *
+ * @example
+ * -- Change timer interval to 60 seconds
+ * SetTimerOption("keepalive", "second", 60)
+ *
+ * @example
+ * -- Update the text to send
+ * SetTimerOption("keepalive", "send", "score")
+ *
+ * @see GetTimerOption, EnableTimer, ResetTimer
  */
 int L_SetTimerOption(lua_State* L)
 {
@@ -1145,13 +1394,22 @@ int L_SetTimerOption(lua_State* L)
 }
 
 /**
- * GetPluginTimerList - Get list of timer names from plugin
+ * world.GetPluginTimerList(pluginID)
  *
- * Lua signature: list = GetPluginTimerList(pluginID)
+ * Returns an array of all timer names defined in a specific plugin.
+ * Allows inspection of timers from other plugins.
  *
- * Returns: Table of timer names (or empty table if plugin not found)
+ * @param pluginID (string) Plugin ID (GUID format)
  *
- * Based on methods_plugins.cpp
+ * @return (table) Array of timer name strings, or empty table if plugin not found
+ *
+ * @example
+ * local timers = GetPluginTimerList("abc12345-1234-1234-1234-123456789012")
+ * for i, name in ipairs(timers) do
+ *     Note("Plugin timer: " .. name)
+ * end
+ *
+ * @see GetTimerList, GetPluginTimerInfo, GetPluginTimerOption, GetPluginList
  */
 int L_GetPluginTimerList(lua_State* L)
 {
@@ -1175,13 +1433,22 @@ int L_GetPluginTimerList(lua_State* L)
 }
 
 /**
- * GetPluginTimerInfo - Get timer info from plugin
+ * world.GetPluginTimerInfo(pluginID, timerName, infoType)
  *
- * Lua signature: value = GetPluginTimerInfo(pluginID, timerName, infoType)
+ * Gets specific information about a timer in another plugin.
+ * Uses the same info type codes as GetTimerInfo.
  *
- * Returns: Varies by infoType
+ * @param pluginID (string) Plugin ID (GUID format)
+ * @param timerName (string) Name of the timer in the plugin
+ * @param infoType (number) Type of information to retrieve (see GetTimerInfo)
  *
- * Based on methods_plugins.cpp
+ * @return (varies) Requested info, or nil if plugin/timer not found
+ *
+ * @example
+ * -- Check if a plugin's timer is enabled
+ * local enabled = GetPluginTimerInfo(pluginID, "keepalive", 7)
+ *
+ * @see GetTimerInfo, GetPluginTimerList, GetPluginTimerOption
  */
 int L_GetPluginTimerInfo(lua_State* L)
 {
@@ -1359,13 +1626,21 @@ int L_GetPluginTimerInfo(lua_State* L)
 }
 
 /**
- * GetPluginTimerOption - Get timer option from plugin
+ * world.GetPluginTimerOption(pluginID, timerName, optionName)
  *
- * Lua signature: value = GetPluginTimerOption(pluginID, timerName, optionName)
+ * Gets an option value for a timer in another plugin.
+ * Uses the same option names as GetTimerOption.
  *
- * Returns: Varies by option
+ * @param pluginID (string) Plugin ID (GUID format)
+ * @param timerName (string) Name of the timer in the plugin
+ * @param optionName (string) Option name (see GetTimerOption for valid names)
  *
- * Based on methods_plugins.cpp
+ * @return (varies) Option value, or nil if plugin/timer not found
+ *
+ * @example
+ * local enabled = GetPluginTimerOption(pluginID, "keepalive", "enabled")
+ *
+ * @see GetTimerOption, GetPluginTimerList, GetPluginTimerInfo
  */
 int L_GetPluginTimerOption(lua_State* L)
 {
