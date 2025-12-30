@@ -639,6 +639,22 @@ return re
         lua_pop(L, 1); // pop error message
     }
 
+    // Mark luacom as unavailable (Windows-only COM automation)
+    // This prevents "module not found" errors when plugins try to require it
+    // Plugins check: luacom = require "luacom"; if luacom then wshell = luacom.CreateObject(...)
+    // We provide a stub table where CreateObject returns nil, so plugins gracefully skip COM code
+    lua_getglobal(L, "package");
+    lua_getfield(L, -1, "loaded");
+    lua_newtable(L); // Create stub table
+    // Add CreateObject that returns nil
+    lua_pushcfunction(L, [](lua_State* L) -> int {
+        lua_pushnil(L);
+        return 1;
+    });
+    lua_setfield(L, -2, "CreateObject");
+    lua_setfield(L, -2, "luacom"); // package.loaded["luacom"] = stub table
+    lua_pop(L, 2);                 // pop loaded, package
+
     // TODO: Register additional libraries
     //    luaopen_rex(L);    // PCRE regex
     //    etc.

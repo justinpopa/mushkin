@@ -10,6 +10,7 @@ class InputView;
 class QSplitter;
 class QVBoxLayout;
 class QLabel;
+class QMdiSubWindow;
 
 /**
  * WorldWidget - MDI child widget for one MUD connection
@@ -115,6 +116,10 @@ class WorldWidget : public QWidget {
     OutputView* m_outputView;  // Custom text display widget
     InputView* m_inputView;    // Custom input widget with history
     QLabel* m_infoBar;         // Script-controllable info bar
+#ifdef Q_OS_MACOS
+    QWidget* m_titleBar;       // Custom title bar for macOS MDI
+    QLabel* m_titleLabel;      // Title label in custom title bar
+#endif
 
     // State
     bool m_modified;    // Has unsaved changes

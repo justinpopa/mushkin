@@ -1723,6 +1723,11 @@ void MainWindow::newWorld()
     // Remove the system menu (that extra menu bar inside the MDI area)
     subWindow->setSystemMenu(nullptr);
 
+#ifdef Q_OS_MACOS
+    // On macOS, use frameless subwindow - WorldWidget has its own custom title bar
+    subWindow->setWindowFlags(Qt::FramelessWindowHint);
+#endif
+
     // Connect window title changes
     connect(worldWidget, &WorldWidget::windowTitleChanged, subWindow,
             &QMdiSubWindow::setWindowTitle);
@@ -1796,6 +1801,11 @@ void MainWindow::openWorld(const QString& filename)
 
     // Remove the system menu (that extra menu bar inside the MDI area)
     subWindow->setSystemMenu(nullptr);
+
+#ifdef Q_OS_MACOS
+    // On macOS, use frameless subwindow - WorldWidget has its own custom title bar
+    subWindow->setWindowFlags(Qt::FramelessWindowHint);
+#endif
 
     // Connect window title changes
     connect(worldWidget, &WorldWidget::windowTitleChanged, subWindow,
@@ -4089,6 +4099,16 @@ void MainWindow::createNotepadWindow(NotepadWidget* notepad)
 
     // Remove the system menu (that extra menu bar inside the MDI area)
     subWindow->setSystemMenu(nullptr);
+
+#ifdef Q_OS_MACOS
+    // On macOS, hide MDI subwindow control buttons via stylesheet
+    subWindow->setStyleSheet(
+        "QMdiSubWindow { border: 1px solid #444; }"
+        "QMdiSubWindow::title { background: #333; height: 20px; }"
+        "QMdiSubWindow::close-button, "
+        "QMdiSubWindow::normal-button, "
+        "QMdiSubWindow::shade-button { width: 0px; height: 0px; }");
+#endif
 
     // Store reference to MDI subwindow in notepad
     notepad->m_pMdiSubWindow = subWindow;
