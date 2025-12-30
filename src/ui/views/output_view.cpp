@@ -1764,7 +1764,13 @@ int OutputView::getMaxScrollPosition() const
         totalLines++; // Include incomplete line
     }
 
-    return qMax(0, totalLines - m_visibleLines);
+    int maxPos = qMax(0, totalLines - m_visibleLines);
+
+    // Update cached value in WorldDocument for Lua API access
+    // (avoids circular dependency between world and ui libraries)
+    m_doc->setMaxScrollPosition(maxPos);
+
+    return maxPos;
 }
 
 /**

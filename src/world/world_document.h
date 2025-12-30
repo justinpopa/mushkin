@@ -846,6 +846,11 @@ class WorldDocument : public QObject {
     class InputView* m_pActiveInputView; // Track active input widget
     OutputView* m_pActiveOutputView;     // OutputView for miniwindow signal connection
 
+    // ========== Cached View State (updated by OutputView) ==========
+    int m_cachedMaxScrollPosition = 0;   // Max scroll position, updated by OutputView
+    void setMaxScrollPosition(int pos) { m_cachedMaxScrollPosition = pos; }
+    int getMaxScrollPosition() const { return m_cachedMaxScrollPosition; }
+
     // ========== Text Selection State ==========
     // Selection coordinates (0-based internally, converted to 1-based for Lua API)
     // -1 indicates no selection

@@ -1285,11 +1285,7 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 294: // Scroll bar max position
-            if (pDoc->m_pActiveOutputView) {
-                lua_pushinteger(L, pDoc->m_pActiveOutputView->getMaxScrollPosition());
-            } else {
-                lua_pushinteger(L, 0);
-            }
+            lua_pushinteger(L, pDoc->getMaxScrollPosition());
             break;
 
         case 295: // Scroll bar page size (visible lines)

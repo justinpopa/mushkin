@@ -14,8 +14,6 @@ target_link_libraries(test-pipeline-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
-    world       # Listed explicitly before ui to handle circular dependency (world needs OutputView from ui)
-    world       # Listed before ui for circular dependency
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
@@ -36,8 +34,6 @@ target_link_libraries(test-trigger-execution-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
-    world       # Listed before ui for circular dependency (world needs OutputView from ui)
-    world       # Listed before ui for circular dependency
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
@@ -652,7 +648,6 @@ target_link_libraries(test-miniwindow-creation PRIVATE
     Qt6::Gui
     Qt6::Widgets
     Qt6::Test
-    world       # Listed before ui for circular dependency
     ui          # Transitively brings: world, text, storage, automation, utils
 )
 
@@ -666,7 +661,6 @@ target_link_libraries(test-miniwindow-drawing PRIVATE
     Qt6::Gui
     Qt6::Widgets
     Qt6::Test
-    world       # Listed before ui for circular dependency
     ui          # Transitively brings: world, text, storage, automation, utils
 )
 
@@ -693,7 +687,6 @@ target_link_libraries(test-sendto-integration-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
-    world       # Listed before ui for circular dependency
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
@@ -712,7 +705,6 @@ target_link_libraries(test-sound-api-gtest PRIVATE
     Qt6::Gui
     Qt6::Widgets
     Qt6::Multimedia
-    world       # Listed before ui for circular dependency
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
@@ -730,7 +722,6 @@ target_link_libraries(test-unique-id-api-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
-    world       # Listed before ui for circular dependency
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
@@ -748,7 +739,6 @@ target_link_libraries(test-bit-library-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
-    world       # Listed before ui for circular dependency
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
@@ -766,7 +756,6 @@ target_link_libraries(test-progress-library-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
-    world       # Listed before ui for circular dependency
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
@@ -784,7 +773,6 @@ target_link_libraries(test-utility-string-functions-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
-    world       # Listed before ui for circular dependency
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
@@ -802,7 +790,6 @@ target_link_libraries(test-utils-hashing-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
-    world       # Listed before ui for circular dependency
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
@@ -820,7 +807,6 @@ target_link_libraries(test-mxp-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
-    world       # Listed before ui for circular dependency
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
@@ -838,7 +824,6 @@ target_link_libraries(test-array-api-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
-    world       # Listed before ui for circular dependency
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
@@ -856,7 +841,6 @@ target_link_libraries(test-url-detection-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
-    world       # Listed before ui for circular dependency
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
