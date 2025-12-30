@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.1.0](https://github.com/justinpopa/mushkin/compare/v0.0.0...v0.1.0) (2025-12-30)
+
+
+### Features
+
+* add app directory helper for macOS .app bundle support ([#27](https://github.com/justinpopa/mushkin/issues/27)) ([f5093e5](https://github.com/justinpopa/mushkin/commit/f5093e55210c717c7eb95a4fe6d199570e815761)), closes [#19](https://github.com/justinpopa/mushkin/issues/19)
+* add static build system and GitHub Actions CI/CD ([#9](https://github.com/justinpopa/mushkin/issues/9)) ([307d919](https://github.com/justinpopa/mushkin/commit/307d91941e9b46ad252271322c979510b6603baa))
+* Lua API documentation system and wiki generator ([#20](https://github.com/justinpopa/mushkin/issues/20)) ([fe7de7a](https://github.com/justinpopa/mushkin/commit/fe7de7a56cbbad1f65d0572952ce94d62f936b1e))
+* UI cleanup and theme support ([#21](https://github.com/justinpopa/mushkin/issues/21)) ([c7192be](https://github.com/justinpopa/mushkin/commit/c7192be29758fa1046fb32c2596e576180c260ae))
+
+
+### Bug Fixes
+
+* remove system paths from Lua package.path (issue [#4](https://github.com/justinpopa/mushkin/issues/4)) ([#14](https://github.com/justinpopa/mushkin/issues/14)) ([d3d03ed](https://github.com/justinpopa/mushkin/commit/d3d03edcb00ff7105a0ab6a0e585418ac099d2bc))
+* use configured directories for file dialogs (issue [#1](https://github.com/justinpopa/mushkin/issues/1)) ([#17](https://github.com/justinpopa/mushkin/issues/17)) ([e6775d9](https://github.com/justinpopa/mushkin/commit/e6775d9ebecce0a9051fa45fccaeccd75c2659a2))
+* use portable relative paths for default directories (issue [#6](https://github.com/justinpopa/mushkin/issues/6)) ([#16](https://github.com/justinpopa/mushkin/issues/16)) ([7dfa1f8](https://github.com/justinpopa/mushkin/commit/7dfa1f8e694050987a6b0ba2e23b8ceda55f384f))
+
 ## [0.1.0](https://github.com/justinpopa/mushkin/compare/v0.0.0...v0.1.0) (2025-12-29)
 
 
