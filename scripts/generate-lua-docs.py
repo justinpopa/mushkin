@@ -400,29 +400,95 @@ def generate_sidebar(categories: dict[str, Category], version: str) -> str:
     version_suffix = f"-{version}" if version else ""
 
     lines = [
-        "**Mushkin**",
+        "**[[Mushkin|Home]]**",
         "",
-        "- [[Home]]",
-        "- [[Getting Started]]",
+        "**Getting Started**",
+        "- [[Installation]]",
+        "- [[Quick Start]]",
+        "- [[Migrating from MUSHclient]]",
         "",
-        "**Lua API**",
+        "**User Guide**",
+        "- [[Configuration]]",
+        "- [[Plugins]]",
+        "- [[Triggers & Aliases]]",
+        "- [[MiniWindows]]",
         "",
+        "**Lua Scripting**",
         f"- [[API Reference|Lua-API{version_suffix}]]",
     ]
 
-    for cat_id in sorted(categories.keys()):
-        cat = categories[cat_id]
-        lines.append(f"  - [[{cat.title}|Lua-API{version_suffix}-{cat_id}]]")
+    # Add top-level categories (not all, just key ones)
+    key_categories = ["Output", "Triggers", "Aliases", "Timers", "MiniWindows", "Database", "Plugins"]
+    for cat_id in key_categories:
+        if cat_id in categories:
+            cat = categories[cat_id]
+            lines.append(f"  - [[{cat.title}|Lua-API{version_suffix}-{cat_id}]]")
+
+    lines.append(f"  - [[All Categories...|Lua-API{version_suffix}]]")
 
     lines.extend([
         "",
-        "**Resources**",
-        "",
+        "**Development**",
+        "- [[Building from Source]]",
+        "- [[Contributing]]",
         "- [[API Versions]]",
-        "- [GitHub](https://github.com/user/mushkin)",
+        "",
+        "---",
+        "[GitHub Repository](https://github.com/jnpopop/mushkin)",
     ])
 
     return '\n'.join(lines)
+
+
+def generate_home_page(categories: dict[str, Category], version: str) -> str:
+    """Generate the wiki Home page."""
+    version_suffix = f"-{version}" if version else ""
+    total_functions = sum(len(c.functions) for c in categories.values())
+
+    return f"""# Mushkin
+
+**Mushkin** is a modern MUD client built with Qt 6, designed as a cross-platform rewrite of [MUSHclient](http://www.gammon.com.au/mushclient/) with full Lua scripting API compatibility.
+
+## Features
+
+- **MUSHclient-compatible Lua API** - {total_functions}+ functions for scripting
+- **Plugin support** - Triggers, aliases, timers, and miniwindows
+- **Telnet protocols** - MCCP compression, MXP, GMCP
+- **SQLite databases** - Built-in persistent storage
+- **Cross-platform** - macOS and Linux (Windows planned)
+
+## Quick Links
+
+| Getting Started | Scripting | Reference |
+|-----------------|-----------|-----------|
+| [[Installation]] | [[Quick Start]] | [[API Reference|Lua-API{version_suffix}]] |
+| [[Configuration]] | [[Plugins]] | [[API Versions]] |
+| [[Migrating from MUSHclient]] | [[MiniWindows]] | [[Building from Source]] |
+
+## Lua API Overview
+
+Mushkin provides a comprehensive Lua API compatible with MUSHclient scripts:
+
+| Category | Functions | Description |
+|----------|-----------|-------------|
+| [[Output|Lua-API{version_suffix}-Output]] | {len(categories.get('Output', Category('','','')).functions)} | Display text, colors, ANSI |
+| [[Triggers|Lua-API{version_suffix}-Triggers]] | {len(categories.get('Triggers', Category('','','')).functions)} | Pattern matching on MUD output |
+| [[Aliases|Lua-API{version_suffix}-Aliases]] | {len(categories.get('Aliases', Category('','','')).functions)} | Command shortcuts and macros |
+| [[Timers|Lua-API{version_suffix}-Timers]] | {len(categories.get('Timers', Category('','','')).functions)} | Scheduled and repeating tasks |
+| [[MiniWindows|Lua-API{version_suffix}-MiniWindows]] | {len(categories.get('MiniWindows', Category('','','')).functions)} | Custom graphics overlays |
+| [[Database|Lua-API{version_suffix}-Database]] | {len(categories.get('Database', Category('','','')).functions)} | SQLite storage |
+
+[[View complete API Reference →|Lua-API{version_suffix}]]
+
+## Getting Help
+
+- **Issues & Bugs**: [GitHub Issues](https://github.com/jnpopop/mushkin/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/jnpopop/mushkin/discussions)
+
+---
+
+*Current API version: {version}*
+"""
 
 
 def generate_versions_page(versions: list, latest: str = None) -> str:
@@ -549,6 +615,13 @@ def main():
     with open(sidebar_file, 'w', encoding='utf-8') as f:
         f.write(sidebar_content)
     print(f"Generated sidebar")
+
+    # Generate Home page
+    home_content = generate_home_page(categories, version)
+    home_file = output_dir / "Home.md"
+    with open(home_file, 'w', encoding='utf-8') as f:
+        f.write(home_content)
+    print(f"Generated Home page")
 
     # Update versions page if requested
     if args.update_versions:
