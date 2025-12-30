@@ -348,10 +348,14 @@ def generate_category_page(category: Category, version: str) -> str:
 
     # Table of functions with links
     for func in sorted(category.functions, key=lambda f: f.name.lower()):
-        # Get first sentence of description (up to first period)
-        desc = func.description.split('\n')[0] if func.description else ""
+        # Get first sentence of description (may span multiple lines)
+        desc = ' '.join(func.description.split()) if func.description else ""
+        # Find first sentence ending with ". "
         if '. ' in desc:
             desc = desc.split('. ')[0] + '.'
+        elif desc.endswith('.'):
+            pass  # Already ends with period
+        # Escape pipe characters for table
         desc = desc.replace('|', '\\|')
         # Display name includes utils. prefix for clarity
         display_name = f"utils.{func.name}" if func.is_utils else func.name
