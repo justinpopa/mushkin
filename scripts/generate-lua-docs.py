@@ -107,7 +107,16 @@ def parse_docstring(comment: str) -> dict:
         # First non-empty line with world. or utils. is the signature
         if not result['signature'] and ('world.' in line or 'utils.' in line):
             result['signature'] = line.strip()
+            # Check if signature continues on next lines (multi-line signatures)
+            # We'll handle continuation in the next iteration
             continue
+
+        # Handle signature continuation (line that's just closing the parameter list)
+        if result['signature'] and not result['signature'].endswith(')') and not line.startswith('@'):
+            # This might be a continuation of the signature
+            if line.strip() and (line.strip().endswith(')') or ',' in line.strip()):
+                result['signature'] += ' ' + line.strip()
+                continue
 
         # Parse @param - format: @param name (type) description
         param_match = re.match(r'@param\s+(\w+)\s+\(([^)]+)\)\s*(.*)', line)
