@@ -1,6 +1,7 @@
 #include "main_window.h"
 #include "../automation/plugin.h" // For plugin callback constants
 #include "../storage/database.h"
+#include "../utils/app_paths.h"
 #include "../storage/global_options.h"
 #include "../text/line.h"
 #include "../world/notepad_widget.h"
@@ -1678,7 +1679,7 @@ void MainWindow::openStartupWorlds()
             // Resolve relative paths relative to the application directory
             // (e.g., "./worlds/Aardwolf.mcl" or "worlds/Aardwolf.mcl")
             if (!QDir::isAbsolutePath(trimmedPath)) {
-                trimmedPath = QCoreApplication::applicationDirPath() + "/" + trimmedPath;
+                trimmedPath = AppPaths::getAppDirectory() + "/" + trimmedPath;
             }
 
             // Clean up the path (resolve . and ..)

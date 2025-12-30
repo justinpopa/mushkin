@@ -9,6 +9,7 @@
 
 #include "../../automation/plugin.h"
 #include "../../storage/database.h"
+#include "../../utils/app_paths.h"
 #include "../../world/config_options.h"
 #include "../../world/view_interfaces.h"
 #include "../../world/world_document.h"
@@ -677,9 +678,9 @@ int L_GetInfo(lua_State* L)
             lua_pushstring(L, "");
         } break;
 
-        case 59: // Scripts directory (executable directory)
+        case 59: // Scripts directory (application directory)
         {
-            QString appDir = QCoreApplication::applicationDirPath();
+            QString appDir = AppPaths::getAppDirectory();
             if (!appDir.isEmpty() && !appDir.endsWith("/")) {
                 appDir += "/";
             }
@@ -696,7 +697,7 @@ int L_GetInfo(lua_State* L)
 
             // If relative, resolve against application directory
             if (!QDir::isAbsolutePath(pluginsDir)) {
-                QString appDir = QCoreApplication::applicationDirPath();
+                QString appDir = AppPaths::getAppDirectory();
                 pluginsDir = QDir(appDir).absoluteFilePath(pluginsDir);
             }
             pluginsDir = QDir::cleanPath(pluginsDir);
@@ -746,9 +747,10 @@ int L_GetInfo(lua_State* L)
 
         case 66: // MUSHclient application directory
         {
-            // Return the directory containing the application executable
+            // Return the application directory (where user files like worlds/ are located)
+            // On macOS .app bundles, this is the folder containing the .app bundle
             // Based on: ExtractDirectory(App.m_strMUSHclientFileName)
-            QString appDir = QCoreApplication::applicationDirPath();
+            QString appDir = AppPaths::getAppDirectory();
             // Ensure trailing slash for compatibility
             if (!appDir.isEmpty() && !appDir.endsWith("/")) {
                 appDir += "/";
@@ -803,7 +805,7 @@ int L_GetInfo(lua_State* L)
 
         case 74: // Sounds directory
         {
-            QString soundsDir = QCoreApplication::applicationDirPath();
+            QString soundsDir = AppPaths::getAppDirectory();
             if (!soundsDir.isEmpty() && !soundsDir.endsWith("/")) {
                 soundsDir += "/";
             }

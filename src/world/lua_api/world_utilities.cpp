@@ -5,6 +5,7 @@
 #include "../../automation/alias.h"
 #include "../../automation/trigger.h"
 #include "../../storage/database.h"
+#include "../../utils/app_paths.h"
 #include "../../utils/name_generator.h"
 #include "../accelerator_manager.h"
 #include "../lua_dialog_callbacks.h"
@@ -4675,7 +4676,7 @@ int L_Save(lua_State* L)
 
         // Resolve relative path against application directory
         if (!QDir::isAbsolutePath(defaultDir)) {
-            defaultDir = QDir(QCoreApplication::applicationDirPath()).absoluteFilePath(defaultDir);
+            defaultDir = QDir(AppPaths::getAppDirectory()).absoluteFilePath(defaultDir);
         }
 
         // Create suggested filename from world name (sanitize invalid characters)

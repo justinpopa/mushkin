@@ -1,5 +1,6 @@
 #include "script_engine.h"
 #include "../automation/plugin.h"
+#include "../utils/app_paths.h"
 #include "../world/world_document.h"
 #include <QCoreApplication>
 #include <QDebug>
@@ -282,9 +283,10 @@ void ScriptEngine::openLua()
 
     // 5b. Set up Lua package.cpath for compiled C modules (issue #4)
     // We replace the default cpath entirely - no system paths
-    // App bundle paths are needed for bundled modules like LuaSocket
+    // Executable paths are needed for bundled modules like LuaSocket
     lua_getglobal(L, "package");
 
+    QString exeDir = AppPaths::getExecutableDirectory();
 #ifdef Q_OS_WIN
     QString libExt = "dll";
 #else
@@ -292,11 +294,11 @@ void ScriptEngine::openLua()
 #endif
 
     QStringList luaCPaths = {
-        // App bundle paths (for bundled C modules like LuaSocket)
-        appDir + "/lib/?." + libExt,
-        appDir + "/lib/?/core." + libExt,
-        appDir + "/lua/?." + libExt,
-        appDir + "/lua/?/core." + libExt,
+        // Executable paths (for bundled C modules like LuaSocket)
+        exeDir + "/lib/?." + libExt,
+        exeDir + "/lib/?/core." + libExt,
+        exeDir + "/lua/?." + libExt,
+        exeDir + "/lua/?/core." + libExt,
         // Relative paths (for user C modules)
         "./lib/?." + libExt,
         "./lib/?/core." + libExt,
@@ -662,7 +664,7 @@ return re
     // We wrap io.open, dofile, and loadfile to transparently convert separators
     // Also try application's lua/ directory for files not found at relative path
     // Note: Pass app_dir as a global to avoid string escaping issues
-    QString normalizedAppDir = appDir;
+    QString normalizedAppDir = AppPaths::getAppDirectory();
     normalizedAppDir.replace('\\', '/');
     lua_pushstring(L, normalizedAppDir.toUtf8().constData());
     lua_setglobal(L, "_MUSHCLIENT_APP_DIR");
