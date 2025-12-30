@@ -434,7 +434,7 @@ def generate_sidebar(categories: dict[str, Category], version: str) -> str:
         "- [[API Versions]]",
         "",
         "---",
-        "[GitHub Repository](https://github.com/jnpopop/mushkin)",
+        "[GitHub Repository](https://github.com/justinpopa/mushkin)",
     ])
 
     return '\n'.join(lines)
@@ -482,8 +482,8 @@ Mushkin provides a comprehensive Lua API compatible with MUSHclient scripts:
 
 ## Getting Help
 
-- **Issues & Bugs**: [GitHub Issues](https://github.com/jnpopop/mushkin/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/jnpopop/mushkin/discussions)
+- **Issues & Bugs**: [GitHub Issues](https://github.com/justinpopa/mushkin/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/justinpopa/mushkin/discussions)
 
 ---
 
