@@ -23,6 +23,7 @@ int luaopen_lsqlite3(lua_State* L); // SQLite3 bindings for Lua
 int luaopen_bit(lua_State* L);      // Bit manipulation library (LuaJIT)
 int luaopen_progress(lua_State* L); // Progress dialog library
 int luaopen_lpeg(lua_State* L);     // LPeg pattern matching library
+int luaopen_yue(lua_State* L);      // YueScript transpiler (statically linked)
 
 // ========== FFI Shims for Cross-Platform Compatibility ==========
 
@@ -660,25 +661,18 @@ return re
     //    etc.
 
     // Load YueScript module for YueScript transpilation support
-    // The yue.so module is in the lib/ directory (or lib/yue.so)
-    // We use require() which will find it via package.cpath
-    lua_getglobal(L, "require");
-    lua_pushstring(L, "yue");
-    if (lua_pcall(L, 1, 1, 0) == 0) {
-        // Store as global and in package.loaded
-        lua_pushvalue(L, -1);     // duplicate yue table
-        lua_setglobal(L, "yue");  // global "yue" = yue table
-        lua_getglobal(L, "package");
-        lua_getfield(L, -1, "loaded");
-        lua_pushvalue(L, -3);         // push yue table again
-        lua_setfield(L, -2, "yue");   // package.loaded["yue"] = yue
-        lua_pop(L, 3);                // pop loaded, package, and yue
-        qDebug() << "YueScript module loaded successfully";
-    } else {
-        // YueScript module not available - this is OK, just means no YueScript support
-        qDebug() << "YueScript module not available (optional):" << lua_tostring(L, -1);
-        lua_pop(L, 1); // pop error message
-    }
+    // YueScript is statically linked into the application to avoid
+    // Windows DLL loading issues with Lua C modules
+    lua_pushcfunction(L, luaopen_yue);
+    lua_call(L, 0, 1);            // Call luaopen_yue(), returns yue table
+    lua_pushvalue(L, -1);         // duplicate yue table
+    lua_setglobal(L, "yue");      // global "yue" = yue table
+    lua_getglobal(L, "package");
+    lua_getfield(L, -1, "loaded");
+    lua_pushvalue(L, -3);         // push yue table again
+    lua_setfield(L, -2, "yue");   // package.loaded["yue"] = yue
+    lua_pop(L, 3);                // pop loaded, package, and yue
+    qDebug() << "YueScript module loaded successfully (statically linked)";
 
     // Load Teal module for typed Lua transpilation support
     // tl.lua is a pure Lua file in the lua/ directory
