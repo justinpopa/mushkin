@@ -233,13 +233,14 @@ class MainWindow : public QMainWindow {
     void tileHorizontally();
     void tileVertically();
     void arrangeIcons();
-    void minimizeActiveWindow();
-    void maximizeActiveWindow();
-    void restoreActiveWindow();
+    void newWindow();
     void closeAllNotepadWindows();
 
     // Help menu actions
     void showHelp();
+    void openBugReports();
+    void openDocumentation();
+    void openWebPage();
     void about();
 
     // MDI area signals
@@ -440,6 +441,7 @@ class MainWindow : public QMainWindow {
     QAction* m_keyNameAction;
 
     // Connection menu and actions
+    QMenu* m_connectionMenu;
     QAction* m_connectAction;
     QAction* m_disconnectAction;
     QAction* m_autoConnectAction;
@@ -541,14 +543,15 @@ class MainWindow : public QMainWindow {
     QAction* m_tileHorizontallyAction;
     QAction* m_tileVerticallyAction;
     QAction* m_arrangeIconsAction;
-    QAction* m_minimizeWindowAction;
-    QAction* m_maximizeWindowAction;
-    QAction* m_restoreWindowAction;
+    QAction* m_newWindowAction;
     QAction* m_closeAllNotepadAction;
 
     // Help menu and actions
     QMenu* m_helpMenu;
     QAction* m_helpAction;
+    QAction* m_bugReportsAction;
+    QAction* m_documentationAction;
+    QAction* m_webPageAction;
     QAction* m_aboutAction;
 
     // Recent files
