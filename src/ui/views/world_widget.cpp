@@ -13,6 +13,8 @@
 #include <QLabel>
 #include <QMessageBox>
 #include <QSplitter>
+#include <QPainter>
+#include <QStyleOption>
 #include <QVBoxLayout>
 #ifdef Q_OS_MACOS
 #include <QHBoxLayout>
@@ -76,8 +78,13 @@ void WorldWidget::setupUi()
     // On macOS with frameless windows, add margin for resize handles and visible border
     layout->setContentsMargins(ResizeMargin, ResizeMargin, ResizeMargin, ResizeMargin);
     setMouseTracking(true);
-    // Add a visible border frame around the window (lighter color to contrast with MDI area)
-    setStyleSheet("WorldWidget { border: 1px solid #888; background: #1a1a1a; }");
+    // Windows 2000-style 3D raised border effect
+    setStyleSheet("WorldWidget { "
+                  "border-top: 1px solid #c0c0c0; "
+                  "border-left: 1px solid #c0c0c0; "
+                  "border-bottom: 1px solid #404040; "
+                  "border-right: 1px solid #404040; "
+                  "background: #1a1a1a; }");
 #else
     layout->setContentsMargins(0, 0, 0, 0);
 #endif
@@ -328,9 +335,14 @@ void WorldWidget::updateFrameForWindowState(Qt::WindowStates state)
         layout->setContentsMargins(0, 0, 0, 0);
         setStyleSheet("WorldWidget { border: none; background: #1a1a1a; }");
     } else {
-        // Show border and resize margins when restored
+        // Show Windows 2000-style 3D border and resize margins when restored
         layout->setContentsMargins(ResizeMargin, ResizeMargin, ResizeMargin, ResizeMargin);
-        setStyleSheet("WorldWidget { border: 1px solid #888; background: #1a1a1a; }");
+        setStyleSheet("WorldWidget { "
+                      "border-top: 1px solid #c0c0c0; "
+                      "border-left: 1px solid #c0c0c0; "
+                      "border-bottom: 1px solid #404040; "
+                      "border-right: 1px solid #404040; "
+                      "background: #1a1a1a; }");
     }
 }
 #endif
@@ -715,6 +727,18 @@ void WorldWidget::clearCommandHistory()
     if (m_document) {
         m_document->clearCommandHistory();
     }
+}
+
+/**
+ * Paint event - required for QWidget subclasses to render stylesheets
+ */
+void WorldWidget::paintEvent(QPaintEvent* event)
+{
+    Q_UNUSED(event);
+    QStyleOption opt;
+    opt.initFrom(this);
+    QPainter p(this);
+    style()->drawPrimitive(QStyle::PE_Widget, &opt, &p, this);
 }
 
 /**

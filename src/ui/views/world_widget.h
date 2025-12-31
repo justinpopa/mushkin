@@ -109,6 +109,8 @@ class WorldWidget : public QWidget {
   protected:
     // Event handling for keyboard shortcuts
     void keyPressEvent(QKeyEvent* event) override;
+    // Required for QWidget subclass to render stylesheets (border)
+    void paintEvent(QPaintEvent* event) override;
 
 #ifdef Q_OS_MACOS
     // Resize handling for frameless windows
@@ -149,7 +151,7 @@ class WorldWidget : public QWidget {
     int m_resizeEdges = NoEdge;
     QPoint m_resizeStartPos;
     QRect m_resizeStartGeometry;
-    static constexpr int ResizeMargin = 6; // Pixels from edge to trigger resize
+    static constexpr int ResizeMargin = 3; // Pixels from edge to trigger resize
 
     // Drag state for title bar
     bool m_dragging = false;
