@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/justinpopa/mushkin/compare/v0.2.0...v0.2.1) (2025-12-31)
+
+
+### Bug Fixes
+
+* remove tag push trigger from release workflow ([5e79010](https://github.com/justinpopa/mushkin/commit/5e79010d2b63170b567aca25c37aa9054bd38275))
+
 ## [0.2.0](https://github.com/justinpopa/mushkin/compare/v0.1.0...v0.2.0) (2025-12-30)
 
 
