@@ -315,38 +315,39 @@ void MainWindow::createMenus()
     // Input Menu (matches original MUSHclient structure)
     m_inputMenu = menuBar()->addMenu("&Input");
 
-    m_activateInputAreaAction = m_inputMenu->addAction("&Activate Input Area");
+    m_activateInputAreaAction = m_inputMenu->addAction("Activate &Input Area");
     m_activateInputAreaAction->setShortcut(QKeySequence(Qt::Key_Tab));
-    m_activateInputAreaAction->setStatusTip("Set focus to the input field (Tab or Escape)");
+    m_activateInputAreaAction->setStatusTip("Set focus to the input field");
     m_activateInputAreaAction->setMenuRole(QAction::NoRole);
     connect(m_activateInputAreaAction, &QAction::triggered, this, &MainWindow::activateInputArea);
 
     m_inputMenu->addSeparator();
 
-    m_previousCommandAction = m_inputMenu->addAction("&Previous Command");
-    m_previousCommandAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_P));
-    m_previousCommandAction->setStatusTip("Recall previous command from history");
-    m_previousCommandAction->setMenuRole(QAction::NoRole);
-    connect(m_previousCommandAction, &QAction::triggered, this, &MainWindow::previousCommand);
-
     m_nextCommandAction = m_inputMenu->addAction("&Next Command");
-    m_nextCommandAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_N));
+    m_nextCommandAction->setShortcut(QKeySequence(Qt::ALT | Qt::Key_Down));
     m_nextCommandAction->setStatusTip("Recall next command from history");
     m_nextCommandAction->setMenuRole(QAction::NoRole);
     connect(m_nextCommandAction, &QAction::triggered, this, &MainWindow::nextCommand);
 
+    m_previousCommandAction = m_inputMenu->addAction("&Previous Command");
+    m_previousCommandAction->setShortcut(QKeySequence(Qt::ALT | Qt::Key_Up));
+    m_previousCommandAction->setStatusTip("Recall previous command from history");
+    m_previousCommandAction->setMenuRole(QAction::NoRole);
+    connect(m_previousCommandAction, &QAction::triggered, this, &MainWindow::previousCommand);
+
     m_repeatLastCommandAction = m_inputMenu->addAction("&Repeat Last Command");
+    m_repeatLastCommandAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_R));
     m_repeatLastCommandAction->setStatusTip("Execute the most recent command again");
     m_repeatLastCommandAction->setMenuRole(QAction::NoRole);
     connect(m_repeatLastCommandAction, &QAction::triggered, this, &MainWindow::repeatLastCommand);
 
-    m_inputMenu->addSeparator();
+    QAction* quitWorldAction = m_inputMenu->addAction("&Quit From This World...");
+    quitWorldAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::CTRL | Qt::Key_Q));
+    quitWorldAction->setStatusTip("Close the current world");
+    quitWorldAction->setMenuRole(QAction::NoRole);
+    connect(quitWorldAction, &QAction::triggered, this, &MainWindow::closeWorld);
 
-    m_clearCommandHistoryAction = m_inputMenu->addAction("C&lear Command History");
-    m_clearCommandHistoryAction->setStatusTip("Clear all command history");
-    m_clearCommandHistoryAction->setMenuRole(QAction::NoRole);
-    connect(m_clearCommandHistoryAction, &QAction::triggered, this,
-            &MainWindow::clearCommandHistory);
+    m_inputMenu->addSeparator();
 
     m_commandHistoryAction = m_inputMenu->addAction("Command &History...");
     m_commandHistoryAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_H));
@@ -354,17 +355,42 @@ void MainWindow::createMenus()
     m_commandHistoryAction->setMenuRole(QAction::NoRole);
     connect(m_commandHistoryAction, &QAction::triggered, this, &MainWindow::showCommandHistory);
 
+    m_clearCommandHistoryAction = m_inputMenu->addAction("&Clear Command History...");
+    m_clearCommandHistoryAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::CTRL | Qt::Key_D));
+    m_clearCommandHistoryAction->setStatusTip("Clear all command history");
+    m_clearCommandHistoryAction->setMenuRole(QAction::NoRole);
+    connect(m_clearCommandHistoryAction, &QAction::triggered, this,
+            &MainWindow::clearCommandHistory);
+
+    m_discardQueueAction = m_inputMenu->addAction("&Discard 0 Queued Commands");
+    m_discardQueueAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_D));
+    m_discardQueueAction->setStatusTip("Clear all pending queued commands");
+    m_discardQueueAction->setMenuRole(QAction::NoRole);
+    m_discardQueueAction->setEnabled(false); // Disabled initially, updated by updateMenus()
+    connect(m_discardQueueAction, &QAction::triggered, this, &MainWindow::discardQueuedCommands);
+
     m_inputMenu->addSeparator();
 
-    m_globalChangeAction = m_inputMenu->addAction("&Global Change...");
+    // Auto Say toggle (also configurable via Game → Configure → Auto Say)
+    QAction* autoSayAction = m_inputMenu->addAction("&Auto Say");
+    autoSayAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::CTRL | Qt::Key_A));
+    autoSayAction->setCheckable(true);
+    autoSayAction->setStatusTip("Toggle auto-say mode");
+    autoSayAction->setMenuRole(QAction::NoRole);
+    connect(autoSayAction, &QAction::triggered, this, &MainWindow::toggleAutoSay);
+
+    // Send File (also in Game menu)
+    QAction* sendFileAction = m_inputMenu->addAction("&Send File...");
+    sendFileAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::CTRL | Qt::Key_O));
+    sendFileAction->setStatusTip("Send a text file to the MUD");
+    sendFileAction->setMenuRole(QAction::NoRole);
+    connect(sendFileAction, &QAction::triggered, this, &MainWindow::sendFile);
+
+    m_globalChangeAction = m_inputMenu->addAction("Global Change...");
+    m_globalChangeAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::CTRL | Qt::Key_G));
     m_globalChangeAction->setStatusTip("Search and replace text globally");
     m_globalChangeAction->setMenuRole(QAction::NoRole);
     connect(m_globalChangeAction, &QAction::triggered, this, &MainWindow::globalChange);
-
-    m_discardQueueAction = m_inputMenu->addAction("&Discard Queued Commands");
-    m_discardQueueAction->setStatusTip("Clear all pending queued commands");
-    m_discardQueueAction->setMenuRole(QAction::NoRole);
-    connect(m_discardQueueAction, &QAction::triggered, this, &MainWindow::discardQueuedCommands);
 
     m_keyNameAction = m_inputMenu->addAction("&Key Name...");
     m_keyNameAction->setStatusTip("Display the name of a key press");
@@ -1660,6 +1686,14 @@ void MainWindow::updateMenus()
     m_repeatLastCommandAction->setEnabled(hasActiveWorld);
     m_clearCommandHistoryAction->setEnabled(hasActiveWorld);
     m_commandHistoryAction->setEnabled(hasActiveWorld);
+
+    // Discard Queued Commands - show count and disable when empty
+    int queuedCount = 0;
+    if (currentDoc) {
+        queuedCount = currentDoc->GetCommandQueue().size();
+    }
+    m_discardQueueAction->setText(tr("&Discard %1 Queued Commands").arg(queuedCount));
+    m_discardQueueAction->setEnabled(hasActiveWorld && queuedCount > 0);
 
     // Window menu actions
     bool hasWorlds = !m_mdiArea->subWindowList().isEmpty();
