@@ -128,6 +128,39 @@ class ScriptEngine : public QObject {
      */
     QString transpileYueScript(const QString& yueCode, const QString& name);
 
+    /**
+     * Transpile Teal code to Lua
+     *
+     * Uses tl.gen() to convert Teal (typed Lua) source code to Lua.
+     *
+     * @param tealCode Teal source code
+     * @param name Name for error messages
+     * @return Transpiled Lua code, or empty string on error
+     */
+    QString transpileTeal(const QString& tealCode, const QString& name);
+
+    /**
+     * Transpile Fennel code to Lua
+     *
+     * Uses fennel.compileString() to convert Fennel (Lisp) source to Lua.
+     *
+     * @param fennelCode Fennel source code
+     * @param name Name for error messages
+     * @return Transpiled Lua code, or empty string on error
+     */
+    QString transpileFennel(const QString& fennelCode, const QString& name);
+
+    /**
+     * Transpile MoonScript code to Lua
+     *
+     * Uses moonscript.to_lua() to convert MoonScript source to Lua.
+     *
+     * @param moonCode MoonScript source code
+     * @param name Name for error messages
+     * @return Transpiled Lua code, or empty string on error
+     */
+    QString transpileMoonScript(const QString& moonCode, const QString& name);
+
     // ========== Lua Function Callbacks ==========
 
     /**

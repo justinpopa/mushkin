@@ -54,6 +54,9 @@ void ImmediateDialog::setupUi()
     m_languageCombo = new QComboBox(this);
     m_languageCombo->addItem("Lua", static_cast<int>(ScriptLanguage::Lua));
     m_languageCombo->addItem("YueScript", static_cast<int>(ScriptLanguage::YueScript));
+    m_languageCombo->addItem("MoonScript", static_cast<int>(ScriptLanguage::MoonScript));
+    m_languageCombo->addItem("Teal", static_cast<int>(ScriptLanguage::Teal));
+    m_languageCombo->addItem("Fennel", static_cast<int>(ScriptLanguage::Fennel));
     langLayout->addWidget(langLabel);
     langLayout->addWidget(m_languageCombo);
     langLayout->addStretch();

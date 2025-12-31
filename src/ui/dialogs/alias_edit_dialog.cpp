@@ -119,6 +119,9 @@ void AliasEditDialog::setupUi()
     m_scriptLanguageCombo = new QComboBox(responseTab);
     m_scriptLanguageCombo->addItem("Lua", static_cast<int>(ScriptLanguage::Lua));
     m_scriptLanguageCombo->addItem("YueScript", static_cast<int>(ScriptLanguage::YueScript));
+    m_scriptLanguageCombo->addItem("MoonScript", static_cast<int>(ScriptLanguage::MoonScript));
+    m_scriptLanguageCombo->addItem("Teal", static_cast<int>(ScriptLanguage::Teal));
+    m_scriptLanguageCombo->addItem("Fennel", static_cast<int>(ScriptLanguage::Fennel));
     m_scriptLanguageCombo->setToolTip("Script language for the send text when Send To is Script");
     responseForm->addRow("Script &language:", m_scriptLanguageCombo);
 

@@ -6,25 +6,37 @@
 /**
  * ScriptLanguage - Scripting language enum for triggers, aliases, timers, and plugins
  *
- * Mushkin supports multiple scripting languages. YueScript is transpiled to Lua
- * at runtime using the yue.to_lua() function.
+ * Mushkin supports multiple scripting languages that transpile to Lua at runtime:
+ * - YueScript: Clean syntax (like CoffeeScript for Lua), MoonScript derivative
+ * - MoonScript: Original clean syntax language (YueScript predecessor)
+ * - Teal: Static typing (like TypeScript for Lua)
+ * - Fennel: Lisp syntax that compiles to Lua
  */
 enum class ScriptLanguage {
-    Lua = 0,       // Standard Lua (default)
-    YueScript = 1  // YueScript (transpiled to Lua)
+    Lua = 0,        // Standard Lua (default)
+    YueScript = 1,  // YueScript (transpiled to Lua)
+    Teal = 2,       // Teal (typed Lua, transpiled)
+    Fennel = 3,     // Fennel (Lisp syntax, transpiled)
+    MoonScript = 4  // MoonScript (transpiled to Lua)
 };
 
 /**
  * Convert ScriptLanguage enum to string for XML serialization
  *
  * @param lang Script language enum value
- * @return String representation ("Lua" or "YueScript")
+ * @return String representation ("Lua", "YueScript", "Teal", "Fennel", or "MoonScript")
  */
 inline QString scriptLanguageToString(ScriptLanguage lang)
 {
     switch (lang) {
         case ScriptLanguage::YueScript:
             return QStringLiteral("YueScript");
+        case ScriptLanguage::Teal:
+            return QStringLiteral("Teal");
+        case ScriptLanguage::Fennel:
+            return QStringLiteral("Fennel");
+        case ScriptLanguage::MoonScript:
+            return QStringLiteral("MoonScript");
         default:
             return QStringLiteral("Lua");
     }
@@ -45,6 +57,18 @@ inline ScriptLanguage scriptLanguageFromString(const QString& str)
         str.compare(QLatin1String("Yue"), Qt::CaseInsensitive) == 0) {
         return ScriptLanguage::YueScript;
     }
+    if (str.compare(QLatin1String("Teal"), Qt::CaseInsensitive) == 0 ||
+        str.compare(QLatin1String("tl"), Qt::CaseInsensitive) == 0) {
+        return ScriptLanguage::Teal;
+    }
+    if (str.compare(QLatin1String("Fennel"), Qt::CaseInsensitive) == 0 ||
+        str.compare(QLatin1String("fnl"), Qt::CaseInsensitive) == 0) {
+        return ScriptLanguage::Fennel;
+    }
+    if (str.compare(QLatin1String("MoonScript"), Qt::CaseInsensitive) == 0 ||
+        str.compare(QLatin1String("moon"), Qt::CaseInsensitive) == 0) {
+        return ScriptLanguage::MoonScript;
+    }
     return ScriptLanguage::Lua;
 }
 
@@ -59,6 +83,12 @@ inline QString scriptLanguageDisplayName(ScriptLanguage lang)
     switch (lang) {
         case ScriptLanguage::YueScript:
             return QStringLiteral("YueScript");
+        case ScriptLanguage::Teal:
+            return QStringLiteral("Teal");
+        case ScriptLanguage::Fennel:
+            return QStringLiteral("Fennel");
+        case ScriptLanguage::MoonScript:
+            return QStringLiteral("MoonScript");
         default:
             return QStringLiteral("Lua");
     }

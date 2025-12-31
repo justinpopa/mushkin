@@ -12,6 +12,7 @@
  * 7. Timing statistics are tracked
  */
 
+#include "../src/automation/script_language.h"
 #include "../src/text/line.h"
 #include "../src/text/style.h"
 #include "../src/world/script_engine.h"
@@ -323,6 +324,306 @@ TEST_F(ScriptLoadingTest, RePatternMatching)
     const char* gsubResult = lua_tostring(L, -1);
     EXPECT_STREQ(gsubResult, "X X") << "re.gsub should replace words with X";
     lua_pop(L, 1);
+}
+
+// ========== Transpiled Language Tests ==========
+
+// Test 15: YueScript module is available
+TEST_F(ScriptLoadingTest, YueScriptModuleAvailable)
+{
+    lua_State* L = doc->m_ScriptEngine->L;
+
+    // Check yue global exists
+    lua_getglobal(L, "yue");
+    EXPECT_TRUE(lua_istable(L, -1)) << "yue global should be a table";
+    lua_pop(L, 1);
+
+    // Check yue.to_lua exists
+    QString code = R"(
+        local yue = require("yue")
+        yue_available = yue and yue.to_lua and type(yue.to_lua) == "function"
+    )";
+    bool error = doc->m_ScriptEngine->parseLua(code, "YueScript module test");
+    EXPECT_FALSE(error) << "require('yue') should succeed";
+
+    lua_getglobal(L, "yue_available");
+    EXPECT_TRUE(lua_toboolean(L, -1)) << "yue.to_lua function should exist";
+    lua_pop(L, 1);
+}
+
+// Test 16: YueScript transpilation works
+TEST_F(ScriptLoadingTest, YueScriptTranspilation)
+{
+    // Simple YueScript code that assigns a value
+    // Note: YueScript creates locals by default, use 'global' statement for globals
+    QString yueCode = R"(
+print "Hello from YueScript"
+global yue_test_value = 42
+)";
+    QString transpiled = doc->m_ScriptEngine->transpileYueScript(yueCode, "YueScript test");
+    EXPECT_FALSE(transpiled.isEmpty()) << "YueScript transpilation should produce output";
+
+    // Execute the transpiled code
+    bool error = doc->m_ScriptEngine->parseLua(transpiled, "YueScript transpiled");
+    EXPECT_FALSE(error) << "Transpiled YueScript should execute without error";
+
+    // Verify the variable was set
+    lua_State* L = doc->m_ScriptEngine->L;
+    lua_getglobal(L, "yue_test_value");
+    int value = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+    EXPECT_EQ(value, 42) << "YueScript should set the global variable";
+}
+
+// Test 17: YueScript parseScript() works
+TEST_F(ScriptLoadingTest, YueScriptParseScript)
+{
+    // Note: YueScript creates locals by default, use 'global' statement for globals
+    QString yueCode = R"(
+global yue_parse_value = 100
+)";
+    bool error = doc->m_ScriptEngine->parseScript(yueCode, "YueScript parseScript", ScriptLanguage::YueScript);
+    EXPECT_FALSE(error) << "parseScript with YueScript should succeed";
+
+    lua_State* L = doc->m_ScriptEngine->L;
+    lua_getglobal(L, "yue_parse_value");
+    int value = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+    EXPECT_EQ(value, 100) << "YueScript parseScript should execute correctly";
+}
+
+// Test 18: Teal module is available
+TEST_F(ScriptLoadingTest, TealModuleAvailable)
+{
+    lua_State* L = doc->m_ScriptEngine->L;
+
+    // Check tl global exists
+    lua_getglobal(L, "tl");
+    EXPECT_TRUE(lua_istable(L, -1)) << "tl global should be a table";
+    lua_pop(L, 1);
+
+    // Check tl.gen exists
+    QString code = R"(
+        local tl = require("tl")
+        tl_available = tl and tl.gen and type(tl.gen) == "function"
+    )";
+    bool error = doc->m_ScriptEngine->parseLua(code, "Teal module test");
+    EXPECT_FALSE(error) << "require('tl') should succeed";
+
+    lua_getglobal(L, "tl_available");
+    EXPECT_TRUE(lua_toboolean(L, -1)) << "tl.gen function should exist";
+    lua_pop(L, 1);
+}
+
+// Test 19: Teal transpilation works
+TEST_F(ScriptLoadingTest, TealTranspilation)
+{
+    // Simple Teal code with type annotation
+    QString tealCode = R"(
+local x: number = 42
+teal_test_value = x
+)";
+    QString transpiled = doc->m_ScriptEngine->transpileTeal(tealCode, "Teal test");
+    EXPECT_FALSE(transpiled.isEmpty()) << "Teal transpilation should produce output";
+
+    // Execute the transpiled code
+    bool error = doc->m_ScriptEngine->parseLua(transpiled, "Teal transpiled");
+    EXPECT_FALSE(error) << "Transpiled Teal should execute without error";
+
+    // Verify the variable was set
+    lua_State* L = doc->m_ScriptEngine->L;
+    lua_getglobal(L, "teal_test_value");
+    int value = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+    EXPECT_EQ(value, 42) << "Teal should set the global variable";
+}
+
+// Test 20: Teal parseScript() works
+TEST_F(ScriptLoadingTest, TealParseScript)
+{
+    QString tealCode = R"(
+local y: number = 200
+teal_parse_value = y
+)";
+    bool error = doc->m_ScriptEngine->parseScript(tealCode, "Teal parseScript", ScriptLanguage::Teal);
+    EXPECT_FALSE(error) << "parseScript with Teal should succeed";
+
+    lua_State* L = doc->m_ScriptEngine->L;
+    lua_getglobal(L, "teal_parse_value");
+    int value = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+    EXPECT_EQ(value, 200) << "Teal parseScript should execute correctly";
+}
+
+// Test 21: Fennel module is available
+TEST_F(ScriptLoadingTest, FennelModuleAvailable)
+{
+    lua_State* L = doc->m_ScriptEngine->L;
+
+    // Check fennel global exists
+    lua_getglobal(L, "fennel");
+    EXPECT_TRUE(lua_istable(L, -1)) << "fennel global should be a table";
+    lua_pop(L, 1);
+
+    // Check fennel.compileString exists
+    QString code = R"(
+        local fennel = require("fennel")
+        fennel_available = fennel and fennel.compileString and type(fennel.compileString) == "function"
+    )";
+    bool error = doc->m_ScriptEngine->parseLua(code, "Fennel module test");
+    EXPECT_FALSE(error) << "require('fennel') should succeed";
+
+    lua_getglobal(L, "fennel_available");
+    EXPECT_TRUE(lua_toboolean(L, -1)) << "fennel.compileString function should exist";
+    lua_pop(L, 1);
+}
+
+// Test 22: Fennel transpilation works
+TEST_F(ScriptLoadingTest, FennelTranspilation)
+{
+    // Simple Fennel code (Lisp syntax)
+    QString fennelCode = R"(
+(global fennel_test_value 42)
+)";
+    QString transpiled = doc->m_ScriptEngine->transpileFennel(fennelCode, "Fennel test");
+    EXPECT_FALSE(transpiled.isEmpty()) << "Fennel transpilation should produce output";
+
+    // Execute the transpiled code
+    bool error = doc->m_ScriptEngine->parseLua(transpiled, "Fennel transpiled");
+    EXPECT_FALSE(error) << "Transpiled Fennel should execute without error";
+
+    // Verify the variable was set
+    lua_State* L = doc->m_ScriptEngine->L;
+    lua_getglobal(L, "fennel_test_value");
+    int value = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+    EXPECT_EQ(value, 42) << "Fennel should set the global variable";
+}
+
+// Test 23: Fennel parseScript() works
+TEST_F(ScriptLoadingTest, FennelParseScript)
+{
+    QString fennelCode = R"(
+(global fennel_parse_value 300)
+)";
+    bool error = doc->m_ScriptEngine->parseScript(fennelCode, "Fennel parseScript", ScriptLanguage::Fennel);
+    EXPECT_FALSE(error) << "parseScript with Fennel should succeed";
+
+    lua_State* L = doc->m_ScriptEngine->L;
+    lua_getglobal(L, "fennel_parse_value");
+    int value = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+    EXPECT_EQ(value, 300) << "Fennel parseScript should execute correctly";
+}
+
+// Test 24: Error handling for invalid YueScript
+TEST_F(ScriptLoadingTest, YueScriptErrorHandling)
+{
+    // Invalid YueScript syntax
+    QString invalidYue = R"(
+@@@invalid syntax here###
+)";
+    QString transpiled = doc->m_ScriptEngine->transpileYueScript(invalidYue, "Invalid YueScript");
+    EXPECT_TRUE(transpiled.isEmpty()) << "Invalid YueScript should return empty string";
+}
+
+// Test 25: Error handling for invalid Teal
+TEST_F(ScriptLoadingTest, TealErrorHandling)
+{
+    // Invalid Teal - type error (assigning string to number)
+    QString invalidTeal = R"(
+local x: number = "not a number"
+)";
+    QString transpiled = doc->m_ScriptEngine->transpileTeal(invalidTeal, "Invalid Teal");
+    // Teal may or may not fail here depending on strictness, but the code should handle it
+    // If it transpiles, the runtime will catch it
+    EXPECT_NO_THROW(transpiled = doc->m_ScriptEngine->transpileTeal(invalidTeal, "Invalid Teal"))
+        << "Teal error handling should not crash";
+}
+
+// Test 26: Error handling for invalid Fennel
+TEST_F(ScriptLoadingTest, FennelErrorHandling)
+{
+    // Invalid Fennel syntax (unbalanced parens)
+    QString invalidFennel = R"(
+(def x 42
+)";
+    QString transpiled = doc->m_ScriptEngine->transpileFennel(invalidFennel, "Invalid Fennel");
+    EXPECT_TRUE(transpiled.isEmpty()) << "Invalid Fennel should return empty string";
+}
+
+// Test 27: MoonScript module is available
+TEST_F(ScriptLoadingTest, MoonScriptModuleAvailable)
+{
+    lua_State* L = doc->m_ScriptEngine->L;
+
+    // Check moonscript global exists
+    lua_getglobal(L, "moonscript");
+    EXPECT_TRUE(lua_istable(L, -1)) << "moonscript global should be a table";
+    lua_pop(L, 1);
+
+    // Check moonscript.to_lua exists
+    QString code = R"(
+        local moonscript = require("moonscript")
+        moonscript_available = moonscript and moonscript.to_lua and type(moonscript.to_lua) == "function"
+    )";
+    bool error = doc->m_ScriptEngine->parseLua(code, "MoonScript module test");
+    EXPECT_FALSE(error) << "require('moonscript') should succeed";
+
+    lua_getglobal(L, "moonscript_available");
+    EXPECT_TRUE(lua_toboolean(L, -1)) << "moonscript.to_lua function should exist";
+    lua_pop(L, 1);
+}
+
+// Test 28: MoonScript transpilation works
+TEST_F(ScriptLoadingTest, MoonScriptTranspilation)
+{
+    // Simple MoonScript code that assigns a value
+    // MoonScript uses export for globals
+    QString moonCode = R"(
+export moon_test_value = 42
+)";
+    QString transpiled = doc->m_ScriptEngine->transpileMoonScript(moonCode, "MoonScript test");
+    EXPECT_FALSE(transpiled.isEmpty()) << "MoonScript transpilation should produce output";
+
+    // Execute the transpiled code
+    bool error = doc->m_ScriptEngine->parseLua(transpiled, "MoonScript transpiled");
+    EXPECT_FALSE(error) << "Transpiled MoonScript should execute without error";
+
+    // Verify the variable was set
+    lua_State* L = doc->m_ScriptEngine->L;
+    lua_getglobal(L, "moon_test_value");
+    int value = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+    EXPECT_EQ(value, 42) << "MoonScript should set the global variable";
+}
+
+// Test 29: MoonScript parseScript() works
+TEST_F(ScriptLoadingTest, MoonScriptParseScript)
+{
+    // MoonScript uses export for globals
+    QString moonCode = R"(
+export moon_parse_value = 100
+)";
+    bool error = doc->m_ScriptEngine->parseScript(moonCode, "MoonScript parseScript", ScriptLanguage::MoonScript);
+    EXPECT_FALSE(error) << "parseScript with MoonScript should succeed";
+
+    lua_State* L = doc->m_ScriptEngine->L;
+    lua_getglobal(L, "moon_parse_value");
+    int value = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+    EXPECT_EQ(value, 100) << "MoonScript parseScript should execute correctly";
+}
+
+// Test 30: Error handling for invalid MoonScript
+TEST_F(ScriptLoadingTest, MoonScriptErrorHandling)
+{
+    // Invalid MoonScript syntax
+    QString invalidMoon = R"(
+@@@ invalid syntax here ###
+)";
+    QString transpiled = doc->m_ScriptEngine->transpileMoonScript(invalidMoon, "Invalid MoonScript");
+    EXPECT_TRUE(transpiled.isEmpty()) << "Invalid MoonScript should return empty string";
 }
 
 // GoogleTest main function

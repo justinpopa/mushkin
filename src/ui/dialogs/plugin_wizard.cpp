@@ -738,7 +738,7 @@ PluginWizardPage7::PluginWizardPage7(WorldDocument* doc, QWidget* parent)
     QHBoxLayout* langLayout = new QHBoxLayout();
     langLayout->addWidget(new QLabel(tr("Script Language:"), this));
     m_languageCombo = new QComboBox(this);
-    m_languageCombo->addItems({"Lua", "YueScript"});
+    m_languageCombo->addItems({"Lua", "YueScript", "MoonScript", "Teal", "Fennel"});
     langLayout->addWidget(m_languageCombo);
     langLayout->addStretch();
     layout->addLayout(langLayout);

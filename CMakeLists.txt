@@ -309,6 +309,13 @@ foreach(LUA_FILE ${LUA_SOURCE_FILES})
 endforeach()
 message(STATUS "Copied ${CMAKE_SOURCE_DIR}/lua/*.lua to build directory")
 
+# Copy MoonScript module directory (multi-file module)
+if(EXISTS "${CMAKE_SOURCE_DIR}/lua/moonscript")
+    file(COPY "${CMAKE_SOURCE_DIR}/lua/moonscript"
+         DESTINATION "${CMAKE_BINARY_DIR}/lua")
+    message(STATUS "Copied MoonScript module to build directory")
+endif()
+
 # ========== LuaSocket Library ==========
 # Build socket.core and mime.core for HTTP client support in plugins
 # Required for plugins that use socket.http for web requests
