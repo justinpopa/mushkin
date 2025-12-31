@@ -12,6 +12,11 @@ target_link_libraries(mushkin PRIVATE
     ui        # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
+# Pass version from CMake to code
+target_compile_definitions(mushkin PRIVATE
+    MUSHKIN_VERSION="${PROJECT_VERSION}"
+)
+
 # ========== Static Qt Plugin Handling ==========
 # When Qt is built statically, plugins must be explicitly imported
 # See: https://doc.qt.io/qt-6/plugins-howto.html#static-plugins
