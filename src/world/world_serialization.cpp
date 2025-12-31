@@ -175,6 +175,11 @@ void WorldDocument::saveTriggersToXml(QXmlStreamWriter& xml)
         if (trigger->iOtherBackground != 0)
             xml.writeAttribute("other_back_colour", colorToName(trigger->iOtherBackground));
 
+        // Script language (only write if not Lua - the default)
+        if (trigger->scriptLanguage != ScriptLanguage::Lua) {
+            xml.writeAttribute("script_language", scriptLanguageToString(trigger->scriptLanguage));
+        }
+
         // Other options
         xml.writeAttribute("clipboard_arg", QString::number(trigger->iClipboardArg));
         xml.writeAttribute("user", QString::number(trigger->iUserOption));
@@ -324,6 +329,12 @@ void WorldDocument::loadTriggersFromXml(QXmlStreamReader& xml, Plugin* plugin)
                 trigger->iOtherBackground =
                     nameToColor(attrs.value("other_back_colour").toString());
 
+            // Script language (defaults to Lua if not specified)
+            if (attrs.hasAttribute("script_language")) {
+                trigger->scriptLanguage =
+                    scriptLanguageFromString(attrs.value("script_language").toString());
+            }
+
             // Other options
             if (attrs.hasAttribute("clipboard_arg"))
                 trigger->iClipboardArg = attrs.value("clipboard_arg").toInt();
@@ -412,6 +423,11 @@ void WorldDocument::saveAliasesToXml(QXmlStreamWriter& xml)
         xml.writeAttribute("one_shot", alias->bOneShot ? "y" : "n");
         xml.writeAttribute("menu", alias->bMenu ? "y" : "n");
 
+        // Script language (only write if not Lua - the default)
+        if (alias->scriptLanguage != ScriptLanguage::Lua) {
+            xml.writeAttribute("script_language", scriptLanguageToString(alias->scriptLanguage));
+        }
+
         // Other options
         xml.writeAttribute("user", QString::number(alias->iUserOption));
 
@@ -481,6 +497,12 @@ void WorldDocument::loadAliasesFromXml(QXmlStreamReader& xml, Plugin* plugin)
             alias->bEchoAlias = attrs.value("echo_alias").toString() == "y";
             alias->bOneShot = attrs.value("one_shot").toString() == "y";
             alias->bMenu = attrs.value("menu").toString() == "y";
+
+            // Script language (defaults to Lua if not specified)
+            if (attrs.hasAttribute("script_language")) {
+                alias->scriptLanguage =
+                    scriptLanguageFromString(attrs.value("script_language").toString());
+            }
 
             // Other options
             if (attrs.hasAttribute("user"))
@@ -586,6 +608,11 @@ void WorldDocument::saveTimersToXml(QXmlStreamWriter& xml)
         xml.writeAttribute("omit_from_output", timer->bOmitFromOutput ? "y" : "n");
         xml.writeAttribute("omit_from_log", timer->bOmitFromLog ? "y" : "n");
 
+        // Script language (only write if not Lua - the default)
+        if (timer->scriptLanguage != ScriptLanguage::Lua) {
+            xml.writeAttribute("script_language", scriptLanguageToString(timer->scriptLanguage));
+        }
+
         // Other options
         xml.writeAttribute("user", QString::number(timer->iUserOption));
 
@@ -690,6 +717,12 @@ void WorldDocument::loadTimersFromXml(QXmlStreamReader& xml, Plugin* plugin)
                                        (attrs.value("active_closed").toString() == "y");
             timer->bOmitFromOutput = attrs.value("omit_from_output").toString() == "y";
             timer->bOmitFromLog = attrs.value("omit_from_log").toString() == "y";
+
+            // Script language (defaults to Lua if not specified)
+            if (attrs.hasAttribute("script_language")) {
+                timer->scriptLanguage =
+                    scriptLanguageFromString(attrs.value("script_language").toString());
+            }
 
             // Other options
             if (attrs.hasAttribute("user"))
@@ -871,6 +904,9 @@ void WorldDocument::Save_One_Trigger_XML(QTextStream& out, Trigger* trigger)
 
     if (!trigger->strProcedure.isEmpty())
         out << QString("   script=\"%1\"\n").arg(escapeXml(trigger->strProcedure));
+    if (trigger->scriptLanguage != ScriptLanguage::Lua)
+        out << QString("   script_language=\"%1\"\n")
+                   .arg(scriptLanguageToString(trigger->scriptLanguage));
     if (!trigger->strGroup.isEmpty())
         out << QString("   group=\"%1\"\n").arg(escapeXml(trigger->strGroup));
     if (!trigger->strVariable.isEmpty())
@@ -979,6 +1015,9 @@ void WorldDocument::Save_One_Alias_XML(QTextStream& out, Alias* alias)
 
     if (!alias->strProcedure.isEmpty())
         out << QString("   script=\"%1\"\n").arg(escapeXml(alias->strProcedure));
+    if (alias->scriptLanguage != ScriptLanguage::Lua)
+        out << QString("   script_language=\"%1\"\n")
+                   .arg(scriptLanguageToString(alias->scriptLanguage));
     if (!alias->strGroup.isEmpty())
         out << QString("   group=\"%1\"\n").arg(escapeXml(alias->strGroup));
     if (!alias->strVariable.isEmpty())
@@ -1052,6 +1091,9 @@ void WorldDocument::Save_One_Timer_XML(QTextStream& out, Timer* timer)
 
     if (!timer->strProcedure.isEmpty())
         out << QString("   script=\"%1\"\n").arg(escapeXml(timer->strProcedure));
+    if (timer->scriptLanguage != ScriptLanguage::Lua)
+        out << QString("   script_language=\"%1\"\n")
+                   .arg(scriptLanguageToString(timer->scriptLanguage));
     if (!timer->strGroup.isEmpty())
         out << QString("   group=\"%1\"\n").arg(escapeXml(timer->strGroup));
     if (!timer->strVariable.isEmpty())

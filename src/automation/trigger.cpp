@@ -59,6 +59,7 @@ void Trigger::initializeDefaults()
     // Actions
     iSendTo = eSendToWorld;
     iClipboardArg = 0;
+    scriptLanguage = ScriptLanguage::Lua;
 
     // Display
     colour = 0; // Custom color 1
@@ -98,9 +99,10 @@ bool Trigger::operator==(const Trigger& rhs) const
            colour == rhs.colour && omit_from_log == rhs.omit_from_log &&
            bOmitFromOutput == rhs.bOmitFromOutput && bKeepEvaluating == rhs.bKeepEvaluating &&
            bEnabled == rhs.bEnabled && strLabel == rhs.strLabel &&
-           strProcedure == rhs.strProcedure && iClipboardArg == rhs.iClipboardArg &&
-           iSendTo == rhs.iSendTo && bRegexp == rhs.bRegexp && bRepeat == rhs.bRepeat &&
-           iSequence == rhs.iSequence && iMatch == rhs.iMatch && iStyle == rhs.iStyle &&
+           strProcedure == rhs.strProcedure && scriptLanguage == rhs.scriptLanguage &&
+           iClipboardArg == rhs.iClipboardArg && iSendTo == rhs.iSendTo &&
+           bRegexp == rhs.bRegexp && bRepeat == rhs.bRepeat && iSequence == rhs.iSequence &&
+           iMatch == rhs.iMatch && iStyle == rhs.iStyle &&
            bSoundIfInactive == rhs.bSoundIfInactive && bExpandVariables == rhs.bExpandVariables &&
            bLowercaseWildcard == rhs.bLowercaseWildcard && strGroup == rhs.strGroup &&
            strVariable == rhs.strVariable && iUserOption == rhs.iUserOption &&

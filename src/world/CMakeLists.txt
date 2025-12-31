@@ -79,6 +79,7 @@ target_link_libraries(world PUBLIC
     automation
     third-party         # third-party defines lsqlite3 symbols (Lua SQLite binding)
     Lua::Lua            # LuaJIT for scripting engine
+    yue_static          # YueScript transpiler (statically linked)
     ZLIB::ZLIB
     PCRE::PCRE          # PCRE regex library for rex Lua module
 )

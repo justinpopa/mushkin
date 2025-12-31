@@ -46,6 +46,7 @@ void Alias::initializeDefaults()
     // Actions
     bExpandVariables = false;
     iSendTo = eSendToWorld;
+    scriptLanguage = ScriptLanguage::Lua;
 
     // Behavior
     bEnabled = true;
@@ -87,7 +88,8 @@ bool Alias::operator==(const Alias& rhs) const
 {
     return name == rhs.name && contents == rhs.contents && bIgnoreCase == rhs.bIgnoreCase &&
            strLabel == rhs.strLabel && strProcedure == rhs.strProcedure &&
-           bEnabled == rhs.bEnabled && bExpandVariables == rhs.bExpandVariables &&
+           scriptLanguage == rhs.scriptLanguage && bEnabled == rhs.bEnabled &&
+           bExpandVariables == rhs.bExpandVariables &&
            bOmitFromLog == rhs.bOmitFromLog && bRegexp == rhs.bRegexp &&
            bOmitFromOutput == rhs.bOmitFromOutput && iSequence == rhs.iSequence &&
            bMenu == rhs.bMenu && strGroup == rhs.strGroup && strVariable == rhs.strVariable &&

@@ -8,6 +8,7 @@ class WorldDocument;
 class QPlainTextEdit;
 class QPushButton;
 class QDialogButtonBox;
+class QComboBox;
 
 /**
  * ImmediateDialog - Execute Lua code immediately
@@ -56,6 +57,7 @@ class ImmediateDialog : public QDialog {
     WorldDocument* m_doc;
 
     QPlainTextEdit* m_expressionEdit;
+    QComboBox* m_languageCombo;
 
     QPushButton* m_executeButton;
     QDialogButtonBox* m_buttonBox;

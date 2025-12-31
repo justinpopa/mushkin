@@ -21,7 +21,8 @@
 // - eSendImmediate: Send immediately (bypass queue)
 // - eSendToScriptAfterOmit: Execute script after omitting from output
 
-#include "../automation/plugin.h" // For plugin context detection
+#include "../automation/plugin.h"          // For plugin context detection
+#include "../automation/script_language.h" // For ScriptLanguage enum
 #include "../automation/sendto.h"
 #include "logging.h"
 #include "script_engine.h"
@@ -46,7 +47,8 @@
  */
 void WorldDocument::sendTo(quint16 iWhere, const QString& strSendText, bool bOmitFromOutput,
                            bool bOmitFromLog, const QString& strDescription,
-                           const QString& strVariable, QString& strOutput)
+                           const QString& strVariable, QString& strOutput,
+                           ScriptLanguage scriptLang)
 {
     // Empty send text does nothing for most destinations
     // Original: doc.cpp
@@ -186,7 +188,8 @@ void WorldDocument::sendTo(quint16 iWhere, const QString& strSendText, bool bOmi
                 if (scriptEngine) {
                     // Set flag to prevent DeleteLines being used during script
                     // (Original sets m_bInSendToScript = true)
-                    scriptEngine->parseLua(strSendText, strDescription);
+                    // Use parseScript() which handles YueScript transpilation if needed
+                    scriptEngine->parseScript(strSendText, strDescription, scriptLang);
                 } else {
                     note("\x1b[37;41mSend-to-script cannot execute because scripting is not "
                          "enabled.\x1b[0m");
@@ -213,7 +216,8 @@ void WorldDocument::sendTo(quint16 iWhere, const QString& strSendText, bool bOmi
                 ScriptEngine* scriptEngine =
                     m_CurrentPlugin ? m_CurrentPlugin->scriptEngine() : m_ScriptEngine.get();
                 if (scriptEngine) {
-                    scriptEngine->parseLua(strSendText, strDescription);
+                    // Use parseScript() which handles YueScript transpilation if needed
+                    scriptEngine->parseScript(strSendText, strDescription, scriptLang);
                 } else {
                     note("\x1b[37;41mSend-to-script cannot execute because scripting is not "
                          "enabled.\x1b[0m");

@@ -7,6 +7,7 @@
 #ifndef TIMER_H
 #define TIMER_H
 
+#include "script_language.h"
 #include <QDateTime>
 #include <QString>
 #include <QVariant>
@@ -45,10 +46,11 @@ class Timer {
 
     // ========== Actions ==========
 
-    QString strContents;  // Text to send when timer fires
-    quint16 iSendTo;      // Where to send (eSendToWorld, eSendToScript, etc.)
-    QString strProcedure; // Lua function to call
-    QString strVariable;  // Variable name (for eSendToVariable)
+    QString strContents;           // Text to send when timer fires
+    quint16 iSendTo;               // Where to send (eSendToWorld, eSendToScript, etc.)
+    QString strProcedure;          // Script function to call
+    ScriptLanguage scriptLanguage; // Script language (Lua or YueScript)
+    QString strVariable;           // Variable name (for eSendToVariable)
 
     // ========== Behavior Flags ==========
 

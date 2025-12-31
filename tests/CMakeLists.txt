@@ -1,6 +1,19 @@
 # Find Qt6::Test for QSignalSpy (used by miniwindow tests)
 find_package(Qt6 COMPONENTS Test QUIET)
 
+# Create symlinks from tests directory to lua and lib directories
+# This allows tests to find Lua modules via relative paths
+execute_process(
+    COMMAND ${CMAKE_COMMAND} -E create_symlink
+    ${CMAKE_BINARY_DIR}/lua
+    ${CMAKE_CURRENT_BINARY_DIR}/lua
+)
+execute_process(
+    COMMAND ${CMAKE_COMMAND} -E create_symlink
+    ${CMAKE_BINARY_DIR}/lib
+    ${CMAKE_CURRENT_BINARY_DIR}/lib
+)
+
 # ========== GoogleTest Tests ==========
 # New test infrastructure using GoogleTest framework
 

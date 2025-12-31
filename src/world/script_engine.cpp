@@ -23,6 +23,7 @@ int luaopen_lsqlite3(lua_State* L); // SQLite3 bindings for Lua
 int luaopen_bit(lua_State* L);      // Bit manipulation library (LuaJIT)
 int luaopen_progress(lua_State* L); // Progress dialog library
 int luaopen_lpeg(lua_State* L);     // LPeg pattern matching library
+int luaopen_yue(lua_State* L);      // YueScript transpiler (statically linked)
 
 // ========== FFI Shims for Cross-Platform Compatibility ==========
 
@@ -659,6 +660,74 @@ return re
     //    luaopen_rex(L);    // PCRE regex
     //    etc.
 
+    // Load YueScript module for YueScript transpilation support
+    // YueScript is statically linked into the application to avoid
+    // Windows DLL loading issues with Lua C modules
+    lua_pushcfunction(L, luaopen_yue);
+    lua_call(L, 0, 1);            // Call luaopen_yue(), returns yue table
+    lua_pushvalue(L, -1);         // duplicate yue table
+    lua_setglobal(L, "yue");      // global "yue" = yue table
+    lua_getglobal(L, "package");
+    lua_getfield(L, -1, "loaded");
+    lua_pushvalue(L, -3);         // push yue table again
+    lua_setfield(L, -2, "yue");   // package.loaded["yue"] = yue
+    lua_pop(L, 3);                // pop loaded, package, and yue
+    qDebug() << "YueScript module loaded successfully (statically linked)";
+
+    // Load Teal module for typed Lua transpilation support
+    // tl.lua is a pure Lua file in the lua/ directory
+    lua_getglobal(L, "require");
+    lua_pushstring(L, "tl");
+    if (lua_pcall(L, 1, 1, 0) == 0) {
+        lua_pushvalue(L, -1);
+        lua_setglobal(L, "tl");
+        lua_getglobal(L, "package");
+        lua_getfield(L, -1, "loaded");
+        lua_pushvalue(L, -3);
+        lua_setfield(L, -2, "tl");
+        lua_pop(L, 3);
+        qDebug() << "Teal module loaded successfully";
+    } else {
+        qDebug() << "Teal module not available (optional):" << lua_tostring(L, -1);
+        lua_pop(L, 1);
+    }
+
+    // Load Fennel module for Lisp-style Lua transpilation support
+    // fennel.lua is a pure Lua file in the lua/ directory
+    lua_getglobal(L, "require");
+    lua_pushstring(L, "fennel");
+    if (lua_pcall(L, 1, 1, 0) == 0) {
+        lua_pushvalue(L, -1);
+        lua_setglobal(L, "fennel");
+        lua_getglobal(L, "package");
+        lua_getfield(L, -1, "loaded");
+        lua_pushvalue(L, -3);
+        lua_setfield(L, -2, "fennel");
+        lua_pop(L, 3);
+        qDebug() << "Fennel module loaded successfully";
+    } else {
+        qDebug() << "Fennel module not available (optional):" << lua_tostring(L, -1);
+        lua_pop(L, 1);
+    }
+
+    // Load MoonScript module for .moon file transpilation support
+    // moonscript/ is a directory with multiple Lua files
+    lua_getglobal(L, "require");
+    lua_pushstring(L, "moonscript");
+    if (lua_pcall(L, 1, 1, 0) == 0) {
+        lua_pushvalue(L, -1);
+        lua_setglobal(L, "moonscript");
+        lua_getglobal(L, "package");
+        lua_getfield(L, -1, "loaded");
+        lua_pushvalue(L, -3);
+        lua_setfield(L, -2, "moonscript");
+        lua_pop(L, 3);
+        qDebug() << "MoonScript module loaded successfully";
+    } else {
+        qDebug() << "MoonScript module not available (optional):" << lua_tostring(L, -1);
+        lua_pop(L, 1);
+    }
+
     // 6b. Install path normalization wrappers for Windows plugin compatibility
     // Windows plugins use backslashes in paths, but POSIX systems need forward slashes
     // We wrap io.open, dofile, and loadfile to transparently convert separators
@@ -1046,4 +1115,390 @@ bool ScriptEngine::parseLua(const QString& code, const QString& name)
     }
 
     return false; // Success
+}
+
+// ========== YueScript Transpilation ==========
+
+/**
+ * transpileYueScript - Convert YueScript to Lua
+ *
+ * Uses the yue.to_lua() function from the YueScript module.
+ *
+ * @param yueCode YueScript source code
+ * @param name Name for error messages
+ * @return Transpiled Lua code, or empty string on error
+ */
+QString ScriptEngine::transpileYueScript(const QString& yueCode, const QString& name)
+{
+    if (!L) {
+        qWarning() << "transpileYueScript: No Lua state";
+        return QString();
+    }
+
+    // Get yue module (should already be loaded in openLua)
+    lua_getglobal(L, "yue");
+    if (!lua_istable(L, -1)) {
+        lua_pop(L, 1);
+        qWarning() << "transpileYueScript: YueScript module not loaded";
+
+        // Display error to user
+        if (m_doc) {
+            m_doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0),
+                              QString("=== YueScript Error: %1 ===").arg(name));
+            m_doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0),
+                              "YueScript module (yue.so) is not loaded. Cannot transpile.");
+        }
+        return QString();
+    }
+
+    // Get yue.to_lua function
+    lua_getfield(L, -1, "to_lua");
+    if (!lua_isfunction(L, -1)) {
+        lua_pop(L, 2); // pop nil and yue table
+        qWarning() << "transpileYueScript: yue.to_lua function not found";
+        return QString();
+    }
+
+    // Push source code
+    QByteArray yueBytes = yueCode.toUtf8();
+    lua_pushlstring(L, yueBytes.constData(), yueBytes.length());
+
+    // Push options table
+    lua_newtable(L);
+    lua_pushboolean(L, true);
+    lua_setfield(L, -2, "implicitReturnRoot");
+    lua_pushboolean(L, true);
+    lua_setfield(L, -2, "reserveLineNumber");
+    lua_pushboolean(L, false);
+    lua_setfield(L, -2, "lint_global");
+
+    // Call yue.to_lua(source, options) - returns lua_code, error_or_nil
+    if (lua_pcall(L, 2, 2, 0) != 0) {
+        QString errorMsg = QString::fromUtf8(lua_tostring(L, -1));
+        lua_pop(L, 2); // pop error and yue table
+        qWarning() << "transpileYueScript: pcall failed:" << errorMsg;
+
+        if (m_doc) {
+            m_doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0),
+                              QString("=== YueScript Error: %1 ===").arg(name));
+            m_doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0), errorMsg);
+        }
+        return QString();
+    }
+
+    QString luaCode;
+
+    // Check result - first return value is lua code (string) or nil on error
+    if (lua_isstring(L, -2)) {
+        luaCode = QString::fromUtf8(lua_tostring(L, -2));
+    } else if (lua_isnil(L, -2) && lua_isstring(L, -1)) {
+        // Error case: nil, error_message
+        QString errorMsg = QString::fromUtf8(lua_tostring(L, -1));
+        qWarning() << "YueScript compile error in" << name << ":" << errorMsg;
+
+        if (m_doc) {
+            m_doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0),
+                              QString("=== YueScript Compile Error: %1 ===").arg(name));
+            m_doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0), errorMsg);
+        }
+    }
+
+    lua_pop(L, 3); // pop result, error/nil, yue table
+    return luaCode;
+}
+
+/**
+ * transpileTeal - Convert Teal to Lua
+ *
+ * Uses tl.gen() to compile typed Teal code to Lua.
+ *
+ * @param tealCode Teal source code
+ * @param name Name for error messages
+ * @return Transpiled Lua code, or empty string on error
+ */
+QString ScriptEngine::transpileTeal(const QString& tealCode, const QString& name)
+{
+    if (!L) {
+        qWarning() << "transpileTeal: No Lua state";
+        return QString();
+    }
+
+    // Get tl module (should already be loaded in openLua)
+    lua_getglobal(L, "tl");
+    if (!lua_istable(L, -1)) {
+        lua_pop(L, 1);
+        qWarning() << "transpileTeal: Teal module not loaded";
+
+        if (m_doc) {
+            m_doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0),
+                              QString("=== Teal Error: %1 ===").arg(name));
+            m_doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0),
+                              "Teal module (tl.lua) is not loaded. Cannot transpile.");
+        }
+        return QString();
+    }
+
+    // Get tl.gen function
+    lua_getfield(L, -1, "gen");
+    if (!lua_isfunction(L, -1)) {
+        lua_pop(L, 2);
+        qWarning() << "transpileTeal: tl.gen function not found";
+        return QString();
+    }
+
+    // Push source code
+    QByteArray tealBytes = tealCode.toUtf8();
+    lua_pushlstring(L, tealBytes.constData(), tealBytes.length());
+
+    // Call tl.gen(source) - returns lua_code, result_table
+    if (lua_pcall(L, 1, 2, 0) != 0) {
+        QString errorMsg = QString::fromUtf8(lua_tostring(L, -1));
+        lua_pop(L, 2);
+        qWarning() << "transpileTeal: pcall failed:" << errorMsg;
+
+        if (m_doc) {
+            m_doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0),
+                              QString("=== Teal Error: %1 ===").arg(name));
+            m_doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0), errorMsg);
+        }
+        return QString();
+    }
+
+    QString luaCode;
+
+    // Check result - first return value is lua code (string) or nil on error
+    if (lua_isstring(L, -2)) {
+        luaCode = QString::fromUtf8(lua_tostring(L, -2));
+    } else if (lua_isnil(L, -2)) {
+        // Error case - check result table for errors
+        QString errorMsg = "Teal compilation failed";
+        if (lua_istable(L, -1)) {
+            lua_getfield(L, -1, "syntax_errors");
+            if (lua_istable(L, -1) && lua_objlen(L, -1) > 0) {
+                lua_rawgeti(L, -1, 1);
+                if (lua_istable(L, -1)) {
+                    lua_getfield(L, -1, "msg");
+                    if (lua_isstring(L, -1)) {
+                        errorMsg = QString::fromUtf8(lua_tostring(L, -1));
+                    }
+                    lua_pop(L, 1);
+                }
+                lua_pop(L, 1);
+            }
+            lua_pop(L, 1);
+        }
+        qWarning() << "Teal compile error in" << name << ":" << errorMsg;
+
+        if (m_doc) {
+            m_doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0),
+                              QString("=== Teal Compile Error: %1 ===").arg(name));
+            m_doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0), errorMsg);
+        }
+    }
+
+    lua_pop(L, 3); // pop result, result_table, tl table
+    return luaCode;
+}
+
+/**
+ * transpileFennel - Convert Fennel to Lua
+ *
+ * Uses fennel.compileString() to compile Lisp-style Fennel code to Lua.
+ *
+ * @param fennelCode Fennel source code
+ * @param name Name for error messages
+ * @return Transpiled Lua code, or empty string on error
+ */
+QString ScriptEngine::transpileFennel(const QString& fennelCode, const QString& name)
+{
+    if (!L) {
+        qWarning() << "transpileFennel: No Lua state";
+        return QString();
+    }
+
+    // Get fennel module (should already be loaded in openLua)
+    lua_getglobal(L, "fennel");
+    if (!lua_istable(L, -1)) {
+        lua_pop(L, 1);
+        qWarning() << "transpileFennel: Fennel module not loaded";
+
+        if (m_doc) {
+            m_doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0),
+                              QString("=== Fennel Error: %1 ===").arg(name));
+            m_doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0),
+                              "Fennel module (fennel.lua) is not loaded. Cannot transpile.");
+        }
+        return QString();
+    }
+
+    // Get fennel.compileString function
+    lua_getfield(L, -1, "compileString");
+    if (!lua_isfunction(L, -1)) {
+        lua_pop(L, 2);
+        qWarning() << "transpileFennel: fennel.compileString function not found";
+        return QString();
+    }
+
+    // Push source code
+    QByteArray fennelBytes = fennelCode.toUtf8();
+    lua_pushlstring(L, fennelBytes.constData(), fennelBytes.length());
+
+    // Push options table with filename for error messages
+    lua_newtable(L);
+    QByteArray nameBytes = name.toUtf8();
+    lua_pushlstring(L, nameBytes.constData(), nameBytes.length());
+    lua_setfield(L, -2, "filename");
+
+    // Call fennel.compileString(source, options) - returns lua_code or throws error
+    if (lua_pcall(L, 2, 1, 0) != 0) {
+        QString errorMsg = QString::fromUtf8(lua_tostring(L, -1));
+        lua_pop(L, 2);
+        qWarning() << "transpileFennel: compile failed:" << errorMsg;
+
+        if (m_doc) {
+            m_doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0),
+                              QString("=== Fennel Compile Error: %1 ===").arg(name));
+            m_doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0), errorMsg);
+        }
+        return QString();
+    }
+
+    QString luaCode;
+
+    // Result is the compiled Lua code
+    if (lua_isstring(L, -1)) {
+        luaCode = QString::fromUtf8(lua_tostring(L, -1));
+    }
+
+    lua_pop(L, 2); // pop result, fennel table
+    return luaCode;
+}
+
+/**
+ * transpileMoonScript - Transpile MoonScript code to Lua
+ *
+ * Uses moonscript.to_lua() to convert MoonScript source to Lua.
+ *
+ * @param moonCode MoonScript source code
+ * @param name Name for error messages
+ * @return Transpiled Lua code, or empty string on error
+ */
+QString ScriptEngine::transpileMoonScript(const QString& moonCode, const QString& name)
+{
+    if (!L) {
+        qWarning() << "transpileMoonScript: No Lua state";
+        return QString();
+    }
+
+    // Get moonscript module (should already be loaded in openLua)
+    lua_getglobal(L, "moonscript");
+    if (!lua_istable(L, -1)) {
+        lua_pop(L, 1);
+        qWarning() << "transpileMoonScript: MoonScript module not loaded";
+
+        if (m_doc) {
+            m_doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0),
+                              QString("=== MoonScript Error: %1 ===").arg(name));
+            m_doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0),
+                              "MoonScript module is not loaded. Cannot transpile.");
+        }
+        return QString();
+    }
+
+    // Get moonscript.to_lua function
+    lua_getfield(L, -1, "to_lua");
+    if (!lua_isfunction(L, -1)) {
+        lua_pop(L, 2);
+        qWarning() << "transpileMoonScript: moonscript.to_lua function not found";
+        return QString();
+    }
+
+    // Push source code
+    QByteArray moonBytes = moonCode.toUtf8();
+    lua_pushlstring(L, moonBytes.constData(), moonBytes.length());
+
+    // Call moonscript.to_lua(source) - returns lua_code, line_table or nil, err
+    if (lua_pcall(L, 1, 2, 0) != 0) {
+        QString errorMsg = QString::fromUtf8(lua_tostring(L, -1));
+        lua_pop(L, 2);
+        qWarning() << "transpileMoonScript: compile failed:" << errorMsg;
+
+        if (m_doc) {
+            m_doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0),
+                              QString("=== MoonScript Compile Error: %1 ===").arg(name));
+            m_doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0), errorMsg);
+        }
+        return QString();
+    }
+
+    QString luaCode;
+
+    // First return value is the compiled Lua code (or nil on error)
+    // Second return value is line table (or error message)
+    if (lua_isstring(L, -2)) {
+        luaCode = QString::fromUtf8(lua_tostring(L, -2));
+    } else if (lua_isnil(L, -2) && lua_isstring(L, -1)) {
+        // Error case: nil, error_message
+        QString errorMsg = QString::fromUtf8(lua_tostring(L, -1));
+        lua_pop(L, 3); // pop nil, error, moonscript table
+        qWarning() << "MoonScript compile error in" << name << ":" << errorMsg;
+
+        if (m_doc) {
+            m_doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0),
+                              QString("=== MoonScript Compile Error: %1 ===").arg(name));
+            m_doc->colourNote(qRgb(255, 140, 0), qRgb(0, 0, 0), errorMsg);
+        }
+        return QString();
+    }
+
+    lua_pop(L, 3); // pop lua_code, line_table, moonscript table
+    return luaCode;
+}
+
+/**
+ * parseScript - Parse and execute script in specified language
+ *
+ * For YueScript, transpiles to Lua first then executes.
+ * For Lua, calls parseLua() directly.
+ *
+ * @param code Script code to execute
+ * @param name Name for error messages
+ * @param lang Script language
+ * @return true on error, false on success
+ */
+bool ScriptEngine::parseScript(const QString& code, const QString& name, ScriptLanguage lang)
+{
+    switch (lang) {
+        case ScriptLanguage::YueScript: {
+            QString luaCode = transpileYueScript(code, name);
+            if (luaCode.isEmpty()) {
+                return true; // Error during transpilation
+            }
+            return parseLua(luaCode, name + " (transpiled)");
+        }
+        case ScriptLanguage::Teal: {
+            QString luaCode = transpileTeal(code, name);
+            if (luaCode.isEmpty()) {
+                return true; // Error during transpilation
+            }
+            return parseLua(luaCode, name + " (transpiled)");
+        }
+        case ScriptLanguage::Fennel: {
+            QString luaCode = transpileFennel(code, name);
+            if (luaCode.isEmpty()) {
+                return true; // Error during transpilation
+            }
+            return parseLua(luaCode, name + " (transpiled)");
+        }
+        case ScriptLanguage::MoonScript: {
+            QString luaCode = transpileMoonScript(code, name);
+            if (luaCode.isEmpty()) {
+                return true; // Error during transpilation
+            }
+            return parseLua(luaCode, name + " (transpiled)");
+        }
+        default:
+            // Default: Lua
+            return parseLua(code, name);
+    }
 }
