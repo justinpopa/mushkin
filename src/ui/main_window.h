@@ -101,11 +101,14 @@ class MainWindow : public QMainWindow {
     // File menu actions
     void newWorld();
     void openWorld();
+    void openStartupList();
     void closeWorld();
     void saveWorld();
     void saveWorldAs();
     void worldProperties();
+    void globalPreferences();
     void toggleLogSession();
+    void reloadDefaults();
     void saveSelection();
     void openRecentFile();
     void quickConnect();
@@ -113,23 +116,22 @@ class MainWindow : public QMainWindow {
     void exitApplication();
 
     // Edit menu actions
+    void undo();
+    void cut();
     void copy();
     void copyAsHtml();
     void paste();
-    void pasteToMud();
+    void pasteToWorld();
+    void recallLastWord();
     void selectAll();
-    void find();
-    void findNext();
-    void preferences();
-    void recall();
+    void spellCheck();
     void generateCharacterName();
+    void reloadNamesFile();
     void generateUniqueID();
-    void insertDateTime();
-    void wordCount();
-    void insertUnicode();
-    void sendToAll();
-    void asciiArt();
-    void highlightPhrase();
+    void openNotepad();
+    void flipToNotepad();
+    void colourPicker();
+    void debugPackets();
     void goToMatchingBrace();
     void selectToMatchingBrace();
 
@@ -189,6 +191,10 @@ class MainWindow : public QMainWindow {
     void showMapper();
 
     // Display menu actions
+    void find();
+    void findNext();
+    void recallText();
+    void highlightPhrase();
     void scrollToStart();
     void scrollPageUp();
     void scrollPageDown();
@@ -196,6 +202,7 @@ class MainWindow : public QMainWindow {
     void scrollLineUp();
     void scrollLineDown();
     void clearOutput();
+    void stopSound();
     void toggleCommandEcho();
     void toggleFreezeOutput();
     void goToLine();
@@ -223,7 +230,7 @@ class MainWindow : public QMainWindow {
     void convertWrapLines();
 
     // View menu actions
-    void toggleTabbedView(bool enabled);
+    void toggleStatusBar(bool visible);
     void toggleAlwaysOnTop(bool enabled);
     void toggleFullScreen(bool enabled);
     void resetToolbars();
@@ -395,36 +402,38 @@ class MainWindow : public QMainWindow {
     QMenu* m_fileMenu;
     QAction* m_newAction;
     QAction* m_openAction;
+    QAction* m_openStartupListAction;
     QAction* m_closeAction;
+    QAction* m_importXmlAction;
+    // m_configurePluginsAction and m_pluginWizardAction declared in Game menu section
     QAction* m_saveAction;
     QAction* m_saveAsAction;
     QAction* m_saveSelectionAction;
-    QAction* m_worldPropertiesAction;
+    QAction* m_globalPreferencesAction;
     QAction* m_logSessionAction;
-    QAction* m_quickConnectAction;
-    QAction* m_importXmlAction;
+    QAction* m_reloadDefaultsAction;
+    QAction* m_worldPropertiesAction;
     QMenu* m_recentFilesMenu;
     QAction* m_exitAction;
 
     // Edit menu and actions
     QMenu* m_editMenu;
+    QAction* m_undoAction;
+    QAction* m_cutAction;
     QAction* m_copyAction;
     QAction* m_copyAsHtmlAction;
     QAction* m_pasteAction;
-    QAction* m_pasteToMudAction;
+    QAction* m_pasteToWorldAction;
+    QAction* m_recallLastWordAction;
     QAction* m_selectAllAction;
-    QAction* m_findAction;
-    QAction* m_findNextAction;
-    QAction* m_insertDateTimeAction;
-    QAction* m_wordCountAction;
-    QAction* m_preferencesAction;
-    QAction* m_recallAction;
+    QAction* m_spellCheckAction;
     QAction* m_generateNameAction;
+    QAction* m_reloadNamesFileAction;
     QAction* m_generateIdAction;
-    QAction* m_insertUnicodeAction;
-    QAction* m_sendToAllAction;
-    QAction* m_asciiArtAction;
-    QAction* m_highlightPhraseAction;
+    QAction* m_notepadAction;
+    QAction* m_flipToNotepadAction;
+    QAction* m_colourPickerAction;
+    QAction* m_debugPacketsAction;
     QAction* m_goToMatchingBraceAction;
     QAction* m_selectToMatchingBraceAction;
 
@@ -492,23 +501,28 @@ class MainWindow : public QMainWindow {
 
     // Display menu and actions (scrolling, output control)
     QMenu* m_displayMenu;
-    QAction* m_startAction;    // Ctrl+Home
-    QAction* m_pageUpAction;   // Page Up
-    QAction* m_pageDownAction; // Page Down
-    QAction* m_endAction;      // Ctrl+End
-    QAction* m_lineUpAction;   // Ctrl+Up
-    QAction* m_lineDownAction; // Ctrl+Down
-    QAction* m_clearOutputAction;
-    QAction* m_commandEchoAction;
+    QAction* m_startAction;
+    QAction* m_pageUpAction;
+    QAction* m_pageDownAction;
+    QAction* m_endAction;
+    QAction* m_lineUpAction;
+    QAction* m_lineDownAction;
+    QAction* m_activityListAction;
     QAction* m_freezeOutputAction;
+    QAction* m_findAction;
+    QAction* m_findNextAction;
+    QAction* m_recallTextAction;
     QAction* m_goToLineAction;
     QAction* m_goToUrlAction;
     QAction* m_sendMailToAction;
+    QAction* m_clearOutputAction;
+    QAction* m_stopSoundAction;
     QAction* m_bookmarkSelectionAction;
     QAction* m_goToBookmarkAction;
-    QAction* m_activityListAction;
-    QAction* m_textAttributesAction;
+    QAction* m_highlightPhraseAction;
     QAction* m_multilineTriggerAction;
+    QAction* m_textAttributesAction;
+    QAction* m_commandEchoAction;
 
     // Convert menu and actions (text transformations for notepad windows)
     QMenu* m_convertMenu;
@@ -531,9 +545,9 @@ class MainWindow : public QMainWindow {
     QAction* m_mainToolBarAction;
     QAction* m_gameToolBarAction;
     QAction* m_activityToolBarAction;
+    QAction* m_statusBarAction;
     QAction* m_infoBarAction;
     QAction* m_resetToolbarsAction;
-    QAction* m_tabbedViewAction;
     QAction* m_alwaysOnTopAction;
     QAction* m_fullScreenAction;
 
