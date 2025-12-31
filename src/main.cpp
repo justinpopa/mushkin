@@ -95,7 +95,7 @@ int main(int argc, char* argv[])
 
     // Set application info (org/app names kept as 'Gammon'/'MUSHclient' for settings compatibility)
     QApplication::setApplicationName("MUSHclient");
-    QApplication::setApplicationVersion("5.0.0");
+    QApplication::setApplicationVersion(MUSHKIN_VERSION);
     QApplication::setOrganizationName("Gammon");
     QApplication::setOrganizationDomain("gammon.com.au");
 
