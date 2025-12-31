@@ -58,6 +58,7 @@ class UnifiedPreferencesDialog : public QDialog {
         // Input group
         Commands,
         Keypad,
+        AutoSay,
         PasteSend,
 
         // Scripting group

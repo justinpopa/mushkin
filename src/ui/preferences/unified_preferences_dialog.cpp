@@ -14,6 +14,7 @@
 #include "pages/info_page.h"
 #include "pages/colors_page.h"
 #include "pages/keypad_page.h"
+#include "pages/autosay_page.h"
 #include "pages/variables_page.h"
 #include "world/world_document.h"
 
@@ -141,6 +142,7 @@ void UnifiedPreferencesDialog::setupTree()
     inputGroup->setExpanded(true);
     addPageItem(inputGroup, Page::Commands, tr("Commands"));
     addPageItem(inputGroup, Page::Keypad, tr("Keypad"));
+    addPageItem(inputGroup, Page::AutoSay, tr("Auto Say"));
     addPageItem(inputGroup, Page::PasteSend, tr("Paste / Send"));
 
     // Scripting group
@@ -196,6 +198,7 @@ void UnifiedPreferencesDialog::setupPages()
     // Input pages
     addPage(Page::Commands, new InputPage(m_doc, this));
     addPage(Page::Keypad, new KeypadPage(m_doc, this));
+    addPage(Page::AutoSay, new AutoSayPage(m_doc, this));
     addPage(Page::PasteSend, new PasteSendPage(m_doc, this));
 
     // Scripting pages

@@ -22,6 +22,8 @@
 #include "dialogs/import_xml_dialog.h"
 #include "dialogs/insert_unicode_dialog.h"
 #include "dialogs/key_name_dialog.h"
+#include "dialogs/debug_world_input_dialog.h"
+#include "dialogs/map_comment_dialog.h"
 #include "dialogs/map_dialog.h"
 #include "dialogs/multiline_trigger_dialog.h"
 #include "dialogs/plugin_dialog.h"
@@ -419,173 +421,253 @@ void MainWindow::createMenus()
     bool reconnectOnDisconnect = db->getPreferenceInt("ReconnectOnDisconnect", 0) != 0;
     m_reconnectOnDisconnectAction->setChecked(reconnectOnDisconnect);
 
-    // Game Menu
+    // Game Menu (matches original MUSHclient structure)
     m_gameMenu = menuBar()->addMenu("&Game");
 
-    m_reloadScriptFileAction = m_gameMenu->addAction("&Reload Script File");
-    m_reloadScriptFileAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_R));
-    m_reloadScriptFileAction->setStatusTip("Reload the script file for the active world");
-    m_reloadScriptFileAction->setMenuRole(QAction::NoRole);
-    connect(m_reloadScriptFileAction, &QAction::triggered, this, &MainWindow::reloadScriptFile);
-
-    m_autoSayAction = m_gameMenu->addAction("Auto-&Say");
-    m_autoSayAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_S));
+    // Hidden Auto-Say action for state tracking (not in menu - config is in Configure submenu)
+    m_autoSayAction = new QAction("Auto-Say", this);
     m_autoSayAction->setCheckable(true);
-    m_autoSayAction->setChecked(false); // Default to disabled
-    m_autoSayAction->setStatusTip("Automatically prepend 'say ' to all commands");
-    m_autoSayAction->setMenuRole(QAction::NoRole);
+    m_autoSayAction->setChecked(false);
     connect(m_autoSayAction, &QAction::triggered, this, &MainWindow::toggleAutoSay);
 
-    m_gameMenu->addSeparator();
-
-    // Movement commands (matches original MUSHclient Game menu)
-    QAction* northAction = m_gameMenu->addAction("&North");
-    northAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::CTRL | Qt::Key_N));
-    northAction->setStatusTip("Go North");
-    connect(northAction, &QAction::triggered, this, [this]() { sendGameCommand("north"); });
-
-    QAction* southAction = m_gameMenu->addAction("&South");
-    southAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::CTRL | Qt::Key_S));
-    southAction->setStatusTip("Go South");
-    connect(southAction, &QAction::triggered, this, [this]() { sendGameCommand("south"); });
-
-    QAction* eastAction = m_gameMenu->addAction("&East");
-    eastAction->setStatusTip("Go East");
-    connect(eastAction, &QAction::triggered, this, [this]() { sendGameCommand("east"); });
-
-    QAction* westAction = m_gameMenu->addAction("&West");
-    westAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::CTRL | Qt::Key_W));
-    westAction->setStatusTip("Go West");
-    connect(westAction, &QAction::triggered, this, [this]() { sendGameCommand("west"); });
-
-    QAction* upAction = m_gameMenu->addAction("&Up");
-    upAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::CTRL | Qt::Key_U));
-    upAction->setStatusTip("Go Up");
-    connect(upAction, &QAction::triggered, this, [this]() { sendGameCommand("up"); });
-
-    QAction* downAction = m_gameMenu->addAction("&Down");
-    downAction->setStatusTip("Go Down");
-    connect(downAction, &QAction::triggered, this, [this]() { sendGameCommand("down"); });
-
-    m_gameMenu->addSeparator();
-
-    QAction* lookAction = m_gameMenu->addAction("&Look");
-    lookAction->setStatusTip("Look around");
-    connect(lookAction, &QAction::triggered, this, [this]() { sendGameCommand("look"); });
-
-    QAction* examineAction = m_gameMenu->addAction("E&xamine");
-    examineAction->setStatusTip("Examine");
-    connect(examineAction, &QAction::triggered, this, [this]() { sendGameCommand("examine"); });
-
-    m_gameMenu->addSeparator();
-
-    // Social commands (REPLACE_COMMAND - put text in input for user to complete)
-    QAction* sayAction = m_gameMenu->addAction("Sa&y");
-    sayAction->setStatusTip("Say something (puts 'say ' in command input)");
-    connect(sayAction, &QAction::triggered, this, [this]() {
-        QMdiSubWindow* sub = m_mdiArea->activeSubWindow();
-        if (WorldWidget* ww = sub ? qobject_cast<WorldWidget*>(sub->widget()) : nullptr) {
-            ww->inputView()->setText("say ");
-            ww->inputView()->setFocus();
-        }
-    });
-
-    QAction* whisperAction = m_gameMenu->addAction("W&hisper");
-    whisperAction->setStatusTip("Whisper to someone (puts 'whisper ' in command input)");
-    connect(whisperAction, &QAction::triggered, this, [this]() {
-        QMdiSubWindow* sub = m_mdiArea->activeSubWindow();
-        if (WorldWidget* ww = sub ? qobject_cast<WorldWidget*>(sub->widget()) : nullptr) {
-            ww->inputView()->setText("whisper ");
-            ww->inputView()->setFocus();
-        }
-    });
-
-    QAction* pageAction = m_gameMenu->addAction("Pa&ge");
-    pageAction->setStatusTip("Page someone (puts 'page ' in command input)");
-    connect(pageAction, &QAction::triggered, this, [this]() {
-        QMdiSubWindow* sub = m_mdiArea->activeSubWindow();
-        if (WorldWidget* ww = sub ? qobject_cast<WorldWidget*>(sub->widget()) : nullptr) {
-            ww->inputView()->setText("page ");
-            ww->inputView()->setFocus();
-        }
-    });
-
-    m_gameMenu->addSeparator();
-
-    // Status commands (SEND_NOW - send immediately)
-    QAction* whoAction = m_gameMenu->addAction("&Who");
-    whoAction->setStatusTip("Show who is connected");
-    connect(whoAction, &QAction::triggered, this, [this]() { sendGameCommand("WHO"); });
-
-    QAction* doingAction = m_gameMenu->addAction("Doin&g");
-    doingAction->setStatusTip("Show what people are doing");
-    connect(doingAction, &QAction::triggered, this, [this]() { sendGameCommand("DOING"); });
-
-    m_gameMenu->addSeparator();
-
-    // Configuration submenu (matches original MUSHclient structure)
+    // Configuration submenu (first item in original)
     QMenu* configureMenu = new QMenu("C&onfigure", this);
     configureMenu->menuAction()->setMenuRole(QAction::NoRole); // Prevent macOS from hiding submenu
     configureMenu->menuAction()->setVisible(true);             // Explicitly set visible for macOS
 
-    // Configuration items (always enabled - no longer disabled when no world is open)
-    m_configureTriggersAction = configureMenu->addAction("Triggers...");
-    m_configureTriggersAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::CTRL | Qt::Key_8));
-    m_configureTriggersAction->setStatusTip("Configure triggers for the active world");
-    m_configureTriggersAction->setMenuRole(QAction::NoRole);
-    connect(m_configureTriggersAction, &QAction::triggered, this, &MainWindow::configureTriggers);
+    // All Configuration (opens unified preferences dialog)
+    m_configureAllAction = configureMenu->addAction("&All Configuration...");
+    m_configureAllAction->setShortcut(QKeySequence(Qt::ALT | Qt::Key_Return));
+    m_configureAllAction->setStatusTip("Open world configuration dialog");
+    m_configureAllAction->setMenuRole(QAction::NoRole);
+    connect(m_configureAllAction, &QAction::triggered, this, &MainWindow::configureAll);
 
-    m_configureAliasesAction = configureMenu->addAction("Aliases...");
-    m_configureAliasesAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::CTRL | Qt::Key_9));
-    m_configureAliasesAction->setStatusTip("Configure aliases for the active world");
-    m_configureAliasesAction->setMenuRole(QAction::NoRole);
-    connect(m_configureAliasesAction, &QAction::triggered, this, &MainWindow::configureAliases);
+    configureMenu->addSeparator();
 
-    m_configureTimersAction = configureMenu->addAction("Timers...");
+    // Connection settings (Alt+1 for address, Alt+2 for connecting - both go to Connection page)
+    m_configureConnectionAction = configureMenu->addAction("MUD &Name/IP address...");
+    m_configureConnectionAction->setShortcut(QKeySequence(Qt::ALT | Qt::Key_1));
+    m_configureConnectionAction->setStatusTip("Configure MUD address and connection settings");
+    m_configureConnectionAction->setMenuRole(QAction::NoRole);
+    connect(m_configureConnectionAction, &QAction::triggered, this, &MainWindow::configureConnection);
+
+    m_configureConnectingAction = configureMenu->addAction("C&onnecting...");
+    m_configureConnectingAction->setShortcut(QKeySequence(Qt::ALT | Qt::Key_2));
+    m_configureConnectingAction->setStatusTip("Configure connection name and password");
+    m_configureConnectingAction->setMenuRole(QAction::NoRole);
+    connect(m_configureConnectingAction, &QAction::triggered, this, &MainWindow::configureConnection);
+
+    m_configureLoggingAction = configureMenu->addAction("&Logging...");
+    m_configureLoggingAction->setShortcut(QKeySequence(Qt::ALT | Qt::Key_3));
+    m_configureLoggingAction->setStatusTip("Configure session logging");
+    m_configureLoggingAction->setMenuRole(QAction::NoRole);
+    connect(m_configureLoggingAction, &QAction::triggered, this, &MainWindow::configureLogging);
+
+    m_configureNotesAction = configureMenu->addAction("No&tes...");
+    m_configureNotesAction->setShortcut(QKeySequence(Qt::ALT | Qt::Key_4));
+    m_configureNotesAction->setStatusTip("View and edit world notes");
+    m_configureNotesAction->setMenuRole(QAction::NoRole);
+    connect(m_configureNotesAction, &QAction::triggered, this, &MainWindow::configureInfo);
+
+    configureMenu->addSeparator();
+
+    // Appearance settings
+    m_configureOutputAction = configureMenu->addAction("&Output...");
+    m_configureOutputAction->setShortcut(QKeySequence(Qt::ALT | Qt::Key_5));
+    m_configureOutputAction->setStatusTip("Configure output window appearance");
+    m_configureOutputAction->setMenuRole(QAction::NoRole);
+    connect(m_configureOutputAction, &QAction::triggered, this, &MainWindow::configureOutput);
+
+    m_configureMxpAction = configureMenu->addAction("MXP / &Pueblo...");
+    m_configureMxpAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_U));
+    m_configureMxpAction->setStatusTip("Configure MXP and Pueblo protocol settings");
+    m_configureMxpAction->setMenuRole(QAction::NoRole);
+    connect(m_configureMxpAction, &QAction::triggered, this, &MainWindow::configureMxp);
+
+    m_configureColoursAction = configureMenu->addAction("ANSI C&olours...");
+    m_configureColoursAction->setShortcut(QKeySequence(Qt::ALT | Qt::Key_6));
+    m_configureColoursAction->setStatusTip("Configure ANSI colours");
+    m_configureColoursAction->setMenuRole(QAction::NoRole);
+    connect(m_configureColoursAction, &QAction::triggered, this, &MainWindow::configureColours);
+
+    m_configureCustomColoursAction = configureMenu->addAction("&Custom Colours...");
+    m_configureCustomColoursAction->setShortcut(QKeySequence(Qt::ALT | Qt::Key_8));
+    m_configureCustomColoursAction->setStatusTip("Configure custom colours");
+    m_configureCustomColoursAction->setMenuRole(QAction::NoRole);
+    connect(m_configureCustomColoursAction, &QAction::triggered, this, &MainWindow::configureColours);
+
+    configureMenu->addSeparator();
+
+    // Input settings
+    m_configureCommandsAction = configureMenu->addAction("Co&mmands...");
+    m_configureCommandsAction->setShortcut(QKeySequence(Qt::ALT | Qt::Key_0));
+    m_configureCommandsAction->setStatusTip("Configure command input settings");
+    m_configureCommandsAction->setMenuRole(QAction::NoRole);
+    connect(m_configureCommandsAction, &QAction::triggered, this, &MainWindow::configureCommands);
+
+    m_configureKeypadAction = configureMenu->addAction("&Keypad...");
+    m_configureKeypadAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::CTRL | Qt::Key_1));
+    m_configureKeypadAction->setStatusTip("Configure numeric keypad commands");
+    m_configureKeypadAction->setMenuRole(QAction::NoRole);
+    connect(m_configureKeypadAction, &QAction::triggered, this, &MainWindow::configureKeypad);
+
+    m_configureMacrosAction = configureMenu->addAction("&Macros...");
+    m_configureMacrosAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::CTRL | Qt::Key_2));
+    m_configureMacrosAction->setStatusTip("Configure keyboard macros");
+    m_configureMacrosAction->setMenuRole(QAction::NoRole);
+    connect(m_configureMacrosAction, &QAction::triggered, this, &MainWindow::configureMacros);
+
+    m_configureAutoSayAction = configureMenu->addAction("Auto &say...");
+    m_configureAutoSayAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::CTRL | Qt::Key_3));
+    m_configureAutoSayAction->setStatusTip("Configure auto-say settings");
+    m_configureAutoSayAction->setMenuRole(QAction::NoRole);
+    connect(m_configureAutoSayAction, &QAction::triggered, this, &MainWindow::configureAutoSay);
+
+    configureMenu->addSeparator();
+
+    // Paste/Send settings
+    m_configurePasteAction = configureMenu->addAction("Pas&te to world...");
+    m_configurePasteAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::CTRL | Qt::Key_4));
+    m_configurePasteAction->setStatusTip("Configure paste to world settings");
+    m_configurePasteAction->setMenuRole(QAction::NoRole);
+    connect(m_configurePasteAction, &QAction::triggered, this, &MainWindow::configurePaste);
+
+    m_configureSendFileAction = configureMenu->addAction("Sen&d file...");
+    m_configureSendFileAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::CTRL | Qt::Key_5));
+    m_configureSendFileAction->setStatusTip("Configure send file settings");
+    m_configureSendFileAction->setMenuRole(QAction::NoRole);
+    connect(m_configureSendFileAction, &QAction::triggered, this, &MainWindow::configurePaste);
+
+    configureMenu->addSeparator();
+
+    // Scripting settings
+    m_configureScriptingAction = configureMenu->addAction("&Scripting...");
+    m_configureScriptingAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::CTRL | Qt::Key_6));
+    m_configureScriptingAction->setStatusTip("Configure script file settings");
+    m_configureScriptingAction->setMenuRole(QAction::NoRole);
+    connect(m_configureScriptingAction, &QAction::triggered, this, &MainWindow::configureScripting);
+
+    m_configureVariablesAction = configureMenu->addAction("&Variables...");
+    m_configureVariablesAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::CTRL | Qt::Key_7));
+    m_configureVariablesAction->setStatusTip("View and edit script variables");
+    m_configureVariablesAction->setMenuRole(QAction::NoRole);
+    connect(m_configureVariablesAction, &QAction::triggered, this, &MainWindow::configureVariables);
+
+    configureMenu->addSeparator();
+
+    // Automation settings
+    m_configureTimersAction = configureMenu->addAction("&Timers...");
     m_configureTimersAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::CTRL | Qt::Key_0));
     m_configureTimersAction->setStatusTip("Configure timers for the active world");
     m_configureTimersAction->setMenuRole(QAction::NoRole);
     connect(m_configureTimersAction, &QAction::triggered, this, &MainWindow::configureTimers);
 
-    m_configureShortcutsAction = configureMenu->addAction("Shortcuts...");
-    m_configureShortcutsAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::CTRL | Qt::Key_K));
-    m_configureShortcutsAction->setStatusTip("Configure keyboard shortcuts for the active world");
-    m_configureShortcutsAction->setMenuRole(QAction::NoRole);
-    connect(m_configureShortcutsAction, &QAction::triggered, this, &MainWindow::configureShortcuts);
+    m_configureTriggersAction = configureMenu->addAction("Tri&ggers...");
+    m_configureTriggersAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::CTRL | Qt::Key_8));
+    m_configureTriggersAction->setStatusTip("Configure triggers for the active world");
+    m_configureTriggersAction->setMenuRole(QAction::NoRole);
+    connect(m_configureTriggersAction, &QAction::triggered, this, &MainWindow::configureTriggers);
+
+    m_configureAliasesAction = configureMenu->addAction("&Aliases...");
+    m_configureAliasesAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::CTRL | Qt::Key_9));
+    m_configureAliasesAction->setStatusTip("Configure aliases for the active world");
+    m_configureAliasesAction->setMenuRole(QAction::NoRole);
+    connect(m_configureAliasesAction, &QAction::triggered, this, &MainWindow::configureAliases);
+
+    configureMenu->addSeparator();
+
+    m_configureInfoAction = configureMenu->addAction("&Info...");
+    m_configureInfoAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::CTRL | Qt::Key_I));
+    m_configureInfoAction->setStatusTip("View world information");
+    m_configureInfoAction->setMenuRole(QAction::NoRole);
+    connect(m_configureInfoAction, &QAction::triggered, this, &MainWindow::configureInfo);
 
     m_gameMenu->addMenu(configureMenu);
 
+    m_wrapOutputAction = m_gameMenu->addAction("Wrap &Output");
+    m_wrapOutputAction->setCheckable(true);
+    m_wrapOutputAction->setChecked(true); // Default to enabled
+    m_wrapOutputAction->setStatusTip("Toggle line wrapping in output window");
+    m_wrapOutputAction->setMenuRole(QAction::NoRole);
+    connect(m_wrapOutputAction, &QAction::triggered, this, &MainWindow::toggleWrapOutput);
+
     m_gameMenu->addSeparator();
 
-    m_immediateScriptAction = m_gameMenu->addAction("&Immediate Script...");
+    m_testTriggerAction = m_gameMenu->addAction("Test &Trigger...");
+    m_testTriggerAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::CTRL | Qt::Key_F12));
+    m_testTriggerAction->setStatusTip("Test triggers with simulated input");
+    m_testTriggerAction->setMenuRole(QAction::NoRole);
+    connect(m_testTriggerAction, &QAction::triggered, this, &MainWindow::testTrigger);
+
+    m_gameMenu->addSeparator();
+
+    m_minimizeProgramAction = m_gameMenu->addAction("Minimize &Program");
+    m_minimizeProgramAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_M));
+    m_minimizeProgramAction->setStatusTip("Minimize to system tray");
+    m_minimizeProgramAction->setMenuRole(QAction::NoRole);
+    connect(m_minimizeProgramAction, &QAction::triggered, this, &MainWindow::minimizeToTray);
+
+    m_gameMenu->addSeparator();
+
+    m_immediateScriptAction = m_gameMenu->addAction("&Immediate...");
     m_immediateScriptAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_I));
     m_immediateScriptAction->setStatusTip("Execute Lua script immediately");
     m_immediateScriptAction->setMenuRole(QAction::NoRole);
     connect(m_immediateScriptAction, &QAction::triggered, this, &MainWindow::immediateScript);
 
-    m_commandOptionsAction = m_gameMenu->addAction("Command &Options...");
-    m_commandOptionsAction->setStatusTip("Configure command processing options");
-    m_commandOptionsAction->setMenuRole(QAction::NoRole);
-    connect(m_commandOptionsAction, &QAction::triggered, this, &MainWindow::commandOptions);
+    m_editScriptFileAction = m_gameMenu->addAction("&Edit Script File...");
+    m_editScriptFileAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::CTRL | Qt::Key_H));
+    m_editScriptFileAction->setStatusTip("Open script file in external editor");
+    m_editScriptFileAction->setMenuRole(QAction::NoRole);
+    connect(m_editScriptFileAction, &QAction::triggered, this, &MainWindow::editScriptFile);
 
-    m_tabDefaultsAction = m_gameMenu->addAction("Tab Com&pletion...");
-    m_tabDefaultsAction->setStatusTip("Configure tab completion defaults");
-    m_tabDefaultsAction->setMenuRole(QAction::NoRole);
-    connect(m_tabDefaultsAction, &QAction::triggered, this, &MainWindow::tabDefaults);
+    m_reloadScriptFileAction = m_gameMenu->addAction("&Reload Script File");
+    m_reloadScriptFileAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::CTRL | Qt::Key_R));
+    m_reloadScriptFileAction->setStatusTip("Reload the script file for the active world");
+    m_reloadScriptFileAction->setMenuRole(QAction::NoRole);
+    connect(m_reloadScriptFileAction, &QAction::triggered, this, &MainWindow::reloadScriptFile);
+
+    m_traceAction = m_gameMenu->addAction("Tr&ace");
+    m_traceAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_T));
+    m_traceAction->setCheckable(true);
+    m_traceAction->setChecked(false);
+    m_traceAction->setStatusTip("Toggle script tracing/debugging mode");
+    m_traceAction->setMenuRole(QAction::NoRole);
+    connect(m_traceAction, &QAction::triggered, this, &MainWindow::toggleTrace);
 
     m_gameMenu->addSeparator();
 
-    m_sendFileAction = m_gameMenu->addAction("Send &File...");
-    m_sendFileAction->setStatusTip("Send a text file to the MUD");
-    m_sendFileAction->setMenuRole(QAction::NoRole);
-    connect(m_sendFileAction, &QAction::triggered, this, &MainWindow::sendFile);
+    m_resetAllTimersAction = m_gameMenu->addAction("Reset All Ti&mers");
+    m_resetAllTimersAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::CTRL | Qt::Key_T));
+    m_resetAllTimersAction->setStatusTip("Reset all timers to their starting values");
+    m_resetAllTimersAction->setMenuRole(QAction::NoRole);
+    connect(m_resetAllTimersAction, &QAction::triggered, this, &MainWindow::resetAllTimers);
 
     m_gameMenu->addSeparator();
 
-    m_mapperAction = m_gameMenu->addAction("&Mapper...");
+    m_sendToAllWorldsAction = m_gameMenu->addAction("&Send To All Worlds...");
+    m_sendToAllWorldsAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_S));
+    m_sendToAllWorldsAction->setStatusTip("Send text to all open worlds");
+    m_sendToAllWorldsAction->setMenuRole(QAction::NoRole);
+    connect(m_sendToAllWorldsAction, &QAction::triggered, this, &MainWindow::sendToAllWorlds);
+
+    m_mapperAction = m_gameMenu->addAction("&Mapper");
+    m_mapperAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_M));
     m_mapperAction->setStatusTip("Open the mapper window");
     m_mapperAction->setMenuRole(QAction::NoRole);
     connect(m_mapperAction, &QAction::triggered, this, &MainWindow::showMapper);
+
+    m_doMapperSpecialAction = m_gameMenu->addAction("&Do Mapper Special...");
+    m_doMapperSpecialAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_D));
+    m_doMapperSpecialAction->setStatusTip("Execute mapper special action");
+    m_doMapperSpecialAction->setMenuRole(QAction::NoRole);
+    connect(m_doMapperSpecialAction, &QAction::triggered, this, &MainWindow::doMapperSpecial);
+
+    m_addMapperCommentAction = m_gameMenu->addAction("Add Mapper &Comment...");
+    m_addMapperCommentAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::SHIFT | Qt::Key_D));
+    m_addMapperCommentAction->setStatusTip("Add a comment to the current mapper room");
+    m_addMapperCommentAction->setMenuRole(QAction::NoRole);
+    connect(m_addMapperCommentAction, &QAction::triggered, this, &MainWindow::addMapperComment);
 
     // Display Menu (matches original MUSHclient structure)
     m_displayMenu = menuBar()->addMenu("&Display");
@@ -2753,6 +2835,266 @@ void MainWindow::toggleAutoSay()
     statusBar()->showMessage(message, 2000);
 }
 
+void MainWindow::toggleWrapOutput()
+{
+    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
+    if (!activeSubWindow) {
+        statusBar()->showMessage("No active world", 2000);
+        return;
+    }
+
+    WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
+    if (!worldWidget) {
+        return;
+    }
+
+    WorldDocument* doc = worldWidget->document();
+    if (!doc) {
+        return;
+    }
+
+    // Toggle wrap setting - 0 means no wrap (very large column), non-zero means wrap
+    bool wrapEnabled = m_wrapOutputAction->isChecked();
+    if (wrapEnabled) {
+        // Restore default wrap column (80 is typical)
+        if (doc->m_nWrapColumn <= 0) {
+            doc->m_nWrapColumn = 80;
+        }
+    } else {
+        // Disable wrapping by setting to 0
+        doc->m_nWrapColumn = 0;
+    }
+
+    QString message = wrapEnabled ? "Line wrapping enabled" : "Line wrapping disabled";
+    statusBar()->showMessage(message, 2000);
+}
+
+void MainWindow::minimizeToTray()
+{
+    if (m_trayIcon && m_trayIcon->isVisible()) {
+        hide();
+        m_trayIcon->showMessage("Mushkin", "Application minimized to system tray",
+                                 QSystemTrayIcon::Information, 2000);
+    } else {
+        // No tray icon, just minimize normally
+        showMinimized();
+    }
+}
+
+void MainWindow::toggleTrace()
+{
+    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
+    if (!activeSubWindow) {
+        statusBar()->showMessage("No active world", 2000);
+        return;
+    }
+
+    WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
+    if (!worldWidget) {
+        return;
+    }
+
+    WorldDocument* doc = worldWidget->document();
+    if (!doc) {
+        return;
+    }
+
+    // Toggle trace mode
+    bool traceEnabled = m_traceAction->isChecked();
+    doc->m_bTrace = traceEnabled ? 1 : 0;
+
+    QString message = traceEnabled ? "Script tracing enabled" : "Script tracing disabled";
+    statusBar()->showMessage(message, 2000);
+}
+
+void MainWindow::testTrigger()
+{
+    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
+    if (!activeSubWindow) {
+        statusBar()->showMessage("No active world", 2000);
+        return;
+    }
+
+    WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
+    if (!worldWidget) {
+        return;
+    }
+
+    WorldDocument* doc = worldWidget->document();
+    if (!doc) {
+        return;
+    }
+
+    // Open debug world input dialog to test triggers
+    DebugWorldInputDialog dialog(this);
+    dialog.setWindowTitle("Test Trigger");
+    if (dialog.exec() == QDialog::Accepted) {
+        QString testInput = dialog.text();
+        if (!testInput.isEmpty()) {
+            // Simulate the test input as if received from MUD (processes through triggers)
+            doc->simulate(testInput);
+            statusBar()->showMessage("Test input processed through triggers", 2000);
+        }
+    }
+}
+
+void MainWindow::editScriptFile()
+{
+    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
+    if (!activeSubWindow) {
+        statusBar()->showMessage("No active world", 2000);
+        return;
+    }
+
+    WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
+    if (!worldWidget) {
+        return;
+    }
+
+    WorldDocument* doc = worldWidget->document();
+    if (!doc) {
+        return;
+    }
+
+    // Check if a script file is configured
+    if (doc->m_strScriptFilename.isEmpty()) {
+        QMessageBox::information(
+            this, "No Script File",
+            "No script file is configured for this world.\n\n"
+            "To set a script file, go to File → World Properties → Scripting tab.");
+        statusBar()->showMessage("No script file configured", 2000);
+        return;
+    }
+
+    // Open the script file in the system's default text editor
+    QUrl fileUrl = QUrl::fromLocalFile(doc->m_strScriptFilename);
+    if (!QDesktopServices::openUrl(fileUrl)) {
+        QMessageBox::warning(
+            this, "Cannot Open File",
+            QString("Could not open script file:\n%1\n\n"
+                    "No application is associated with this file type.")
+                .arg(doc->m_strScriptFilename));
+    } else {
+        statusBar()->showMessage(
+            QString("Opening script file: %1").arg(QFileInfo(doc->m_strScriptFilename).fileName()),
+            3000);
+    }
+}
+
+void MainWindow::resetAllTimers()
+{
+    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
+    if (!activeSubWindow) {
+        statusBar()->showMessage("No active world", 2000);
+        return;
+    }
+
+    WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
+    if (!worldWidget) {
+        return;
+    }
+
+    WorldDocument* doc = worldWidget->document();
+    if (!doc) {
+        return;
+    }
+
+    // Reset all timers
+    doc->resetAllTimers();
+    statusBar()->showMessage("All timers reset", 2000);
+}
+
+void MainWindow::sendToAllWorlds()
+{
+    // Get list of all open world names and documents
+    QStringList worldNames;
+    QList<WorldDocument*> openWorlds;
+    for (QMdiSubWindow* subWindow : m_mdiArea->subWindowList()) {
+        if (WorldWidget* ww = qobject_cast<WorldWidget*>(subWindow->widget())) {
+            if (WorldDocument* doc = ww->document()) {
+                openWorlds.append(doc);
+                worldNames.append(doc->worldName());
+            }
+        }
+    }
+
+    if (openWorlds.isEmpty()) {
+        QMessageBox::information(this, "Send To All Worlds", "No worlds are currently open.");
+        return;
+    }
+
+    SendToAllDialog dialog(this);
+    dialog.setWorlds(worldNames);
+    if (dialog.exec() == QDialog::Accepted) {
+        QString text = dialog.sendText();
+        QStringList selectedWorlds = dialog.selectedWorlds();
+        bool echo = dialog.echo();
+
+        // Send to each selected world
+        for (int i = 0; i < openWorlds.size(); ++i) {
+            if (selectedWorlds.contains(worldNames[i])) {
+                if (echo) {
+                    openWorlds[i]->note(QString("> %1").arg(text));
+                }
+                openWorlds[i]->sendToMud(text + "\n");
+            }
+        }
+        statusBar()->showMessage(QString("Sent to %1 world(s)").arg(selectedWorlds.size()), 2000);
+    }
+}
+
+void MainWindow::doMapperSpecial()
+{
+    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
+    if (!activeSubWindow) {
+        statusBar()->showMessage("No active world", 2000);
+        return;
+    }
+
+    WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
+    if (!worldWidget) {
+        return;
+    }
+
+    WorldDocument* doc = worldWidget->document();
+    if (!doc) {
+        return;
+    }
+
+    // Open mapper special dialog
+    MapDialog dialog(doc, this);
+    dialog.exec();
+}
+
+void MainWindow::addMapperComment()
+{
+    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
+    if (!activeSubWindow) {
+        statusBar()->showMessage("No active world", 2000);
+        return;
+    }
+
+    WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
+    if (!worldWidget) {
+        return;
+    }
+
+    WorldDocument* doc = worldWidget->document();
+    if (!doc) {
+        return;
+    }
+
+    // Open mapper comment dialog
+    MapCommentDialog dialog(this);
+    if (dialog.exec() == QDialog::Accepted) {
+        QString comment = dialog.comment();
+        if (!comment.isEmpty()) {
+            // TODO: Add comment to current mapper location when mapper is fully implemented
+            statusBar()->showMessage("Mapper comment added (mapper feature pending)", 2000);
+        }
+    }
+}
+
 void MainWindow::configureTriggers()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
@@ -2816,7 +3158,7 @@ void MainWindow::configureTimers()
     statusBar()->showMessage("Timer configuration closed", 2000);
 }
 
-void MainWindow::configureShortcuts()
+void MainWindow::configureAll()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
@@ -2829,11 +3171,244 @@ void MainWindow::configureShortcuts()
         return;
     }
 
-    // Open Shortcut List Dialog
-    ShortcutListDialog dialog(worldWidget->document(), this);
+    // Open Unified Preferences dialog to Connection page (first page)
+    UnifiedPreferencesDialog dialog(worldWidget->document(),
+                                     UnifiedPreferencesDialog::Page::Connection, this);
     dialog.exec();
+}
 
-    statusBar()->showMessage("Shortcut configuration closed", 2000);
+void MainWindow::configureConnection()
+{
+    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
+    if (!activeSubWindow) {
+        statusBar()->showMessage("No active world", 2000);
+        return;
+    }
+
+    WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
+    if (!worldWidget) {
+        return;
+    }
+
+    UnifiedPreferencesDialog dialog(worldWidget->document(),
+                                     UnifiedPreferencesDialog::Page::Connection, this);
+    dialog.exec();
+}
+
+void MainWindow::configureLogging()
+{
+    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
+    if (!activeSubWindow) {
+        statusBar()->showMessage("No active world", 2000);
+        return;
+    }
+
+    WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
+    if (!worldWidget) {
+        return;
+    }
+
+    UnifiedPreferencesDialog dialog(worldWidget->document(),
+                                     UnifiedPreferencesDialog::Page::Logging, this);
+    dialog.exec();
+}
+
+void MainWindow::configureInfo()
+{
+    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
+    if (!activeSubWindow) {
+        statusBar()->showMessage("No active world", 2000);
+        return;
+    }
+
+    WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
+    if (!worldWidget) {
+        return;
+    }
+
+    UnifiedPreferencesDialog dialog(worldWidget->document(),
+                                     UnifiedPreferencesDialog::Page::Info, this);
+    dialog.exec();
+}
+
+void MainWindow::configureOutput()
+{
+    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
+    if (!activeSubWindow) {
+        statusBar()->showMessage("No active world", 2000);
+        return;
+    }
+
+    WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
+    if (!worldWidget) {
+        return;
+    }
+
+    UnifiedPreferencesDialog dialog(worldWidget->document(),
+                                     UnifiedPreferencesDialog::Page::Output, this);
+    dialog.exec();
+}
+
+void MainWindow::configureMxp()
+{
+    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
+    if (!activeSubWindow) {
+        statusBar()->showMessage("No active world", 2000);
+        return;
+    }
+
+    WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
+    if (!worldWidget) {
+        return;
+    }
+
+    UnifiedPreferencesDialog dialog(worldWidget->document(),
+                                     UnifiedPreferencesDialog::Page::MXP, this);
+    dialog.exec();
+}
+
+void MainWindow::configureColours()
+{
+    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
+    if (!activeSubWindow) {
+        statusBar()->showMessage("No active world", 2000);
+        return;
+    }
+
+    WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
+    if (!worldWidget) {
+        return;
+    }
+
+    UnifiedPreferencesDialog dialog(worldWidget->document(),
+                                     UnifiedPreferencesDialog::Page::Colors, this);
+    dialog.exec();
+}
+
+void MainWindow::configureCommands()
+{
+    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
+    if (!activeSubWindow) {
+        statusBar()->showMessage("No active world", 2000);
+        return;
+    }
+
+    WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
+    if (!worldWidget) {
+        return;
+    }
+
+    UnifiedPreferencesDialog dialog(worldWidget->document(),
+                                     UnifiedPreferencesDialog::Page::Commands, this);
+    dialog.exec();
+}
+
+void MainWindow::configureKeypad()
+{
+    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
+    if (!activeSubWindow) {
+        statusBar()->showMessage("No active world", 2000);
+        return;
+    }
+
+    WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
+    if (!worldWidget) {
+        return;
+    }
+
+    UnifiedPreferencesDialog dialog(worldWidget->document(),
+                                     UnifiedPreferencesDialog::Page::Keypad, this);
+    dialog.exec();
+}
+
+void MainWindow::configureMacros()
+{
+    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
+    if (!activeSubWindow) {
+        statusBar()->showMessage("No active world", 2000);
+        return;
+    }
+
+    WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
+    if (!worldWidget) {
+        return;
+    }
+
+    UnifiedPreferencesDialog dialog(worldWidget->document(),
+                                     UnifiedPreferencesDialog::Page::Macros, this);
+    dialog.exec();
+}
+
+void MainWindow::configureAutoSay()
+{
+    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
+    if (!activeSubWindow) {
+        statusBar()->showMessage("No active world", 2000);
+        return;
+    }
+
+    WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
+    if (!worldWidget) {
+        return;
+    }
+
+    UnifiedPreferencesDialog dialog(worldWidget->document(),
+                                     UnifiedPreferencesDialog::Page::AutoSay, this);
+    dialog.exec();
+}
+
+void MainWindow::configurePaste()
+{
+    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
+    if (!activeSubWindow) {
+        statusBar()->showMessage("No active world", 2000);
+        return;
+    }
+
+    WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
+    if (!worldWidget) {
+        return;
+    }
+
+    UnifiedPreferencesDialog dialog(worldWidget->document(),
+                                     UnifiedPreferencesDialog::Page::PasteSend, this);
+    dialog.exec();
+}
+
+void MainWindow::configureScripting()
+{
+    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
+    if (!activeSubWindow) {
+        statusBar()->showMessage("No active world", 2000);
+        return;
+    }
+
+    WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
+    if (!worldWidget) {
+        return;
+    }
+
+    UnifiedPreferencesDialog dialog(worldWidget->document(),
+                                     UnifiedPreferencesDialog::Page::Scripting, this);
+    dialog.exec();
+}
+
+void MainWindow::configureVariables()
+{
+    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
+    if (!activeSubWindow) {
+        statusBar()->showMessage("No active world", 2000);
+        return;
+    }
+
+    WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
+    if (!worldWidget) {
+        return;
+    }
+
+    UnifiedPreferencesDialog dialog(worldWidget->document(),
+                                     UnifiedPreferencesDialog::Page::Variables, this);
+    dialog.exec();
 }
 
 void MainWindow::configurePlugins()

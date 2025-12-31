@@ -174,6 +174,8 @@ add_library(ui
     preferences/pages/colors_page.cpp
     preferences/pages/keypad_page.h
     preferences/pages/keypad_page.cpp
+    preferences/pages/autosay_page.h
+    preferences/pages/autosay_page.cpp
     preferences/pages/variables_page.h
     preferences/pages/variables_page.cpp
     # Lua dialog callback registration
