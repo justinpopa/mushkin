@@ -156,6 +156,18 @@ add_library(ui
     preferences/pages/timers_page.cpp
     preferences/pages/connection_page.h
     preferences/pages/connection_page.cpp
+    preferences/pages/output_page.h
+    preferences/pages/output_page.cpp
+    preferences/pages/logging_page.h
+    preferences/pages/logging_page.cpp
+    preferences/pages/scripting_page.h
+    preferences/pages/scripting_page.cpp
+    preferences/pages/input_page.h
+    preferences/pages/input_page.cpp
+    preferences/pages/paste_send_page.h
+    preferences/pages/paste_send_page.cpp
+    preferences/pages/macros_page.h
+    preferences/pages/macros_page.cpp
     # Lua dialog callback registration
     lua_dialog_registration.h
     lua_dialog_registration.cpp

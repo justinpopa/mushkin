@@ -5,6 +5,12 @@
 #include "pages/aliases_page.h"
 #include "pages/timers_page.h"
 #include "pages/connection_page.h"
+#include "pages/output_page.h"
+#include "pages/logging_page.h"
+#include "pages/scripting_page.h"
+#include "pages/input_page.h"
+#include "pages/paste_send_page.h"
+#include "pages/macros_page.h"
 #include "world/world_document.h"
 
 #include <QDialogButtonBox>
@@ -151,60 +157,48 @@ void UnifiedPreferencesDialog::addPageItem(QTreeWidgetItem* parent, Page page,
 
 void UnifiedPreferencesDialog::setupPages()
 {
-    // Create stub pages for now - these will be replaced with real implementations
+    // Helper to add a page with change tracking
+    auto addPage = [this](Page page, PreferencesPageBase* pageWidget) {
+        m_pages[page] = pageWidget;
+        m_stack->addWidget(pageWidget);
+        connect(pageWidget, &PreferencesPageBase::settingsChanged, this,
+                &UnifiedPreferencesDialog::onPageSettingsChanged);
+    };
+
+    // Stub page helper for remaining unimplemented pages
     auto addStubPage = [this](Page page, const QString& name, const QString& desc) {
         auto* stubPage = new StubPage(m_doc, name, desc, this);
         m_pages[page] = stubPage;
         m_stack->addWidget(stubPage);
     };
 
-    // General pages - using real implementations
-    auto* connectionPage = new ConnectionPage(m_doc, this);
-    m_pages[Page::Connection] = connectionPage;
-    m_stack->addWidget(connectionPage);
-    connect(connectionPage, &PreferencesPageBase::settingsChanged, this,
-            &UnifiedPreferencesDialog::onPageSettingsChanged);
-
-    addStubPage(Page::Logging, tr("Logging"),
-                tr("Configure log file settings and automatic logging."));
+    // General pages
+    addPage(Page::Connection, new ConnectionPage(m_doc, this));
+    addPage(Page::Logging, new LoggingPage(m_doc, this));
     addStubPage(Page::Info, tr("Info"),
                 tr("View and edit world information and notes."));
 
     // Appearance pages
-    addStubPage(Page::Output, tr("Output"),
-                tr("Configure output window appearance, fonts, and colors."));
+    addPage(Page::Output, new OutputPage(m_doc, this));
     addStubPage(Page::Colors, tr("Colors"),
                 tr("Configure ANSI and custom color mappings."));
     addStubPage(Page::MXP, tr("MXP / Pueblo"),
                 tr("Configure MXP and Pueblo protocol settings."));
 
-    // Automation pages - using real implementations
-    auto* triggersPage = new TriggersPage(m_doc, this);
-    m_pages[Page::Triggers] = triggersPage;
-    m_stack->addWidget(triggersPage);
-
-    auto* aliasesPage = new AliasesPage(m_doc, this);
-    m_pages[Page::Aliases] = aliasesPage;
-    m_stack->addWidget(aliasesPage);
-
-    auto* timersPage = new TimersPage(m_doc, this);
-    m_pages[Page::Timers] = timersPage;
-    m_stack->addWidget(timersPage);
-
-    addStubPage(Page::Macros, tr("Macros"),
-                tr("Manage keyboard macros and accelerators."));
+    // Automation pages
+    addPage(Page::Triggers, new TriggersPage(m_doc, this));
+    addPage(Page::Aliases, new AliasesPage(m_doc, this));
+    addPage(Page::Timers, new TimersPage(m_doc, this));
+    addPage(Page::Macros, new MacrosPage(m_doc, this));
 
     // Input pages
-    addStubPage(Page::Commands, tr("Commands"),
-                tr("Configure command input behavior and history."));
+    addPage(Page::Commands, new InputPage(m_doc, this));
     addStubPage(Page::Keypad, tr("Keypad"),
                 tr("Configure numeric keypad for speedwalking."));
-    addStubPage(Page::PasteSend, tr("Paste / Send"),
-                tr("Configure paste and send file options."));
+    addPage(Page::PasteSend, new PasteSendPage(m_doc, this));
 
     // Scripting pages
-    addStubPage(Page::Scripting, tr("Script File"),
-                tr("Configure script file and scripting language."));
+    addPage(Page::Scripting, new ScriptingPage(m_doc, this));
     addStubPage(Page::Variables, tr("Variables"),
                 tr("View and manage script variables."));
 }
