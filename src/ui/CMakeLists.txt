@@ -139,6 +139,21 @@ add_library(ui
     dialogs/map_comment_dialog.cpp
     dialogs/map_move_dialog.h
     dialogs/map_move_dialog.cpp
+    # Unified preferences dialog
+    preferences/preferences_page_base.h
+    preferences/preferences_page_base.cpp
+    preferences/item_list_page_base.h
+    preferences/item_list_page_base.cpp
+    preferences/unified_preferences_dialog.h
+    preferences/unified_preferences_dialog.cpp
+    preferences/pages/stub_page.h
+    preferences/pages/stub_page.cpp
+    preferences/pages/triggers_page.h
+    preferences/pages/triggers_page.cpp
+    preferences/pages/aliases_page.h
+    preferences/pages/aliases_page.cpp
+    preferences/pages/timers_page.h
+    preferences/pages/timers_page.cpp
     # Lua dialog callback registration
     lua_dialog_registration.h
     lua_dialog_registration.cpp

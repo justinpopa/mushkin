@@ -36,6 +36,7 @@
 #include "dialogs/timer_list_dialog.h"
 #include "dialogs/trigger_list_dialog.h"
 #include "dialogs/world_properties_dialog.h"
+#include "preferences/unified_preferences_dialog.h"
 #include "logging.h"
 #include "views/input_view.h"
 #include "views/output_view.h"
@@ -1951,8 +1952,9 @@ void MainWindow::worldProperties()
         return;
     }
 
-    // Open World Properties dialog
-    WorldPropertiesDialog dialog(worldWidget->document(), this);
+    // Open Unified Preferences dialog to Connection page
+    UnifiedPreferencesDialog dialog(worldWidget->document(),
+                                     UnifiedPreferencesDialog::Page::Connection, this);
     dialog.exec();
 
     statusBar()->showMessage("World properties updated", 2000);
@@ -2764,8 +2766,9 @@ void MainWindow::configureTriggers()
         return;
     }
 
-    // Open Trigger List Dialog
-    TriggerListDialog dialog(worldWidget->document(), this);
+    // Open Unified Preferences dialog to Triggers page
+    UnifiedPreferencesDialog dialog(worldWidget->document(),
+                                     UnifiedPreferencesDialog::Page::Triggers, this);
     dialog.exec();
 
     statusBar()->showMessage("Trigger configuration closed", 2000);
@@ -2784,8 +2787,9 @@ void MainWindow::configureAliases()
         return;
     }
 
-    // Open Alias List Dialog
-    AliasListDialog dialog(worldWidget->document(), this);
+    // Open Unified Preferences dialog to Aliases page
+    UnifiedPreferencesDialog dialog(worldWidget->document(),
+                                     UnifiedPreferencesDialog::Page::Aliases, this);
     dialog.exec();
 
     statusBar()->showMessage("Alias configuration closed", 2000);
@@ -2804,8 +2808,9 @@ void MainWindow::configureTimers()
         return;
     }
 
-    // Open Timer List Dialog
-    TimerListDialog dialog(worldWidget->document(), this);
+    // Open Unified Preferences dialog to Timers page
+    UnifiedPreferencesDialog dialog(worldWidget->document(),
+                                     UnifiedPreferencesDialog::Page::Timers, this);
     dialog.exec();
 
     statusBar()->showMessage("Timer configuration closed", 2000);
