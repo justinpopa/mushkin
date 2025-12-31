@@ -4,6 +4,7 @@
 #include "pages/triggers_page.h"
 #include "pages/aliases_page.h"
 #include "pages/timers_page.h"
+#include "pages/connection_page.h"
 #include "world/world_document.h"
 
 #include <QDialogButtonBox>
@@ -157,9 +158,13 @@ void UnifiedPreferencesDialog::setupPages()
         m_stack->addWidget(stubPage);
     };
 
-    // General pages
-    addStubPage(Page::Connection, tr("Connection"),
-                tr("Configure server address, port, and connection options."));
+    // General pages - using real implementations
+    auto* connectionPage = new ConnectionPage(m_doc, this);
+    m_pages[Page::Connection] = connectionPage;
+    m_stack->addWidget(connectionPage);
+    connect(connectionPage, &PreferencesPageBase::settingsChanged, this,
+            &UnifiedPreferencesDialog::onPageSettingsChanged);
+
     addStubPage(Page::Logging, tr("Logging"),
                 tr("Configure log file settings and automatic logging."));
     addStubPage(Page::Info, tr("Info"),
