@@ -309,6 +309,13 @@ foreach(LUA_FILE ${LUA_SOURCE_FILES})
 endforeach()
 message(STATUS "Copied ${CMAKE_SOURCE_DIR}/lua/*.lua to build directory")
 
+# Copy MoonScript module directory (multi-file module)
+if(EXISTS "${CMAKE_SOURCE_DIR}/lua/moonscript")
+    file(COPY "${CMAKE_SOURCE_DIR}/lua/moonscript"
+         DESTINATION "${CMAKE_BINARY_DIR}/lua")
+    message(STATUS "Copied MoonScript module to build directory")
+endif()
+
 # ========== LuaSocket Library ==========
 # Build socket.core and mime.core for HTTP client support in plugins
 # Required for plugins that use socket.http for web requests
@@ -323,6 +330,14 @@ endif()
 if(EXISTS "${CMAKE_SOURCE_DIR}/external/luasec/CMakeLists.txt")
     add_subdirectory(external/luasec)
     message(STATUS "LuaSec: Building ssl module for HTTPS support")
+endif()
+
+# ========== YueScript Library ==========
+# Build yue.so for YueScript support (MoonScript-like language that compiles to Lua)
+# Allows loading .yue files directly without manual transpilation
+if(EXISTS "${CMAKE_SOURCE_DIR}/external/yuescript/src/yuescript/yuescript.cpp")
+    add_subdirectory(external/yuescript-build)
+    message(STATUS "YueScript: Building yue module for .yue file support")
 endif()
 
 # ========== Google Test Framework ==========

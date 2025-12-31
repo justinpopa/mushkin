@@ -128,6 +128,7 @@ private:
     QTextEdit* m_sendTextEdit;
     QComboBox* m_sendToCombo;
     QLineEdit* m_scriptEdit;
+    QComboBox* m_scriptLanguageCombo; // Script language (Lua, YueScript)
 
     // Options tab widgets
     QCheckBox* m_oneShotCheck;

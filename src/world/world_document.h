@@ -20,8 +20,9 @@
 #include <functional> // For std::function (progress callback)
 #include <memory>     // For std::unique_ptr
 
-#include "../automation/variable.h" // ArraysMap type
-#include "miniwindow.h"             // MiniWindow (off-screen drawing surface)
+#include "../automation/script_language.h" // ScriptLanguage enum
+#include "../automation/variable.h"        // ArraysMap type
+#include "miniwindow.h"                    // MiniWindow (off-screen drawing surface)
 #include "mxp_types.h"              // MXP data structures
 #include <QJsonArray>               // GMCP JSON parsing
 #include <QJsonObject>              // GMCP JSON parsing
@@ -1551,7 +1552,8 @@ class WorldDocument : public QObject {
 
     // ========== SendTo() - Central Action Routing ==========
     void sendTo(quint16 iWhere, const QString& strSendText, bool bOmitFromOutput, bool bOmitFromLog,
-                const QString& strDescription, const QString& strVariable, QString& strOutput);
+                const QString& strDescription, const QString& strVariable, QString& strOutput,
+                ScriptLanguage scriptLang = ScriptLanguage::Lua);
 
     // ========== Command Execution Pipeline ==========
     void SendMsg(const QString& text, bool bEcho, bool bQueue,

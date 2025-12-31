@@ -1,6 +1,7 @@
 #ifndef ALIAS_H
 #define ALIAS_H
 
+#include "script_language.h"
 #include <QDateTime>
 #include <QMap>
 #include <QObject>
@@ -52,9 +53,10 @@ class Alias : public QObject {
 
     // ========== Action Fields ==========
 
-    QString contents;         // What to send when matched
-    QString strProcedure;     // Lua procedure to execute
-    quint16 iSendTo;          // Where alias is sent (see SendTo enum)
+    QString contents;              // What to send when matched
+    QString strProcedure;          // Script procedure to execute
+    ScriptLanguage scriptLanguage; // Script language (Lua or YueScript)
+    quint16 iSendTo;               // Where alias is sent (see SendTo enum)
     QString strVariable;      // Which variable to set (for send to variable)
     quint16 bExpandVariables; // Expand variables (e.g., @food)
 

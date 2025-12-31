@@ -340,7 +340,7 @@ void WorldDocument::executeTimer(Timer* timer, const QString& name)
 
     // Call SendTo() to route timer contents to destination
     sendTo(timer->iSendTo, timer->strContents, timer->bOmitFromOutput, timer->bOmitFromLog,
-           strDescription, timer->strVariable, strExtraOutput);
+           strDescription, timer->strVariable, strExtraOutput, timer->scriptLanguage);
 
     // Reset action source
     m_iCurrentActionSource = eUnknownActionSource;
@@ -516,7 +516,7 @@ void WorldDocument::executePluginTimer(Plugin* plugin, Timer* timer, const QStri
 
     // Call SendTo() - for eSendToScript, sendTo will use the current plugin's Lua state
     sendTo(timer->iSendTo, timer->strContents, timer->bOmitFromOutput, timer->bOmitFromLog,
-           strDescription, timer->strVariable, strExtraOutput);
+           strDescription, timer->strVariable, strExtraOutput, timer->scriptLanguage);
 
     // Reset action source and plugin context
     m_iCurrentActionSource = eUnknownActionSource;

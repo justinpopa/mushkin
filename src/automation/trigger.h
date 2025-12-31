@@ -1,6 +1,7 @@
 #ifndef TRIGGER_H
 #define TRIGGER_H
 
+#include "script_language.h"
 #include <QColor> // for QRgb typedef
 #include <QDateTime>
 #include <QMap>
@@ -67,10 +68,11 @@ class Trigger : public QObject {
 
     // ========== Action Fields ==========
 
-    QString contents;      // What to send when triggered
-    QString sound_to_play; // Sound file to play
-    QString strProcedure;  // Lua procedure to execute
-    quint16 iSendTo;       // Where trigger is sent (see SendTo enum)
+    QString contents;              // What to send when triggered
+    QString sound_to_play;         // Sound file to play
+    QString strProcedure;          // Script procedure to execute
+    ScriptLanguage scriptLanguage; // Script language (Lua or YueScript)
+    quint16 iSendTo;               // Where trigger is sent (see SendTo enum)
     QString strVariable;   // Which variable to set (for send to variable)
     quint16 iClipboardArg; // If non-zero, copy matching wildcard to clipboard
 
