@@ -15,6 +15,10 @@ class QComboBox;
  *
  * Configure input font, echo settings, command history,
  * and input behavior options.
+ *
+ * Matches original MUSHclient Page 9 (Input) with sub-dialogs for:
+ * - Command Options (double-click, arrow keys, keyboard shortcuts)
+ * - Tab Completion Defaults (word list, lines to search)
  */
 class InputPage : public PreferencesPageBase {
     Q_OBJECT
@@ -34,6 +38,8 @@ class InputPage : public PreferencesPageBase {
 
   private slots:
     void onInputFontButtonClicked();
+    void onCommandOptionsClicked();
+    void onTabDefaultsClicked();
     void markChanged();
 
   private:

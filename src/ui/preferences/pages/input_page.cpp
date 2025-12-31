@@ -1,4 +1,6 @@
 #include "input_page.h"
+#include "../../dialogs/command_options_dialog.h"
+#include "../../dialogs/tab_defaults_dialog.h"
 #include "world/world_document.h"
 
 #include <QCheckBox>
@@ -94,6 +96,23 @@ void InputPage::setupUi()
     behaviorLayout->addWidget(m_doubleClickSelectCheck);
 
     mainLayout->addWidget(behaviorGroup);
+
+    // Advanced options section (matches original MUSHclient Page 9)
+    QGroupBox* advancedGroup = new QGroupBox(tr("Advanced Options"), this);
+    QVBoxLayout* advancedLayout = new QVBoxLayout(advancedGroup);
+
+    QPushButton* commandOptionsButton = new QPushButton(tr("Command Options..."), this);
+    commandOptionsButton->setToolTip(
+        tr("Configure double-click behavior, arrow keys, and keyboard shortcuts"));
+    connect(commandOptionsButton, &QPushButton::clicked, this, &InputPage::onCommandOptionsClicked);
+    advancedLayout->addWidget(commandOptionsButton);
+
+    QPushButton* tabDefaultsButton = new QPushButton(tr("Tab Completion Defaults..."), this);
+    tabDefaultsButton->setToolTip(tr("Configure default words and settings for tab completion"));
+    connect(tabDefaultsButton, &QPushButton::clicked, this, &InputPage::onTabDefaultsClicked);
+    advancedLayout->addWidget(tabDefaultsButton);
+
+    mainLayout->addWidget(advancedGroup);
 
     mainLayout->addStretch();
 }
@@ -200,4 +219,28 @@ void InputPage::markChanged()
 {
     m_hasChanges = true;
     emit settingsChanged();
+}
+
+void InputPage::onCommandOptionsClicked()
+{
+    if (!m_doc)
+        return;
+
+    CommandOptionsDialog dialog(m_doc, this);
+    if (dialog.exec() == QDialog::Accepted) {
+        // Settings are saved by the dialog
+        markChanged();
+    }
+}
+
+void InputPage::onTabDefaultsClicked()
+{
+    if (!m_doc)
+        return;
+
+    TabDefaultsDialog dialog(m_doc, this);
+    if (dialog.exec() == QDialog::Accepted) {
+        // Settings are saved by the dialog
+        markChanged();
+    }
 }

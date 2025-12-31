@@ -38,6 +38,10 @@ add_library(ui
     dialogs/shortcut_edit_dialog.cpp
     dialogs/command_history_dialog.h
     dialogs/command_history_dialog.cpp
+    dialogs/command_options_dialog.h
+    dialogs/command_options_dialog.cpp
+    dialogs/tab_defaults_dialog.h
+    dialogs/tab_defaults_dialog.cpp
     dialogs/find_dialog.h
     dialogs/find_dialog.cpp
     dialogs/recall_search_dialog.h
