@@ -34,14 +34,14 @@ add_library(ui
     dialogs/timer_list_dialog.cpp
     dialogs/timer_edit_dialog.h
     dialogs/timer_edit_dialog.cpp
-    dialogs/shortcut_list_dialog.h
-    dialogs/shortcut_list_dialog.cpp
     dialogs/shortcut_edit_dialog.h
     dialogs/shortcut_edit_dialog.cpp
     dialogs/command_history_dialog.h
     dialogs/command_history_dialog.cpp
     dialogs/command_options_dialog.h
     dialogs/command_options_dialog.cpp
+    dialogs/tab_defaults_dialog.h
+    dialogs/tab_defaults_dialog.cpp
     dialogs/find_dialog.h
     dialogs/find_dialog.cpp
     dialogs/recall_search_dialog.h
@@ -62,8 +62,6 @@ add_library(ui
     dialogs/log_dialog.cpp
     dialogs/highlight_phrase_dialog.h
     dialogs/highlight_phrase_dialog.cpp
-    dialogs/tab_defaults_dialog.h
-    dialogs/tab_defaults_dialog.cpp
     dialogs/import_xml_dialog.h
     dialogs/import_xml_dialog.cpp
     dialogs/map_dialog.h
@@ -139,6 +137,45 @@ add_library(ui
     dialogs/map_comment_dialog.cpp
     dialogs/map_move_dialog.h
     dialogs/map_move_dialog.cpp
+    # Unified preferences dialog
+    preferences/preferences_page_base.h
+    preferences/preferences_page_base.cpp
+    preferences/item_list_page_base.h
+    preferences/item_list_page_base.cpp
+    preferences/unified_preferences_dialog.h
+    preferences/unified_preferences_dialog.cpp
+    preferences/pages/stub_page.h
+    preferences/pages/stub_page.cpp
+    preferences/pages/triggers_page.h
+    preferences/pages/triggers_page.cpp
+    preferences/pages/aliases_page.h
+    preferences/pages/aliases_page.cpp
+    preferences/pages/timers_page.h
+    preferences/pages/timers_page.cpp
+    preferences/pages/connection_page.h
+    preferences/pages/connection_page.cpp
+    preferences/pages/output_page.h
+    preferences/pages/output_page.cpp
+    preferences/pages/logging_page.h
+    preferences/pages/logging_page.cpp
+    preferences/pages/scripting_page.h
+    preferences/pages/scripting_page.cpp
+    preferences/pages/input_page.h
+    preferences/pages/input_page.cpp
+    preferences/pages/paste_send_page.h
+    preferences/pages/paste_send_page.cpp
+    preferences/pages/macros_page.h
+    preferences/pages/macros_page.cpp
+    preferences/pages/info_page.h
+    preferences/pages/info_page.cpp
+    preferences/pages/colors_page.h
+    preferences/pages/colors_page.cpp
+    preferences/pages/keypad_page.h
+    preferences/pages/keypad_page.cpp
+    preferences/pages/autosay_page.h
+    preferences/pages/autosay_page.cpp
+    preferences/pages/variables_page.h
+    preferences/pages/variables_page.cpp
     # Lua dialog callback registration
     lua_dialog_registration.h
     lua_dialog_registration.cpp

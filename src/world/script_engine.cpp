@@ -250,9 +250,8 @@ void ScriptEngine::openLua()
 
     // 5. Set up Lua package.path (issue #4)
     // Use only relative paths for portability - no system paths
+    // Working directory is set to AppPaths::getAppDirectory() at startup
     lua_getglobal(L, "package");
-
-    QString appDir = QCoreApplication::applicationDirPath();
 
     QStringList luaPaths = {
         "./?.lua",
