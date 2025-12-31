@@ -76,6 +76,15 @@ if(APPLE)
         INSTALL_RPATH "@executable_path/../Frameworks"
         BUILD_WITH_INSTALL_RPATH TRUE
     )
+
+    # Ad-hoc codesign the app bundle after build (required for macOS to run unsigned apps)
+    # This gets invalidated by macdeployqt, so deployment scripts must re-sign
+    if(BUILD_APP_BUNDLE)
+        add_custom_command(TARGET mushkin POST_BUILD
+            COMMAND codesign --force --deep --sign - "$<TARGET_BUNDLE_DIR:mushkin>"
+            COMMENT "Ad-hoc signing mushkin.app"
+        )
+    endif()
 endif()
 
 # Install

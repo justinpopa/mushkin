@@ -85,6 +85,11 @@ int main(int argc, char* argv[])
 
     QApplication app(argc, argv);
 
+    // Set working directory to app directory so relative paths work correctly
+    // On macOS .app bundles, this is the folder containing the .app
+    // On standalone executables, this is the folder containing the executable
+    QDir::setCurrent(AppPaths::getAppDirectory());
+
     // Load local fonts from application directory (must be after QApplication is created)
     loadLocalFonts();
 
@@ -111,6 +116,7 @@ int main(int argc, char* argv[])
 
     // Build LUA_PATH for Lua modules (issue #4)
     // Use only relative paths for portability - no system paths
+    // Working directory is set to AppPaths::getAppDirectory() at startup
     QStringList luaPaths = {
         "./?.lua",
         "./lua/?.lua",

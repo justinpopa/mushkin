@@ -1,43 +1,35 @@
-/**
- * shortcut_list_dialog.cpp - Unified keyboard shortcut manager dialog
- *
- * Displays all keyboard shortcuts in a searchable, filterable table with
- * add/edit/delete support for user-defined shortcuts and conflict detection.
- */
+#include "macros_page.h"
+#include "../../dialogs/shortcut_edit_dialog.h"
+#include "automation/sendto.h"
+#include "world/accelerator_manager.h"
+#include "world/world_document.h"
 
-#include "shortcut_list_dialog.h"
-#include "../../automation/sendto.h"
-#include "../../world/accelerator_manager.h"
-#include "../../world/world_document.h"
-#include "shortcut_edit_dialog.h"
-#include <QDialogButtonBox>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QHeaderView>
+#include <QLabel>
+#include <QLineEdit>
 #include <QMessageBox>
+#include <QPushButton>
+#include <QTableWidget>
 #include <QVBoxLayout>
 
-ShortcutListDialog::ShortcutListDialog(WorldDocument* doc, QWidget* parent)
-    : QDialog(parent), m_doc(doc)
+MacrosPage::MacrosPage(WorldDocument* doc, QWidget* parent)
+    : PreferencesPageBase(doc, parent)
 {
     setupUi();
-    loadShortcuts();
-    updateButtonStates();
-    updateConflictIndicator();
-
-    setWindowTitle("Keyboard Shortcuts");
-    resize(700, 500);
 }
 
-void ShortcutListDialog::setupUi()
+void MacrosPage::setupUi()
 {
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
+    mainLayout->setContentsMargins(0, 0, 0, 0);
 
     // Search bar
     QHBoxLayout* searchLayout = new QHBoxLayout();
-    QLabel* searchLabel = new QLabel("Search:", this);
+    QLabel* searchLabel = new QLabel(tr("Search:"), this);
     m_searchEdit = new QLineEdit(this);
-    m_searchEdit->setPlaceholderText("Filter by key or action...");
+    m_searchEdit->setPlaceholderText(tr("Filter by key or action..."));
     m_searchEdit->setClearButtonEnabled(true);
     searchLayout->addWidget(searchLabel);
     searchLayout->addWidget(m_searchEdit, 1);
@@ -46,7 +38,7 @@ void ShortcutListDialog::setupUi()
     // Table
     m_table = new QTableWidget(this);
     m_table->setColumnCount(ColCount);
-    m_table->setHorizontalHeaderLabels({"Shortcut", "Action", "Send To", "Source"});
+    m_table->setHorizontalHeaderLabels({tr("Shortcut"), tr("Action"), tr("Send To"), tr("Source")});
     m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_table->setSelectionMode(QAbstractItemView::SingleSelection);
     m_table->setAlternatingRowColors(true);
@@ -57,15 +49,14 @@ void ShortcutListDialog::setupUi()
     m_table->verticalHeader()->setVisible(false);
     mainLayout->addWidget(m_table, 1);
 
-    // Buttons group
-    QGroupBox* buttonGroup = new QGroupBox("Shortcut Operations", this);
-    QHBoxLayout* buttonLayout = new QHBoxLayout(buttonGroup);
+    // Buttons
+    QHBoxLayout* buttonLayout = new QHBoxLayout();
 
-    m_addButton = new QPushButton("&Add...", this);
-    m_editButton = new QPushButton("&Edit...", this);
-    m_deleteButton = new QPushButton("&Delete", this);
-    m_enableButton = new QPushButton("E&nable", this);
-    m_disableButton = new QPushButton("D&isable", this);
+    m_addButton = new QPushButton(tr("&Add..."), this);
+    m_editButton = new QPushButton(tr("&Edit..."), this);
+    m_deleteButton = new QPushButton(tr("&Delete"), this);
+    m_enableButton = new QPushButton(tr("E&nable"), this);
+    m_disableButton = new QPushButton(tr("D&isable"), this);
 
     buttonLayout->addWidget(m_addButton);
     buttonLayout->addWidget(m_editButton);
@@ -75,7 +66,7 @@ void ShortcutListDialog::setupUi()
     buttonLayout->addWidget(m_disableButton);
     buttonLayout->addStretch();
 
-    mainLayout->addWidget(buttonGroup);
+    mainLayout->addLayout(buttonLayout);
 
     // Conflict indicator
     m_conflictLabel = new QLabel(this);
@@ -83,25 +74,37 @@ void ShortcutListDialog::setupUi()
     m_conflictLabel->hide();
     mainLayout->addWidget(m_conflictLabel);
 
-    // Close button
-    QDialogButtonBox* dialogButtons = new QDialogButtonBox(QDialogButtonBox::Close, this);
-    mainLayout->addWidget(dialogButtons);
-
     // Connect signals
-    connect(m_searchEdit, &QLineEdit::textChanged, this, &ShortcutListDialog::onSearchChanged);
-    connect(m_table, &QTableWidget::itemSelectionChanged, this,
-            &ShortcutListDialog::onSelectionChanged);
-    connect(m_table, &QTableWidget::itemDoubleClicked, this,
-            &ShortcutListDialog::onItemDoubleClicked);
-    connect(m_addButton, &QPushButton::clicked, this, &ShortcutListDialog::onAddClicked);
-    connect(m_editButton, &QPushButton::clicked, this, &ShortcutListDialog::onEditClicked);
-    connect(m_deleteButton, &QPushButton::clicked, this, &ShortcutListDialog::onDeleteClicked);
-    connect(m_enableButton, &QPushButton::clicked, this, &ShortcutListDialog::onEnableClicked);
-    connect(m_disableButton, &QPushButton::clicked, this, &ShortcutListDialog::onDisableClicked);
-    connect(dialogButtons, &QDialogButtonBox::rejected, this, &QDialog::accept);
+    connect(m_searchEdit, &QLineEdit::textChanged, this, &MacrosPage::onSearchChanged);
+    connect(m_table, &QTableWidget::itemSelectionChanged, this, &MacrosPage::onSelectionChanged);
+    connect(m_table, &QTableWidget::itemDoubleClicked, this, &MacrosPage::onItemDoubleClicked);
+    connect(m_addButton, &QPushButton::clicked, this, &MacrosPage::onAddClicked);
+    connect(m_editButton, &QPushButton::clicked, this, &MacrosPage::onEditClicked);
+    connect(m_deleteButton, &QPushButton::clicked, this, &MacrosPage::onDeleteClicked);
+    connect(m_enableButton, &QPushButton::clicked, this, &MacrosPage::onEnableClicked);
+    connect(m_disableButton, &QPushButton::clicked, this, &MacrosPage::onDisableClicked);
 }
 
-void ShortcutListDialog::loadShortcuts()
+void MacrosPage::loadSettings()
+{
+    loadShortcuts();
+    updateButtonStates();
+    updateConflictIndicator();
+    m_hasChanges = false;
+}
+
+void MacrosPage::saveSettings()
+{
+    // Changes are saved immediately when add/edit/delete is performed
+    m_hasChanges = false;
+}
+
+bool MacrosPage::hasChanges() const
+{
+    return m_hasChanges;
+}
+
+void MacrosPage::loadShortcuts()
 {
     if (!m_doc || !m_doc->m_acceleratorManager) {
         return;
@@ -118,7 +121,7 @@ void ShortcutListDialog::loadShortcuts()
 
         // Shortcut column
         QTableWidgetItem* keyItem = new QTableWidgetItem(entry.keyString);
-        keyItem->setData(Qt::UserRole, entry.keyString); // Store for retrieval
+        keyItem->setData(Qt::UserRole, entry.keyString);
         if (!entry.enabled) {
             keyItem->setForeground(Qt::gray);
         }
@@ -142,24 +145,23 @@ void ShortcutListDialog::loadShortcuts()
         QString sourceText;
         switch (entry.source) {
             case AcceleratorSource::User:
-                sourceText = "User";
+                sourceText = tr("User");
                 break;
             case AcceleratorSource::Script:
-                sourceText = "Script";
+                sourceText = tr("Script");
                 break;
             case AcceleratorSource::Plugin:
-                sourceText = QString("Plugin: %1").arg(entry.pluginId);
+                sourceText = tr("Plugin: %1").arg(entry.pluginId);
                 break;
         }
         QTableWidgetItem* sourceItem = new QTableWidgetItem(sourceText);
         sourceItem->setData(Qt::UserRole, static_cast<int>(entry.source));
 
-        // Style runtime shortcuts differently
         if (entry.source != AcceleratorSource::User) {
             QFont font = sourceItem->font();
             font.setItalic(true);
             sourceItem->setFont(font);
-            sourceItem->setForeground(QColor("#7f8c8d")); // Gray for runtime
+            sourceItem->setForeground(QColor("#7f8c8d"));
         }
         if (!entry.enabled) {
             sourceItem->setForeground(Qt::gray);
@@ -172,7 +174,7 @@ void ShortcutListDialog::loadShortcuts()
     applyFilter();
 }
 
-void ShortcutListDialog::applyFilter()
+void MacrosPage::applyFilter()
 {
     QString filter = m_currentFilter.toLower();
 
@@ -182,7 +184,6 @@ void ShortcutListDialog::applyFilter()
         if (!filter.isEmpty()) {
             QString key = m_table->item(row, ColShortcut)->text().toLower();
             QString action = m_table->item(row, ColAction)->text().toLower();
-
             show = key.contains(filter) || action.contains(filter);
         }
 
@@ -190,18 +191,18 @@ void ShortcutListDialog::applyFilter()
     }
 }
 
-void ShortcutListDialog::onSearchChanged(const QString& text)
+void MacrosPage::onSearchChanged(const QString& text)
 {
     m_currentFilter = text;
     applyFilter();
 }
 
-void ShortcutListDialog::onSelectionChanged()
+void MacrosPage::onSelectionChanged()
 {
     updateButtonStates();
 }
 
-void ShortcutListDialog::updateButtonStates()
+void MacrosPage::updateButtonStates()
 {
     bool hasSelection = !m_table->selectedItems().isEmpty();
     bool isUserShortcut = isSelectedUserShortcut();
@@ -212,7 +213,7 @@ void ShortcutListDialog::updateButtonStates()
     m_disableButton->setEnabled(hasSelection);
 }
 
-void ShortcutListDialog::updateConflictIndicator()
+void MacrosPage::updateConflictIndicator()
 {
     if (!m_doc || !m_doc->m_acceleratorManager) {
         m_conflictLabel->hide();
@@ -226,14 +227,14 @@ void ShortcutListDialog::updateConflictIndicator()
     } else {
         QStringList conflictKeys;
         for (auto it = conflicts.constBegin(); it != conflicts.constEnd(); ++it) {
-            conflictKeys.append(QString("%1 (%2 bindings)").arg(it.key()).arg(it.value().size()));
+            conflictKeys.append(tr("%1 (%2 bindings)").arg(it.key()).arg(it.value().size()));
         }
-        m_conflictLabel->setText(QString("Conflicts: %1").arg(conflictKeys.join(", ")));
+        m_conflictLabel->setText(tr("Conflicts: %1").arg(conflictKeys.join(", ")));
         m_conflictLabel->show();
     }
 }
 
-QString ShortcutListDialog::getSelectedKeyString() const
+QString MacrosPage::getSelectedKeyString() const
 {
     QList<QTableWidgetItem*> selected = m_table->selectedItems();
     if (selected.isEmpty()) {
@@ -245,7 +246,7 @@ QString ShortcutListDialog::getSelectedKeyString() const
     return keyItem ? keyItem->data(Qt::UserRole).toString() : QString();
 }
 
-bool ShortcutListDialog::isSelectedUserShortcut() const
+bool MacrosPage::isSelectedUserShortcut() const
 {
     QList<QTableWidgetItem*> selected = m_table->selectedItems();
     if (selected.isEmpty()) {
@@ -262,7 +263,7 @@ bool ShortcutListDialog::isSelectedUserShortcut() const
     return source == static_cast<int>(AcceleratorSource::User);
 }
 
-void ShortcutListDialog::onItemDoubleClicked(QTableWidgetItem* item)
+void MacrosPage::onItemDoubleClicked(QTableWidgetItem* item)
 {
     Q_UNUSED(item);
     if (isSelectedUserShortcut()) {
@@ -270,22 +271,21 @@ void ShortcutListDialog::onItemDoubleClicked(QTableWidgetItem* item)
     }
 }
 
-void ShortcutListDialog::onAddClicked()
+void MacrosPage::onAddClicked()
 {
     ShortcutEditDialog dialog(m_doc, this);
     if (dialog.exec() == QDialog::Accepted) {
-        // Add the new shortcut
         m_doc->m_acceleratorManager->addKeyBinding(dialog.keyString(), dialog.action(),
                                                    dialog.sendTo());
-
-        // Reload the list
         loadShortcuts();
         updateButtonStates();
         updateConflictIndicator();
+        m_hasChanges = true;
+        emit settingsChanged();
     }
 }
 
-void ShortcutListDialog::onEditClicked()
+void MacrosPage::onEditClicked()
 {
     QString keyString = getSelectedKeyString();
     if (keyString.isEmpty()) {
@@ -294,31 +294,28 @@ void ShortcutListDialog::onEditClicked()
 
     ShortcutEditDialog dialog(m_doc, keyString, this);
     if (dialog.exec() == QDialog::Accepted) {
-        // Remove old shortcut if key changed
         if (dialog.keyString() != keyString) {
             m_doc->m_acceleratorManager->removeKeyBinding(keyString);
         }
-
-        // Add/update the shortcut
         m_doc->m_acceleratorManager->addKeyBinding(dialog.keyString(), dialog.action(),
                                                    dialog.sendTo());
-
-        // Reload the list
         loadShortcuts();
         updateButtonStates();
         updateConflictIndicator();
+        m_hasChanges = true;
+        emit settingsChanged();
     }
 }
 
-void ShortcutListDialog::onDeleteClicked()
+void MacrosPage::onDeleteClicked()
 {
     QString keyString = getSelectedKeyString();
     if (keyString.isEmpty()) {
         return;
     }
 
-    int result = QMessageBox::question(this, "Confirm Delete",
-                                       QString("Delete shortcut '%1'?").arg(keyString),
+    int result = QMessageBox::question(this, tr("Confirm Delete"),
+                                       tr("Delete shortcut '%1'?").arg(keyString),
                                        QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
 
     if (result == QMessageBox::Yes) {
@@ -326,10 +323,12 @@ void ShortcutListDialog::onDeleteClicked()
         loadShortcuts();
         updateButtonStates();
         updateConflictIndicator();
+        m_hasChanges = true;
+        emit settingsChanged();
     }
 }
 
-void ShortcutListDialog::onEnableClicked()
+void MacrosPage::onEnableClicked()
 {
     QString keyString = getSelectedKeyString();
     if (keyString.isEmpty()) {
@@ -339,9 +338,11 @@ void ShortcutListDialog::onEnableClicked()
     m_doc->m_acceleratorManager->setAcceleratorEnabled(keyString, true);
     loadShortcuts();
     updateButtonStates();
+    m_hasChanges = true;
+    emit settingsChanged();
 }
 
-void ShortcutListDialog::onDisableClicked()
+void MacrosPage::onDisableClicked()
 {
     QString keyString = getSelectedKeyString();
     if (keyString.isEmpty()) {
@@ -351,4 +352,6 @@ void ShortcutListDialog::onDisableClicked()
     m_doc->m_acceleratorManager->setAcceleratorEnabled(keyString, false);
     loadShortcuts();
     updateButtonStates();
+    m_hasChanges = true;
+    emit settingsChanged();
 }
