@@ -182,8 +182,6 @@ class MainWindow : public QMainWindow {
     void configurePlugins();
     void pluginWizard();
     void immediateScript();
-    void commandOptions();
-    void tabDefaults();
     void sendFile();
     void showMapper();
 

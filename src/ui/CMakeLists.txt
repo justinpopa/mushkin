@@ -34,14 +34,10 @@ add_library(ui
     dialogs/timer_list_dialog.cpp
     dialogs/timer_edit_dialog.h
     dialogs/timer_edit_dialog.cpp
-    dialogs/shortcut_list_dialog.h
-    dialogs/shortcut_list_dialog.cpp
     dialogs/shortcut_edit_dialog.h
     dialogs/shortcut_edit_dialog.cpp
     dialogs/command_history_dialog.h
     dialogs/command_history_dialog.cpp
-    dialogs/command_options_dialog.h
-    dialogs/command_options_dialog.cpp
     dialogs/find_dialog.h
     dialogs/find_dialog.cpp
     dialogs/recall_search_dialog.h
@@ -62,8 +58,6 @@ add_library(ui
     dialogs/log_dialog.cpp
     dialogs/highlight_phrase_dialog.h
     dialogs/highlight_phrase_dialog.cpp
-    dialogs/tab_defaults_dialog.h
-    dialogs/tab_defaults_dialog.cpp
     dialogs/import_xml_dialog.h
     dialogs/import_xml_dialog.cpp
     dialogs/map_dialog.h

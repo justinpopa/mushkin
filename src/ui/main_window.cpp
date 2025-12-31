@@ -9,7 +9,6 @@
 #include "dialogs/alias_list_dialog.h"
 #include "dialogs/ascii_art_dialog.h"
 #include "dialogs/command_history_dialog.h"
-#include "dialogs/command_options_dialog.h"
 #include "dialogs/confirm_preamble_dialog.h"
 #include "dialogs/find_dialog.h"
 #include "dialogs/generate_id_dialog.h"
@@ -32,8 +31,6 @@
 #include "dialogs/quick_connect_dialog.h"
 #include "dialogs/recall_search_dialog.h"
 #include "dialogs/send_to_all_dialog.h"
-#include "dialogs/shortcut_list_dialog.h"
-#include "dialogs/tab_defaults_dialog.h"
 #include "dialogs/text_attributes_dialog.h"
 #include "dialogs/timer_list_dialog.h"
 #include "dialogs/trigger_list_dialog.h"
@@ -4990,46 +4987,6 @@ void MainWindow::immediateScript()
     }
 
     ImmediateDialog dlg(worldWidget->document(), this);
-    dlg.exec();
-}
-
-void MainWindow::commandOptions()
-{
-    // Get active world
-    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
-    if (!activeSubWindow) {
-        QMessageBox::warning(this, "Command Options", "Please open a world first.");
-        return;
-    }
-
-    WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
-    if (!worldWidget || !worldWidget->document()) {
-        QMessageBox::warning(this, "Command Options", "No active world document.");
-        return;
-    }
-
-    CommandOptionsDialog dlg(worldWidget->document(), this);
-    if (dlg.exec() == QDialog::Accepted) {
-        // Settings are saved by the dialog
-    }
-}
-
-void MainWindow::tabDefaults()
-{
-    // Get active world
-    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
-    if (!activeSubWindow) {
-        QMessageBox::warning(this, "Tab Completion", "Please open a world first.");
-        return;
-    }
-
-    WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
-    if (!worldWidget || !worldWidget->document()) {
-        QMessageBox::warning(this, "Tab Completion", "No active world document.");
-        return;
-    }
-
-    TabDefaultsDialog dlg(worldWidget->document(), this);
     dlg.exec();
 }
 
