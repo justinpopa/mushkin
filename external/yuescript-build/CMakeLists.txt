@@ -37,8 +37,14 @@ target_compile_definitions(yue_module PRIVATE
 # C++17 required
 target_compile_features(yue_module PRIVATE cxx_std_17)
 
-# Optimization for release
-if(NOT MSVC)
+# Compiler-specific options
+if(MSVC)
+    target_compile_options(yue_module PRIVATE
+        # Make MSVC report __cplusplus correctly for C++17
+        # Required for utf8cpp.h to enable the C++11+ string overloads
+        /Zc:__cplusplus
+    )
+else()
     target_compile_options(yue_module PRIVATE
         $<$<CONFIG:Release>:-O3>
         -fPIC
