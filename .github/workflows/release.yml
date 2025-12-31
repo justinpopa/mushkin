@@ -278,7 +278,7 @@ jobs:
         run: |
           python scripts/generate-lua-docs.py \
             --version ${{ needs.version.outputs.version }} \
-            --update-versions-page
+            --update-versions
 
       - name: Checkout wiki repo
         uses: actions/checkout@v4
