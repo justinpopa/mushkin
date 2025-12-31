@@ -374,13 +374,21 @@ void MainWindow::createMenus()
     // Connection Menu (matches original MUSHclient structure)
     QMenu* connectionMenu = menuBar()->addMenu("Connecti&on");
 
+    // Quick Connect first (also in File menu)
+    QAction* quickConnectAction2 = connectionMenu->addAction("&Quick Connect...");
+    quickConnectAction2->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::SHIFT | Qt::Key_K));
+    quickConnectAction2->setStatusTip("Quickly connect to a MUD server");
+    connect(quickConnectAction2, &QAction::triggered, this, &MainWindow::quickConnect);
+
+    connectionMenu->addSeparator();
+
     m_connectAction = connectionMenu->addAction("&Connect");
-    m_connectAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_G));
+    m_connectAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_K));
     m_connectAction->setStatusTip("Connect to the MUD server");
     connect(m_connectAction, &QAction::triggered, this, &MainWindow::connectToMud);
 
     m_disconnectAction = connectionMenu->addAction("&Disconnect");
-    m_disconnectAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_G));
+    m_disconnectAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::CTRL | Qt::Key_K));
     m_disconnectAction->setStatusTip("Disconnect from the MUD server");
     connect(m_disconnectAction, &QAction::triggered, this, &MainWindow::disconnectFromMud);
 
@@ -392,7 +400,7 @@ void MainWindow::createMenus()
     m_autoConnectAction->setMenuRole(QAction::NoRole);
     connect(m_autoConnectAction, &QAction::triggered, this, &MainWindow::toggleAutoConnect);
 
-    m_reconnectOnDisconnectAction = connectionMenu->addAction("&Reconnect on Disconnect");
+    m_reconnectOnDisconnectAction = connectionMenu->addAction("&Reconnect On Disconnect");
     m_reconnectOnDisconnectAction->setCheckable(true);
     m_reconnectOnDisconnectAction->setStatusTip("Automatically reconnect when disconnected");
     m_reconnectOnDisconnectAction->setMenuRole(QAction::NoRole);
@@ -401,11 +409,12 @@ void MainWindow::createMenus()
 
     connectionMenu->addSeparator();
 
-    m_connectToAllAction = connectionMenu->addAction("Connect to All &Open Worlds");
+    m_connectToAllAction = connectionMenu->addAction("Connect to All Open &Worlds");
+    m_connectToAllAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_K));
     m_connectToAllAction->setStatusTip("Connect to all open but disconnected worlds");
     connect(m_connectToAllAction, &QAction::triggered, this, &MainWindow::connectToAllOpenWorlds);
 
-    m_connectToStartupListAction = connectionMenu->addAction("Connect to Worlds in &Startup List");
+    m_connectToStartupListAction = connectionMenu->addAction("Connect to Worlds &In Startup List");
     m_connectToStartupListAction->setStatusTip(
         "Open and connect to all worlds in the startup list");
     connect(m_connectToStartupListAction, &QAction::triggered, this,
