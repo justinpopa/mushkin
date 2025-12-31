@@ -193,6 +193,8 @@ class MainWindow : public QMainWindow {
     // Display menu actions
     void find();
     void findNext();
+    void findForward();
+    void findBackward();
     void recallText();
     void highlightPhrase();
     void scrollToStart();
@@ -325,11 +327,6 @@ class MainWindow : public QMainWindow {
     void createInfoBar();
 
     /**
-     * Send a command to the active world
-     */
-    void sendGameCommand(const QString& command);
-
-    /**
      * Create the status bar
      */
     void createStatusBar();
@@ -376,16 +373,6 @@ class MainWindow : public QMainWindow {
     // Activity Window (dockable list of all open worlds)
     ActivityWindow* m_activityWindow;
 
-    // Game toolbar direction actions
-    QAction* m_gameNorthAction;
-    QAction* m_gameSouthAction;
-    QAction* m_gameEastAction;
-    QAction* m_gameWestAction;
-    QAction* m_gameUpAction;
-    QAction* m_gameDownAction;
-    QAction* m_gameLookAction;
-    QAction* m_gameExamineAction;
-    QAction* m_gameWhoAction;
 
     // Status bar indicators
     QLabel* m_freezeIndicator;
@@ -511,6 +498,8 @@ class MainWindow : public QMainWindow {
     QAction* m_freezeOutputAction;
     QAction* m_findAction;
     QAction* m_findNextAction;
+    QAction* m_findForwardAction;
+    QAction* m_findBackwardAction;
     QAction* m_recallTextAction;
     QAction* m_goToLineAction;
     QAction* m_goToUrlAction;
@@ -584,10 +573,16 @@ class MainWindow : public QMainWindow {
     int m_lastFoundChar;
 
     /**
-     * performSearch - Execute search with current parameters
+     * performSearch - Execute search with current parameters (forward)
      * @return true if found, false if not found
      */
     bool performSearch();
+
+    /**
+     * performSearchBackward - Execute search with current parameters (backward)
+     * @return true if found, false if not found
+     */
+    bool performSearchBackward();
 
     /**
      * Setup system tray icon based on preferences

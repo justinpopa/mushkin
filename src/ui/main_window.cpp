@@ -800,6 +800,16 @@ void MainWindow::createMenus()
     m_findNextAction->setStatusTip("Find next occurrence of search text");
     connect(m_findNextAction, &QAction::triggered, this, &MainWindow::findNext);
 
+    m_findForwardAction = m_displayMenu->addAction("Find Again &Forwards");
+    m_findForwardAction->setShortcut(QKeySequence(Qt::Key_F3));
+    m_findForwardAction->setStatusTip("Find next occurrence (forward)");
+    connect(m_findForwardAction, &QAction::triggered, this, &MainWindow::findForward);
+
+    m_findBackwardAction = m_displayMenu->addAction("Find Again &Backwards");
+    m_findBackwardAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::Key_F3));
+    m_findBackwardAction->setStatusTip("Find previous occurrence (backward)");
+    connect(m_findBackwardAction, &QAction::triggered, this, &MainWindow::findBackward);
+
     m_recallTextAction = m_displayMenu->addAction("&Recall Text...");
     m_recallTextAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_U));
     m_recallTextAction->setStatusTip("Search and recall buffer contents");
@@ -1061,32 +1071,38 @@ void MainWindow::createMenus()
 
 void MainWindow::createToolBars()
 {
-    // === Main Toolbar - File/Edit operations ===
-    m_mainToolBar = addToolBar("Main Toolbar");
+    // === Main Toolbar - File/Edit operations (matches original MUSHclient) ===
+    m_mainToolBar = addToolBar("Toolbar");
     m_mainToolBar->setObjectName("MainToolBar");
     m_mainToolBar->setMovable(true);
 
-    // Add actions to toolbar (icons set by updateToolbarIcons based on theme)
+    // File operations (icons set by updateToolbarIcons based on theme)
     m_mainToolBar->addAction(m_newAction);
-    m_mainToolBar->addAction(m_openAction);
-    m_mainToolBar->addAction(m_saveAction);
 
     m_mainToolBar->addSeparator();
 
-    // Connection actions
-    m_mainToolBar->addAction(m_connectAction);
-    m_mainToolBar->addAction(m_disconnectAction);
+    m_mainToolBar->addAction(m_openAction);
+    m_mainToolBar->addAction(m_saveAction);
+    // Print World button (stub - not yet implemented)
+    // m_mainToolBar->addAction(m_printWorldAction);
+
+    m_mainToolBar->addSeparator();
+
+    // Notepad
+    m_mainToolBar->addAction(m_notepadAction);
 
     m_mainToolBar->addSeparator();
 
     // Edit actions
+    m_mainToolBar->addAction(m_cutAction);
     m_mainToolBar->addAction(m_copyAction);
     m_mainToolBar->addAction(m_pasteAction);
 
     m_mainToolBar->addSeparator();
 
-    // Find action
-    m_mainToolBar->addAction(m_findAction);
+    // About and Help
+    m_mainToolBar->addAction(m_aboutAction);
+    m_mainToolBar->addAction(m_helpAction);
 
     // Connect visibility toggle
     connect(m_mainToolBarAction, &QAction::toggled, m_mainToolBar, &QToolBar::setVisible);
@@ -1105,64 +1121,52 @@ void MainWindow::createToolBars()
 
 void MainWindow::createGameToolBar()
 {
-    // === Game Toolbar - Direction buttons and common commands ===
-    m_gameToolBar = addToolBar("Game Toolbar");
+    // === World Toolbar - World configuration controls (matches original MUSHclient) ===
+    m_gameToolBar = addToolBar("World Toolbar");
     m_gameToolBar->setObjectName("GameToolBar");
     m_gameToolBar->setMovable(true);
 
-    // Use a slightly larger font for direction buttons
-    QFont dirFont = m_gameToolBar->font();
-    dirFont.setBold(true);
-    dirFont.setPointSize(dirFont.pointSize() + 1);
-
-    // Direction buttons using text (like original MUSHclient)
-    m_gameNorthAction = m_gameToolBar->addAction("N");
-    m_gameNorthAction->setToolTip("Go North");
-    m_gameNorthAction->setFont(dirFont);
-    connect(m_gameNorthAction, &QAction::triggered, this, [this]() { sendGameCommand("north"); });
-
-    m_gameSouthAction = m_gameToolBar->addAction("S");
-    m_gameSouthAction->setToolTip("Go South");
-    m_gameSouthAction->setFont(dirFont);
-    connect(m_gameSouthAction, &QAction::triggered, this, [this]() { sendGameCommand("south"); });
-
-    m_gameEastAction = m_gameToolBar->addAction("E");
-    m_gameEastAction->setToolTip("Go East");
-    m_gameEastAction->setFont(dirFont);
-    connect(m_gameEastAction, &QAction::triggered, this, [this]() { sendGameCommand("east"); });
-
-    m_gameWestAction = m_gameToolBar->addAction("W");
-    m_gameWestAction->setToolTip("Go West");
-    m_gameWestAction->setFont(dirFont);
-    connect(m_gameWestAction, &QAction::triggered, this, [this]() { sendGameCommand("west"); });
+    // Wrap Lines toggle and Log Session toggle
+    m_gameToolBar->addAction(m_wrapOutputAction);
+    m_gameToolBar->addAction(m_logSessionAction);
 
     m_gameToolBar->addSeparator();
 
-    m_gameUpAction = m_gameToolBar->addAction("U");
-    m_gameUpAction->setToolTip("Go Up");
-    m_gameUpAction->setFont(dirFont);
-    connect(m_gameUpAction, &QAction::triggered, this, [this]() { sendGameCommand("up"); });
-
-    m_gameDownAction = m_gameToolBar->addAction("D");
-    m_gameDownAction->setToolTip("Go Down");
-    m_gameDownAction->setFont(dirFont);
-    connect(m_gameDownAction, &QAction::triggered, this, [this]() { sendGameCommand("down"); });
+    // Connection controls
+    m_gameToolBar->addAction(m_connectAction);
+    m_gameToolBar->addAction(m_disconnectAction);
 
     m_gameToolBar->addSeparator();
 
-    // Common commands
-    m_gameLookAction = m_gameToolBar->addAction("Look");
-    m_gameLookAction->setToolTip("Look around");
-    connect(m_gameLookAction, &QAction::triggered, this, [this]() { sendGameCommand("look"); });
+    // World configuration buttons
+    m_gameToolBar->addAction(m_configureAllAction);
+    m_gameToolBar->addAction(m_configureTriggersAction);
+    m_gameToolBar->addAction(m_configureAliasesAction);
+    m_gameToolBar->addAction(m_configureTimersAction);
+    m_gameToolBar->addAction(m_configureOutputAction);
+    m_gameToolBar->addAction(m_configureCommandsAction);
+    m_gameToolBar->addAction(m_configureScriptingAction);
+    m_gameToolBar->addAction(m_configureNotesAction);
+    m_gameToolBar->addAction(m_configureVariablesAction);
 
-    m_gameExamineAction = m_gameToolBar->addAction("Exam");
-    m_gameExamineAction->setToolTip("Examine");
-    connect(m_gameExamineAction, &QAction::triggered, this,
-            [this]() { sendGameCommand("examine"); });
+    m_gameToolBar->addSeparator();
 
-    m_gameWhoAction = m_gameToolBar->addAction("Who");
-    m_gameWhoAction->setToolTip("Who is online");
-    connect(m_gameWhoAction, &QAction::triggered, this, [this]() { sendGameCommand("who"); });
+    // Timer and script controls
+    m_gameToolBar->addAction(m_resetAllTimersAction);
+    m_gameToolBar->addAction(m_reloadScriptFileAction);
+
+    m_gameToolBar->addSeparator();
+
+    // Toggle actions
+    m_gameToolBar->addAction(m_autoSayAction);
+    m_gameToolBar->addAction(m_freezeOutputAction);
+
+    m_gameToolBar->addSeparator();
+
+    // Find controls
+    m_gameToolBar->addAction(m_findAction);
+    m_gameToolBar->addAction(m_findForwardAction);
+    m_gameToolBar->addAction(m_findBackwardAction);
 
     // Connect visibility toggle
     connect(m_gameToolBarAction, &QAction::toggled, m_gameToolBar, &QToolBar::setVisible);
@@ -1393,40 +1397,38 @@ QIcon MainWindow::loadThemedIcon(const QString& name)
 
 void MainWindow::updateToolbarIcons()
 {
-    // Update main toolbar action icons
+    // Main toolbar icons
     m_newAction->setIcon(loadThemedIcon("file-plus"));
     m_openAction->setIcon(loadThemedIcon("folder-open"));
     m_saveAction->setIcon(loadThemedIcon("device-floppy"));
-    m_connectAction->setIcon(loadThemedIcon("plug-connected"));
-    m_disconnectAction->setIcon(loadThemedIcon("plug-x"));
+    m_notepadAction->setIcon(loadThemedIcon("notebook"));
+    m_cutAction->setIcon(loadThemedIcon("scissors"));
     m_copyAction->setIcon(loadThemedIcon("copy"));
     m_pasteAction->setIcon(loadThemedIcon("clipboard"));
+    m_aboutAction->setIcon(loadThemedIcon("info-circle"));
+    m_helpAction->setIcon(loadThemedIcon("help-circle"));
+
+    // World toolbar icons
+    m_wrapOutputAction->setIcon(loadThemedIcon("text-wrap"));
+    m_logSessionAction->setIcon(loadThemedIcon("file-text"));
+    m_connectAction->setIcon(loadThemedIcon("plug-connected"));
+    m_disconnectAction->setIcon(loadThemedIcon("plug-x"));
+    m_configureAllAction->setIcon(loadThemedIcon("settings"));
+    m_configureTriggersAction->setIcon(loadThemedIcon("bolt"));
+    m_configureAliasesAction->setIcon(loadThemedIcon("at"));
+    m_configureTimersAction->setIcon(loadThemedIcon("clock"));
+    m_configureOutputAction->setIcon(loadThemedIcon("terminal"));
+    m_configureCommandsAction->setIcon(loadThemedIcon("command"));
+    m_configureScriptingAction->setIcon(loadThemedIcon("code"));
+    m_configureNotesAction->setIcon(loadThemedIcon("notes"));
+    m_configureVariablesAction->setIcon(loadThemedIcon("braces"));
+    m_resetAllTimersAction->setIcon(loadThemedIcon("refresh"));
+    m_reloadScriptFileAction->setIcon(loadThemedIcon("refresh"));
+    m_autoSayAction->setIcon(loadThemedIcon("message"));
+    m_freezeOutputAction->setIcon(loadThemedIcon("player-pause"));
     m_findAction->setIcon(loadThemedIcon("search"));
-}
-
-void MainWindow::sendGameCommand(const QString& command)
-{
-    // Get the active world widget and send the command
-    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
-    if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
-        return;
-    }
-
-    WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
-    if (!worldWidget) {
-        statusBar()->showMessage("No active world", 2000);
-        return;
-    }
-
-    WorldDocument* doc = worldWidget->document();
-    if (!doc || doc->m_iConnectPhase != eConnectConnectedToMud) {
-        statusBar()->showMessage("Not connected", 2000);
-        return;
-    }
-
-    // Send the command
-    doc->sendToMud(command);
+    m_findForwardAction->setIcon(loadThemedIcon("arrow-right"));
+    m_findBackwardAction->setIcon(loadThemedIcon("arrow-left"));
 }
 
 void MainWindow::createStatusBar()
@@ -2621,6 +2623,34 @@ void MainWindow::findNext()
 
     // Perform search with stored parameters
     if (!performSearch()) {
+        statusBar()->showMessage(QString("Cannot find \"%1\"").arg(m_lastSearchText), 3000);
+    }
+}
+
+void MainWindow::findForward()
+{
+    if (m_lastSearchText.isEmpty()) {
+        // No previous search - open find dialog
+        find();
+        return;
+    }
+
+    // Perform forward search
+    if (!performSearch()) {
+        statusBar()->showMessage(QString("Cannot find \"%1\"").arg(m_lastSearchText), 3000);
+    }
+}
+
+void MainWindow::findBackward()
+{
+    if (m_lastSearchText.isEmpty()) {
+        // No previous search - open find dialog
+        find();
+        return;
+    }
+
+    // Perform backward search
+    if (!performSearchBackward()) {
         statusBar()->showMessage(QString("Cannot find \"%1\"").arg(m_lastSearchText), 3000);
     }
 }
@@ -4859,6 +4889,120 @@ bool MainWindow::performSearch()
             }
         } else {
             index = lineText.indexOf(m_lastSearchText, 0, cs);
+        }
+
+        if (index != -1) {
+            // Found!
+            m_lastFoundLine = i;
+            m_lastFoundChar = index;
+
+            // Highlight the result
+            outputView->selectTextAt(i, index, m_lastSearchText.length());
+            statusBar()->showMessage("Found (wrapped)", 2000);
+            return true;
+        }
+    }
+
+    return false;
+}
+
+// Helper method to perform backward search with stored parameters
+bool MainWindow::performSearchBackward()
+{
+    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
+    if (!activeSubWindow) {
+        return false;
+    }
+
+    WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
+    if (!worldWidget) {
+        return false;
+    }
+
+    WorldDocument* doc = worldWidget->document();
+    OutputView* outputView = worldWidget->outputView();
+    if (!doc || !outputView) {
+        return false;
+    }
+
+    if (doc->m_lineList.isEmpty()) {
+        return false;
+    }
+
+    Qt::CaseSensitivity cs = m_lastSearchMatchCase ? Qt::CaseSensitive : Qt::CaseInsensitive;
+
+    // Start from position before last find
+    int startLine = (m_lastFoundLine >= 0) ? m_lastFoundLine : doc->m_lineList.count() - 1;
+    int startChar = (m_lastFoundChar > 0) ? m_lastFoundChar - 1 : -1;
+
+    // Search backward from current position
+    for (int i = startLine; i >= 0; i--) {
+        Line* pLine = doc->m_lineList[i];
+        if (!pLine || pLine->len() == 0)
+            continue;
+
+        QString lineText = QString::fromUtf8(pLine->text(), pLine->len());
+
+        int searchTo = (i == startLine && startChar >= 0) ? startChar : lineText.length();
+        int index = -1;
+
+        if (m_lastSearchUseRegex) {
+            QRegularExpression re(m_lastSearchText,
+                                  m_lastSearchMatchCase
+                                      ? QRegularExpression::NoPatternOption
+                                      : QRegularExpression::CaseInsensitiveOption);
+            // Search backwards by finding all matches up to searchTo
+            int lastMatch = -1;
+            QRegularExpressionMatchIterator it = re.globalMatch(lineText);
+            while (it.hasNext()) {
+                QRegularExpressionMatch match = it.next();
+                if (match.capturedStart() < searchTo) {
+                    lastMatch = match.capturedStart();
+                } else {
+                    break;
+                }
+            }
+            index = lastMatch;
+        } else {
+            // Find last occurrence before searchTo
+            index = lineText.lastIndexOf(m_lastSearchText, searchTo - 1, cs);
+        }
+
+        if (index != -1) {
+            // Found!
+            m_lastFoundLine = i;
+            m_lastFoundChar = index;
+
+            // Highlight the result
+            outputView->selectTextAt(i, index, m_lastSearchText.length());
+            statusBar()->showMessage("Found", 2000);
+            return true;
+        }
+    }
+
+    // Not found - wrap around to end
+    for (int i = doc->m_lineList.count() - 1; i > startLine; i--) {
+        Line* pLine = doc->m_lineList[i];
+        if (!pLine || pLine->len() == 0)
+            continue;
+
+        QString lineText = QString::fromUtf8(pLine->text(), pLine->len());
+
+        int index = -1;
+        if (m_lastSearchUseRegex) {
+            QRegularExpression re(m_lastSearchText,
+                                  m_lastSearchMatchCase
+                                      ? QRegularExpression::NoPatternOption
+                                      : QRegularExpression::CaseInsensitiveOption);
+            int lastMatch = -1;
+            QRegularExpressionMatchIterator it = re.globalMatch(lineText);
+            while (it.hasNext()) {
+                QRegularExpressionMatch match = it.next();
+                lastMatch = match.capturedStart();
+            }
+            index = lastMatch;
+        } else {
+            index = lineText.lastIndexOf(m_lastSearchText, -1, cs);
         }
 
         if (index != -1) {

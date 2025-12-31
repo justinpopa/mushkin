@@ -12,5 +12,26 @@
         <file alias="copy">resources/icons/copy.svg</file>
         <file alias="clipboard">resources/icons/clipboard.svg</file>
         <file alias="search">resources/icons/search.svg</file>
+        <file alias="printer">resources/icons/printer.svg</file>
+        <file alias="notebook">resources/icons/notebook.svg</file>
+        <file alias="scissors">resources/icons/scissors.svg</file>
+        <file alias="info-circle">resources/icons/info-circle.svg</file>
+        <file alias="help-circle">resources/icons/help-circle.svg</file>
+        <file alias="text-wrap">resources/icons/text-wrap.svg</file>
+        <file alias="file-text">resources/icons/file-text.svg</file>
+        <file alias="settings">resources/icons/settings.svg</file>
+        <file alias="bolt">resources/icons/bolt.svg</file>
+        <file alias="at">resources/icons/at.svg</file>
+        <file alias="clock">resources/icons/clock.svg</file>
+        <file alias="terminal">resources/icons/terminal.svg</file>
+        <file alias="command">resources/icons/command.svg</file>
+        <file alias="code">resources/icons/code.svg</file>
+        <file alias="notes">resources/icons/notes.svg</file>
+        <file alias="braces">resources/icons/braces.svg</file>
+        <file alias="refresh">resources/icons/refresh.svg</file>
+        <file alias="message">resources/icons/message.svg</file>
+        <file alias="player-pause">resources/icons/player-pause.svg</file>
+        <file alias="arrow-right">resources/icons/arrow-right.svg</file>
+        <file alias="arrow-left">resources/icons/arrow-left.svg</file>
     </qresource>
 </RCC>
