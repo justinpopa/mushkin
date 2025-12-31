@@ -426,49 +426,49 @@ void MainWindow::createMenus()
     connect(m_keyNameAction, &QAction::triggered, this, &MainWindow::showKeyName);
 
     // Connection Menu (matches original MUSHclient structure)
-    QMenu* connectionMenu = menuBar()->addMenu("Connecti&on");
+    m_connectionMenu = menuBar()->addMenu("Connecti&on");
 
     // Quick Connect first (also in File menu)
-    QAction* quickConnectAction2 = connectionMenu->addAction("&Quick Connect...");
+    QAction* quickConnectAction2 = m_connectionMenu->addAction("&Quick Connect...");
     quickConnectAction2->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::SHIFT | Qt::Key_K));
     quickConnectAction2->setStatusTip("Quickly connect to a MUD server");
     connect(quickConnectAction2, &QAction::triggered, this, &MainWindow::quickConnect);
 
-    connectionMenu->addSeparator();
+    m_connectionMenu->addSeparator();
 
-    m_connectAction = connectionMenu->addAction("&Connect");
+    m_connectAction = m_connectionMenu->addAction("&Connect");
     m_connectAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_K));
     m_connectAction->setStatusTip("Connect to the MUD server");
     connect(m_connectAction, &QAction::triggered, this, &MainWindow::connectToMud);
 
-    m_disconnectAction = connectionMenu->addAction("&Disconnect");
+    m_disconnectAction = m_connectionMenu->addAction("&Disconnect");
     m_disconnectAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::CTRL | Qt::Key_K));
     m_disconnectAction->setStatusTip("Disconnect from the MUD server");
     connect(m_disconnectAction, &QAction::triggered, this, &MainWindow::disconnectFromMud);
 
-    connectionMenu->addSeparator();
+    m_connectionMenu->addSeparator();
 
-    m_autoConnectAction = connectionMenu->addAction("&Auto Connect");
+    m_autoConnectAction = m_connectionMenu->addAction("&Auto Connect");
     m_autoConnectAction->setCheckable(true);
     m_autoConnectAction->setStatusTip("Automatically connect when opening worlds");
     m_autoConnectAction->setMenuRole(QAction::NoRole);
     connect(m_autoConnectAction, &QAction::triggered, this, &MainWindow::toggleAutoConnect);
 
-    m_reconnectOnDisconnectAction = connectionMenu->addAction("&Reconnect On Disconnect");
+    m_reconnectOnDisconnectAction = m_connectionMenu->addAction("&Reconnect On Disconnect");
     m_reconnectOnDisconnectAction->setCheckable(true);
     m_reconnectOnDisconnectAction->setStatusTip("Automatically reconnect when disconnected");
     m_reconnectOnDisconnectAction->setMenuRole(QAction::NoRole);
     connect(m_reconnectOnDisconnectAction, &QAction::triggered, this,
             &MainWindow::toggleReconnectOnDisconnect);
 
-    connectionMenu->addSeparator();
+    m_connectionMenu->addSeparator();
 
-    m_connectToAllAction = connectionMenu->addAction("Connect to All Open &Worlds");
+    m_connectToAllAction = m_connectionMenu->addAction("Connect to All Open &Worlds");
     m_connectToAllAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_K));
     m_connectToAllAction->setStatusTip("Connect to all open but disconnected worlds");
     connect(m_connectToAllAction, &QAction::triggered, this, &MainWindow::connectToAllOpenWorlds);
 
-    m_connectToStartupListAction = connectionMenu->addAction("Connect to Worlds &In Startup List");
+    m_connectToStartupListAction = m_connectionMenu->addAction("Connect to Worlds &In Startup List");
     m_connectToStartupListAction->setStatusTip(
         "Open and connect to all worlds in the startup list");
     connect(m_connectToStartupListAction, &QAction::triggered, this,
@@ -948,8 +948,12 @@ void MainWindow::createMenus()
     m_recallAction->setStatusTip("Search and recall buffer contents");
     connect(m_recallAction, &QAction::triggered, this, &MainWindow::recall);
 
-    // Window Menu
+    // Window Menu (matches original MUSHclient structure)
     m_windowMenu = menuBar()->addMenu("&Window");
+
+    m_newWindowAction = m_windowMenu->addAction("&New Window");
+    m_newWindowAction->setStatusTip("Open another window for the active document");
+    connect(m_newWindowAction, &QAction::triggered, this, &MainWindow::newWindow);
 
     m_cascadeAction = m_windowMenu->addAction("&Cascade");
     m_cascadeAction->setStatusTip("Cascade all windows");
@@ -967,19 +971,6 @@ void MainWindow::createMenus()
     m_arrangeIconsAction->setStatusTip("Arrange minimized windows");
     connect(m_arrangeIconsAction, &QAction::triggered, this, &MainWindow::arrangeIcons);
 
-    m_minimizeWindowAction = m_windowMenu->addAction("&Minimize");
-    m_minimizeWindowAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::CTRL | Qt::Key_M));
-    m_minimizeWindowAction->setStatusTip("Minimize active window");
-    connect(m_minimizeWindowAction, &QAction::triggered, this, &MainWindow::minimizeActiveWindow);
-
-    m_maximizeWindowAction = m_windowMenu->addAction("Ma&ximize");
-    m_maximizeWindowAction->setStatusTip("Maximize active window");
-    connect(m_maximizeWindowAction, &QAction::triggered, this, &MainWindow::maximizeActiveWindow);
-
-    m_restoreWindowAction = m_windowMenu->addAction("&Restore");
-    m_restoreWindowAction->setStatusTip("Restore active window to normal size");
-    connect(m_restoreWindowAction, &QAction::triggered, this, &MainWindow::restoreActiveWindow);
-
     m_closeAllNotepadAction = m_windowMenu->addAction("Close A&ll Notepad Windows");
     m_closeAllNotepadAction->setStatusTip("Close all notepad windows");
     connect(m_closeAllNotepadAction, &QAction::triggered, this, &MainWindow::closeAllNotepadWindows);
@@ -989,7 +980,7 @@ void MainWindow::createMenus()
     // Dynamic window list is added after a separator by updateWindowMenu
     connect(m_windowMenu, &QMenu::aboutToShow, this, &MainWindow::updateWindowMenu);
 
-    // Help Menu
+    // Help Menu (matches original MUSHclient structure)
     m_helpMenu = menuBar()->addMenu("&Help");
 
     m_helpAction = m_helpMenu->addAction("&Contents");
@@ -999,9 +990,38 @@ void MainWindow::createMenus()
 
     m_helpMenu->addSeparator();
 
+    m_bugReportsAction = m_helpMenu->addAction("&Bug Reports...");
+    m_bugReportsAction->setStatusTip("Report bugs or suggest features on GitHub");
+    connect(m_bugReportsAction, &QAction::triggered, this, &MainWindow::openBugReports);
+
+    m_documentationAction = m_helpMenu->addAction("&Documentation Web Page...");
+    m_documentationAction->setStatusTip("Open the Mushkin documentation wiki");
+    connect(m_documentationAction, &QAction::triggered, this, &MainWindow::openDocumentation);
+
+    m_webPageAction = m_helpMenu->addAction("Mushkin &Web Page...");
+    m_webPageAction->setStatusTip("Open the Mushkin GitHub repository");
+    connect(m_webPageAction, &QAction::triggered, this, &MainWindow::openWebPage);
+
+    m_helpMenu->addSeparator();
+
     m_aboutAction = m_helpMenu->addAction("&About");
     m_aboutAction->setStatusTip("About Mushkin");
     connect(m_aboutAction, &QAction::triggered, this, &MainWindow::about);
+
+    // Reorder menus to match original MUSHclient:
+    // File, Edit, View, Connection, Input, Display, Game, Window, Help
+    // (Convert menu is removed - it's notepad-specific in original)
+    menuBar()->clear();
+    menuBar()->addMenu(m_fileMenu);
+    menuBar()->addMenu(m_editMenu);
+    menuBar()->addMenu(m_viewMenu);
+    menuBar()->addMenu(m_connectionMenu);
+    menuBar()->addMenu(m_inputMenu);
+    menuBar()->addMenu(m_displayMenu);
+    menuBar()->addMenu(m_gameMenu);
+    menuBar()->addMenu(m_windowMenu);
+    menuBar()->addMenu(m_helpMenu);
+    // Note: m_convertMenu is intentionally not added - it's notepad-specific
 }
 
 void MainWindow::createToolBars()
@@ -1739,15 +1759,11 @@ void MainWindow::updateMenus()
 
     // Window menu actions
     bool hasWorlds = !m_mdiArea->subWindowList().isEmpty();
-    QMdiSubWindow* activeWindow = m_mdiArea->activeSubWindow();
     m_cascadeAction->setEnabled(hasWorlds);
     m_tileHorizontallyAction->setEnabled(hasWorlds);
     m_tileVerticallyAction->setEnabled(hasWorlds);
     m_arrangeIconsAction->setEnabled(hasWorlds);
-    m_minimizeWindowAction->setEnabled(activeWindow != nullptr);
-    m_maximizeWindowAction->setEnabled(activeWindow != nullptr && !activeWindow->isMaximized());
-    m_restoreWindowAction->setEnabled(activeWindow != nullptr &&
-                                       (activeWindow->isMinimized() || activeWindow->isMaximized()));
+    m_newWindowAction->setEnabled(hasWorlds);
     m_closeAllNotepadAction->setEnabled(hasWorlds);
 
     // Update status bar indicators
@@ -3764,25 +3780,12 @@ void MainWindow::closeAllNotepadWindows()
     }
 }
 
-void MainWindow::minimizeActiveWindow()
+void MainWindow::newWindow()
 {
-    if (QMdiSubWindow* activeWindow = m_mdiArea->activeSubWindow()) {
-        activeWindow->showMinimized();
-    }
-}
-
-void MainWindow::maximizeActiveWindow()
-{
-    if (QMdiSubWindow* activeWindow = m_mdiArea->activeSubWindow()) {
-        activeWindow->showMaximized();
-    }
-}
-
-void MainWindow::restoreActiveWindow()
-{
-    if (QMdiSubWindow* activeWindow = m_mdiArea->activeSubWindow()) {
-        activeWindow->showNormal();
-    }
+    // Open another view of the active world document
+    // For now, just show a message - full implementation would create a second view
+    QMessageBox::information(this, "New Window",
+                             "Opening additional views of the same world is not yet implemented.");
 }
 
 void MainWindow::toggleTabbedView(bool enabled)
@@ -3994,25 +3997,37 @@ int MainWindow::getToolBarInfo(int which, int infoType)
 // Help menu slots
 void MainWindow::showHelp()
 {
-    QMessageBox::information(this, "Help",
-                             "Mushkin Help\n\n"
-                             "Online documentation:\n"
-                             "https://www.gammon.com.au/mushclient\n\n"
-                             "Mushkin is a cross-platform MUD client based on MUSHclient.");
+    QDesktopServices::openUrl(QUrl("https://github.com/justinpopa/mushkin/wiki"));
+}
+
+void MainWindow::openBugReports()
+{
+    QDesktopServices::openUrl(QUrl("https://github.com/justinpopa/mushkin/issues"));
+}
+
+void MainWindow::openDocumentation()
+{
+    QDesktopServices::openUrl(QUrl("https://github.com/justinpopa/mushkin/wiki"));
+}
+
+void MainWindow::openWebPage()
+{
+    QDesktopServices::openUrl(QUrl("https://github.com/justinpopa/mushkin"));
 }
 
 void MainWindow::about()
 {
     QMessageBox::about(
         this, "About Mushkin",
-        "<h2>Mushkin</h2>"
-        "<p><b>Version 5.0.0</b></p>"
-        "<p>Cross-platform MUD client built with Qt 6</p>"
-        "<p>Based on MUSHclient by Nick Gammon</p>"
-        "<p><a href='https://www.gammon.com.au/mushclient'>www.gammon.com.au/mushclient</a></p>"
-        "<hr>"
-        "<p>A streamlined port maintaining compatibility "
-        "with existing world files and plugins.</p>");
+        QString("<h2>Mushkin</h2>"
+                "<p><b>Version %1</b></p>"
+                "<p>Cross-platform MUD client built with Qt 6</p>"
+                "<hr>"
+                "<p>A ground-up rewrite inspired by MUSHclient, "
+                "preserving its behavior and compatibility across multiple platforms.</p>"
+                "<p>Original MUSHclient by Nick Gammon:<br>"
+                "<a href='https://www.gammon.com.au/mushclient'>www.gammon.com.au/mushclient</a></p>")
+            .arg(QCoreApplication::applicationVersion()));
 }
 
 // Additional Edit/File/Display menu slots
