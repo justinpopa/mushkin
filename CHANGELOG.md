@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.3.0](https://github.com/justinpopa/mushkin/compare/v0.2.1...v0.3.0) (2025-12-31)
+
+
+### Features
+
+* add transpiled language support (YueScript, Teal, Fennel, MoonScript) ([#33](https://github.com/justinpopa/mushkin/issues/33)) ([3400da4](https://github.com/justinpopa/mushkin/commit/3400da4f5e971b27a19631257662c415816e8c17))
+* complete Game menu and unified preferences dialog ([#34](https://github.com/justinpopa/mushkin/issues/34)) ([74fb539](https://github.com/justinpopa/mushkin/commit/74fb539f0bdc0f2d090989569c91ba2616396f76))
+
+
+### Bug Fixes
+
+* Connection menu order and shortcuts to match original MUSHclient ([#35](https://github.com/justinpopa/mushkin/issues/35)) ([91984e9](https://github.com/justinpopa/mushkin/commit/91984e91c0f67f8b190bc3fd15429174f241bcc9))
+* correct argument name for doc generator ([958278f](https://github.com/justinpopa/mushkin/commit/958278fb7dd2849a29e79b87f140424d72c6cc83))
+* Edit, Display, and View menus to match original MUSHclient ([1503a0e](https://github.com/justinpopa/mushkin/commit/1503a0e4cde4d15ead10a6d5f2bb85d34e74cc6b))
+* Edit, Display, and View menus to match original MUSHclient ([19b100a](https://github.com/justinpopa/mushkin/commit/19b100a3e171863d43031275be9e1e8a3d5c24a9))
+* Input menu order, shortcuts, and missing items to match original ([#36](https://github.com/justinpopa/mushkin/issues/36)) ([6516010](https://github.com/justinpopa/mushkin/commit/6516010e948d89641cc93fa744b31f266686154b))
+* match original Window menu structure ([#37](https://github.com/justinpopa/mushkin/issues/37)) ([c9c2b85](https://github.com/justinpopa/mushkin/commit/c9c2b852f6fbef7def709daec0cf5a4df26c4535))
+* menu order and structure to match original MUSHclient ([acffc88](https://github.com/justinpopa/mushkin/commit/acffc8852d9e73142c4a70612c36f86fcbcfc297))
+* toolbars to match original MUSHclient ([0e8bd5c](https://github.com/justinpopa/mushkin/commit/0e8bd5c07a5a07a221cd289ee9cd636c978f646e))
+* toolbars to match original MUSHclient ([6a0b722](https://github.com/justinpopa/mushkin/commit/6a0b722bfee82650935fdedf68660c3cb40cad4c))
+
 ## [0.2.1](https://github.com/justinpopa/mushkin/compare/v0.2.0...v0.2.1) (2025-12-31)
 
 
