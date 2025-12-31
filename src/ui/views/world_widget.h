@@ -150,6 +150,10 @@ class WorldWidget : public QWidget {
     QPoint m_resizeStartPos;
     QRect m_resizeStartGeometry;
     static constexpr int ResizeMargin = 6; // Pixels from edge to trigger resize
+
+    // Drag state for title bar
+    bool m_dragging = false;
+    QPoint m_dragStartPos;
 #endif
 };
 

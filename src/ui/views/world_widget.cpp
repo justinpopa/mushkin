@@ -136,6 +136,9 @@ void WorldWidget::setupUi()
     titleLayout->addWidget(closeBtn);
 
     layout->addWidget(m_titleBar);
+
+    // Install event filter for title bar dragging
+    m_titleBar->installEventFilter(this);
 #endif
 
     // Create info bar (script-controllable status display)
@@ -865,6 +868,31 @@ void WorldWidget::mouseReleaseEvent(QMouseEvent* event)
 
 bool WorldWidget::eventFilter(QObject* obj, QEvent* event)
 {
+    // Handle title bar dragging
+    if (obj == m_titleBar) {
+        QMdiSubWindow* mdi = qobject_cast<QMdiSubWindow*>(parentWidget());
+        if (mdi && !mdi->isMaximized()) {
+            if (event->type() == QEvent::MouseButtonPress) {
+                QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
+                if (mouseEvent->button() == Qt::LeftButton) {
+                    m_dragging = true;
+                    m_dragStartPos = mouseEvent->globalPosition().toPoint() - mdi->pos();
+                    return true;
+                }
+            } else if (event->type() == QEvent::MouseMove && m_dragging) {
+                QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
+                mdi->move(mouseEvent->globalPosition().toPoint() - m_dragStartPos);
+                return true;
+            } else if (event->type() == QEvent::MouseButtonRelease) {
+                QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
+                if (mouseEvent->button() == Qt::LeftButton && m_dragging) {
+                    m_dragging = false;
+                    return true;
+                }
+            }
+        }
+    }
+
     // Handle mouse events that might be consumed by child widgets
     if (event->type() == QEvent::MouseMove) {
         QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
