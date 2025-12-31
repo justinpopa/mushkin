@@ -3,9 +3,12 @@
 
 #include <QAction>
 #include <QDockWidget>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QMainWindow>
+#include <QMap>
 #include <QMdiArea>
+#include <QMdiSubWindow>
 #include <QMenu>
 #include <QPointer>
 #include <QStringList>
@@ -229,7 +232,11 @@ class MainWindow : public QMainWindow {
     void cascade();
     void tileHorizontally();
     void tileVertically();
-    void closeAllWindows();
+    void arrangeIcons();
+    void minimizeActiveWindow();
+    void maximizeActiveWindow();
+    void restoreActiveWindow();
+    void closeAllNotepadWindows();
 
     // Help menu actions
     void showHelp();
@@ -249,6 +256,12 @@ class MainWindow : public QMainWindow {
 
     // System tray
     void trayIconActivated(QSystemTrayIcon::ActivationReason reason);
+
+#ifdef Q_OS_MACOS
+    // Minimized bar management (macOS only)
+    void onSubWindowStateChanged(Qt::WindowStates oldState, Qt::WindowStates newState);
+    void updateMinimizedBar();
+#endif
 
   private:
     /**
@@ -335,6 +348,13 @@ class MainWindow : public QMainWindow {
 
     // UI Components
     QMdiArea* m_mdiArea;
+
+#ifdef Q_OS_MACOS
+    // Minimized bar (macOS only - frameless MDI windows need custom minimized representation)
+    QWidget* m_minimizedBarContainer;
+    QHBoxLayout* m_minimizedBarLayout;
+    QMap<QMdiSubWindow*, QWidget*> m_minimizedBars; // Maps subwindow to its minimized bar widget
+#endif
 
     // Toolbars
     QToolBar* m_mainToolBar;
@@ -520,7 +540,11 @@ class MainWindow : public QMainWindow {
     QAction* m_cascadeAction;
     QAction* m_tileHorizontallyAction;
     QAction* m_tileVerticallyAction;
-    QAction* m_closeAllAction;
+    QAction* m_arrangeIconsAction;
+    QAction* m_minimizeWindowAction;
+    QAction* m_maximizeWindowAction;
+    QAction* m_restoreWindowAction;
+    QAction* m_closeAllNotepadAction;
 
     // Help menu and actions
     QMenu* m_helpMenu;

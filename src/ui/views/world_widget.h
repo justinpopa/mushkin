@@ -88,6 +88,11 @@ class WorldWidget : public QWidget {
     // Input handling (stub for now)
     void sendCommand();
 
+#ifdef Q_OS_MACOS
+    // Update frame visibility based on maximize state
+    void updateFrameForWindowState(Qt::WindowStates state);
+#endif
+
     // Connection control
     void connectToMud();
     void disconnectFromMud();
@@ -104,6 +109,20 @@ class WorldWidget : public QWidget {
   protected:
     // Event handling for keyboard shortcuts
     void keyPressEvent(QKeyEvent* event) override;
+    // Required for QWidget subclass to render stylesheets (border)
+    void paintEvent(QPaintEvent* event) override;
+
+#ifdef Q_OS_MACOS
+    // Resize handling for frameless windows
+    void mousePressEvent(QMouseEvent* event) override;
+    void mouseMoveEvent(QMouseEvent* event) override;
+    void mouseReleaseEvent(QMouseEvent* event) override;
+    bool eventFilter(QObject* obj, QEvent* event) override;
+
+  private:
+    int getResizeEdges(const QPoint& pos) const;
+    Qt::CursorShape cursorForEdges(int edges) const;
+#endif
 
   private:
     void setupUi();
@@ -125,6 +144,19 @@ class WorldWidget : public QWidget {
     bool m_modified;    // Has unsaved changes
     bool m_connected;   // Connected to MUD
     QString m_filename; // Current file path (empty for new worlds)
+
+#ifdef Q_OS_MACOS
+    // Resize state for frameless windows
+    enum ResizeEdge { NoEdge = 0, Left = 1, Right = 2, Top = 4, Bottom = 8 };
+    int m_resizeEdges = NoEdge;
+    QPoint m_resizeStartPos;
+    QRect m_resizeStartGeometry;
+    static constexpr int ResizeMargin = 3; // Pixels from edge to trigger resize
+
+    // Drag state for title bar
+    bool m_dragging = false;
+    QPoint m_dragStartPos;
+#endif
 };
 
 #endif // WORLD_WIDGET_H
