@@ -17,6 +17,7 @@
 #ifdef Q_OS_MACOS
 #include <QHBoxLayout>
 #include <QMdiSubWindow>
+#include <QMouseEvent>
 #include <QToolButton>
 #endif
 
@@ -69,14 +70,23 @@ void WorldWidget::setupUi()
 {
     // Create main layout
     QVBoxLayout* layout = new QVBoxLayout(this);
-    layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
+
+#ifdef Q_OS_MACOS
+    // On macOS with frameless windows, add margin for resize handles and visible border
+    layout->setContentsMargins(ResizeMargin, ResizeMargin, ResizeMargin, ResizeMargin);
+    setMouseTracking(true);
+    // Add a visible border frame around the window (lighter color to contrast with MDI area)
+    setStyleSheet("WorldWidget { border: 1px solid #888; background: #1a1a1a; }");
+#else
+    layout->setContentsMargins(0, 0, 0, 0);
+#endif
 
 #ifdef Q_OS_MACOS
     // Create custom title bar for macOS (replaces QMdiSubWindow's native title bar)
     m_titleBar = new QWidget(this);
     m_titleBar->setFixedHeight(22);
-    m_titleBar->setStyleSheet("background-color: #383838; border-bottom: 1px solid #555;");
+    m_titleBar->setStyleSheet("background-color: #383838; border: none; border-bottom: 1px solid #555;");
 
     QHBoxLayout* titleLayout = new QHBoxLayout(m_titleBar);
     titleLayout->setContentsMargins(8, 0, 4, 0);
@@ -303,6 +313,24 @@ void WorldWidget::updateWindowTitle()
     }
 #endif
 }
+
+#ifdef Q_OS_MACOS
+void WorldWidget::updateFrameForWindowState(Qt::WindowStates state)
+{
+    QVBoxLayout* layout = qobject_cast<QVBoxLayout*>(this->layout());
+    if (!layout) return;
+
+    if (state & Qt::WindowMaximized) {
+        // No border/margin when maximized
+        layout->setContentsMargins(0, 0, 0, 0);
+        setStyleSheet("WorldWidget { border: none; background: #1a1a1a; }");
+    } else {
+        // Show border and resize margins when restored
+        layout->setContentsMargins(ResizeMargin, ResizeMargin, ResizeMargin, ResizeMargin);
+        setStyleSheet("WorldWidget { border: 1px solid #888; background: #1a1a1a; }");
+    }
+}
+#endif
 
 /**
  * Update the info bar appearance from document state
@@ -721,3 +749,131 @@ void WorldWidget::keyPressEvent(QKeyEvent* event)
     // Pass other keys to base class
     QWidget::keyPressEvent(event);
 }
+
+#ifdef Q_OS_MACOS
+int WorldWidget::getResizeEdges(const QPoint& pos) const
+{
+    int edges = NoEdge;
+
+    if (pos.x() < ResizeMargin)
+        edges |= Left;
+    if (pos.x() >= width() - ResizeMargin)
+        edges |= Right;
+    if (pos.y() < ResizeMargin)
+        edges |= Top;
+    if (pos.y() >= height() - ResizeMargin)
+        edges |= Bottom;
+
+    return edges;
+}
+
+Qt::CursorShape WorldWidget::cursorForEdges(int edges) const
+{
+    // Corners
+    if ((edges & Left) && (edges & Top))
+        return Qt::SizeFDiagCursor;
+    if ((edges & Right) && (edges & Top))
+        return Qt::SizeBDiagCursor;
+    if ((edges & Left) && (edges & Bottom))
+        return Qt::SizeBDiagCursor;
+    if ((edges & Right) && (edges & Bottom))
+        return Qt::SizeFDiagCursor;
+    // Edges
+    if (edges & Left || edges & Right)
+        return Qt::SizeHorCursor;
+    if (edges & Top || edges & Bottom)
+        return Qt::SizeVerCursor;
+    return Qt::ArrowCursor;
+}
+
+void WorldWidget::mousePressEvent(QMouseEvent* event)
+{
+    if (event->button() == Qt::LeftButton) {
+        int edges = getResizeEdges(event->pos());
+        if (edges != NoEdge) {
+            m_resizeEdges = edges;
+            m_resizeStartPos = event->globalPosition().toPoint();
+            if (QMdiSubWindow* mdi = qobject_cast<QMdiSubWindow*>(parentWidget())) {
+                m_resizeStartGeometry = mdi->geometry();
+            }
+            event->accept();
+            return;
+        }
+    }
+    QWidget::mousePressEvent(event);
+}
+
+void WorldWidget::mouseMoveEvent(QMouseEvent* event)
+{
+    if (m_resizeEdges != NoEdge && (event->buttons() & Qt::LeftButton)) {
+        // Actively resizing
+        QMdiSubWindow* mdi = qobject_cast<QMdiSubWindow*>(parentWidget());
+        if (!mdi) {
+            QWidget::mouseMoveEvent(event);
+            return;
+        }
+
+        QPoint delta = event->globalPosition().toPoint() - m_resizeStartPos;
+        QRect newGeometry = m_resizeStartGeometry;
+
+        if (m_resizeEdges & Left) {
+            int newLeft = m_resizeStartGeometry.left() + delta.x();
+            int newWidth = m_resizeStartGeometry.right() - newLeft + 1;
+            if (newWidth >= mdi->minimumWidth()) {
+                newGeometry.setLeft(newLeft);
+            }
+        }
+        if (m_resizeEdges & Right) {
+            newGeometry.setWidth(m_resizeStartGeometry.width() + delta.x());
+        }
+        if (m_resizeEdges & Top) {
+            int newTop = m_resizeStartGeometry.top() + delta.y();
+            int newHeight = m_resizeStartGeometry.bottom() - newTop + 1;
+            if (newHeight >= mdi->minimumHeight()) {
+                newGeometry.setTop(newTop);
+            }
+        }
+        if (m_resizeEdges & Bottom) {
+            newGeometry.setHeight(m_resizeStartGeometry.height() + delta.y());
+        }
+
+        // Apply minimum size constraints
+        if (newGeometry.width() >= mdi->minimumWidth() &&
+            newGeometry.height() >= mdi->minimumHeight()) {
+            mdi->setGeometry(newGeometry);
+        }
+        event->accept();
+        return;
+    }
+
+    // Update cursor based on position
+    int edges = getResizeEdges(event->pos());
+    setCursor(cursorForEdges(edges));
+
+    QWidget::mouseMoveEvent(event);
+}
+
+void WorldWidget::mouseReleaseEvent(QMouseEvent* event)
+{
+    if (event->button() == Qt::LeftButton && m_resizeEdges != NoEdge) {
+        m_resizeEdges = NoEdge;
+        event->accept();
+        return;
+    }
+    QWidget::mouseReleaseEvent(event);
+}
+
+bool WorldWidget::eventFilter(QObject* obj, QEvent* event)
+{
+    // Handle mouse events that might be consumed by child widgets
+    if (event->type() == QEvent::MouseMove) {
+        QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
+        QPoint localPos = mapFromGlobal(mouseEvent->globalPosition().toPoint());
+        int edges = getResizeEdges(localPos);
+        if (edges != NoEdge) {
+            setCursor(cursorForEdges(edges));
+        }
+    }
+    return QWidget::eventFilter(obj, event);
+}
+#endif
