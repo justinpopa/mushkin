@@ -11,6 +11,10 @@
 #include "pages/input_page.h"
 #include "pages/paste_send_page.h"
 #include "pages/macros_page.h"
+#include "pages/info_page.h"
+#include "pages/colors_page.h"
+#include "pages/keypad_page.h"
+#include "pages/variables_page.h"
 #include "world/world_document.h"
 
 #include <QDialogButtonBox>
@@ -175,13 +179,11 @@ void UnifiedPreferencesDialog::setupPages()
     // General pages
     addPage(Page::Connection, new ConnectionPage(m_doc, this));
     addPage(Page::Logging, new LoggingPage(m_doc, this));
-    addStubPage(Page::Info, tr("Info"),
-                tr("View and edit world information and notes."));
+    addPage(Page::Info, new InfoPage(m_doc, this));
 
     // Appearance pages
     addPage(Page::Output, new OutputPage(m_doc, this));
-    addStubPage(Page::Colors, tr("Colors"),
-                tr("Configure ANSI and custom color mappings."));
+    addPage(Page::Colors, new ColorsPage(m_doc, this));
     addStubPage(Page::MXP, tr("MXP / Pueblo"),
                 tr("Configure MXP and Pueblo protocol settings."));
 
@@ -193,14 +195,12 @@ void UnifiedPreferencesDialog::setupPages()
 
     // Input pages
     addPage(Page::Commands, new InputPage(m_doc, this));
-    addStubPage(Page::Keypad, tr("Keypad"),
-                tr("Configure numeric keypad for speedwalking."));
+    addPage(Page::Keypad, new KeypadPage(m_doc, this));
     addPage(Page::PasteSend, new PasteSendPage(m_doc, this));
 
     // Scripting pages
     addPage(Page::Scripting, new ScriptingPage(m_doc, this));
-    addStubPage(Page::Variables, tr("Variables"),
-                tr("View and manage script variables."));
+    addPage(Page::Variables, new VariablesPage(m_doc, this));
 }
 
 void UnifiedPreferencesDialog::connectSignals()

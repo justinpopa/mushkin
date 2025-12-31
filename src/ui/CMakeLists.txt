@@ -168,6 +168,14 @@ add_library(ui
     preferences/pages/paste_send_page.cpp
     preferences/pages/macros_page.h
     preferences/pages/macros_page.cpp
+    preferences/pages/info_page.h
+    preferences/pages/info_page.cpp
+    preferences/pages/colors_page.h
+    preferences/pages/colors_page.cpp
+    preferences/pages/keypad_page.h
+    preferences/pages/keypad_page.cpp
+    preferences/pages/variables_page.h
+    preferences/pages/variables_page.cpp
     # Lua dialog callback registration
     lua_dialog_registration.h
     lua_dialog_registration.cpp
