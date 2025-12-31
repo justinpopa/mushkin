@@ -44,6 +44,7 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QCloseEvent>
+#include <QColorDialog>
 #include <QDateTime>
 #include <QDebug>
 #include <QDesktopServices>
@@ -156,7 +157,7 @@ MainWindow::~MainWindow()
 
 void MainWindow::createMenus()
 {
-    // File Menu
+    // File Menu (matches original MUSHclient structure)
     m_fileMenu = menuBar()->addMenu("&File");
 
     m_newAction = m_fileMenu->addAction("&New World...");
@@ -164,31 +165,42 @@ void MainWindow::createMenus()
     m_newAction->setStatusTip("Create a new world connection");
     connect(m_newAction, &QAction::triggered, this, &MainWindow::newWorld);
 
-    m_openAction = m_fileMenu->addAction("&Open...");
+    m_openAction = m_fileMenu->addAction("&Open World...");
     m_openAction->setShortcut(QKeySequence::Open);
     m_openAction->setStatusTip("Open an existing world file");
     connect(m_openAction, &QAction::triggered, this, qOverload<>(&MainWindow::openWorld));
 
-    m_quickConnectAction = m_fileMenu->addAction("&Quick Connect...");
-    m_quickConnectAction->setStatusTip("Quickly connect to a MUD server");
-    connect(m_quickConnectAction, &QAction::triggered, this, &MainWindow::quickConnect);
+    m_openStartupListAction = m_fileMenu->addAction("Open Worlds In &Startup List");
+    m_openStartupListAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_O));
+    m_openStartupListAction->setStatusTip("Open all worlds in the startup list");
+    connect(m_openStartupListAction, &QAction::triggered, this, &MainWindow::openStartupList);
 
-    m_fileMenu->addSeparator();
-
-    m_closeAction = m_fileMenu->addAction("&Close");
+    m_closeAction = m_fileMenu->addAction("&Close World");
     m_closeAction->setShortcut(QKeySequence::Close);
     m_closeAction->setStatusTip("Close the current world");
     connect(m_closeAction, &QAction::triggered, this, &MainWindow::closeWorld);
 
-    m_fileMenu->addSeparator();
+    m_importXmlAction = m_fileMenu->addAction("&Import...");
+    m_importXmlAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_I));
+    m_importXmlAction->setStatusTip("Import triggers, aliases, and other settings from XML");
+    connect(m_importXmlAction, &QAction::triggered, this, &MainWindow::importXml);
 
-    m_saveAction = m_fileMenu->addAction("&Save");
+    m_configurePluginsAction = m_fileMenu->addAction("Pl&ugins...");
+    m_configurePluginsAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_P));
+    m_configurePluginsAction->setStatusTip("Manage plugins for the active world");
+    connect(m_configurePluginsAction, &QAction::triggered, this, &MainWindow::configurePlugins);
+
+    m_pluginWizardAction = m_fileMenu->addAction("Plugin &Wizard...");
+    m_pluginWizardAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::ALT | Qt::Key_P));
+    m_pluginWizardAction->setStatusTip("Create a new plugin from world items");
+    connect(m_pluginWizardAction, &QAction::triggered, this, &MainWindow::pluginWizard);
+
+    m_saveAction = m_fileMenu->addAction("&Save World Details");
     m_saveAction->setShortcut(QKeySequence::Save);
     m_saveAction->setStatusTip("Save the current world");
     connect(m_saveAction, &QAction::triggered, this, &MainWindow::saveWorld);
 
-    m_saveAsAction = m_fileMenu->addAction("Save &As...");
-    m_saveAsAction->setShortcut(QKeySequence::SaveAs);
+    m_saveAsAction = m_fileMenu->addAction("Save World Details &As...");
     m_saveAsAction->setStatusTip("Save the current world with a new name");
     connect(m_saveAsAction, &QAction::triggered, this, &MainWindow::saveWorldAs);
 
@@ -198,32 +210,26 @@ void MainWindow::createMenus()
 
     m_fileMenu->addSeparator();
 
-    m_worldPropertiesAction = m_fileMenu->addAction("World &Properties...");
-    m_worldPropertiesAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_P));
-    m_worldPropertiesAction->setStatusTip("Configure world settings");
-    connect(m_worldPropertiesAction, &QAction::triggered, this, &MainWindow::worldProperties);
+    m_globalPreferencesAction = m_fileMenu->addAction("&Global Preferences...");
+    m_globalPreferencesAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_G));
+    m_globalPreferencesAction->setStatusTip("Configure global application settings");
+    connect(m_globalPreferencesAction, &QAction::triggered, this, &MainWindow::globalPreferences);
 
-    m_configurePluginsAction = m_fileMenu->addAction("Pl&ugins...");
-    m_configurePluginsAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_P));
-    m_configurePluginsAction->setStatusTip("Manage plugins for the active world");
-    connect(m_configurePluginsAction, &QAction::triggered, this, &MainWindow::configurePlugins);
-
-    m_pluginWizardAction = m_fileMenu->addAction("Plugin &Wizard...");
-    m_pluginWizardAction->setStatusTip("Create a new plugin from world items");
-    connect(m_pluginWizardAction, &QAction::triggered, this, &MainWindow::pluginWizard);
-
-    m_fileMenu->addSeparator();
-
-    m_logSessionAction = m_fileMenu->addAction("&Log Session");
+    m_logSessionAction = m_fileMenu->addAction("&Log Session...");
+    m_logSessionAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_J));
     m_logSessionAction->setCheckable(true);
     m_logSessionAction->setStatusTip("Toggle session logging to file");
     connect(m_logSessionAction, &QAction::triggered, this, &MainWindow::toggleLogSession);
 
-    m_fileMenu->addSeparator();
+    m_reloadDefaultsAction = m_fileMenu->addAction("&Reload Defaults");
+    m_reloadDefaultsAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_R));
+    m_reloadDefaultsAction->setStatusTip("Reload default settings for the current world");
+    connect(m_reloadDefaultsAction, &QAction::triggered, this, &MainWindow::reloadDefaults);
 
-    m_importXmlAction = m_fileMenu->addAction("&Import XML...");
-    m_importXmlAction->setStatusTip("Import triggers, aliases, and other settings from XML");
-    connect(m_importXmlAction, &QAction::triggered, this, &MainWindow::importXml);
+    m_worldPropertiesAction = m_fileMenu->addAction("World &Properties...");
+    m_worldPropertiesAction->setShortcut(QKeySequence(Qt::ALT | Qt::Key_Return));
+    m_worldPropertiesAction->setStatusTip("Configure world settings");
+    connect(m_worldPropertiesAction, &QAction::triggered, this, &MainWindow::worldProperties);
 
     m_fileMenu->addSeparator();
 
@@ -240,16 +246,28 @@ void MainWindow::createMenus()
     m_exitAction->setStatusTip("Exit the application");
     connect(m_exitAction, &QAction::triggered, this, &MainWindow::exitApplication);
 
-    // Edit Menu
+    // Edit Menu (matches original MUSHclient structure)
     m_editMenu = menuBar()->addMenu("&Edit");
+
+    m_undoAction = m_editMenu->addAction("&Undo");
+    m_undoAction->setShortcut(QKeySequence::Undo);
+    m_undoAction->setStatusTip("Undo last action");
+    connect(m_undoAction, &QAction::triggered, this, &MainWindow::undo);
+
+    m_editMenu->addSeparator();
+
+    m_cutAction = m_editMenu->addAction("Cu&t");
+    m_cutAction->setShortcut(QKeySequence::Cut);
+    m_cutAction->setStatusTip("Cut selected text");
+    connect(m_cutAction, &QAction::triggered, this, &MainWindow::cut);
 
     m_copyAction = m_editMenu->addAction("&Copy");
     m_copyAction->setShortcut(QKeySequence::Copy);
     m_copyAction->setStatusTip("Copy selected text");
     connect(m_copyAction, &QAction::triggered, this, &MainWindow::copy);
 
-    m_copyAsHtmlAction = m_editMenu->addAction("Copy as &HTML");
-    m_copyAsHtmlAction->setShortcut(QKeySequence("Ctrl+Shift+C"));
+    m_copyAsHtmlAction = m_editMenu->addAction("Copy as HTML");
+    m_copyAsHtmlAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_C));
     m_copyAsHtmlAction->setStatusTip("Copy selected text with colors and formatting as HTML");
     connect(m_copyAsHtmlAction, &QAction::triggered, this, &MainWindow::copyAsHtml);
 
@@ -258,50 +276,40 @@ void MainWindow::createMenus()
     m_pasteAction->setStatusTip("Paste text");
     connect(m_pasteAction, &QAction::triggered, this, &MainWindow::paste);
 
-    m_pasteToMudAction = m_editMenu->addAction("Paste to &MUD");
-    m_pasteToMudAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_V));
-    m_pasteToMudAction->setStatusTip("Paste clipboard text directly to the MUD");
-    connect(m_pasteToMudAction, &QAction::triggered, this, &MainWindow::pasteToMud);
+    m_editMenu->addSeparator();
+
+    m_pasteToWorldAction = m_editMenu->addAction("Paste To &World...");
+    m_pasteToWorldAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_V));
+    m_pasteToWorldAction->setStatusTip("Paste clipboard text directly to the MUD");
+    connect(m_pasteToWorldAction, &QAction::triggered, this, &MainWindow::pasteToWorld);
+
+    m_recallLastWordAction = m_editMenu->addAction("Recall Last Word");
+    m_recallLastWordAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Backspace));
+    m_recallLastWordAction->setStatusTip("Recall last word typed");
+    connect(m_recallLastWordAction, &QAction::triggered, this, &MainWindow::recallLastWord);
+
+    m_editMenu->addSeparator();
 
     m_selectAllAction = m_editMenu->addAction("Select &All");
     m_selectAllAction->setShortcut(QKeySequence::SelectAll);
     m_selectAllAction->setStatusTip("Select all text");
     connect(m_selectAllAction, &QAction::triggered, this, &MainWindow::selectAll);
 
-    m_editMenu->addSeparator();
-
-    m_findAction = m_editMenu->addAction("&Find...");
-    m_findAction->setShortcut(QKeySequence::Find);
-    m_findAction->setStatusTip("Find text in the output");
-    connect(m_findAction, &QAction::triggered, this, &MainWindow::find);
-
-    m_findNextAction = m_editMenu->addAction("Find &Next");
-    m_findNextAction->setShortcut(QKeySequence::FindNext); // F3
-    m_findNextAction->setStatusTip("Find next occurrence");
-    connect(m_findNextAction, &QAction::triggered, this, &MainWindow::findNext);
+    m_spellCheckAction = m_editMenu->addAction("Sp&ell Check");
+    m_spellCheckAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_J));
+    m_spellCheckAction->setStatusTip("Check spelling of text");
+    connect(m_spellCheckAction, &QAction::triggered, this, &MainWindow::spellCheck);
 
     m_editMenu->addSeparator();
 
-    m_insertDateTimeAction = m_editMenu->addAction("Insert &Date/Time");
-    m_insertDateTimeAction->setStatusTip("Insert current date and time");
-    connect(m_insertDateTimeAction, &QAction::triggered, this, &MainWindow::insertDateTime);
-
-    m_wordCountAction = m_editMenu->addAction("&Word Count...");
-    m_wordCountAction->setStatusTip("Count words in selected text");
-    connect(m_wordCountAction, &QAction::triggered, this, &MainWindow::wordCount);
-
-    m_editMenu->addSeparator();
-
-    m_preferencesAction = m_editMenu->addAction("&Preferences...");
-    m_preferencesAction->setShortcut(QKeySequence::Preferences);
-    m_preferencesAction->setStatusTip("Configure application preferences");
-    connect(m_preferencesAction, &QAction::triggered, this, &MainWindow::preferences);
-
-    m_editMenu->addSeparator();
-
-    m_generateNameAction = m_editMenu->addAction("Generate Character &Name...");
+    m_generateNameAction = m_editMenu->addAction("&Generate Character Name...");
+    m_generateNameAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_N));
     m_generateNameAction->setStatusTip("Generate a random fantasy character name");
     connect(m_generateNameAction, &QAction::triggered, this, &MainWindow::generateCharacterName);
+
+    m_reloadNamesFileAction = m_editMenu->addAction("&Reload Names File...");
+    m_reloadNamesFileAction->setStatusTip("Reload the character names file");
+    connect(m_reloadNamesFileAction, &QAction::triggered, this, &MainWindow::reloadNamesFile);
 
     m_generateIdAction = m_editMenu->addAction("Generate Unique &ID...");
     m_generateIdAction->setStatusTip("Generate a unique identifier for plugins");
@@ -309,32 +317,37 @@ void MainWindow::createMenus()
 
     m_editMenu->addSeparator();
 
-    m_insertUnicodeAction = m_editMenu->addAction("Insert &Unicode...");
-    m_insertUnicodeAction->setStatusTip("Insert a Unicode character");
-    connect(m_insertUnicodeAction, &QAction::triggered, this, &MainWindow::insertUnicode);
+    m_notepadAction = m_editMenu->addAction("&Notepad");
+    m_notepadAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_W));
+    m_notepadAction->setStatusTip("Open the notepad window");
+    connect(m_notepadAction, &QAction::triggered, this, &MainWindow::openNotepad);
 
-    m_sendToAllAction = m_editMenu->addAction("Send to &All Worlds...");
-    m_sendToAllAction->setStatusTip("Send text to all open worlds");
-    connect(m_sendToAllAction, &QAction::triggered, this, &MainWindow::sendToAll);
-
-    m_asciiArtAction = m_editMenu->addAction("ASC&II Art...");
-    m_asciiArtAction->setStatusTip("Create ASCII art text");
-    connect(m_asciiArtAction, &QAction::triggered, this, &MainWindow::asciiArt);
-
-    m_highlightPhraseAction = m_editMenu->addAction("&Highlight Phrase...");
-    m_highlightPhraseAction->setStatusTip("Highlight text in output");
-    connect(m_highlightPhraseAction, &QAction::triggered, this, &MainWindow::highlightPhrase);
+    m_flipToNotepadAction = m_editMenu->addAction("&Flip To Notepad");
+    m_flipToNotepadAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Space));
+    m_flipToNotepadAction->setStatusTip("Switch to notepad window");
+    connect(m_flipToNotepadAction, &QAction::triggered, this, &MainWindow::flipToNotepad);
 
     m_editMenu->addSeparator();
 
-    m_goToMatchingBraceAction = m_editMenu->addAction("Go to &Matching Brace");
-    m_goToMatchingBraceAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_BracketRight));
+    m_colourPickerAction = m_editMenu->addAction("Colour Picker");
+    m_colourPickerAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_P));
+    m_colourPickerAction->setStatusTip("Open colour picker dialog");
+    connect(m_colourPickerAction, &QAction::triggered, this, &MainWindow::colourPicker);
+
+    m_debugPacketsAction = m_editMenu->addAction("Debug Packets");
+    m_debugPacketsAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_F11));
+    m_debugPacketsAction->setStatusTip("Debug incoming packets");
+    connect(m_debugPacketsAction, &QAction::triggered, this, &MainWindow::debugPackets);
+
+    m_editMenu->addSeparator();
+
+    m_goToMatchingBraceAction = m_editMenu->addAction("Go To &Matching Brace");
+    m_goToMatchingBraceAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_E));
     m_goToMatchingBraceAction->setStatusTip("Jump to matching bracket, brace, or parenthesis");
     connect(m_goToMatchingBraceAction, &QAction::triggered, this, &MainWindow::goToMatchingBrace);
 
-    m_selectToMatchingBraceAction = m_editMenu->addAction("Select to Matchin&g Brace");
-    m_selectToMatchingBraceAction->setShortcut(
-        QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_BracketRight));
+    m_selectToMatchingBraceAction = m_editMenu->addAction("Select To Matching &Brace");
+    m_selectToMatchingBraceAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_E));
     m_selectToMatchingBraceAction->setStatusTip(
         "Select text to matching bracket, brace, or parenthesis");
     connect(m_selectToMatchingBraceAction, &QAction::triggered, this,
@@ -752,45 +765,55 @@ void MainWindow::createMenus()
     m_endAction->setStatusTip("Scroll to end of output");
     connect(m_endAction, &QAction::triggered, this, &MainWindow::scrollToEnd);
 
-    m_displayMenu->addSeparator();
-
-    m_lineUpAction = m_displayMenu->addAction("Line U&p");
+    m_lineUpAction = m_displayMenu->addAction("Line Up");
     m_lineUpAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Up));
     m_lineUpAction->setStatusTip("Scroll up one line");
     connect(m_lineUpAction, &QAction::triggered, this, &MainWindow::scrollLineUp);
 
-    m_lineDownAction = m_displayMenu->addAction("Line Do&wn");
+    m_lineDownAction = m_displayMenu->addAction("Line Down");
     m_lineDownAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Down));
     m_lineDownAction->setStatusTip("Scroll down one line");
     connect(m_lineDownAction, &QAction::triggered, this, &MainWindow::scrollLineDown);
 
     m_displayMenu->addSeparator();
 
-    m_clearOutputAction = m_displayMenu->addAction("&Clear Output");
-    m_clearOutputAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_L));
-    m_clearOutputAction->setStatusTip("Clear all output text");
-    connect(m_clearOutputAction, &QAction::triggered, this, &MainWindow::clearOutput);
+    m_activityListAction = m_displayMenu->addAction("&Activity List...");
+    m_activityListAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::CTRL | Qt::Key_L));
+    m_activityListAction->setStatusTip("Show list of worlds with activity");
+    connect(m_activityListAction, &QAction::triggered, this, &MainWindow::activityList);
 
-    m_commandEchoAction = m_displayMenu->addAction("Command &Echo");
-    m_commandEchoAction->setCheckable(true);
-    m_commandEchoAction->setChecked(true); // Default to enabled
-    m_commandEchoAction->setStatusTip("Toggle command echo in output");
-    connect(m_commandEchoAction, &QAction::triggered, this, &MainWindow::toggleCommandEcho);
-
-    m_freezeOutputAction = m_displayMenu->addAction("&Freeze Output");
+    m_freezeOutputAction = m_displayMenu->addAction("Pause &Output");
     m_freezeOutputAction->setCheckable(true);
-    m_freezeOutputAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_F));
+    m_freezeOutputAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Space));
     m_freezeOutputAction->setStatusTip("Pause output scrolling");
     connect(m_freezeOutputAction, &QAction::triggered, this, &MainWindow::toggleFreezeOutput);
 
     m_displayMenu->addSeparator();
 
-    m_goToLineAction = m_displayMenu->addAction("&Go to Line...");
-    m_goToLineAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_G));
+    m_findAction = m_displayMenu->addAction("&Find...");
+    m_findAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_F));
+    m_findAction->setStatusTip("Search for text in output");
+    connect(m_findAction, &QAction::triggered, this, &MainWindow::find);
+
+    m_findNextAction = m_displayMenu->addAction("Find &Again");
+    m_findNextAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::CTRL | Qt::Key_F));
+    m_findNextAction->setStatusTip("Find next occurrence of search text");
+    connect(m_findNextAction, &QAction::triggered, this, &MainWindow::findNext);
+
+    m_recallTextAction = m_displayMenu->addAction("&Recall Text...");
+    m_recallTextAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_U));
+    m_recallTextAction->setStatusTip("Search and recall buffer contents");
+    connect(m_recallTextAction, &QAction::triggered, this, &MainWindow::recallText);
+
+    m_goToLineAction = m_displayMenu->addAction("Go to &Line...");
+    m_goToLineAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_L));
     m_goToLineAction->setStatusTip("Navigate to a specific line in output");
     connect(m_goToLineAction, &QAction::triggered, this, &MainWindow::goToLine);
 
-    m_goToUrlAction = m_displayMenu->addAction("Go to &URL");
+    m_displayMenu->addSeparator();
+
+    m_goToUrlAction = m_displayMenu->addAction("Go to &URL...");
+    m_goToUrlAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_J));
     m_goToUrlAction->setStatusTip("Open selected text as URL in browser");
     connect(m_goToUrlAction, &QAction::triggered, this, &MainWindow::goToUrl);
 
@@ -800,29 +823,50 @@ void MainWindow::createMenus()
 
     m_displayMenu->addSeparator();
 
-    m_bookmarkSelectionAction = m_displayMenu->addAction("&Bookmark Selection");
-    m_bookmarkSelectionAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_B));
-    m_bookmarkSelectionAction->setStatusTip("Toggle bookmark on current line");
-    connect(m_bookmarkSelectionAction, &QAction::triggered, this, &MainWindow::bookmarkSelection);
+    m_clearOutputAction = m_displayMenu->addAction("&Clear Output Buffer...");
+    m_clearOutputAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::CTRL | Qt::Key_C));
+    m_clearOutputAction->setStatusTip("Clear all output text");
+    connect(m_clearOutputAction, &QAction::triggered, this, &MainWindow::clearOutput);
 
-    m_goToBookmarkAction = m_displayMenu->addAction("Go to Boo&kmark");
-    m_goToBookmarkAction->setShortcut(QKeySequence(Qt::Key_F2));
-    m_goToBookmarkAction->setStatusTip("Jump to next bookmarked line");
-    connect(m_goToBookmarkAction, &QAction::triggered, this, &MainWindow::goToBookmark);
+    m_stopSoundAction = m_displayMenu->addAction("Stop Sound Playing");
+    m_stopSoundAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_B));
+    m_stopSoundAction->setStatusTip("Stop any currently playing sound");
+    connect(m_stopSoundAction, &QAction::triggered, this, &MainWindow::stopSound);
 
     m_displayMenu->addSeparator();
 
-    m_activityListAction = m_displayMenu->addAction("&Activity List...");
-    m_activityListAction->setStatusTip("Show list of worlds with activity");
-    connect(m_activityListAction, &QAction::triggered, this, &MainWindow::activityList);
+    m_bookmarkSelectionAction = m_displayMenu->addAction("&Bookmark Selection");
+    m_bookmarkSelectionAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::CTRL | Qt::Key_B));
+    m_bookmarkSelectionAction->setStatusTip("Toggle bookmark on current line");
+    connect(m_bookmarkSelectionAction, &QAction::triggered, this, &MainWindow::bookmarkSelection);
 
-    m_textAttributesAction = m_displayMenu->addAction("Text &Attributes...");
-    m_textAttributesAction->setStatusTip("Configure text formatting attributes");
-    connect(m_textAttributesAction, &QAction::triggered, this, &MainWindow::textAttributes);
+    m_goToBookmarkAction = m_displayMenu->addAction("&Go To Bookmark");
+    m_goToBookmarkAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_B));
+    m_goToBookmarkAction->setStatusTip("Jump to next bookmarked line");
+    connect(m_goToBookmarkAction, &QAction::triggered, this, &MainWindow::goToBookmark);
+
+    m_highlightPhraseAction = m_displayMenu->addAction("&Highlight Word...");
+    m_highlightPhraseAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_H));
+    m_highlightPhraseAction->setStatusTip("Highlight matching words in output");
+    connect(m_highlightPhraseAction, &QAction::triggered, this, &MainWindow::highlightPhrase);
 
     m_multilineTriggerAction = m_displayMenu->addAction("&Multi-line Trigger...");
     m_multilineTriggerAction->setStatusTip("Configure multi-line trigger patterns");
     connect(m_multilineTriggerAction, &QAction::triggered, this, &MainWindow::multilineTrigger);
+
+    m_textAttributesAction = m_displayMenu->addAction("&Text Attributes...");
+    m_textAttributesAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_A));
+    m_textAttributesAction->setStatusTip("Configure text formatting attributes");
+    connect(m_textAttributesAction, &QAction::triggered, this, &MainWindow::textAttributes);
+
+    m_displayMenu->addSeparator();
+
+    m_commandEchoAction = m_displayMenu->addAction("No Command &Echo");
+    m_commandEchoAction->setCheckable(true);
+    m_commandEchoAction->setChecked(false); // Default: echo is enabled (not checked = echo on)
+    m_commandEchoAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_E));
+    m_commandEchoAction->setStatusTip("Toggle command echo in output");
+    connect(m_commandEchoAction, &QAction::triggered, this, &MainWindow::toggleCommandEcho);
 
     // Convert Menu (text transformations for notepad windows)
     m_convertMenu = menuBar()->addMenu("Con&vert");
@@ -890,24 +934,30 @@ void MainWindow::createMenus()
     m_convertWrapLinesAction->setStatusTip("Remove line breaks to create continuous text");
     connect(m_convertWrapLinesAction, &QAction::triggered, this, &MainWindow::convertWrapLines);
 
-    // View Menu
+    // View Menu (matches original MUSHclient structure)
     m_viewMenu = menuBar()->addMenu("&View");
 
     // Toolbar visibility toggles (will be connected after toolbars are created)
-    m_mainToolBarAction = m_viewMenu->addAction("&Main Toolbar");
+    m_mainToolBarAction = m_viewMenu->addAction("&Toolbar");
     m_mainToolBarAction->setCheckable(true);
     m_mainToolBarAction->setChecked(true);
     m_mainToolBarAction->setStatusTip("Show or hide the main toolbar");
 
-    m_gameToolBarAction = m_viewMenu->addAction("&Game Toolbar");
+    m_gameToolBarAction = m_viewMenu->addAction("&World Toolbar");
     m_gameToolBarAction->setCheckable(true);
     m_gameToolBarAction->setChecked(true);
-    m_gameToolBarAction->setStatusTip("Show or hide the game toolbar");
+    m_gameToolBarAction->setStatusTip("Show or hide the world/game toolbar");
 
     m_activityToolBarAction = m_viewMenu->addAction("&Activity Toolbar");
     m_activityToolBarAction->setCheckable(true);
     m_activityToolBarAction->setChecked(true);
     m_activityToolBarAction->setStatusTip("Show or hide the activity toolbar");
+
+    m_statusBarAction = m_viewMenu->addAction("&Status Bar");
+    m_statusBarAction->setCheckable(true);
+    m_statusBarAction->setChecked(true);
+    m_statusBarAction->setStatusTip("Show or hide the status bar");
+    connect(m_statusBarAction, &QAction::triggered, this, &MainWindow::toggleStatusBar);
 
     m_infoBarAction = m_viewMenu->addAction("&Info Bar");
     m_infoBarAction->setCheckable(true);
@@ -916,37 +966,22 @@ void MainWindow::createMenus()
 
     m_viewMenu->addSeparator();
 
-    m_resetToolbarsAction = m_viewMenu->addAction("&Reset Toolbars");
+    m_resetToolbarsAction = m_viewMenu->addAction("&Reset Toolbar Locations");
     m_resetToolbarsAction->setStatusTip("Reset all toolbars to their default positions");
     connect(m_resetToolbarsAction, &QAction::triggered, this, &MainWindow::resetToolbars);
 
-    m_viewMenu->addSeparator();
-
-    m_tabbedViewAction = m_viewMenu->addAction("&Tabbed Windows");
-    m_tabbedViewAction->setCheckable(true);
-    m_tabbedViewAction->setChecked(false);
-    m_tabbedViewAction->setStatusTip("Toggle between tabbed and windowed view");
-    connect(m_tabbedViewAction, &QAction::triggered, this, &MainWindow::toggleTabbedView);
-
-    m_alwaysOnTopAction = m_viewMenu->addAction("&Always On Top");
+    m_alwaysOnTopAction = m_viewMenu->addAction("Always &On Top");
     m_alwaysOnTopAction->setCheckable(true);
     m_alwaysOnTopAction->setChecked(false);
     m_alwaysOnTopAction->setStatusTip("Keep window above all other windows");
     connect(m_alwaysOnTopAction, &QAction::triggered, this, &MainWindow::toggleAlwaysOnTop);
 
-    m_fullScreenAction = m_viewMenu->addAction("&Full Screen");
+    m_fullScreenAction = m_viewMenu->addAction("&Full Screen Mode");
     m_fullScreenAction->setCheckable(true);
     m_fullScreenAction->setChecked(false);
-    m_fullScreenAction->setShortcut(QKeySequence(Qt::Key_F11));
+    m_fullScreenAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_F));
     m_fullScreenAction->setStatusTip("Toggle full screen mode");
     connect(m_fullScreenAction, &QAction::triggered, this, &MainWindow::toggleFullScreen);
-
-    m_viewMenu->addSeparator();
-
-    m_recallAction = m_viewMenu->addAction("&Recall...");
-    m_recallAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_R));
-    m_recallAction->setStatusTip("Search and recall buffer contents");
-    connect(m_recallAction, &QAction::triggered, this, &MainWindow::recall);
 
     // Window Menu (matches original MUSHclient structure)
     m_windowMenu = menuBar()->addMenu("&Window");
@@ -1442,10 +1477,10 @@ void MainWindow::readSettings()
         restoreState(state);
     }
 
-    // Restore tabbed view preference
-    bool tabbedView = settings.value("mainWindow/tabbedView", false).toBool();
-    m_tabbedViewAction->setChecked(tabbedView);
-    toggleTabbedView(tabbedView);
+    // Restore status bar visibility
+    bool statusBarVisible = settings.value("mainWindow/statusBar", true).toBool();
+    m_statusBarAction->setChecked(statusBarVisible);
+    statusBar()->setVisible(statusBarVisible);
 }
 
 void MainWindow::writeSettings()
@@ -1454,7 +1489,7 @@ void MainWindow::writeSettings()
 
     settings.setValue("mainWindow/geometry", saveGeometry());
     settings.setValue("mainWindow/state", saveState());
-    settings.setValue("mainWindow/tabbedView", m_tabbedViewAction->isChecked());
+    settings.setValue("mainWindow/statusBar", m_statusBarAction->isChecked());
 }
 
 void MainWindow::closeEvent(QCloseEvent* event)
@@ -1703,9 +1738,6 @@ void MainWindow::updateMenus()
     m_selectAllAction->setEnabled(hasActiveWorld);
     m_findAction->setEnabled(hasActiveWorld);
     m_findNextAction->setEnabled(hasActiveWorld && !m_lastSearchText.isEmpty());
-    m_recallAction->setEnabled(hasActiveWorld);
-    m_insertDateTimeAction->setEnabled(hasActiveWorld);
-    m_wordCountAction->setEnabled(hasActiveWorld);
 
     // Display menu actions
     m_clearOutputAction->setEnabled(hasActiveWorld);
@@ -2095,6 +2127,14 @@ void MainWindow::openWorld(const QString& filename)
     }
 }
 
+void MainWindow::openStartupList()
+{
+    // Open all worlds in the startup list
+    // TODO: Implement startup list functionality
+    QMessageBox::information(this, "Open Startup List",
+                             "Opening worlds from startup list is not yet implemented.");
+}
+
 void MainWindow::closeWorld()
 {
     if (m_mdiArea->activeSubWindow()) {
@@ -2193,6 +2233,20 @@ void MainWindow::worldProperties()
     statusBar()->showMessage("World properties updated", 2000);
 }
 
+void MainWindow::globalPreferences()
+{
+    // TODO: Implement global preferences dialog
+    QMessageBox::information(this, "Global Preferences",
+                             "Global preferences dialog is not yet implemented.");
+}
+
+void MainWindow::reloadDefaults()
+{
+    // TODO: Implement reload defaults functionality
+    QMessageBox::information(this, "Reload Defaults",
+                             "Reload defaults is not yet implemented.");
+}
+
 void MainWindow::toggleLogSession()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
@@ -2270,6 +2324,32 @@ void MainWindow::exitApplication()
 }
 
 // Edit menu slots
+void MainWindow::undo()
+{
+    // Get focus widget and try to undo
+    QWidget* focusWidget = QApplication::focusWidget();
+    if (auto* textEdit = qobject_cast<QTextEdit*>(focusWidget)) {
+        textEdit->undo();
+    } else if (auto* lineEdit = qobject_cast<QLineEdit*>(focusWidget)) {
+        lineEdit->undo();
+    } else {
+        statusBar()->showMessage("Undo not available", 2000);
+    }
+}
+
+void MainWindow::cut()
+{
+    // Get focus widget and try to cut
+    QWidget* focusWidget = QApplication::focusWidget();
+    if (auto* textEdit = qobject_cast<QTextEdit*>(focusWidget)) {
+        textEdit->cut();
+    } else if (auto* lineEdit = qobject_cast<QLineEdit*>(focusWidget)) {
+        lineEdit->cut();
+    } else {
+        statusBar()->showMessage("Cut not available", 2000);
+    }
+}
+
 void MainWindow::copy()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
@@ -2339,7 +2419,7 @@ void MainWindow::paste()
     }
 }
 
-void MainWindow::pasteToMud()
+void MainWindow::pasteToWorld()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
@@ -2456,6 +2536,52 @@ void MainWindow::selectAll()
     }
 }
 
+void MainWindow::spellCheck()
+{
+    // TODO: Implement spell check functionality
+    statusBar()->showMessage("Spell check not yet implemented", 2000);
+}
+
+void MainWindow::reloadNamesFile()
+{
+    // TODO: Implement reload names file functionality
+    statusBar()->showMessage("Reload names file not yet implemented", 2000);
+}
+
+void MainWindow::openNotepad()
+{
+    // TODO: Implement open notepad functionality
+    statusBar()->showMessage("Notepad not yet implemented", 2000);
+}
+
+void MainWindow::flipToNotepad()
+{
+    // TODO: Implement flip to notepad functionality
+    statusBar()->showMessage("Flip to notepad not yet implemented", 2000);
+}
+
+void MainWindow::colourPicker()
+{
+    QColor color = QColorDialog::getColor(Qt::white, this, "Choose Colour");
+    if (color.isValid()) {
+        // Copy color info to clipboard
+        QString colorInfo = QString("RGB: %1, %2, %3\nHex: %4")
+                                .arg(color.red())
+                                .arg(color.green())
+                                .arg(color.blue())
+                                .arg(color.name());
+        QGuiApplication::clipboard()->setText(colorInfo);
+        statusBar()->showMessage(
+            QString("Color %1 copied to clipboard").arg(color.name()), 2000);
+    }
+}
+
+void MainWindow::debugPackets()
+{
+    // TODO: Implement debug packets window
+    statusBar()->showMessage("Debug packets not yet implemented", 2000);
+}
+
 void MainWindow::find()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
@@ -2499,61 +2625,11 @@ void MainWindow::findNext()
     }
 }
 
-void MainWindow::preferences()
+void MainWindow::recallLastWord()
 {
-    // Open Global Preferences dialog
-    GlobalPreferencesDialog dialog(this);
-    if (dialog.exec() == QDialog::Accepted) {
-        statusBar()->showMessage("Preferences saved", 2000);
-        // Apply toolbar preferences that may have changed
-        applyToolbarPreferences();
-    } else {
-        statusBar()->showMessage("Preferences cancelled", 2000);
-    }
-}
-
-void MainWindow::recall()
-{
-    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
-    if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
-        return;
-    }
-
-    WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
-    if (!worldWidget) {
-        return;
-    }
-
-    WorldDocument* doc = worldWidget->document();
-    if (!doc) {
-        return;
-    }
-
-    // Open Recall Search dialog
-    RecallSearchDialog dialog(doc, this);
-    if (dialog.exec() != QDialog::Accepted) {
-        return;
-    }
-
-    // Perform the search
-    QString result = doc->RecallText(
-        dialog.searchText(), dialog.matchCase(), dialog.useRegex(), dialog.includeOutput(),
-        dialog.includeCommands(), dialog.includeNotes(), dialog.lineCount(), dialog.linePreamble());
-
-    if (result.isEmpty()) {
-        QMessageBox::information(
-            this, "Recall", QString("No lines found matching \"%1\"").arg(dialog.searchText()));
-        return;
-    }
-
-    // Create notepad window with results
-    QString title = QString("Recall: %1").arg(dialog.searchText());
-    doc->SendToNotepad(title, result);
-    doc->ActivateNotepad(title);
-
-    statusBar()->showMessage(QString("Recall completed: %1 characters found").arg(result.length()),
-                             3000);
+    // Recall last word from input - essentially undo last word deletion
+    // TODO: Implement recall last word functionality
+    statusBar()->showMessage("Recall last word not yet implemented", 2000);
 }
 
 void MainWindow::generateCharacterName()
@@ -3788,15 +3864,9 @@ void MainWindow::newWindow()
                              "Opening additional views of the same world is not yet implemented.");
 }
 
-void MainWindow::toggleTabbedView(bool enabled)
+void MainWindow::toggleStatusBar(bool visible)
 {
-    if (enabled) {
-        m_mdiArea->setViewMode(QMdiArea::TabbedView);
-        m_mdiArea->setTabsClosable(true);
-        m_mdiArea->setTabsMovable(true);
-    } else {
-        m_mdiArea->setViewMode(QMdiArea::SubWindowView);
-    }
+    statusBar()->setVisible(visible);
 }
 
 void MainWindow::toggleAlwaysOnTop(bool enabled)
@@ -4079,118 +4149,6 @@ void MainWindow::saveSelection()
     }
 }
 
-void MainWindow::insertDateTime()
-{
-    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
-    if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
-        return;
-    }
-
-    WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
-    if (!worldWidget) {
-        return;
-    }
-
-    // Get current date/time formatted nicely
-    QString dateTime = QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss");
-
-    // Insert into input field
-    InputView* inputView = worldWidget->inputView();
-    if (inputView) {
-        inputView->insertPlainText(dateTime);
-        statusBar()->showMessage("Date/time inserted", 2000);
-    }
-}
-
-void MainWindow::wordCount()
-{
-    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
-    if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
-        return;
-    }
-
-    WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
-    if (!worldWidget) {
-        return;
-    }
-
-    OutputView* outputView = worldWidget->outputView();
-    WorldDocument* doc = worldWidget->document();
-    if (!outputView || !doc) {
-        return;
-    }
-
-    // Get text - either selection or entire document
-    QString text;
-    bool isSelection = false;
-
-    if (outputView->hasSelection()) {
-        text = outputView->getSelectedText();
-        isSelection = true;
-    } else {
-        // Get all text from document (matches original MUSHclient behavior)
-        QStringList lines;
-        for (Line* line : doc->m_lineList) {
-            if (line && line->len() > 0) {
-                lines.append(QString::fromUtf8(line->text(), line->len()));
-            }
-        }
-        text = lines.join('\n');
-    }
-
-    if (text.isEmpty()) {
-        QMessageBox::information(this, "Word Count", "No text to count.");
-        return;
-    }
-
-    // Count using original MUSHclient algorithm (TextView.cpp)
-    int lineCount = 0;
-    int wordCount = 0;
-    int charCount = text.length();
-
-    // Count newlines
-    for (int i = 0; i < text.length(); i++) {
-        if (text[i] == '\n') {
-            lineCount++;
-        }
-        // Count words: space followed by non-space
-        if (i > 0 && text[i - 1].isSpace() && !text[i].isSpace()) {
-            wordCount++;
-        }
-    }
-
-    // Unless zero length, must have one line in it
-    if (!text.isEmpty()) {
-        lineCount++;
-        // If first character is not a space, that counts as our first word
-        if (!text[0].isSpace()) {
-            wordCount++;
-        }
-    }
-
-    // Build message with proper pluralization
-    QString scope = isSelection ? "selection" : "document";
-    QString linePlural = (lineCount == 1) ? "" : "s";
-    QString wordPlural = (wordCount == 1) ? "" : "s";
-    QString charPlural = (charCount == 1) ? "" : "s";
-
-    QString message = QString("The %1 contains %2 line%3, %4 word%5, %6 character%7")
-                          .arg(scope)
-                          .arg(lineCount)
-                          .arg(linePlural)
-                          .arg(wordCount)
-                          .arg(wordPlural)
-                          .arg(charCount)
-                          .arg(charPlural);
-
-    QMessageBox::information(this, "Word Count", message);
-
-    statusBar()->showMessage(QString("%1 words, %2 characters").arg(wordCount).arg(charCount),
-                             3000);
-}
-
 void MainWindow::clearOutput()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
@@ -4232,6 +4190,68 @@ void MainWindow::clearOutput()
 
         statusBar()->showMessage("Output cleared", 2000);
     }
+}
+
+void MainWindow::recallText()
+{
+    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
+    if (!activeSubWindow) {
+        statusBar()->showMessage("No active world", 2000);
+        return;
+    }
+
+    WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
+    if (!worldWidget) {
+        return;
+    }
+
+    WorldDocument* doc = worldWidget->document();
+    if (!doc) {
+        return;
+    }
+
+    // Open Recall Search dialog
+    RecallSearchDialog dialog(doc, this);
+    if (dialog.exec() != QDialog::Accepted) {
+        return;
+    }
+
+    // Perform the search
+    QString result = doc->RecallText(
+        dialog.searchText(), dialog.matchCase(), dialog.useRegex(), dialog.includeOutput(),
+        dialog.includeCommands(), dialog.includeNotes(), dialog.lineCount(), dialog.linePreamble());
+
+    if (result.isEmpty()) {
+        QMessageBox::information(
+            this, "Recall", QString("No lines found matching \"%1\"").arg(dialog.searchText()));
+        return;
+    }
+
+    // Create notepad window with results
+    QString title = QString("Recall: %1").arg(dialog.searchText());
+    doc->SendToNotepad(title, result);
+    doc->ActivateNotepad(title);
+
+    statusBar()->showMessage(QString("Recall completed: %1 characters found").arg(result.length()),
+                             3000);
+}
+
+void MainWindow::stopSound()
+{
+    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
+    if (!activeSubWindow) {
+        statusBar()->showMessage("No active world", 2000);
+        return;
+    }
+
+    WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
+    if (!worldWidget || !worldWidget->document()) {
+        return;
+    }
+
+    // Stop all sounds for this world (buffer 0 = all)
+    worldWidget->document()->StopSound(0);
+    statusBar()->showMessage("Sound playback stopped", 2000);
 }
 
 void MainWindow::toggleCommandEcho()
@@ -4933,75 +4953,6 @@ void MainWindow::importXml()
     if (dlg.exec() == QDialog::Accepted) {
         // The ImportXmlDialog handles file selection and import internally
         statusBar()->showMessage("XML import completed", 3000);
-    }
-}
-
-void MainWindow::insertUnicode()
-{
-    InsertUnicodeDialog dlg(this);
-    if (dlg.exec() == QDialog::Accepted) {
-        QString unicodeChar = dlg.character();
-        if (!unicodeChar.isEmpty()) {
-            // Get active world's input view and insert the character
-            QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
-            if (activeSubWindow) {
-                WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
-                if (worldWidget) {
-                    worldWidget->inputView()->insertPlainText(unicodeChar);
-                }
-            }
-        }
-    }
-}
-
-void MainWindow::sendToAll()
-{
-    // Collect all open world names
-    QStringList worldNames;
-    for (QMdiSubWindow* subWindow : m_mdiArea->subWindowList()) {
-        WorldWidget* worldWidget = qobject_cast<WorldWidget*>(subWindow->widget());
-        if (worldWidget && worldWidget->document()) {
-            worldNames.append(worldWidget->document()->m_mush_name);
-        }
-    }
-
-    if (worldNames.isEmpty()) {
-        QMessageBox::information(this, "Send to All", "No worlds are currently open.");
-        return;
-    }
-
-    SendToAllDialog dlg(this);
-    dlg.setWorlds(worldNames);
-    if (dlg.exec() == QDialog::Accepted) {
-        QString textToSend = dlg.sendText();
-        QStringList selectedWorlds = dlg.selectedWorlds();
-        // Send text to selected worlds
-        for (QMdiSubWindow* subWindow : m_mdiArea->subWindowList()) {
-            WorldWidget* worldWidget = qobject_cast<WorldWidget*>(subWindow->widget());
-            if (worldWidget && worldWidget->document()) {
-                if (selectedWorlds.contains(worldWidget->document()->m_mush_name)) {
-                    worldWidget->document()->sendToMud(textToSend);
-                }
-            }
-        }
-    }
-}
-
-void MainWindow::asciiArt()
-{
-    AsciiArtDialog dlg(this);
-    if (dlg.exec() == QDialog::Accepted) {
-        QString art = dlg.generatedArt();
-        if (!art.isEmpty()) {
-            // Get active world's input view and insert the art
-            QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
-            if (activeSubWindow) {
-                WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
-                if (worldWidget) {
-                    worldWidget->inputView()->insertPlainText(art);
-                }
-            }
-        }
     }
 }
 
