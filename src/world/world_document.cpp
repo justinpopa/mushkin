@@ -76,10 +76,10 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
 
     // ========== Initialize display settings ==========
     m_font_name = "Courier New";
-    m_font_height = 10;
+    m_font_height = 12; // matches original MUSHclient default
     m_font_weight = 400; // FW_NORMAL
     m_font_charset = 0;  // DEFAULT_CHARSET
-    m_wrap = 1; // true = wrap enabled (boolean, not column width)
+    m_wrap = 1; // true = wrap enabled (matches original MUSHclient default)
     m_timestamps = 0;
     m_match_width = 30;
 
@@ -593,6 +593,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_cMXPquoteTerminator = 0;
     // MXP maps and lists are auto-initialized to empty
     m_cLastChar = 0;
+    m_lastSpace = -1; // No space position yet
     m_iLastOutstandingTagCount = 0;
     m_strPuebloMD5 = QString();
 
@@ -2803,6 +2804,26 @@ void WorldDocument::AddToLine(const char* sText, int iLength)
     if (iLength > 0) {
         m_cLastChar = sText[iLength - 1];
     }
+
+    // Track space positions for word-wrap
+    // Scan added text for spaces and update m_lastSpace
+    // Only track spaces that are within the wrap column
+    for (int i = 0; i < iLength; i++) {
+        if (sText[i] == ' ') {
+            int spacePos = currentLen + i;
+            // Only remember this space if it's before the wrap column
+            // (or if no wrap column is set)
+            if (m_nWrapColumn == 0 || spacePos < static_cast<int>(m_nWrapColumn)) {
+                m_lastSpace = spacePos;
+            }
+        }
+    }
+
+    // Check if line needs to wrap (exceeds wrap column)
+    // Only wrap if m_nWrapColumn > 0 (0 means no wrapping)
+    if (m_nWrapColumn > 0 && m_currentLine->len() >= static_cast<qint32>(m_nWrapColumn)) {
+        handleLineWrap();
+    }
 }
 
 /**
@@ -2814,6 +2835,166 @@ void WorldDocument::AddToLine(unsigned char c)
 {
     char ch = static_cast<char>(c);
     AddToLine(&ch, 1);
+}
+
+/**
+ * handleLineWrap - Handle line wrapping when wrap column is exceeded
+ *
+ * Source: doc.cpp:1512-1600 (original MUSHclient word-wrap logic)
+ *
+ * This is called when the current line length exceeds m_nWrapColumn.
+ * Behavior depends on m_wrap setting:
+ * - m_wrap = 0: Hard break at column boundary
+ * - m_wrap = 1: Word-wrap at last space (if found within reasonable distance)
+ *
+ * Word-wrap logic:
+ * 1. If m_wrap is enabled and we have a valid last space position
+ * 2. And the text after the space isn't too long (< m_nWrapColumn)
+ * 3. Break at the space, carry text after space to new line
+ * 4. Otherwise, hard break at the column boundary
+ */
+void WorldDocument::handleLineWrap()
+{
+    if (!m_currentLine) {
+        return;
+    }
+
+    qint32 lineLen = m_currentLine->len();
+
+    // Determine break point
+    int breakPoint = -1;
+
+    // If word-wrap is enabled and we have a valid space position
+    if (m_wrap != 0 && m_lastSpace >= 0) {
+        // Check that the text after the space isn't too long
+        // (if remaining text is >= wrap column, we'd have to break again immediately)
+        qint32 remainingLen = lineLen - m_lastSpace;
+        if (remainingLen < static_cast<qint32>(m_nWrapColumn)) {
+            breakPoint = m_lastSpace;
+        }
+    }
+
+    if (breakPoint >= 0) {
+        // Word-wrap: break at the space
+        // Original MUSHclient behavior (doc.cpp:1557-1562):
+        // When m_indent_paras is false (normal case), KEEP the space at end of this line
+        // This ensures soft-wrapped lines display correctly when joined
+
+        // Save the text AFTER the space to carry over to the next line
+        int carryOverStart = breakPoint + 1;  // Text starts after the space
+        int carryOverLen = lineLen - carryOverStart;
+
+        QByteArray carryOver;
+        if (carryOverLen > 0) {
+            carryOver = QByteArray(m_currentLine->text() + carryOverStart, carryOverLen);
+        }
+
+        // Truncate current line AFTER the space (include the space in this line)
+        // This matches original MUSHclient when m_indent_paras is false
+        int truncateAt = breakPoint + 1;  // Keep up to and including the space
+        m_currentLine->textBuffer.resize(truncateAt);
+        m_currentLine->textBuffer.push_back('\0');
+
+        // Adjust styles: need to truncate styles to match new line length
+        adjustStylesForTruncation(truncateAt);
+
+        // Start new line (soft wrap - bNewLine=false)
+        StartNewLine(false, 0);
+
+        // Reset last space tracking for new line
+        m_lastSpace = -1;
+
+        // Add carried-over text to new line
+        if (carryOverLen > 0) {
+            // Temporarily disable wrap checking to avoid recursion
+            quint16 savedWrapColumn = m_nWrapColumn;
+            m_nWrapColumn = 0;
+
+            AddToLine(carryOver.constData(), carryOverLen);
+
+            m_nWrapColumn = savedWrapColumn;
+
+            // Re-check for wrap (in case carried text is still too long)
+            if (m_nWrapColumn > 0 && m_currentLine->len() >= static_cast<qint32>(m_nWrapColumn)) {
+                handleLineWrap();
+            }
+        }
+    } else {
+        // Hard break: split at the wrap column
+        // Save text beyond the wrap column
+        int splitPoint = static_cast<int>(m_nWrapColumn);
+        int carryOverLen = lineLen - splitPoint;
+
+        QByteArray carryOver;
+        if (carryOverLen > 0) {
+            carryOver = QByteArray(m_currentLine->text() + splitPoint, carryOverLen);
+        }
+
+        // Truncate current line at the split point
+        m_currentLine->textBuffer.resize(splitPoint);
+        m_currentLine->textBuffer.push_back('\0');
+
+        // Adjust styles
+        adjustStylesForTruncation(splitPoint);
+
+        // Start new line (soft wrap - bNewLine=false)
+        StartNewLine(false, 0);
+
+        // Reset last space tracking for new line
+        m_lastSpace = -1;
+
+        // Add carried-over text to new line
+        if (carryOverLen > 0) {
+            // Temporarily disable wrap checking to avoid recursion
+            quint16 savedWrapColumn = m_nWrapColumn;
+            m_nWrapColumn = 0;
+
+            AddToLine(carryOver.constData(), carryOverLen);
+
+            m_nWrapColumn = savedWrapColumn;
+
+            // Re-check for wrap (in case carried text is still too long)
+            if (m_nWrapColumn > 0 && m_currentLine->len() >= static_cast<qint32>(m_nWrapColumn)) {
+                handleLineWrap();
+            }
+        }
+    }
+}
+
+/**
+ * adjustStylesForTruncation - Adjust style runs when line is truncated
+ *
+ * When we truncate a line for word-wrap, we need to adjust the style runs
+ * so they don't reference text beyond the truncation point.
+ *
+ * @param newLength The new length of the line text
+ */
+void WorldDocument::adjustStylesForTruncation(qint32 newLength)
+{
+    if (!m_currentLine || m_currentLine->styleList.empty()) {
+        return;
+    }
+
+    qint32 pos = 0;
+    auto it = m_currentLine->styleList.begin();
+
+    while (it != m_currentLine->styleList.end()) {
+        Style* style = it->get();
+        qint32 styleEnd = pos + style->iLength;
+
+        if (pos >= newLength) {
+            // This style is entirely beyond the truncation point - remove it
+            it = m_currentLine->styleList.erase(it);
+        } else if (styleEnd > newLength) {
+            // This style spans the truncation point - truncate it
+            style->iLength = static_cast<quint16>(newLength - pos);
+            ++it;
+        } else {
+            // This style is entirely before the truncation point - keep it
+            ++it;
+        }
+        pos = styleEnd;
+    }
 }
 
 // ========== Lua Function Callbacks ==========
@@ -3054,6 +3235,9 @@ void WorldDocument::StartNewLine(bool bNewLine, unsigned char iFlags)
                              initialFore,   // foreground color
                              initialBack,   // background color
                              m_bUTF_8);     // UTF-8 mode
+
+    // Reset word-wrap tracking for new line
+    m_lastSpace = -1;
 
     // IMPORTANT: Create initial style for new line
     // The Line constructor does NOT create an initial style

@@ -564,6 +564,23 @@ gtest_discover_tests(test-tab-completion-gtest
     DISCOVERY_TIMEOUT 30
 )
 
+# Word wrap test (GoogleTest version)
+add_executable(test-word-wrap-gtest
+    test_word_wrap_gtest.cpp
+)
+
+target_link_libraries(test-word-wrap-gtest PRIVATE
+    GTest::gtest
+    Qt6::Core
+    Qt6::Gui
+    Qt6::Widgets
+    ui
+)
+
+gtest_discover_tests(test-word-wrap-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
 # Line logging test (GoogleTest version)
 add_executable(test-line-logging-gtest
     test_line_logging_gtest.cpp

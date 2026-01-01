@@ -1,5 +1,6 @@
 #include "input_view.h"
 #include "../../automation/plugin.h"
+#include "../../utils/font_utils.h"
 #include "../../world/color_utils.h"
 #include "../../world/lua_api/lua_registration.h"
 #include "../../world/script_engine.h"
@@ -352,9 +353,8 @@ void InputView::applyInputSettings()
     QString fontWeight = (m_doc->m_input_font_weight >= 700) ? "bold" : "normal";
 
     // Use stylesheet for reliable font and color application on QPlainTextEdit
-    // Note: Use 'px' (pixels) not 'pt' (points) to match Windows GDI font rendering
-    // Windows at 96 DPI: points * 96/72 = points * 1.33 = pixels
-    int fontSizePx = qRound(m_doc->m_input_font_height * 96.0 / 72.0);
+    // Note: Use scaledFontSize() for cross-platform DPI-consistent sizing
+    int fontSizePx = scaledFontSize(m_doc->m_input_font_height);
 
     QString style = QString(
         "QPlainTextEdit { color: %1; background-color: %2; "

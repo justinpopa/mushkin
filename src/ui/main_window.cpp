@@ -1827,6 +1827,14 @@ void MainWindow::updateMenus()
     // Update Auto-Say checked state
     m_autoSayAction->setChecked(isAutoSayEnabled);
 
+    // Update Wrap Output checked state from document's m_wrap setting
+    if (hasActiveWorld) {
+        WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
+        if (worldWidget && worldWidget->document()) {
+            m_wrapOutputAction->setChecked(worldWidget->document()->m_wrap != 0);
+        }
+    }
+
     // Configure Triggers/Aliases/Timers are always enabled (matches original MUSHclient)
     // This also fixes the macOS native menu bar bug where disabled items stay disabled
 
@@ -3082,18 +3090,10 @@ void MainWindow::toggleWrapOutput()
         return;
     }
 
-    // Toggle wrap setting - 0 means no wrap (very large column), non-zero means wrap
-    bool wrapEnabled = m_wrapOutputAction->isChecked();
-    if (wrapEnabled) {
-        // Restore default wrap column (80 is typical)
-        if (doc->m_nWrapColumn <= 0) {
-            doc->m_nWrapColumn = 80;
-        }
-    } else {
-        // Disable wrapping by setting to 0
-        doc->m_nWrapColumn = 0;
-    }
-
+    // Toggle m_wrap (word-wrap at spaces enabled/disabled)
+    // m_wrap is a boolean (0=off, non-zero=on), separate from m_nWrapColumn (the wrap column width)
+    // This matches original MUSHclient behavior from doc.cpp OnGameWraplines()
+    doc->m_wrap = m_wrapOutputAction->isChecked() ? 1 : 0;
 }
 
 void MainWindow::minimizeToTray()

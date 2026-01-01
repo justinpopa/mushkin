@@ -1,5 +1,6 @@
 #include "output_view.h"
 #include "../../text/action.h"
+#include "../../utils/font_utils.h"
 #include "../../world/color_utils.h"
 #include "../../world/miniwindow.h"
 #include "../automation/plugin.h"
@@ -47,16 +48,17 @@ OutputView::OutputView(WorldDocument* doc, QWidget* parent)
       m_visibleLines(0), m_selectionActive(false), m_selectionStartLine(-1),
       m_selectionStartChar(-1), m_selectionEndLine(-1), m_selectionEndChar(-1),
       m_mouseDownButton(Qt::NoButton), m_freeze(false), m_frozenLineCount(0),
-      m_lastAlertTime(0)
+      m_hasBeenShown(false), m_lastAlertTime(0)
 {
     // Set up fixed-width font for MUD display
     // Read font from WorldDocument if available, otherwise use default
+    // Use createScaledFont for cross-platform DPI-consistent sizing
     if (m_doc && !m_doc->m_font_name.isEmpty()) {
-        m_font = QFont(m_doc->m_font_name, m_doc->m_font_height);
+        m_font = createScaledFont(m_doc->m_font_name, m_doc->m_font_height);
         qCDebug(lcUI) << "OutputView: Using font from WorldDocument:" << m_doc->m_font_name
                       << m_doc->m_font_height;
     } else {
-        m_font = QFont("Courier New", 10);
+        m_font = createScaledFont("Courier New", 10);
         qCDebug(lcUI) << "OutputView: Using default font (Courier New, 10)";
     }
     m_font.setFixedPitch(true);
@@ -129,8 +131,10 @@ void OutputView::setOutputFont(const QFont& font)
  */
 void OutputView::calculateMetrics()
 {
-    // Use widget as paint device for DPI-aware font metrics (fixes HiDPI displays)
-    QFontMetrics fm(m_font, const_cast<OutputView*>(this));
+    // Get font metrics - use simple constructor for consistent logical pixel measurements
+    // Note: Previously used widget as paint device, but that caused issues on HiDPI displays
+    // where charWidth was returned in physical pixels but viewWidth in logical pixels
+    QFontMetrics fm(m_font);
     m_lineHeight = fm.height();
     m_charWidth = fm.horizontalAdvance('M'); // Width of average character
 
@@ -163,6 +167,33 @@ void OutputView::calculateMetrics()
     qCDebug(lcUI) << "Metrics calculated - height:" << height()
                   << "haveTextRect:" << (m_doc && haveTextRectangle())
                   << "lineHeight:" << m_lineHeight << "visibleLines:" << m_visibleLines;
+
+    // Auto-wrap to window width: dynamically adjust wrap column based on view width
+    // This matches original MUSHclient's AutoWrapWindowWidth() in mushview.cpp
+    //
+    // IMPORTANT: Only apply auto-wrap after the widget has been shown, to prevent
+    // wrapping at small startup sizes before the window reaches its intended size.
+    if (m_doc && m_doc->m_bAutoWrapWindowWidth && m_charWidth > 0 && m_hasBeenShown) {
+        // Calculate how many characters fit in the view width
+        int viewWidth = width();
+        if (haveTextRectangle()) {
+            viewWidth = getTextRectangle().width();
+        }
+
+        // Account for pixel offset (scrollbar margin)
+        int usableWidth = viewWidth - m_doc->m_iPixelOffset;
+        int newWrapColumn = usableWidth / m_charWidth;
+
+        // Clamp to reasonable range (20 to MAX_LINE_WIDTH=10000)
+        newWrapColumn = qBound(20, newWrapColumn, 10000);
+
+        // Only update if changed significantly (avoid constant updates from rounding)
+        if (m_doc->m_nWrapColumn != static_cast<quint16>(newWrapColumn)) {
+            m_doc->m_nWrapColumn = static_cast<quint16>(newWrapColumn);
+            qCDebug(lcUI) << "Auto-wrap: updated wrap column to" << newWrapColumn
+                          << "(width:" << viewWidth << "charWidth:" << m_charWidth << ")";
+        }
+    }
 }
 
 /**
@@ -179,6 +210,25 @@ void OutputView::resizeEvent(QResizeEvent* event)
     // Notify plugins of resize
     if (m_doc) {
         m_doc->SendToAllPluginCallbacks(ON_PLUGIN_WORLD_OUTPUT_RESIZED);
+    }
+}
+
+/**
+ * showEvent - Handle widget first shown
+ *
+ * Sets m_hasBeenShown flag so auto_wrap_window_width can take effect.
+ * This prevents wrapping at small startup sizes before the window reaches
+ * its intended size from the window manager/layout system.
+ */
+void OutputView::showEvent(QShowEvent* event)
+{
+    QWidget::showEvent(event);
+
+    if (!m_hasBeenShown) {
+        m_hasBeenShown = true;
+        // Now that we're shown at proper size, recalculate metrics
+        // which will apply auto_wrap_window_width if enabled
+        calculateMetrics();
     }
 }
 

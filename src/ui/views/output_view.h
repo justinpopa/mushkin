@@ -239,6 +239,7 @@ class OutputView : public QWidget, public IOutputView {
     void mouseDoubleClickEvent(QMouseEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
     void contextMenuEvent(QContextMenuEvent* event) override;
+    void showEvent(QShowEvent* event) override;
 
   private slots:
     /**
@@ -460,6 +461,9 @@ class OutputView : public QWidget, public IOutputView {
     // Freeze/Pause State
     bool m_freeze;         // Output is frozen (no auto-scroll)
     int m_frozenLineCount; // Lines received while frozen
+
+    // Widget shown state (for auto-wrap timing)
+    bool m_hasBeenShown;   // True after first showEvent (window fully sized)
 
     // Alert throttling (like original MUSHclient - max once per second)
     qint64 m_lastAlertTime; // Last time we flashed the icon (ms since epoch)

@@ -1,4 +1,5 @@
 #include "miniwindow.h"
+#include "../utils/font_utils.h"
 #include "../world/world_document.h"
 #include "color_utils.h"
 #include <QColor>
@@ -952,18 +953,8 @@ qint32 MiniWindow::Gradient(qint32 left, qint32 top, qint32 right, qint32 bottom
 qint32 MiniWindow::Font(const QString& fontId, const QString& fontName, double size, bool bold,
                         bool italic, bool underline, bool strikeout)
 {
-    QFont font(fontName);
-
-#ifdef Q_OS_MACOS
-    // macOS uses 72 DPI logical, but MUSHclient plugins expect Windows GDI sizing (96 DPI)
-    // Convert point size to pixel size: pointSize * 96 / 72 = pixelSize
-    int pixelSize = qRound(size * 96.0 / 72.0);
-    font.setPixelSize(pixelSize);
-#else
-    // Windows/Linux: use point size directly, Qt handles DPI conversion
-    // This respects system DPI scaling settings
-    font.setPointSizeF(size);
-#endif
+    // Use createScaledFontF for cross-platform DPI-consistent sizing
+    QFont font = createScaledFontF(fontName, size);
 
     font.setBold(bold);
     font.setItalic(italic);
