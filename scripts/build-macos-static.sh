@@ -52,11 +52,13 @@ check_prerequisites() {
 
     # Check for full Xcode (not just command line tools)
     # Building Qt from source requires the Metal compiler which is only in full Xcode
-    if ! xcode-select -p 2>/dev/null | grep -q "Xcode.app"; then
+    # Note: GitHub runners use paths like /Applications/Xcode_16.4.app/Contents/Developer
+    local dev_path=$(xcode-select -p 2>/dev/null || echo '')
+    if [[ ! "$dev_path" =~ Xcode.*\.app ]]; then
         echo_error "Full Xcode installation required (not just Command Line Tools)"
         echo_error "Building Qt from source requires the Metal shader compiler."
         echo_error ""
-        echo_error "Current developer path: $(xcode-select -p 2>/dev/null || echo 'not set')"
+        echo_error "Current developer path: ${dev_path:-not set}"
         echo_error ""
         echo_error "To fix:"
         echo_error "  1. Install Xcode from the App Store"
