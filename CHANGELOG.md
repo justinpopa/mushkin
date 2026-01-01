@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/justinpopa/mushkin/compare/v0.3.0...v0.3.1) (2026-01-01)
+
+
+### Bug Fixes
+
+* improve compatibility with original MUSHclient behavior ([#43](https://github.com/justinpopa/mushkin/issues/43)) ([1d9f995](https://github.com/justinpopa/mushkin/commit/1d9f995ecf07dcef362e23b2c8d06964e2a5459c))
+
 ## [0.3.0](https://github.com/justinpopa/mushkin/compare/v0.2.1...v0.3.0) (2025-12-31)
 
 
