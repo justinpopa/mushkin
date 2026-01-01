@@ -42,13 +42,21 @@ void OutputPage::setupUi()
     QGroupBox* displayGroup = new QGroupBox(tr("Display Options"), this);
     QVBoxLayout* displayLayout = new QVBoxLayout(displayGroup);
 
-    // Wrap column
+    // Word wrap checkbox (m_wrap - enable word-wrap at spaces)
+    m_wordWrapCheck = new QCheckBox(tr("Word wrap at spaces"), this);
+    m_wordWrapCheck->setToolTip(
+        tr("When enabled, lines wrap at the last space before the wrap column.\n"
+           "When disabled, lines wrap exactly at the column boundary."));
+    connect(m_wordWrapCheck, &QCheckBox::toggled, this, &OutputPage::markChanged);
+    displayLayout->addWidget(m_wordWrapCheck);
+
+    // Wrap column (m_nWrapColumn - the column width)
     QHBoxLayout* wrapLayout = new QHBoxLayout();
     wrapLayout->addWidget(new QLabel(tr("Wrap at column:"), this));
     m_wrapColumnSpin = new QSpinBox(this);
     m_wrapColumnSpin->setRange(40, 500);
     m_wrapColumnSpin->setValue(80);
-    m_wrapColumnSpin->setToolTip(tr("Word wrap column (0 = no wrap)"));
+    m_wrapColumnSpin->setToolTip(tr("Column at which lines are wrapped"));
     connect(m_wrapColumnSpin, QOverload<int>::of(&QSpinBox::valueChanged), this,
             &OutputPage::markChanged);
     wrapLayout->addWidget(m_wrapColumnSpin);
@@ -122,6 +130,7 @@ void OutputPage::loadSettings()
         return;
 
     // Block signals while loading
+    m_wordWrapCheck->blockSignals(true);
     m_wrapColumnSpin->blockSignals(true);
     m_showBoldCheck->blockSignals(true);
     m_showItalicCheck->blockSignals(true);
@@ -136,6 +145,7 @@ void OutputPage::loadSettings()
         QString("%1, %2pt").arg(m_outputFont.family()).arg(m_outputFont.pointSize()));
 
     // Load wrap settings
+    m_wordWrapCheck->setChecked(m_doc->m_wrap != 0);
     m_wrapColumnSpin->setValue(m_doc->m_nWrapColumn);
 
     // Load text style options
@@ -155,6 +165,7 @@ void OutputPage::loadSettings()
     m_flashIconCheck->setChecked(m_doc->m_bFlashIcon != 0);
 
     // Unblock signals
+    m_wordWrapCheck->blockSignals(false);
     m_wrapColumnSpin->blockSignals(false);
     m_showBoldCheck->blockSignals(false);
     m_showItalicCheck->blockSignals(false);
@@ -175,6 +186,7 @@ void OutputPage::saveSettings()
     m_doc->m_font_weight = m_outputFont.weight();
 
     // Save wrap settings
+    m_doc->m_wrap = m_wordWrapCheck->isChecked() ? 1 : 0;
     m_doc->m_nWrapColumn = m_wrapColumnSpin->value();
 
     // Save text style options

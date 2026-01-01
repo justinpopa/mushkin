@@ -1434,27 +1434,56 @@ void MainWindow::updateToolbarIcons()
 void MainWindow::createStatusBar()
 {
     // Create permanent status indicators (right side of status bar)
+    // Order matches original MUSHclient: Freeze | World Name | Time | Lines | Log
+
+    // Freeze indicator - shows CLOSED/PAUSE/MORE
+    m_freezeIndicator = new QLabel(this);
+    m_freezeIndicator->setMinimumWidth(50);
+    m_freezeIndicator->setAlignment(Qt::AlignCenter);
+    m_freezeIndicator->setFrameStyle(QFrame::Panel | QFrame::Sunken);
+    m_freezeIndicator->setToolTip("Double-click to toggle freeze");
+    m_freezeIndicator->installEventFilter(this);
+    statusBar()->addPermanentWidget(m_freezeIndicator);
+
+    // World name indicator
+    m_worldNameIndicator = new QLabel(this);
+    m_worldNameIndicator->setMinimumWidth(120);
+    m_worldNameIndicator->setAlignment(Qt::AlignCenter);
+    m_worldNameIndicator->setFrameStyle(QFrame::Panel | QFrame::Sunken);
+    m_worldNameIndicator->setToolTip("Click to switch worlds");
+    m_worldNameIndicator->installEventFilter(this);
+    statusBar()->addPermanentWidget(m_worldNameIndicator);
+
+    // Time indicator - shows connected time (H:MM:SS)
+    m_timeIndicator = new QLabel(this);
+    m_timeIndicator->setMinimumWidth(70);
+    m_timeIndicator->setAlignment(Qt::AlignCenter);
+    m_timeIndicator->setFrameStyle(QFrame::Panel | QFrame::Sunken);
+    m_timeIndicator->setToolTip("Double-click to reset connected time");
+    m_timeIndicator->installEventFilter(this);
+    statusBar()->addPermanentWidget(m_timeIndicator);
 
     // Lines indicator - shows line count
     m_linesIndicator = new QLabel(this);
     m_linesIndicator->setMinimumWidth(80);
     m_linesIndicator->setAlignment(Qt::AlignCenter);
     m_linesIndicator->setFrameStyle(QFrame::Panel | QFrame::Sunken);
+    m_linesIndicator->setToolTip("Double-click to go to line");
+    m_linesIndicator->installEventFilter(this);
     statusBar()->addPermanentWidget(m_linesIndicator);
 
-    // Connection indicator - shows connected/closed status
-    m_connectionIndicator = new QLabel(this);
-    m_connectionIndicator->setMinimumWidth(80);
-    m_connectionIndicator->setAlignment(Qt::AlignCenter);
-    m_connectionIndicator->setFrameStyle(QFrame::Panel | QFrame::Sunken);
-    statusBar()->addPermanentWidget(m_connectionIndicator);
+    // Log indicator - shows LOG when logging is active
+    m_logIndicator = new QLabel(this);
+    m_logIndicator->setMinimumWidth(40);
+    m_logIndicator->setAlignment(Qt::AlignCenter);
+    m_logIndicator->setFrameStyle(QFrame::Panel | QFrame::Sunken);
+    m_logIndicator->setToolTip("Logging status");
+    statusBar()->addPermanentWidget(m_logIndicator);
 
-    // Freeze indicator - shows PAUSE/MORE when output is frozen
-    m_freezeIndicator = new QLabel(this);
-    m_freezeIndicator->setMinimumWidth(60);
-    m_freezeIndicator->setAlignment(Qt::AlignCenter);
-    m_freezeIndicator->setFrameStyle(QFrame::Panel | QFrame::Sunken);
-    statusBar()->addPermanentWidget(m_freezeIndicator);
+    // Timer for updating the connected time indicator
+    m_statusBarTimer = new QTimer(this);
+    connect(m_statusBarTimer, &QTimer::timeout, this, &MainWindow::updateTimeIndicator);
+    m_statusBarTimer->start(1000);
 
     // Initial status message
     statusBar()->showMessage("Ready");
@@ -1576,6 +1605,32 @@ void MainWindow::changeEvent(QEvent* event)
         }
     }
     QMainWindow::changeEvent(event);
+}
+
+bool MainWindow::eventFilter(QObject* watched, QEvent* event)
+{
+    // Handle double-clicks on status bar indicators
+    if (event->type() == QEvent::MouseButtonDblClick) {
+        if (watched == m_freezeIndicator) {
+            onFreezeIndicatorClicked();
+            return true;
+        } else if (watched == m_timeIndicator) {
+            onTimeIndicatorClicked();
+            return true;
+        } else if (watched == m_linesIndicator) {
+            onLinesIndicatorClicked();
+            return true;
+        }
+    }
+    // Handle single clicks on world name indicator
+    else if (event->type() == QEvent::MouseButtonPress) {
+        if (watched == m_worldNameIndicator) {
+            onWorldNameIndicatorClicked();
+            return true;
+        }
+    }
+
+    return QMainWindow::eventFilter(watched, event);
 }
 
 void MainWindow::setupSystemTray()
@@ -1771,6 +1826,14 @@ void MainWindow::updateMenus()
 
     // Update Auto-Say checked state
     m_autoSayAction->setChecked(isAutoSayEnabled);
+
+    // Update Wrap Output checked state from document's m_wrap setting
+    if (hasActiveWorld) {
+        WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
+        if (worldWidget && worldWidget->document()) {
+            m_wrapOutputAction->setChecked(worldWidget->document()->m_wrap != 0);
+        }
+    }
 
     // Configure Triggers/Aliases/Timers are always enabled (matches original MUSHclient)
     // This also fixes the macOS native menu bar bug where disabled items stay disabled
@@ -2011,8 +2074,6 @@ void MainWindow::newWorld()
 
     // Update menus
     updateMenus();
-
-    statusBar()->showMessage("New world created", 2000);
 }
 
 void MainWindow::openWorld()
@@ -2231,8 +2292,6 @@ void MainWindow::worldProperties()
     UnifiedPreferencesDialog dialog(worldWidget->document(),
                                      UnifiedPreferencesDialog::Page::Connection, this);
     dialog.exec();
-
-    statusBar()->showMessage("World properties updated", 2000);
 }
 
 void MainWindow::globalPreferences()
@@ -2253,7 +2312,6 @@ void MainWindow::toggleLogSession()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -2271,11 +2329,8 @@ void MainWindow::toggleLogSession()
     if (doc->IsLogOpen()) {
         // Close the log
         qint32 result = doc->CloseLog();
-        if (result == 0) {
-            statusBar()->showMessage("Log session closed", 2000);
-        } else {
+        if (result != 0) {
             QMessageBox::warning(this, "Log Error", "Failed to close log file.");
-            statusBar()->showMessage("Failed to close log", 2000);
         }
     } else {
         // Open the log - prompt for filename
@@ -2334,8 +2389,6 @@ void MainWindow::undo()
         textEdit->undo();
     } else if (auto* lineEdit = qobject_cast<QLineEdit*>(focusWidget)) {
         lineEdit->undo();
-    } else {
-        statusBar()->showMessage("Undo not available", 2000);
     }
 }
 
@@ -2347,8 +2400,6 @@ void MainWindow::cut()
         textEdit->cut();
     } else if (auto* lineEdit = qobject_cast<QLineEdit*>(focusWidget)) {
         lineEdit->cut();
-    } else {
-        statusBar()->showMessage("Cut not available", 2000);
     }
 }
 
@@ -2356,7 +2407,6 @@ void MainWindow::copy()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -2369,7 +2419,6 @@ void MainWindow::copy()
     OutputView* outputView = worldWidget->outputView();
     if (outputView) {
         outputView->copyToClipboard();
-        statusBar()->showMessage("Copied to clipboard", 2000);
     }
 }
 
@@ -2377,7 +2426,6 @@ void MainWindow::copyAsHtml()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -2390,7 +2438,6 @@ void MainWindow::copyAsHtml()
     OutputView* outputView = worldWidget->outputView();
     if (outputView) {
         outputView->copyAsHtml();
-        statusBar()->showMessage("Copied as HTML to clipboard", 2000);
     }
 }
 
@@ -2398,7 +2445,6 @@ void MainWindow::paste()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -2416,7 +2462,6 @@ void MainWindow::paste()
         InputView* inputView = worldWidget->inputView();
         if (inputView) {
             inputView->paste();
-            statusBar()->showMessage("Pasted from clipboard", 2000);
         }
     }
 }
@@ -2425,7 +2470,6 @@ void MainWindow::pasteToWorld()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -2441,8 +2485,7 @@ void MainWindow::pasteToWorld()
     QString text = clipboard->text();
 
     if (text.isEmpty()) {
-        statusBar()->showMessage("Clipboard is empty", 2000);
-        return;
+            return;
     }
 
     // Get settings from confirm dialog or use defaults
@@ -2473,8 +2516,7 @@ void MainWindow::pasteToWorld()
         dlg.setEcho(echo);
 
         if (dlg.exec() != QDialog::Accepted) {
-            statusBar()->showMessage("Paste cancelled", 2000);
-            return;
+                return;
         }
 
         // Use values from dialog (user may have modified them)
@@ -2511,9 +2553,7 @@ void MainWindow::pasteToWorld()
     progressDlg.close();
 
     if (completed) {
-        statusBar()->showMessage("Pasted to MUD", 2000);
     } else {
-        statusBar()->showMessage("Paste cancelled", 2000);
     }
 }
 
@@ -2521,7 +2561,6 @@ void MainWindow::selectAll()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -2534,32 +2573,27 @@ void MainWindow::selectAll()
     OutputView* outputView = worldWidget->outputView();
     if (outputView) {
         outputView->selectAll();
-        statusBar()->showMessage("All text selected", 2000);
     }
 }
 
 void MainWindow::spellCheck()
 {
     // TODO: Implement spell check functionality
-    statusBar()->showMessage("Spell check not yet implemented", 2000);
 }
 
 void MainWindow::reloadNamesFile()
 {
     // TODO: Implement reload names file functionality
-    statusBar()->showMessage("Reload names file not yet implemented", 2000);
 }
 
 void MainWindow::openNotepad()
 {
     // TODO: Implement open notepad functionality
-    statusBar()->showMessage("Notepad not yet implemented", 2000);
 }
 
 void MainWindow::flipToNotepad()
 {
     // TODO: Implement flip to notepad functionality
-    statusBar()->showMessage("Flip to notepad not yet implemented", 2000);
 }
 
 void MainWindow::colourPicker()
@@ -2573,22 +2607,18 @@ void MainWindow::colourPicker()
                                 .arg(color.blue())
                                 .arg(color.name());
         QGuiApplication::clipboard()->setText(colorInfo);
-        statusBar()->showMessage(
-            QString("Color %1 copied to clipboard").arg(color.name()), 2000);
     }
 }
 
 void MainWindow::debugPackets()
 {
     // TODO: Implement debug packets window
-    statusBar()->showMessage("Debug packets not yet implemented", 2000);
 }
 
 void MainWindow::find()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -2659,7 +2689,6 @@ void MainWindow::recallLastWord()
 {
     // Recall last word from input - essentially undo last word deletion
     // TODO: Implement recall last word functionality
-    statusBar()->showMessage("Recall last word not yet implemented", 2000);
 }
 
 void MainWindow::generateCharacterName()
@@ -2679,7 +2708,6 @@ void MainWindow::activateInputArea()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -2696,7 +2724,6 @@ void MainWindow::previousCommand()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -2712,7 +2739,6 @@ void MainWindow::nextCommand()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -2728,7 +2754,6 @@ void MainWindow::repeatLastCommand()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -2738,14 +2763,12 @@ void MainWindow::repeatLastCommand()
     }
 
     worldWidget->repeatLastCommand();
-    statusBar()->showMessage("Repeated last command", 2000);
 }
 
 void MainWindow::clearCommandHistory()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -2761,7 +2784,6 @@ void MainWindow::clearCommandHistory()
 
     if (reply == QMessageBox::Yes) {
         worldWidget->clearCommandHistory();
-        statusBar()->showMessage("Command history cleared", 2000);
     }
 }
 
@@ -2769,7 +2791,6 @@ void MainWindow::showCommandHistory()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -2782,7 +2803,6 @@ void MainWindow::showCommandHistory()
     CommandHistoryDialog dialog(worldWidget->document(), this);
     dialog.exec();
 
-    statusBar()->showMessage("Command history closed", 2000);
 }
 
 void MainWindow::globalChange()
@@ -2792,7 +2812,6 @@ void MainWindow::globalChange()
 
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -2809,7 +2828,6 @@ void MainWindow::globalChange()
     // Get current text and selection
     QString currentText = inputView->text();
     if (currentText.isEmpty()) {
-        statusBar()->showMessage("No text in command input", 2000);
         return;
     }
 
@@ -2857,7 +2875,6 @@ void MainWindow::globalChange()
     QString newText = textToProcess.replace(findProcessed, replaceProcessed);
 
     if (newText == textToProcess) {
-        statusBar()->showMessage(QString("No replacements made for '%1'").arg(findText), 2000);
         return;
     }
 
@@ -2874,14 +2891,12 @@ void MainWindow::globalChange()
         inputView->textCursor().insertText(newText);
     }
 
-    statusBar()->showMessage("Global change completed", 2000);
 }
 
 void MainWindow::discardQueuedCommands()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -2891,11 +2906,7 @@ void MainWindow::discardQueuedCommands()
     }
 
     WorldDocument* doc = worldWidget->document();
-    qint32 count = doc->DiscardQueue();
-
-    QString message = count > 0 ? QString("Discarded %1 queued command(s)").arg(count)
-                                : "No queued commands to discard";
-    statusBar()->showMessage(message, 2000);
+    doc->DiscardQueue();
 }
 
 void MainWindow::showKeyName()
@@ -2904,7 +2915,6 @@ void MainWindow::showKeyName()
     if (dialog.exec() == QDialog::Accepted) {
         QString keyName = dialog.keyName();
         if (!keyName.isEmpty()) {
-            statusBar()->showMessage(QString("Key: %1").arg(keyName), 3000);
         }
     }
 }
@@ -2914,7 +2924,6 @@ void MainWindow::connectToMud()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -2931,7 +2940,6 @@ void MainWindow::disconnectFromMud()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -2954,8 +2962,6 @@ void MainWindow::toggleAutoConnect()
     db->setPreferenceInt("AutoConnectWorlds", newValue ? 1 : 0);
     m_autoConnectAction->setChecked(newValue);
 
-    QString message = newValue ? "Auto-connect enabled" : "Auto-connect disabled";
-    statusBar()->showMessage(message, 2000);
 }
 
 void MainWindow::toggleReconnectOnDisconnect()
@@ -2968,26 +2974,17 @@ void MainWindow::toggleReconnectOnDisconnect()
     db->setPreferenceInt("ReconnectOnDisconnect", newValue ? 1 : 0);
     m_reconnectOnDisconnectAction->setChecked(newValue);
 
-    QString message =
-        newValue ? "Reconnect on disconnect enabled" : "Reconnect on disconnect disabled";
-    statusBar()->showMessage(message, 2000);
 }
 
 void MainWindow::connectToAllOpenWorlds()
 {
     // Connect to all open but disconnected worlds
-    int connectedCount = 0;
     for (QMdiSubWindow* window : m_mdiArea->subWindowList()) {
         WorldWidget* worldWidget = qobject_cast<WorldWidget*>(window->widget());
         if (worldWidget && !worldWidget->isConnected()) {
             worldWidget->connectToMud();
-            connectedCount++;
         }
     }
-
-    QString message = connectedCount > 0 ? QString("Connecting to %1 world(s)").arg(connectedCount)
-                                         : "No disconnected worlds to connect";
-    statusBar()->showMessage(message, 2000);
 }
 
 void MainWindow::connectToStartupList()
@@ -2997,33 +2994,24 @@ void MainWindow::connectToStartupList()
     QString startupList = db->getPreference("WorldList", "");
 
     if (startupList.isEmpty()) {
-        statusBar()->showMessage("No worlds in startup list", 2000);
         return;
     }
 
     // Split by newlines or semicolons (common separators)
     QStringList worldFiles = startupList.split(QRegularExpression("[\\n;]"), Qt::SkipEmptyParts);
 
-    int openedCount = 0;
     for (const QString& worldFile : worldFiles) {
         QString trimmed = worldFile.trimmed();
         if (!trimmed.isEmpty() && QFile::exists(trimmed)) {
             openWorld(trimmed);
-            openedCount++;
         }
     }
-
-    QString message = openedCount > 0
-                          ? QString("Opened %1 world(s) from startup list").arg(openedCount)
-                          : "No valid worlds in startup list";
-    statusBar()->showMessage(message, 2000);
 }
 
 void MainWindow::reloadScriptFile()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -3043,15 +3031,11 @@ void MainWindow::reloadScriptFile()
             this, "No Script File",
             "No script file is configured for this world.\n\n"
             "To set a script file, go to File → World Properties → Scripting tab.");
-        statusBar()->showMessage("No script file configured", 2000);
         return;
     }
 
     // Reload the script file
     doc->loadScriptFile();
-    statusBar()->showMessage(
-        QString("Script file reloaded: %1").arg(QFileInfo(doc->m_strScriptFilename).fileName()),
-        3000);
 }
 
 /**
@@ -3070,7 +3054,6 @@ void MainWindow::toggleAutoSay()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -3088,15 +3071,12 @@ void MainWindow::toggleAutoSay()
     bool newValue = m_autoSayAction->isChecked();
     doc->m_bEnableAutoSay = newValue ? 1 : 0;
 
-    QString message = newValue ? "Auto-Say mode enabled" : "Auto-Say mode disabled";
-    statusBar()->showMessage(message, 2000);
 }
 
 void MainWindow::toggleWrapOutput()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -3110,20 +3090,10 @@ void MainWindow::toggleWrapOutput()
         return;
     }
 
-    // Toggle wrap setting - 0 means no wrap (very large column), non-zero means wrap
-    bool wrapEnabled = m_wrapOutputAction->isChecked();
-    if (wrapEnabled) {
-        // Restore default wrap column (80 is typical)
-        if (doc->m_nWrapColumn <= 0) {
-            doc->m_nWrapColumn = 80;
-        }
-    } else {
-        // Disable wrapping by setting to 0
-        doc->m_nWrapColumn = 0;
-    }
-
-    QString message = wrapEnabled ? "Line wrapping enabled" : "Line wrapping disabled";
-    statusBar()->showMessage(message, 2000);
+    // Toggle m_wrap (word-wrap at spaces enabled/disabled)
+    // m_wrap is a boolean (0=off, non-zero=on), separate from m_nWrapColumn (the wrap column width)
+    // This matches original MUSHclient behavior from doc.cpp OnGameWraplines()
+    doc->m_wrap = m_wrapOutputAction->isChecked() ? 1 : 0;
 }
 
 void MainWindow::minimizeToTray()
@@ -3142,7 +3112,6 @@ void MainWindow::toggleTrace()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -3160,15 +3129,12 @@ void MainWindow::toggleTrace()
     bool traceEnabled = m_traceAction->isChecked();
     doc->m_bTrace = traceEnabled ? 1 : 0;
 
-    QString message = traceEnabled ? "Script tracing enabled" : "Script tracing disabled";
-    statusBar()->showMessage(message, 2000);
 }
 
 void MainWindow::testTrigger()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -3190,7 +3156,6 @@ void MainWindow::testTrigger()
         if (!testInput.isEmpty()) {
             // Simulate the test input as if received from MUD (processes through triggers)
             doc->simulate(testInput);
-            statusBar()->showMessage("Test input processed through triggers", 2000);
         }
     }
 }
@@ -3199,7 +3164,6 @@ void MainWindow::editScriptFile()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -3219,7 +3183,6 @@ void MainWindow::editScriptFile()
             this, "No Script File",
             "No script file is configured for this world.\n\n"
             "To set a script file, go to File → World Properties → Scripting tab.");
-        statusBar()->showMessage("No script file configured", 2000);
         return;
     }
 
@@ -3231,10 +3194,6 @@ void MainWindow::editScriptFile()
             QString("Could not open script file:\n%1\n\n"
                     "No application is associated with this file type.")
                 .arg(doc->m_strScriptFilename));
-    } else {
-        statusBar()->showMessage(
-            QString("Opening script file: %1").arg(QFileInfo(doc->m_strScriptFilename).fileName()),
-            3000);
     }
 }
 
@@ -3242,7 +3201,6 @@ void MainWindow::resetAllTimers()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -3258,7 +3216,6 @@ void MainWindow::resetAllTimers()
 
     // Reset all timers
     doc->resetAllTimers();
-    statusBar()->showMessage("All timers reset", 2000);
 }
 
 void MainWindow::sendToAllWorlds()
@@ -3296,7 +3253,6 @@ void MainWindow::sendToAllWorlds()
                 openWorlds[i]->sendToMud(text + "\n");
             }
         }
-        statusBar()->showMessage(QString("Sent to %1 world(s)").arg(selectedWorlds.size()), 2000);
     }
 }
 
@@ -3304,7 +3260,6 @@ void MainWindow::doMapperSpecial()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -3327,7 +3282,6 @@ void MainWindow::addMapperComment()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -3347,7 +3301,6 @@ void MainWindow::addMapperComment()
         QString comment = dialog.comment();
         if (!comment.isEmpty()) {
             // TODO: Add comment to current mapper location when mapper is fully implemented
-            statusBar()->showMessage("Mapper comment added (mapper feature pending)", 2000);
         }
     }
 }
@@ -3356,7 +3309,6 @@ void MainWindow::configureTriggers()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -3370,14 +3322,12 @@ void MainWindow::configureTriggers()
                                      UnifiedPreferencesDialog::Page::Triggers, this);
     dialog.exec();
 
-    statusBar()->showMessage("Trigger configuration closed", 2000);
 }
 
 void MainWindow::configureAliases()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -3391,14 +3341,12 @@ void MainWindow::configureAliases()
                                      UnifiedPreferencesDialog::Page::Aliases, this);
     dialog.exec();
 
-    statusBar()->showMessage("Alias configuration closed", 2000);
 }
 
 void MainWindow::configureTimers()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -3412,14 +3360,12 @@ void MainWindow::configureTimers()
                                      UnifiedPreferencesDialog::Page::Timers, this);
     dialog.exec();
 
-    statusBar()->showMessage("Timer configuration closed", 2000);
 }
 
 void MainWindow::configureAll()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -3438,7 +3384,6 @@ void MainWindow::configureConnection()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -3456,7 +3401,6 @@ void MainWindow::configureLogging()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -3474,7 +3418,6 @@ void MainWindow::configureInfo()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -3492,7 +3435,6 @@ void MainWindow::configureOutput()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -3510,7 +3452,6 @@ void MainWindow::configureMxp()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -3528,7 +3469,6 @@ void MainWindow::configureColours()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -3546,7 +3486,6 @@ void MainWindow::configureCommands()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -3564,7 +3503,6 @@ void MainWindow::configureKeypad()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -3582,7 +3520,6 @@ void MainWindow::configureMacros()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -3600,7 +3537,6 @@ void MainWindow::configureAutoSay()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -3618,7 +3554,6 @@ void MainWindow::configurePaste()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -3636,7 +3571,6 @@ void MainWindow::configureScripting()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -3654,7 +3588,6 @@ void MainWindow::configureVariables()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -3672,7 +3605,6 @@ void MainWindow::configurePlugins()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -3685,14 +3617,12 @@ void MainWindow::configurePlugins()
     PluginDialog dialog(worldWidget->document(), this);
     dialog.exec();
 
-    statusBar()->showMessage("Plugin configuration closed", 2000);
 }
 
 void MainWindow::pluginWizard()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -3704,9 +3634,7 @@ void MainWindow::pluginWizard()
     // Open Plugin Wizard
     PluginWizard wizard(worldWidget->document(), this);
     if (wizard.exec() == QDialog::Accepted) {
-        statusBar()->showMessage("Plugin created successfully", 3000);
     } else {
-        statusBar()->showMessage("Plugin wizard cancelled", 2000);
     }
 }
 
@@ -3913,8 +3841,6 @@ void MainWindow::toggleAlwaysOnTop(bool enabled)
     // setWindowFlags hides the window, so we need to show it again
     show();
 
-    QString message = enabled ? "Always on top enabled" : "Always on top disabled";
-    statusBar()->showMessage(message, 2000);
 }
 
 void MainWindow::toggleFullScreen(bool enabled)
@@ -3925,8 +3851,6 @@ void MainWindow::toggleFullScreen(bool enabled)
         showNormal();
     }
 
-    QString message = enabled ? "Full screen mode" : "Windowed mode";
-    statusBar()->showMessage(message, 2000);
 }
 
 void MainWindow::resetToolbars()
@@ -3961,7 +3885,6 @@ void MainWindow::resetToolbars()
     m_activityToolBarAction->setChecked(true);
     m_infoBarAction->setChecked(false);
 
-    statusBar()->showMessage("Toolbars reset to default positions", 2000);
 }
 
 int MainWindow::setToolBarPosition(int which, bool floating, int side, int top, int left)
@@ -4135,7 +4058,6 @@ void MainWindow::saveSelection()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -4183,7 +4105,6 @@ void MainWindow::clearOutput()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -4218,7 +4139,6 @@ void MainWindow::clearOutput()
             outputView->update();
         }
 
-        statusBar()->showMessage("Output cleared", 2000);
     }
 }
 
@@ -4226,7 +4146,6 @@ void MainWindow::recallText()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -4262,15 +4181,12 @@ void MainWindow::recallText()
     doc->SendToNotepad(title, result);
     doc->ActivateNotepad(title);
 
-    statusBar()->showMessage(QString("Recall completed: %1 characters found").arg(result.length()),
-                             3000);
 }
 
 void MainWindow::stopSound()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -4281,14 +4197,12 @@ void MainWindow::stopSound()
 
     // Stop all sounds for this world (buffer 0 = all)
     worldWidget->document()->StopSound(0);
-    statusBar()->showMessage("Sound playback stopped", 2000);
 }
 
 void MainWindow::toggleCommandEcho()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -4306,15 +4220,12 @@ void MainWindow::toggleCommandEcho()
     bool newValue = m_commandEchoAction->isChecked();
     doc->m_display_my_input = newValue ? 1 : 0;
 
-    QString message = newValue ? "Command echo enabled" : "Command echo disabled";
-    statusBar()->showMessage(message, 2000);
 }
 
 void MainWindow::toggleFreezeOutput()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -4326,15 +4237,12 @@ void MainWindow::toggleFreezeOutput()
     bool newValue = m_freezeOutputAction->isChecked();
     worldWidget->outputView()->setFrozen(newValue);
 
-    QString message = newValue ? "Output frozen" : "Output unfrozen";
-    statusBar()->showMessage(message, 2000);
 }
 
 void MainWindow::goToLine()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -4346,7 +4254,6 @@ void MainWindow::goToLine()
     // Get total lines from the world document's line list
     int totalLines = worldWidget->document()->m_lineList.count();
     if (totalLines == 0) {
-        statusBar()->showMessage("No lines in output", 2000);
         return;
     }
 
@@ -4355,7 +4262,6 @@ void MainWindow::goToLine()
         int lineNumber = dlg.lineNumber();
         if (lineNumber > 0 && lineNumber <= totalLines && worldWidget->outputView()) {
             worldWidget->outputView()->scrollToLine(lineNumber - 1); // 0-based index
-            statusBar()->showMessage(QString("Jumped to line %1").arg(lineNumber), 2000);
         }
     }
 }
@@ -4364,7 +4270,6 @@ void MainWindow::goToUrl()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -4375,12 +4280,10 @@ void MainWindow::goToUrl()
 
     QString selection = worldWidget->outputView()->getSelectedText().trimmed();
     if (selection.isEmpty()) {
-        statusBar()->showMessage("No URL selected", 2000);
         return;
     }
 
     if (selection.length() > 512) {
-        statusBar()->showMessage("URL too long", 2000);
         return;
     }
 
@@ -4393,14 +4296,12 @@ void MainWindow::goToUrl()
     }
 
     QDesktopServices::openUrl(QUrl(url));
-    statusBar()->showMessage(QString("Opening URL: %1").arg(selection), 2000);
 }
 
 void MainWindow::sendMailTo()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -4411,7 +4312,6 @@ void MainWindow::sendMailTo()
 
     QString selection = worldWidget->outputView()->getSelectedText().trimmed();
     if (selection.isEmpty()) {
-        statusBar()->showMessage("No email address selected", 2000);
         return;
     }
 
@@ -4422,14 +4322,12 @@ void MainWindow::sendMailTo()
     }
 
     QDesktopServices::openUrl(QUrl("mailto:" + email));
-    statusBar()->showMessage(QString("Opening mail to: %1").arg(email), 2000);
 }
 
 void MainWindow::bookmarkSelection()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -4445,17 +4343,11 @@ void MainWindow::bookmarkSelection()
     }
 
     if (lineIndex < 0 || lineIndex >= worldWidget->document()->m_lineList.count()) {
-        statusBar()->showMessage("No line to bookmark", 2000);
         return;
     }
 
     Line* pLine = worldWidget->document()->m_lineList[lineIndex];
     pLine->flags ^= BOOKMARK; // Toggle bookmark
-
-    QString message = (pLine->flags & BOOKMARK)
-                          ? QString("Line %1 bookmarked").arg(lineIndex + 1)
-                          : QString("Line %1 bookmark removed").arg(lineIndex + 1);
-    statusBar()->showMessage(message, 2000);
     worldWidget->outputView()->update();
 }
 
@@ -4463,7 +4355,6 @@ void MainWindow::goToBookmark()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -4488,14 +4379,11 @@ void MainWindow::goToBookmark()
     do {
         if (lines[current]->flags & BOOKMARK) {
             worldWidget->outputView()->scrollToLine(current);
-            statusBar()->showMessage(QString("Jumped to bookmark at line %1").arg(current + 1),
-                                     2000);
             return;
         }
         current = (current + 1) % lines.count();
     } while (current != searchStart);
 
-    statusBar()->showMessage("No bookmarks found", 2000);
 }
 
 void MainWindow::activityList()
@@ -4514,7 +4402,6 @@ void MainWindow::textAttributes()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -4531,7 +4418,6 @@ void MainWindow::multilineTrigger()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -4741,7 +4627,6 @@ void MainWindow::convertQuoteLines()
 {
     QTextEdit* textEdit = getActiveNotepadTextEdit(m_mdiArea);
     if (!textEdit) {
-        statusBar()->showMessage("No active notepad window", 2000);
         return;
     }
 
@@ -5074,7 +4959,6 @@ void MainWindow::quickConnect()
     QuickConnectDialog dlg(this);
     if (dlg.exec() == QDialog::Accepted) {
         // TODO: Create temporary world and connect with the provided settings
-        statusBar()->showMessage("Quick connect: feature in development", 3000);
     }
 }
 
@@ -5096,7 +4980,6 @@ void MainWindow::importXml()
     ImportXmlDialog dlg(worldWidget->document(), this);
     if (dlg.exec() == QDialog::Accepted) {
         // The ImportXmlDialog handles file selection and import internally
-        statusBar()->showMessage("XML import completed", 3000);
     }
 }
 
@@ -5110,11 +4993,6 @@ void MainWindow::highlightPhrase()
             WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
             if (worldWidget && worldWidget->document()) {
                 // TODO: Apply highlight settings to the world document
-                QString phrase = dlg.text();
-                if (!phrase.isEmpty()) {
-                    statusBar()->showMessage(
-                        QString("Highlight phrase '%1' configured").arg(phrase), 3000);
-                }
             }
         }
     }
@@ -5295,7 +5173,6 @@ void MainWindow::sendFile()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
-        statusBar()->showMessage("No active world", 2000);
         return;
     }
 
@@ -5326,7 +5203,6 @@ void MainWindow::sendFile()
     file.close();
 
     if (text.isEmpty()) {
-        statusBar()->showMessage("File is empty", 2000);
         return;
     }
 
@@ -5360,7 +5236,6 @@ void MainWindow::sendFile()
         dlg.setEcho(echo);
 
         if (dlg.exec() != QDialog::Accepted) {
-            statusBar()->showMessage("Send file cancelled", 2000);
             return;
         }
 
@@ -5402,7 +5277,6 @@ void MainWindow::sendFile()
     if (completed) {
         statusBar()->showMessage(QString("Sent file: %1").arg(shortFileName), 2000);
     } else {
-        statusBar()->showMessage("Send file cancelled", 2000);
     }
 }
 
@@ -5460,64 +5334,72 @@ void MainWindow::updateStatusIndicators()
 
     // Update indicators based on current state
     if (!worldWidget) {
-        // No active world
+        // No active world - clear all indicators
         m_freezeIndicator->setText("");
-        m_connectionIndicator->setText("");
+        m_freezeIndicator->setStyleSheet("");
+        m_worldNameIndicator->setText("");
+        m_timeIndicator->setText("");
         m_linesIndicator->setText("");
+        m_logIndicator->setText("");
         return;
     }
 
-    // Connection indicator
+    // Freeze/Connection indicator (combined like original MUSHclient)
     bool isConnected = worldWidget->isConnected();
-    m_connectionIndicator->setText(isConnected ? "" : "CLOSED");
-
-    // Freeze indicator
-    OutputView* outputView = worldWidget->outputView();
-    if (outputView && outputView->isFrozen()) {
-        int pendingLines = outputView->frozenLineCount();
-        if (pendingLines > 0) {
-            // There are lines waiting - show MORE (inverted style)
-            m_freezeIndicator->setText("MORE");
-            m_freezeIndicator->setStyleSheet(
-                "QLabel { background-color: #000000; color: #FFFFFF; }");
+    if (!isConnected) {
+        m_freezeIndicator->setText("CLOSED");
+        m_freezeIndicator->setStyleSheet("");
+    } else {
+        OutputView* outputView = worldWidget->outputView();
+        if (outputView && outputView->isFrozen()) {
+            if (!outputView->isAtBottom()) {
+                // Frozen and NOT at bottom - show MORE (inverted style)
+                m_freezeIndicator->setText("MORE");
+                m_freezeIndicator->setStyleSheet(
+                    "QLabel { background-color: #000000; color: #FFFFFF; }");
+            } else {
+                // Frozen but at end of buffer - show PAUSE
+                m_freezeIndicator->setText("PAUSE");
+                m_freezeIndicator->setStyleSheet("");
+            }
         } else {
-            // Frozen but at end of buffer - show PAUSE
-            m_freezeIndicator->setText("PAUSE");
+            m_freezeIndicator->setText("");
             m_freezeIndicator->setStyleSheet("");
         }
-    } else {
-        m_freezeIndicator->setText("");
-        m_freezeIndicator->setStyleSheet("");
     }
 
-    // Lines indicator - show line count in output buffer
+    // World name indicator
+    m_worldNameIndicator->setText(worldWidget->worldName());
+
+    // Time indicator
+    updateTimeIndicator();
+
+    // Lines indicator
     if (WorldDocument* doc = worldWidget->document()) {
         int lineCount = doc->m_lineList.count();
         m_linesIndicator->setText(QString("%1 lines").arg(lineCount));
     } else {
         m_linesIndicator->setText("");
     }
+
+    // Log indicator
+    if (WorldDocument* doc = worldWidget->document()) {
+        m_logIndicator->setText(doc->isLogging() ? "LOG" : "");
+    } else {
+        m_logIndicator->setText("");
+    }
 }
 
-void MainWindow::onFreezeStateChanged(bool frozen, int lineCount)
+void MainWindow::onFreezeStateChanged(bool frozen, bool atBottom)
 {
-    Q_UNUSED(frozen);
-    Q_UNUSED(lineCount);
-
     // Update the freeze indicator immediately
     if (!m_trackedWorld) {
         return;
     }
 
-    OutputView* outputView = m_trackedWorld->outputView();
-    if (!outputView) {
-        return;
-    }
-
-    if (outputView->isFrozen()) {
-        int pendingLines = outputView->frozenLineCount();
-        if (pendingLines > 0) {
-            // There are lines waiting - show MORE (inverted style)
+    if (frozen) {
+        if (!atBottom) {
+            // Frozen and NOT at bottom - show MORE (inverted style like original)
             m_freezeIndicator->setText("MORE");
             m_freezeIndicator->setStyleSheet(
                 "QLabel { background-color: #000000; color: #FFFFFF; }");
@@ -5534,8 +5416,87 @@ void MainWindow::onFreezeStateChanged(bool frozen, int lineCount)
 
 void MainWindow::onConnectionStateChanged(bool connected)
 {
-    // Update connection indicator
-    m_connectionIndicator->setText(connected ? "" : "CLOSED");
+    // Update freeze indicator - shows CLOSED when disconnected
+    if (!connected) {
+        m_freezeIndicator->setText("CLOSED");
+        m_freezeIndicator->setStyleSheet("");
+    } else {
+        // Let onFreezeStateChanged handle the rest when connected
+        if (m_trackedWorld) {
+            if (OutputView* outputView = m_trackedWorld->outputView()) {
+                onFreezeStateChanged(outputView->isFrozen(), outputView->isAtBottom());
+            }
+        }
+    }
+}
+
+void MainWindow::updateTimeIndicator()
+{
+    if (!m_trackedWorld) {
+        m_timeIndicator->setText("");
+        return;
+    }
+
+    WorldDocument* doc = m_trackedWorld->document();
+    if (!doc) {
+        m_timeIndicator->setText("");
+        return;
+    }
+
+    qint64 secs = doc->connectedTime();
+    if (secs < 0) {
+        m_timeIndicator->setText("");
+        return;
+    }
+
+    // Format as H:MM:SS (matching original MUSHclient)
+    int hours = secs / 3600;
+    int mins = (secs % 3600) / 60;
+    int s = secs % 60;
+    m_timeIndicator->setText(QString("%1:%2:%3")
+                                 .arg(hours)
+                                 .arg(mins, 2, 10, QChar('0'))
+                                 .arg(s, 2, 10, QChar('0')));
+}
+
+void MainWindow::onFreezeIndicatorClicked()
+{
+    // Toggle freeze on double-click
+    if (!m_trackedWorld) {
+        return;
+    }
+
+    OutputView* outputView = m_trackedWorld->outputView();
+    if (outputView) {
+        outputView->setFrozen(!outputView->isFrozen());
+    }
+}
+
+void MainWindow::onTimeIndicatorClicked()
+{
+    // Reset connected time on double-click
+    if (!m_trackedWorld) {
+        return;
+    }
+
+    WorldDocument* doc = m_trackedWorld->document();
+    if (doc) {
+        doc->resetConnectedTime();
+        updateTimeIndicator();
+    }
+}
+
+void MainWindow::onLinesIndicatorClicked()
+{
+    // Open Go To Line dialog on double-click
+    goToLine();
+}
+
+void MainWindow::onWorldNameIndicatorClicked()
+{
+    // Show activity window on click
+    m_activityWindow->show();
+    m_activityWindow->raise();
 }
 
 #ifdef Q_OS_MACOS
