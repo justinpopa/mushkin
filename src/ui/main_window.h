@@ -267,7 +267,7 @@ class MainWindow : public QMainWindow {
 
     // Status bar updates
     void updateStatusIndicators();
-    void onFreezeStateChanged(bool frozen, int lineCount);
+    void onFreezeStateChanged(bool frozen, bool atBottom);
     void onConnectionStateChanged(bool connected);
     void updateTimeIndicator();
 

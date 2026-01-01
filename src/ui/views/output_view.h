@@ -211,13 +211,22 @@ class OutputView : public QWidget, public IOutputView {
         return m_frozenLineCount;
     }
 
+    /**
+     * isAtBottom - Check if scrolled to bottom of buffer
+     *
+     * Used to determine whether to show MORE vs PAUSE in status bar.
+     *
+     * @return true if at bottom, false if scrolled up
+     */
+    bool isAtBottom() const;
+
   signals:
     /**
-     * freezeStateChanged - Emitted when freeze state changes
-     * @param frozen New freeze state
-     * @param lineCount Number of lines buffered while frozen
+     * freezeStateChanged - Emitted when freeze state or scroll position changes
+     * @param frozen Current freeze state
+     * @param atBottom Whether view is scrolled to bottom
      */
-    void freezeStateChanged(bool frozen, int lineCount);
+    void freezeStateChanged(bool frozen, bool atBottom);
 
   protected:
     // Qt event handlers
@@ -280,15 +289,6 @@ class OutputView : public QWidget, public IOutputView {
      * @return QColor for rendering
      */
     QColor ansiToRgb(quint32 color, quint16 flags, bool bold) const;
-
-    /**
-     * isAtBottom - Check if scrolled to bottom of buffer
-     *
-     * Used to determine whether to auto-scroll when new lines arrive.
-     *
-     * @return true if at bottom, false if scrolled up
-     */
-    bool isAtBottom() const;
 
     /**
      * positionToLineChar - Convert pixel position to line/char coordinates
@@ -460,6 +460,9 @@ class OutputView : public QWidget, public IOutputView {
     // Freeze/Pause State
     bool m_freeze;         // Output is frozen (no auto-scroll)
     int m_frozenLineCount; // Lines received while frozen
+
+    // Alert throttling (like original MUSHclient - max once per second)
+    qint64 m_lastAlertTime; // Last time we flashed the icon (ms since epoch)
 
     /**
      * drawImage - Draw an image with specified mode

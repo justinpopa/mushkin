@@ -154,6 +154,64 @@ bool IsArchiveXML(QFile& file)
     return false;
 }
 
+/**
+ * Convert BGR color value to MUSHclient format string
+ *
+ * Original MUSHclient saves colors as:
+ * - Named colors when matching standard Windows color names
+ * - Hex format "#RRGGBB" for other colors
+ *
+ * Note: Colors are stored internally as BGR (Windows COLORREF format)
+ * but hex output should be RGB order for consistency with original.
+ */
+QString bgrToColorString(quint32 bgr)
+{
+    // Extract RGB components from BGR
+    int r = bgr & 0xFF;
+    int g = (bgr >> 8) & 0xFF;
+    int b = (bgr >> 16) & 0xFF;
+
+    // Check for standard Windows color names (case matters for original compatibility)
+    // These are the colors that QColor::setNamedColor() recognizes
+    if (r == 0 && g == 0 && b == 0)
+        return "black";
+    if (r == 255 && g == 255 && b == 255)
+        return "white";
+    if (r == 255 && g == 0 && b == 0)
+        return "red";
+    if (r == 0 && g == 128 && b == 0)
+        return "green";
+    if (r == 0 && g == 0 && b == 255)
+        return "blue";
+    if (r == 255 && g == 255 && b == 0)
+        return "yellow";
+    if (r == 0 && g == 255 && b == 255)
+        return "cyan";
+    if (r == 255 && g == 0 && b == 255)
+        return "magenta";
+    if (r == 128 && g == 0 && b == 0)
+        return "maroon";
+    if (r == 0 && g == 0 && b == 128)
+        return "navy";
+    if (r == 128 && g == 128 && b == 128)
+        return "gray";
+    if (r == 192 && g == 192 && b == 192)
+        return "silver";
+    if (r == 128 && g == 0 && b == 128)
+        return "purple";
+    if (r == 0 && g == 128 && b == 128)
+        return "teal";
+    if (r == 128 && g == 128 && b == 0)
+        return "olive";
+
+    // For other colors, use #RRGGBB hex format
+    return QString("#%1%2%3")
+        .arg(r, 2, 16, QChar('0'))
+        .arg(g, 2, 16, QChar('0'))
+        .arg(b, 2, 16, QChar('0'))
+        .toUpper();
+}
+
 // ============================================================================
 // SAVE WORLD TO XML
 // ============================================================================
@@ -193,12 +251,18 @@ bool SaveWorldXML(WorldDocument* doc, const QString& filename)
     // Write root element
     writer.writeStartElement("muclient");
 
-    // Write world element
+    // Write world element with version headers
     writer.writeStartElement("world");
+
+    // Version headers for compatibility and identification
+    // world_file_version=15 matches original MUSHclient format version
+    writer.writeAttribute("mushkin_version", QCoreApplication::applicationVersion());
+    writer.writeAttribute("world_file_version", "15");
 
     // ========================================================================
     // SAVE NUMERIC OPTIONS
     // ========================================================================
+    // Only save non-default values to match original MUSHclient behavior
 
     for (int i = 0; OptionsTable[i].pName != nullptr; i++) {
         const tConfigurationNumericOption& opt = OptionsTable[i];
@@ -250,16 +314,30 @@ bool SaveWorldXML(WorldDocument* doc, const QString& filename)
         }
 
         // Handle custom color indexing (add 1 when saving)
+        double saveValue = value;
         if (opt.iFlags & OPT_CUSTOM_COLOUR) {
-            value += 1.0;
+            saveValue += 1.0;
+        }
+
+        // Skip if value matches default (like original MUSHclient)
+        double defaultValue = opt.iDefault;
+        if (opt.iFlags & OPT_CUSTOM_COLOUR) {
+            defaultValue += 1.0;
+        }
+        if (saveValue == defaultValue) {
+            continue;
         }
 
         // Write as XML attribute
-        // Boolean values: write as "y" or "n"
         if (opt.iMaximum == 0.0 && opt.iMinimum == 0.0) {
-            writer.writeAttribute(opt.pName, value != 0.0 ? "y" : "n");
+            // Boolean values: write as "y" or "n"
+            writer.writeAttribute(opt.pName, saveValue != 0.0 ? "y" : "n");
+        } else if (opt.iFlags & OPT_RGB_COLOUR) {
+            // RGB colors: write as color name or #RRGGBB hex
+            writer.writeAttribute(opt.pName, bgrToColorString(static_cast<quint32>(value)));
         } else {
-            writer.writeAttribute(opt.pName, QString::number(value, 'g', 15));
+            // Numeric values: write as integer (not float)
+            writer.writeAttribute(opt.pName, QString::number(static_cast<qint64>(saveValue)));
         }
     }
 
@@ -267,6 +345,7 @@ bool SaveWorldXML(WorldDocument* doc, const QString& filename)
     // SAVE STRING OPTIONS (ATTRIBUTES FIRST)
     // ========================================================================
     // Important: All attributes must be written before any child elements!
+    // Only save non-default values to match original MUSHclient behavior
 
     // First pass: Write single-line string options as attributes
     for (int i = 0; AlphaOptionsTable[i].pName != nullptr; i++) {
@@ -282,6 +361,11 @@ bool SaveWorldXML(WorldDocument* doc, const QString& filename)
 
         // Skip multi-line options in this pass
         if ((opt.iFlags & OPT_MULTLINE) || value.contains('\n')) {
+            continue;
+        }
+
+        // Skip if value matches default (like original MUSHclient)
+        if (value == QString(opt.sDefault)) {
             continue;
         }
 
@@ -311,6 +395,11 @@ bool SaveWorldXML(WorldDocument* doc, const QString& filename)
 
         // Only process multi-line options in this pass
         if (!((opt.iFlags & OPT_MULTLINE) || value.contains('\n'))) {
+            continue;
+        }
+
+        // Skip if value matches default (like original MUSHclient)
+        if (value == QString(opt.sDefault)) {
             continue;
         }
 
@@ -498,6 +587,11 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
                             value = color.red() | (color.green() << 8) | (color.blue() << 16);
                         }
                         // If invalid, value stays 0 and will be skipped below
+                    } else {
+                        // Mask off alpha byte - old saves may have ARGB format (0xFFRRGGBB)
+                        // but we only want 24-bit BGR color (0x00BBGGRR)
+                        quint32 colorVal = static_cast<quint32>(value);
+                        value = colorVal & 0x00FFFFFF;
                     }
                 } else {
                     value = attrValue.toDouble();

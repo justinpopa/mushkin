@@ -5352,12 +5352,13 @@ void MainWindow::updateStatusIndicators()
     } else {
         OutputView* outputView = worldWidget->outputView();
         if (outputView && outputView->isFrozen()) {
-            int pendingLines = outputView->frozenLineCount();
-            if (pendingLines > 0) {
+            if (!outputView->isAtBottom()) {
+                // Frozen and NOT at bottom - show MORE (inverted style)
                 m_freezeIndicator->setText("MORE");
                 m_freezeIndicator->setStyleSheet(
                     "QLabel { background-color: #000000; color: #FFFFFF; }");
             } else {
+                // Frozen but at end of buffer - show PAUSE
                 m_freezeIndicator->setText("PAUSE");
                 m_freezeIndicator->setStyleSheet("");
             }
@@ -5389,25 +5390,16 @@ void MainWindow::updateStatusIndicators()
     }
 }
 
-void MainWindow::onFreezeStateChanged(bool frozen, int lineCount)
+void MainWindow::onFreezeStateChanged(bool frozen, bool atBottom)
 {
-    Q_UNUSED(frozen);
-    Q_UNUSED(lineCount);
-
     // Update the freeze indicator immediately
     if (!m_trackedWorld) {
         return;
     }
 
-    OutputView* outputView = m_trackedWorld->outputView();
-    if (!outputView) {
-        return;
-    }
-
-    if (outputView->isFrozen()) {
-        int pendingLines = outputView->frozenLineCount();
-        if (pendingLines > 0) {
-            // There are lines waiting - show MORE (inverted style)
+    if (frozen) {
+        if (!atBottom) {
+            // Frozen and NOT at bottom - show MORE (inverted style like original)
             m_freezeIndicator->setText("MORE");
             m_freezeIndicator->setStyleSheet(
                 "QLabel { background-color: #000000; color: #FFFFFF; }");
@@ -5432,7 +5424,7 @@ void MainWindow::onConnectionStateChanged(bool connected)
         // Let onFreezeStateChanged handle the rest when connected
         if (m_trackedWorld) {
             if (OutputView* outputView = m_trackedWorld->outputView()) {
-                onFreezeStateChanged(outputView->isFrozen(), outputView->frozenLineCount());
+                onFreezeStateChanged(outputView->isFrozen(), outputView->isAtBottom());
             }
         }
     }

@@ -87,9 +87,10 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     initializeColors();
 
     // ========== Initialize input colors and font ==========
-    m_input_text_colour = qRgb(0, 0, 0);             // Black text
-    m_input_background_colour = qRgb(255, 255, 255); // White background
-    m_input_font_height = 10;
+    // Colors are stored in BGR format (Windows COLORREF: 0x00BBGGRR)
+    m_input_text_colour = BGR(0, 0, 0);              // Black text
+    m_input_background_colour = BGR(255, 255, 255);  // White background
+    m_input_font_height = 12;
     m_input_font_name = "Courier New";
     m_input_font_italic = 0;
     m_input_font_weight = 400; // FW_NORMAL
@@ -117,7 +118,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_echo_colour = 65535; // SAMECOLOUR
     m_bEscapeDeletesInput = 0;
     m_bArrowsChangeHistory = 1;
-    m_bConfirmOnPaste = 0;
+    m_bConfirmOnPaste = 1;              // Default: true (like original)
 
     // ========== Initialize command history ==========
     m_commandHistory.clear();
@@ -193,7 +194,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_strWorldLoseFocus = QString();
 
     // ========== Initialize MXP ==========
-    m_iUseMXP = eMXP_Off;
+    m_iUseMXP = 2; // eOnCommandMXP - Default: on command (like original MUSHclient)
     m_iMXPdebugLevel = 0;
     m_strOnMXP_Start = QString();
     m_strOnMXP_Stop = QString();
@@ -203,23 +204,23 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_strOnMXP_SetVariable = QString();
 
     // ========== Initialize hyperlinks ==========
-    m_iHyperlinkColour = BGR(0, 0, 255); // Blue
+    m_iHyperlinkColour = BGR(255, 128, 0); // Light blue - RGB(0, 128, 255) like original
 
     // ========== Initialize misc flags ==========
-    m_indent_paras = 0;
+    m_indent_paras = 1;                 // Default: true (like original)
     m_bSaveWorldAutomatically = 0;
-    m_bLineInformation = 0;
+    m_bLineInformation = 1;             // Default: true (like original)
     m_bStartPaused = 0;
-    m_iNoteTextColour = 0;
+    m_iNoteTextColour = 4;              // Default: 4 (cyan) like original
     m_bKeepCommandsOnSameLine = 0;
 
     // ========== Initialize auto-say ==========
-    m_strAutoSayString = QString();
+    m_strAutoSayString = "say ";        // Default: "say " (like original)
     m_bEnableAutoSay = 0;
     m_bExcludeMacros = 0;
     m_bExcludeNonAlpha = 0;
-    m_strOverridePrefix = QString();
-    m_bConfirmBeforeReplacingTyping = 0;
+    m_strOverridePrefix = "-";          // Default: "-" (like original)
+    m_bConfirmBeforeReplacingTyping = 1; // Default: true (like original)
     m_bReEvaluateAutoSay = 0;
 
     // ========== Initialize Script Variables Collection ==========
@@ -232,25 +233,25 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     }
 
     // ========== Initialize display options (version 9+) ==========
-    m_bShowBold = 1;
+    m_bShowBold = 0;                    // Default: false (like original)
     m_bShowItalic = 1;
     m_bShowUnderline = 1;
     m_bAltArrowRecallsPartial = 0;
-    m_iPixelOffset = 0;
-    m_bAutoFreeze = 0;
+    m_iPixelOffset = 1;                 // Default: 1 (like original)
+    m_bAutoFreeze = 1;                  // Default: true (like original) - auto_pause
     m_bKeepFreezeAtBottom = 0;
     m_bAutoRepeat = 0;
     m_bDisableCompression = 0;
     m_bLowerCaseTabCompletion = 0;
     m_bDoubleClickInserts = 0;
     m_bDoubleClickSends = 0;
-    m_bConfirmOnSend = 0;
+    m_bConfirmOnSend = 1;               // Default: true (like original)
     m_bTranslateGerman = 0;
 
     // ========== Initialize tab completion ==========
     m_strTabCompletionDefaults = QString();
     m_iTabCompletionLines = 200;
-    m_bTabCompletionSpace = 1;
+    m_bTabCompletionSpace = 0;          // Default: false (like original)
     m_strWordDelimiters = "-._~!@#$%^&*()+=[]{}\\|;:'\",<>?/"; // Word delimiters
     m_bTabCompleteFunctions = true; // Show Lua functions in Shift+Tab menu by default
     // m_ExtraShiftTabCompleteItems initialized empty by default
@@ -266,15 +267,16 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_strLogLinePostambleNotes = QString();
 
     // ========== Initialize output line preambles ==========
+    // Colors stored in BGR format (Windows COLORREF)
     m_strOutputLinePreambleOutput = QString();
     m_strOutputLinePreambleInput = QString();
     m_strOutputLinePreambleNotes = QString();
-    m_OutputLinePreambleOutputTextColour = qRgb(192, 192, 192);
-    m_OutputLinePreambleOutputBackColour = qRgb(0, 0, 0);
-    m_OutputLinePreambleInputTextColour = qRgb(192, 192, 192);
-    m_OutputLinePreambleInputBackColour = qRgb(0, 0, 0);
-    m_OutputLinePreambleNotesTextColour = qRgb(192, 192, 192);
-    m_OutputLinePreambleNotesBackColour = qRgb(0, 0, 0);
+    m_OutputLinePreambleOutputTextColour = BGR(255, 255, 255); // White (like original)
+    m_OutputLinePreambleOutputBackColour = BGR(0, 0, 0);       // Black
+    m_OutputLinePreambleInputTextColour = BGR(0, 0, 128);      // Dark red RGB(128,0,0) (like original)
+    m_OutputLinePreambleInputBackColour = BGR(0, 0, 0);        // Black
+    m_OutputLinePreambleNotesTextColour = BGR(255, 0, 0);      // Blue RGB(0,0,255) (like original)
+    m_OutputLinePreambleNotesBackColour = BGR(0, 0, 0);        // Black
 
     // ========== Initialize recall window ==========
     m_strRecallLinePreamble = QString();
@@ -282,7 +284,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     // ========== Initialize paste/file options ==========
     m_bPasteCommentedSoftcode = 0;
     m_bFileCommentedSoftcode = 0;
-    m_bFlashIcon = 1;
+    m_bFlashIcon = 0; // Off by default (like original MUSHclient)
     m_bArrowKeysWrap = 0;
     m_bSpellCheckOnSend = 0;
     m_nPasteDelay = 0;
@@ -295,11 +297,11 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_bUseDefaultOutputFont = 0;
     m_bSaveDeletedCommand = 0;
     m_bTranslateBackslashSequences = 0;
-    m_bEditScriptWithNotepad = 0;
-    m_bWarnIfScriptingInactive = 0;
+    m_bEditScriptWithNotepad = 1;       // Default: true (like original)
+    m_bWarnIfScriptingInactive = 1;     // Default: true (like original)
 
     // ========== Initialize sending options ==========
-    m_bWriteWorldNameToLog = 0;
+    m_bWriteWorldNameToLog = 1;         // Default: true (like original)
     m_bSendEcho = 0;
     m_bPasteEcho = 0;
 
@@ -312,10 +314,10 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_bUseDefaultInputFont = 0;
 
     // ========== Initialize terminal settings ==========
-    m_strTerminalIdentification = "ANSI";
+    m_strTerminalIdentification = "mushkin"; // Identify as Mushkin
 
     // ========== Initialize mapping ==========
-    m_strMappingFailure = QString();
+    m_strMappingFailure = "Alas, you cannot go that way."; // Default like original
     m_bMapFailureRegexp = 0;
 
     // ========== Initialize flag containers ==========

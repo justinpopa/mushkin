@@ -46,7 +46,8 @@ OutputView::OutputView(WorldDocument* doc, QWidget* parent)
     : QWidget(parent), m_doc(doc), m_lineHeight(0), m_charWidth(0), m_scrollPos(0),
       m_visibleLines(0), m_selectionActive(false), m_selectionStartLine(-1),
       m_selectionStartChar(-1), m_selectionEndLine(-1), m_selectionEndChar(-1),
-      m_mouseDownButton(Qt::NoButton), m_freeze(false), m_frozenLineCount(0)
+      m_mouseDownButton(Qt::NoButton), m_freeze(false), m_frozenLineCount(0),
+      m_lastAlertTime(0)
 {
     // Set up fixed-width font for MUD display
     // Read font from WorldDocument if available, otherwise use default
@@ -214,10 +215,15 @@ void OutputView::onNewLinesAdded()
         return;
 
     // Flash taskbar icon if enabled and window is not active
+    // Throttle to max once per second (like original MUSHclient)
     if (m_doc->m_bFlashIcon) {
         QWidget* mainWindow = window();
         if (mainWindow && !mainWindow->isActiveWindow()) {
-            QApplication::alert(mainWindow);
+            qint64 now = QDateTime::currentMSecsSinceEpoch();
+            if (now - m_lastAlertTime >= 1000) { // At least 1 second since last alert
+                QApplication::alert(mainWindow);
+                m_lastAlertTime = now;
+            }
         }
     }
 
@@ -225,7 +231,7 @@ void OutputView::onNewLinesAdded()
     if (m_freeze) {
         // Count the new line (we get called once per line)
         m_frozenLineCount++;
-        emit freezeStateChanged(true, m_frozenLineCount);
+        emit freezeStateChanged(true, isAtBottom());
         // Don't scroll, but still repaint
         update();
         return;
@@ -298,6 +304,9 @@ void OutputView::wheelEvent(QWheelEvent* event)
     // Auto-unfreeze: If we've scrolled to the bottom, unfreeze
     if (m_freeze && m_scrollPos >= maxScroll) {
         setFrozen(false);
+    } else if (m_freeze) {
+        // Emit signal to update MORE/PAUSE status
+        emit freezeStateChanged(true, isAtBottom());
     }
 
     // Trigger repaint
@@ -543,31 +552,6 @@ void OutputView::paintEvent(QPaintEvent* event)
     // Draw foreground image if set (on top of everything)
     if (!m_foregroundImage.isNull()) {
         drawImage(painter, m_foregroundImage, m_doc->m_iForegroundMode);
-    }
-
-    // Draw freeze indicator if frozen
-    if (m_freeze) {
-        // Draw a subtle indicator in the top-right corner
-        QString freezeText = QString("PAUSED (%1)").arg(m_frozenLineCount);
-        QFont indicatorFont = m_font;
-        indicatorFont.setBold(true);
-        painter.setFont(indicatorFont);
-        QFontMetrics fm(indicatorFont);
-
-        int textWidth = fm.horizontalAdvance(freezeText);
-        int textHeight = fm.height();
-        int padding = 4;
-        int margin = 8;
-
-        QRect indicatorRect(width() - textWidth - padding * 2 - margin, margin,
-                            textWidth + padding * 2, textHeight + padding * 2);
-
-        // Semi-transparent background
-        painter.fillRect(indicatorRect, QColor(255, 100, 100, 200));
-
-        // White text
-        painter.setPen(Qt::white);
-        painter.drawText(indicatorRect, Qt::AlignCenter, freezeText);
     }
 }
 
@@ -903,6 +887,12 @@ void OutputView::mouseReleaseEvent(QMouseEvent* event)
         if (m_selectionActive) {
             // Finalize selection (but keep it highlighted)
             m_selectionActive = false;
+
+            // Auto-freeze when selection is made (like original MUSHclient)
+            if (hasSelection() && m_doc && m_doc->m_bAutoFreeze && !m_freeze) {
+                setFrozen(true);
+            }
+
             update();
 
             // Notify plugins that selection has changed
@@ -952,6 +942,9 @@ void OutputView::keyPressEvent(QKeyEvent* event)
         int scrollAmount = qMax(1, m_visibleLines - 2);
         m_scrollPos -= scrollAmount;
         m_scrollPos = qMax(0, m_scrollPos);
+        if (m_freeze) {
+            emit freezeStateChanged(true, isAtBottom());
+        }
         update();
         event->accept();
         return;
@@ -973,6 +966,8 @@ void OutputView::keyPressEvent(QKeyEvent* event)
         // Auto-unfreeze if we've reached the bottom
         if (m_freeze && m_scrollPos >= maxScroll) {
             setFrozen(false);
+        } else if (m_freeze) {
+            emit freezeStateChanged(true, isAtBottom());
         }
 
         update();
@@ -987,6 +982,9 @@ void OutputView::keyPressEvent(QKeyEvent* event)
         }
         // Ctrl+Home: Scroll to top
         m_scrollPos = 0;
+        if (m_freeze) {
+            emit freezeStateChanged(true, isAtBottom());
+        }
         update();
         event->accept();
         return;
@@ -1015,6 +1013,9 @@ void OutputView::keyPressEvent(QKeyEvent* event)
         }
         // Ctrl+Up: Scroll up one line
         m_scrollPos = qMax(0, m_scrollPos - 1);
+        if (m_freeze) {
+            emit freezeStateChanged(true, isAtBottom());
+        }
         update();
         event->accept();
         return;
@@ -1032,6 +1033,8 @@ void OutputView::keyPressEvent(QKeyEvent* event)
         // Auto-unfreeze if we've reached the bottom
         if (m_freeze && m_scrollPos >= maxScroll) {
             setFrozen(false);
+        } else if (m_freeze) {
+            emit freezeStateChanged(true, isAtBottom());
         }
         update();
         event->accept();
@@ -1978,7 +1981,7 @@ void OutputView::setFrozen(bool frozen)
         m_frozenLineCount = 0;
     }
 
-    emit freezeStateChanged(m_freeze, m_frozenLineCount);
+    emit freezeStateChanged(m_freeze, isAtBottom());
     update();
 }
 
