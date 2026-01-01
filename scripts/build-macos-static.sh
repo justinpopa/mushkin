@@ -8,7 +8,7 @@
 # x86_64 on Intel). Homebrew doesn't provide universal dynamic libraries.
 #
 # Prerequisites:
-#   xcode-select --install
+#   Full Xcode (not just command line tools) - required for Qt's Metal shader compiler
 #   brew install cmake ninja pcre luajit sqlite openssl
 #   pip3 install aqtinstall
 #
@@ -49,6 +49,27 @@ NATIVE_ARCH=$(uname -m)
 check_prerequisites() {
     echo_info "Checking prerequisites..."
     local missing=()
+
+    # Check for full Xcode (not just command line tools)
+    # Building Qt from source requires the Metal compiler which is only in full Xcode
+    if ! xcode-select -p 2>/dev/null | grep -q "Xcode.app"; then
+        echo_error "Full Xcode installation required (not just Command Line Tools)"
+        echo_error "Building Qt from source requires the Metal shader compiler."
+        echo_error ""
+        echo_error "Current developer path: $(xcode-select -p 2>/dev/null || echo 'not set')"
+        echo_error ""
+        echo_error "To fix:"
+        echo_error "  1. Install Xcode from the App Store"
+        echo_error "  2. Run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer"
+        echo_error "  3. Accept license: sudo xcodebuild -license accept"
+        exit 1
+    fi
+
+    # Verify Metal compiler is available
+    if ! xcrun -f metal &>/dev/null; then
+        echo_error "Metal compiler not found. Ensure Xcode is properly installed."
+        exit 1
+    fi
 
     command -v cmake &>/dev/null || missing+=("cmake")
     command -v ninja &>/dev/null || missing+=("ninja")

@@ -8,117 +8,199 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  QT_VERSION: "6.9.3"
-
 jobs:
-  build:
-    name: Build ${{ matrix.os }}
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: Linux
-            runner: ubuntu-latest
-          - os: macOS
-            runner: macos-latest
-          - os: Windows
-            runner: windows-latest
+  version:
+    name: Get Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
+      - name: Get base version from release-please manifest
+        id: version
+        run: |
+          base_version=$(jq -r '.["."]' .release-please-manifest.json)
+          echo "version=${base_version}-pr-${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+
+  build-macos:
+    name: Build macOS
+    runs-on: macos-latest
+    needs: version
+    timeout-minutes: 90
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      # ===== Linux =====
-      - name: Install dependencies (Linux)
-        if: matrix.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential cmake ninja-build \
-            libgl1-mesa-dev libxkbcommon-dev \
-            libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 \
-            libluajit-5.1-dev libpcre3-dev libsqlite3-dev \
-            libssl-dev zlib1g-dev \
-            libpulse-dev libasound2-dev libpipewire-0.3-dev
-          pip3 install aqtinstall
-
-      - name: Install Qt (Linux)
-        if: matrix.os == 'Linux'
-        run: |
-          aqt install-qt linux desktop ${{ env.QT_VERSION }} linux_gcc_64 -m qtmultimedia --outputdir $HOME/Qt
-          echo "Qt6_DIR=$HOME/Qt/${{ env.QT_VERSION }}/gcc_64/lib/cmake/Qt6" >> $GITHUB_ENV
-          echo "$HOME/Qt/${{ env.QT_VERSION }}/gcc_64/bin" >> $GITHUB_PATH
-
-      # ===== macOS =====
-      - name: Install dependencies (macOS)
-        if: matrix.os == 'macOS'
+      - name: Install dependencies
         run: |
           brew install cmake ninja pcre luajit sqlite openssl aqtinstall
 
-      - name: Install Qt (macOS)
-        if: matrix.os == 'macOS'
-        run: |
-          aqt install-qt mac desktop ${{ env.QT_VERSION }} -m qtmultimedia --outputdir $HOME/Qt
-          echo "Qt6_DIR=$HOME/Qt/${{ env.QT_VERSION }}/macos/lib/cmake/Qt6" >> $GITHUB_ENV
-          echo "$HOME/Qt/${{ env.QT_VERSION }}/macos/bin" >> $GITHUB_PATH
+      - name: Cache Qt Static
+        id: cache-qt
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/mushkin/Qt-static
+          key: qt-static-6.9.3-macos-${{ runner.arch }}-v4
 
-      # ===== Windows =====
-      - name: Install dependencies (Windows)
-        if: matrix.os == 'Windows'
+      - name: Build Static Binary
+        run: ./scripts/build-macos-static.sh
+
+      - name: Run Tests
+        run: ctest --test-dir build-static --output-on-failure --build-config Release
+
+      - name: Package
+        run: |
+          mkdir -p package
+          cp build-static/mushkin package/
+          cp README.md LICENSE package/ 2>/dev/null || true
+          cd package
+          zip -r ../mushkin-${{ needs.version.outputs.version }}-macos-${{ runner.arch }}.zip .
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mushkin-${{ needs.version.outputs.version }}-macos-${{ runner.arch }}
+          path: mushkin-${{ needs.version.outputs.version }}-macos-*.zip
+
+  build-linux:
+    name: Build Linux
+    runs-on: ubuntu-latest
+    needs: version
+    timeout-minutes: 90
+    steps:
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /opt/hostedtoolcache/go
+          sudo rm -rf /opt/hostedtoolcache/node
+          sudo rm -rf /opt/hostedtoolcache/Python
+          sudo rm -rf /opt/hostedtoolcache/Ruby
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf /usr/share/swift
+          sudo rm -rf /usr/local/.ghcup
+          sudo apt-get clean
+          df -h
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake ninja-build pkg-config \
+            libpcre3-dev libsqlite3-dev luajit libluajit-5.1-dev \
+            libssl-dev zlib1g-dev libgl1-mesa-dev libglu1-mesa-dev \
+            libxkbcommon-dev libxcb1-dev libxcb-cursor-dev libxcb-icccm4-dev \
+            libxcb-keysyms1-dev libxcb-shape0-dev libxcb-xfixes0-dev \
+            libxcb-sync-dev libxcb-randr0-dev libxcb-render-util0-dev \
+            libxcb-image0-dev libxcb-glx0-dev libxcb-shm0-dev \
+            libfontconfig1-dev libfreetype6-dev libx11-dev libx11-xcb-dev \
+            libxext-dev libxfixes-dev libxi-dev libxrender-dev \
+            libatspi2.0-dev libglib2.0-dev \
+            libpulse-dev libasound2-dev libpipewire-0.3-dev
+          pip3 install aqtinstall
+
+      - name: Cache Qt Static
+        id: cache-qt
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/mushkin/Qt-static
+          key: qt-static-6.9.3-linux-x64-v4
+
+      - name: Build Static Binary
+        run: ./scripts/build-linux-static.sh
+
+      - name: Run Tests
+        run: ctest --test-dir build-static --output-on-failure --build-config Release
+        env:
+          QT_QPA_PLATFORM: offscreen
+
+      - name: Package
+        run: |
+          mkdir -p package/mushkin
+          cp build-static/mushkin package/mushkin/
+          cp README.md LICENSE package/mushkin/ 2>/dev/null || true
+          cd package
+          tar -czf ../mushkin-${{ needs.version.outputs.version }}-linux-x64.tar.gz mushkin
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mushkin-${{ needs.version.outputs.version }}-linux-x64
+          path: mushkin-${{ needs.version.outputs.version }}-linux-x64.tar.gz
+
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    needs: version
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Enable Long Paths
+        run: |
+          Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' -Name 'LongPathsEnabled' -Value 1 -Type DWord
+
+      - name: Install dependencies
         run: |
           choco install ninja -y
           pip install aqtinstall
           vcpkg install pcre:x64-windows luajit:x64-windows sqlite3:x64-windows openssl:x64-windows zlib:x64-windows
 
-      - name: Setup MSVC (Windows)
-        if: matrix.os == 'Windows'
+      - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Install Qt (Windows)
-        if: matrix.os == 'Windows'
+      - name: Cache Qt Static
+        id: cache-qt
+        uses: actions/cache@v4
+        with:
+          path: C:/Users/runneradmin/AppData/Local/mushkin/Qt-static
+          key: qt-static-6.9.3-windows-x64-v6
+
+      - name: Build Static Binary
         run: |
-          python -m aqt install-qt windows desktop ${{ env.QT_VERSION }} win64_msvc2022_64 -m qtmultimedia --outputdir C:/Qt
-          echo "Qt6_DIR=C:/Qt/${{ env.QT_VERSION }}/msvc2022_64/lib/cmake/Qt6" >> $env:GITHUB_ENV
-          echo "C:/Qt/${{ env.QT_VERSION }}/msvc2022_64/bin" >> $env:GITHUB_PATH
+          $env:VCPKG_ROOT = "C:\vcpkg"
+          .\scripts\build-windows-static.ps1
 
-      # ===== Build =====
-      - name: Configure (Unix)
-        if: matrix.os != 'Windows'
+      - name: Run Tests
         run: |
-          cmake -B build -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release
-
-      - name: Configure (Windows)
-        if: matrix.os == 'Windows'
-        run: |
-          cmake -B build -G Ninja `
-            -DCMAKE_BUILD_TYPE=Release `
-            -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake `
-            -DVCPKG_TARGET_TRIPLET=x64-windows
-
-      - name: Build
-        run: cmake --build build --config Release --parallel
-        env:
-          QT_QPA_PLATFORM: ${{ matrix.os == 'Linux' && 'offscreen' || '' }}
-
-      - name: Test (Unix)
-        if: matrix.os != 'Windows'
-        run: ctest --test-dir build --output-on-failure --build-config Release
-        env:
-          QT_QPA_PLATFORM: ${{ matrix.os == 'Linux' && 'offscreen' || '' }}
-
-      - name: Test (Windows)
-        if: matrix.os == 'Windows'
-        run: |
-          # Copy lua51.dll next to yue.dll so it can find its dependency
-          Copy-Item "C:\vcpkg\installed\x64-windows\bin\lua51.dll" "build\lib\" -ErrorAction SilentlyContinue
           $env:PATH = "C:\vcpkg\installed\x64-windows\bin;$env:PATH"
-          ctest --test-dir build --output-on-failure --build-config Release
+          ctest --test-dir build-static --output-on-failure --build-config Release
+
+      - name: Package
+        run: |
+          mkdir package\mushkin
+          copy build-static\mushkin.exe package\mushkin\
+          copy README.md package\mushkin\ 2>$null
+          copy LICENSE package\mushkin\ 2>$null
+
+          # Copy vcpkg DLLs
+          $vcpkgBin = "C:\vcpkg\installed\x64-windows\bin"
+          if (Test-Path $vcpkgBin) {
+            copy "$vcpkgBin\*.dll" package\mushkin\ 2>$null
+          }
+
+          cd package
+          7z a ..\mushkin-${{ needs.version.outputs.version }}-windows-x64.zip mushkin
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mushkin-${{ needs.version.outputs.version }}-windows-x64
+          path: mushkin-${{ needs.version.outputs.version }}-windows-x64.zip
 
   docs:
     name: Verify Docs

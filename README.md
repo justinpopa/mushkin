@@ -46,7 +46,7 @@ open build/mushkin.app
 
 ```bash
 # Prerequisites
-xcode-select --install
+# Full Xcode required (not just Command Line Tools) - Qt's shader tools need the Metal compiler
 brew install cmake ninja pcre luajit sqlite openssl aqtinstall
 
 # Build (first run ~60 min for Qt, subsequent runs ~2 min)
