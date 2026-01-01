@@ -10,9 +10,9 @@
 
 #include <QtGlobal>
 
-// Import the offscreen platform plugin for static builds
-// This allows tests to run without a display (headless CI)
-#if defined(QT_STATIC)
+// Import the offscreen platform plugin for static Linux builds
+// Linux CI is headless and needs this. macOS CI has a display and uses Cocoa.
+#if defined(QT_STATIC) && defined(__linux__)
 #include <QtPlugin>
 Q_IMPORT_PLUGIN(QOffscreenIntegrationPlugin)
 #endif
