@@ -50,7 +50,8 @@ class OutputPage : public PreferencesPageBase {
     QRgb m_ansiColors[16];
 
     // Display options
-    QSpinBox* m_wrapColumnSpin;
+    QCheckBox* m_wordWrapCheck;   // Enable word-wrap at spaces (m_wrap)
+    QSpinBox* m_wrapColumnSpin;   // Wrap column width (m_nWrapColumn)
     QCheckBox* m_showBoldCheck;
     QCheckBox* m_showItalicCheck;
     QCheckBox* m_showUnderlineCheck;

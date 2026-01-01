@@ -1,5 +1,6 @@
 #include "input_view.h"
 #include "../../automation/plugin.h"
+#include "../../utils/font_utils.h"
 #include "../../world/color_utils.h"
 #include "../../world/lua_api/lua_registration.h"
 #include "../../world/script_engine.h"
@@ -342,30 +343,30 @@ void InputView::applyInputSettings()
         return;
     }
 
-    // Apply font settings
-    QFont inputFont(m_doc->m_input_font_name, m_doc->m_input_font_height);
-    inputFont.setItalic(m_doc->m_input_font_italic);
-    inputFont.setWeight(static_cast<QFont::Weight>(m_doc->m_input_font_weight));
-    setFont(inputFont);
-
-    // Apply color settings using palette (more reliable than stylesheet with themes)
+    // Apply color settings using stylesheet (more reliable than QPalette for QPlainTextEdit)
     // Colors are stored in BGR format (Windows COLORREF), convert to QColor
     QColor textColor = bgrToQColor(m_doc->m_input_text_colour);
     QColor bgColor = bgrToQColor(m_doc->m_input_background_colour);
 
-    // Use QPalette instead of stylesheet for better theme compatibility
-    QPalette pal = palette();
-    pal.setColor(QPalette::Text, textColor);
-    pal.setColor(QPalette::Base, bgColor);
-    pal.setColor(QPalette::PlaceholderText, textColor.darker(150));
-    setPalette(pal);
-    setAutoFillBackground(true);
+    // Build font style string
+    QString fontStyle = m_doc->m_input_font_italic ? "italic" : "normal";
+    QString fontWeight = (m_doc->m_input_font_weight >= 700) ? "bold" : "normal";
+
+    // Use stylesheet for reliable font and color application on QPlainTextEdit
+    // Note: Use scaledFontSize() for cross-platform DPI-consistent sizing
+    int fontSizePx = scaledFontSize(m_doc->m_input_font_height);
+
+    QString style = QString(
+        "QPlainTextEdit { color: %1; background-color: %2; "
+        "font-family: '%3'; font-size: %4px; font-style: %5; font-weight: %6; }"
+    ).arg(textColor.name(), bgColor.name(),
+          m_doc->m_input_font_name,
+          QString::number(fontSizePx),
+          fontStyle, fontWeight);
+    setStyleSheet(style);
 
     // Update height after font change
     updateHeight();
-
-    qCDebug(lcUI) << "Applied input settings: font=" << inputFont.family() << inputFont.pointSize()
-                  << "fg=" << textColor.name() << "bg=" << bgColor.name();
 }
 
 /**

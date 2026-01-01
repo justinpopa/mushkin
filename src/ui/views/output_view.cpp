@@ -1,5 +1,6 @@
 #include "output_view.h"
 #include "../../text/action.h"
+#include "../../utils/font_utils.h"
 #include "../../world/color_utils.h"
 #include "../../world/miniwindow.h"
 #include "../automation/plugin.h"
@@ -46,16 +47,18 @@ OutputView::OutputView(WorldDocument* doc, QWidget* parent)
     : QWidget(parent), m_doc(doc), m_lineHeight(0), m_charWidth(0), m_scrollPos(0),
       m_visibleLines(0), m_selectionActive(false), m_selectionStartLine(-1),
       m_selectionStartChar(-1), m_selectionEndLine(-1), m_selectionEndChar(-1),
-      m_mouseDownButton(Qt::NoButton), m_freeze(false), m_frozenLineCount(0)
+      m_mouseDownButton(Qt::NoButton), m_freeze(false), m_frozenLineCount(0),
+      m_hasBeenShown(false), m_lastAlertTime(0)
 {
     // Set up fixed-width font for MUD display
     // Read font from WorldDocument if available, otherwise use default
+    // Use createScaledFont for cross-platform DPI-consistent sizing
     if (m_doc && !m_doc->m_font_name.isEmpty()) {
-        m_font = QFont(m_doc->m_font_name, m_doc->m_font_height);
+        m_font = createScaledFont(m_doc->m_font_name, m_doc->m_font_height);
         qCDebug(lcUI) << "OutputView: Using font from WorldDocument:" << m_doc->m_font_name
                       << m_doc->m_font_height;
     } else {
-        m_font = QFont("Courier New", 10);
+        m_font = createScaledFont("Courier New", 10);
         qCDebug(lcUI) << "OutputView: Using default font (Courier New, 10)";
     }
     m_font.setFixedPitch(true);
@@ -128,8 +131,10 @@ void OutputView::setOutputFont(const QFont& font)
  */
 void OutputView::calculateMetrics()
 {
-    // Use widget as paint device for DPI-aware font metrics (fixes HiDPI displays)
-    QFontMetrics fm(m_font, const_cast<OutputView*>(this));
+    // Get font metrics - use simple constructor for consistent logical pixel measurements
+    // Note: Previously used widget as paint device, but that caused issues on HiDPI displays
+    // where charWidth was returned in physical pixels but viewWidth in logical pixels
+    QFontMetrics fm(m_font);
     m_lineHeight = fm.height();
     m_charWidth = fm.horizontalAdvance('M'); // Width of average character
 
@@ -162,6 +167,33 @@ void OutputView::calculateMetrics()
     qCDebug(lcUI) << "Metrics calculated - height:" << height()
                   << "haveTextRect:" << (m_doc && haveTextRectangle())
                   << "lineHeight:" << m_lineHeight << "visibleLines:" << m_visibleLines;
+
+    // Auto-wrap to window width: dynamically adjust wrap column based on view width
+    // This matches original MUSHclient's AutoWrapWindowWidth() in mushview.cpp
+    //
+    // IMPORTANT: Only apply auto-wrap after the widget has been shown, to prevent
+    // wrapping at small startup sizes before the window reaches its intended size.
+    if (m_doc && m_doc->m_bAutoWrapWindowWidth && m_charWidth > 0 && m_hasBeenShown) {
+        // Calculate how many characters fit in the view width
+        int viewWidth = width();
+        if (haveTextRectangle()) {
+            viewWidth = getTextRectangle().width();
+        }
+
+        // Account for pixel offset (scrollbar margin)
+        int usableWidth = viewWidth - m_doc->m_iPixelOffset;
+        int newWrapColumn = usableWidth / m_charWidth;
+
+        // Clamp to reasonable range (20 to MAX_LINE_WIDTH=10000)
+        newWrapColumn = qBound(20, newWrapColumn, 10000);
+
+        // Only update if changed significantly (avoid constant updates from rounding)
+        if (m_doc->m_nWrapColumn != static_cast<quint16>(newWrapColumn)) {
+            m_doc->m_nWrapColumn = static_cast<quint16>(newWrapColumn);
+            qCDebug(lcUI) << "Auto-wrap: updated wrap column to" << newWrapColumn
+                          << "(width:" << viewWidth << "charWidth:" << m_charWidth << ")";
+        }
+    }
 }
 
 /**
@@ -178,6 +210,25 @@ void OutputView::resizeEvent(QResizeEvent* event)
     // Notify plugins of resize
     if (m_doc) {
         m_doc->SendToAllPluginCallbacks(ON_PLUGIN_WORLD_OUTPUT_RESIZED);
+    }
+}
+
+/**
+ * showEvent - Handle widget first shown
+ *
+ * Sets m_hasBeenShown flag so auto_wrap_window_width can take effect.
+ * This prevents wrapping at small startup sizes before the window reaches
+ * its intended size from the window manager/layout system.
+ */
+void OutputView::showEvent(QShowEvent* event)
+{
+    QWidget::showEvent(event);
+
+    if (!m_hasBeenShown) {
+        m_hasBeenShown = true;
+        // Now that we're shown at proper size, recalculate metrics
+        // which will apply auto_wrap_window_width if enabled
+        calculateMetrics();
     }
 }
 
@@ -214,10 +265,15 @@ void OutputView::onNewLinesAdded()
         return;
 
     // Flash taskbar icon if enabled and window is not active
+    // Throttle to max once per second (like original MUSHclient)
     if (m_doc->m_bFlashIcon) {
         QWidget* mainWindow = window();
         if (mainWindow && !mainWindow->isActiveWindow()) {
-            QApplication::alert(mainWindow);
+            qint64 now = QDateTime::currentMSecsSinceEpoch();
+            if (now - m_lastAlertTime >= 1000) { // At least 1 second since last alert
+                QApplication::alert(mainWindow);
+                m_lastAlertTime = now;
+            }
         }
     }
 
@@ -225,7 +281,7 @@ void OutputView::onNewLinesAdded()
     if (m_freeze) {
         // Count the new line (we get called once per line)
         m_frozenLineCount++;
-        emit freezeStateChanged(true, m_frozenLineCount);
+        emit freezeStateChanged(true, isAtBottom());
         // Don't scroll, but still repaint
         update();
         return;
@@ -298,6 +354,9 @@ void OutputView::wheelEvent(QWheelEvent* event)
     // Auto-unfreeze: If we've scrolled to the bottom, unfreeze
     if (m_freeze && m_scrollPos >= maxScroll) {
         setFrozen(false);
+    } else if (m_freeze) {
+        // Emit signal to update MORE/PAUSE status
+        emit freezeStateChanged(true, isAtBottom());
     }
 
     // Trigger repaint
@@ -543,31 +602,6 @@ void OutputView::paintEvent(QPaintEvent* event)
     // Draw foreground image if set (on top of everything)
     if (!m_foregroundImage.isNull()) {
         drawImage(painter, m_foregroundImage, m_doc->m_iForegroundMode);
-    }
-
-    // Draw freeze indicator if frozen
-    if (m_freeze) {
-        // Draw a subtle indicator in the top-right corner
-        QString freezeText = QString("PAUSED (%1)").arg(m_frozenLineCount);
-        QFont indicatorFont = m_font;
-        indicatorFont.setBold(true);
-        painter.setFont(indicatorFont);
-        QFontMetrics fm(indicatorFont);
-
-        int textWidth = fm.horizontalAdvance(freezeText);
-        int textHeight = fm.height();
-        int padding = 4;
-        int margin = 8;
-
-        QRect indicatorRect(width() - textWidth - padding * 2 - margin, margin,
-                            textWidth + padding * 2, textHeight + padding * 2);
-
-        // Semi-transparent background
-        painter.fillRect(indicatorRect, QColor(255, 100, 100, 200));
-
-        // White text
-        painter.setPen(Qt::white);
-        painter.drawText(indicatorRect, Qt::AlignCenter, freezeText);
     }
 }
 
@@ -903,6 +937,12 @@ void OutputView::mouseReleaseEvent(QMouseEvent* event)
         if (m_selectionActive) {
             // Finalize selection (but keep it highlighted)
             m_selectionActive = false;
+
+            // Auto-freeze when selection is made (like original MUSHclient)
+            if (hasSelection() && m_doc && m_doc->m_bAutoFreeze && !m_freeze) {
+                setFrozen(true);
+            }
+
             update();
 
             // Notify plugins that selection has changed
@@ -952,6 +992,9 @@ void OutputView::keyPressEvent(QKeyEvent* event)
         int scrollAmount = qMax(1, m_visibleLines - 2);
         m_scrollPos -= scrollAmount;
         m_scrollPos = qMax(0, m_scrollPos);
+        if (m_freeze) {
+            emit freezeStateChanged(true, isAtBottom());
+        }
         update();
         event->accept();
         return;
@@ -973,6 +1016,8 @@ void OutputView::keyPressEvent(QKeyEvent* event)
         // Auto-unfreeze if we've reached the bottom
         if (m_freeze && m_scrollPos >= maxScroll) {
             setFrozen(false);
+        } else if (m_freeze) {
+            emit freezeStateChanged(true, isAtBottom());
         }
 
         update();
@@ -987,6 +1032,9 @@ void OutputView::keyPressEvent(QKeyEvent* event)
         }
         // Ctrl+Home: Scroll to top
         m_scrollPos = 0;
+        if (m_freeze) {
+            emit freezeStateChanged(true, isAtBottom());
+        }
         update();
         event->accept();
         return;
@@ -1015,6 +1063,9 @@ void OutputView::keyPressEvent(QKeyEvent* event)
         }
         // Ctrl+Up: Scroll up one line
         m_scrollPos = qMax(0, m_scrollPos - 1);
+        if (m_freeze) {
+            emit freezeStateChanged(true, isAtBottom());
+        }
         update();
         event->accept();
         return;
@@ -1032,6 +1083,8 @@ void OutputView::keyPressEvent(QKeyEvent* event)
         // Auto-unfreeze if we've reached the bottom
         if (m_freeze && m_scrollPos >= maxScroll) {
             setFrozen(false);
+        } else if (m_freeze) {
+            emit freezeStateChanged(true, isAtBottom());
         }
         update();
         event->accept();
@@ -1978,7 +2031,7 @@ void OutputView::setFrozen(bool frozen)
         m_frozenLineCount = 0;
     }
 
-    emit freezeStateChanged(m_freeze, m_frozenLineCount);
+    emit freezeStateChanged(m_freeze, isAtBottom());
     update();
 }
 

@@ -420,7 +420,7 @@ class WorldDocument : public QObject {
     qint32 m_font_height;   // font size in pixels
     qint32 m_font_weight;   // bold/normal (400=normal, 700=bold)
     quint32 m_font_charset; // character set
-    quint16 m_wrap;         // wrap width in characters
+    quint16 m_wrap;         // word-wrap enabled (boolean: 0=off, non-zero=on)
     quint16 m_timestamps;   // show timestamps?
     quint16 m_match_width;  // match width?
 
@@ -972,7 +972,8 @@ class WorldDocument : public QObject {
     ActiveTagList m_activeTagList;       // Stack of unclosed tags
     MXPGaugeMap m_gaugeMap;              // Track gauges and stats by entity name
 
-    char m_cLastChar; // last incoming character
+    char m_cLastChar;      // last incoming character
+    qint32 m_lastSpace;    // position of last space in current line (for word-wrap), -1 if none
     qint32 m_iLastOutstandingTagCount;
     QString m_strPuebloMD5; // Pueblo hash string
 
@@ -1255,6 +1256,13 @@ class WorldDocument : public QObject {
     void disconnectFromMud();            // Disconnect from MUD
     void sendToMud(const QString& text); // Send text to MUD
 
+    // Connection time methods (for status bar)
+    qint64 connectedTime() const;  // Returns seconds connected, or -1 if not connected
+    void resetConnectedTime();     // Reset connection timer to now
+
+    // Logging status (for status bar)
+    bool isLogging() const { return m_logfile != nullptr; }
+
     // ========== Telnet State Machine ==========
 
     // Main byte processor - routes incoming bytes to phase handlers
@@ -1364,6 +1372,8 @@ class WorldDocument : public QObject {
     void AddLineToBuffer(Line* line);              // Add line to buffer with size limiting
     void AddToLine(const char* str, int len = -1); // Add text to current line
     void AddToLine(unsigned char c);               // Add single character to current line
+    void handleLineWrap();                         // Handle line wrapping when column exceeded
+    void adjustStylesForTruncation(qint32 newLength); // Adjust styles when truncating line
     void StartNewLine(bool bNewLine,
                       unsigned char iFlags); // Complete current line and start new one
 

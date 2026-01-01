@@ -14,6 +14,7 @@
 #include <QStringList>
 #include <QSystemTrayIcon>
 #include <QTextEdit>
+#include <QTimer>
 #include <QToolBar>
 
 class ActivityWindow;
@@ -89,6 +90,11 @@ class MainWindow : public QMainWindow {
      * Handle window state changes (minimize to tray)
      */
     void changeEvent(QEvent* event) override;
+
+    /**
+     * Handle clicks on status bar indicators
+     */
+    bool eventFilter(QObject* watched, QEvent* event) override;
 
   public slots:
     /**
@@ -261,8 +267,15 @@ class MainWindow : public QMainWindow {
 
     // Status bar updates
     void updateStatusIndicators();
-    void onFreezeStateChanged(bool frozen, int lineCount);
+    void onFreezeStateChanged(bool frozen, bool atBottom);
     void onConnectionStateChanged(bool connected);
+    void updateTimeIndicator();
+
+    // Status bar click handlers
+    void onFreezeIndicatorClicked();
+    void onTimeIndicatorClicked();
+    void onLinesIndicatorClicked();
+    void onWorldNameIndicatorClicked();
 
     // System tray
     void trayIconActivated(QSystemTrayIcon::ActivationReason reason);
@@ -374,10 +387,13 @@ class MainWindow : public QMainWindow {
     ActivityWindow* m_activityWindow;
 
 
-    // Status bar indicators
+    // Status bar indicators (order matches original MUSHclient: Freeze, Name, Time, Lines, Log)
     QLabel* m_freezeIndicator;
-    QLabel* m_connectionIndicator;
+    QLabel* m_worldNameIndicator;
+    QLabel* m_timeIndicator;
     QLabel* m_linesIndicator;
+    QLabel* m_logIndicator;
+    QTimer* m_statusBarTimer;  // Updates time indicator every second
 
     // Currently tracked world for status updates
     QPointer<class WorldWidget> m_trackedWorld;
