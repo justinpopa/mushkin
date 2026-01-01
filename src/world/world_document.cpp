@@ -79,7 +79,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_font_height = 10;
     m_font_weight = 400; // FW_NORMAL
     m_font_charset = 0;  // DEFAULT_CHARSET
-    m_wrap = 80;
+    m_wrap = 1; // true = wrap enabled (boolean, not column width)
     m_timestamps = 0;
     m_match_width = 30;
 

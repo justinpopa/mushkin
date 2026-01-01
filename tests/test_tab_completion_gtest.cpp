@@ -73,7 +73,7 @@ class TabCompletionTest : public ::testing::Test {
  * Test 1: Simple completion from output buffer
  * Output buffer: ["kill archer", "look"]
  * Input: "kill ar" + Tab
- * Expected: "kill archer "
+ * Expected: "kill archer"
  */
 TEST_F(TabCompletionTest, SimpleCompletion)
 {
@@ -88,15 +88,15 @@ TEST_F(TabCompletionTest, SimpleCompletion)
     // Trigger tab completion
     input->handleTabCompletion();
 
-    // Should complete to "archer" with space
-    EXPECT_EQ(input->text(), "kill archer ") << "Simple completion should work";
+    // Should complete to "archer" (no trailing space by default, matching original MUSHclient)
+    EXPECT_EQ(input->text(), "kill archer") << "Simple completion should work";
 }
 
 /**
  * Test 2: Completion at start of line
  * Output buffer: ["north", "look"]
  * Input: "nor" + Tab
- * Expected: "north "
+ * Expected: "north"
  */
 TEST_F(TabCompletionTest, CompletionAtStart)
 {
@@ -108,14 +108,14 @@ TEST_F(TabCompletionTest, CompletionAtStart)
 
     input->handleTabCompletion();
 
-    EXPECT_EQ(input->text(), "north ") << "Completion at start of line should work";
+    EXPECT_EQ(input->text(), "north") << "Completion at start of line should work";
 }
 
 /**
  * Test 3: Completion in middle of line
  * Output buffer: ["attack goblin warrior"]
  * Input: "attack gob|" + Tab (| = cursor)
- * Expected: "attack goblin "
+ * Expected: "attack goblin"
  */
 TEST_F(TabCompletionTest, CompletionInMiddle)
 {
@@ -126,14 +126,14 @@ TEST_F(TabCompletionTest, CompletionInMiddle)
 
     input->handleTabCompletion();
 
-    EXPECT_EQ(input->text(), "attack goblin ") << "Completion in middle of line should work";
+    EXPECT_EQ(input->text(), "attack goblin") << "Completion in middle of line should work";
 }
 
 /**
  * Test 4: Multiple matches - picks FIRST found (not alphabetical!)
  * Output buffer: ["kill axeman", "kill assassin", "kill archer"]
  * Input: "kill a" + Tab
- * Expected: "kill archer " (FIRST FOUND searching backwards from tail)
+ * Expected: "kill archer" (FIRST FOUND searching backwards from tail)
  */
 TEST_F(TabCompletionTest, MultipleMatches)
 {
@@ -148,7 +148,7 @@ TEST_F(TabCompletionTest, MultipleMatches)
     input->handleTabCompletion();
 
     // Should pick "archer" (FIRST match found searching backwards)
-    EXPECT_EQ(input->text(), "kill archer ") << "Multiple matches should pick first found";
+    EXPECT_EQ(input->text(), "kill archer") << "Multiple matches should pick first found";
 }
 
 /**
@@ -175,7 +175,7 @@ TEST_F(TabCompletionTest, NoMatch)
  * Test 6: Case-insensitive matching
  * Output buffer: ["Kill Archer"]
  * Input: "kill ar" + Tab
- * Expected: "kill archer " (lowercase if m_bLowerCaseTabCompletion=true)
+ * Expected: "kill archer" (lowercase if m_bLowerCaseTabCompletion=true)
  */
 TEST_F(TabCompletionTest, CaseInsensitive)
 {
@@ -188,7 +188,7 @@ TEST_F(TabCompletionTest, CaseInsensitive)
     input->handleTabCompletion();
 
     // Should match and convert to lowercase
-    EXPECT_EQ(input->text(), "kill archer ") << "Case-insensitive matching should work";
+    EXPECT_EQ(input->text(), "kill archer") << "Case-insensitive matching should work";
 }
 
 /**
@@ -217,7 +217,7 @@ TEST_F(TabCompletionTest, NoSpaceAfterCompletion)
  * m_strTabCompletionDefaults = "fireball lightning heal"
  * Output buffer: (empty)
  * Input: "fire" + Tab
- * Expected: "fireball "
+ * Expected: "fireball"
  */
 TEST_F(TabCompletionTest, DefaultCompletionList)
 {
@@ -228,7 +228,7 @@ TEST_F(TabCompletionTest, DefaultCompletionList)
 
     input->handleTabCompletion();
 
-    EXPECT_EQ(input->text(), "fireball ") << "Default completion list should work";
+    EXPECT_EQ(input->text(), "fireball") << "Default completion list should work";
 }
 
 /**
@@ -254,7 +254,7 @@ TEST_F(TabCompletionTest, EmptyHistory)
  * Test 10: Duplicate words - first match wins
  * Output buffer: ["kill orc", "kill orc", "kill orc"]
  * Input: "or" + Tab
- * Expected: "orc " (first match found)
+ * Expected: "orc" (first match found)
  */
 TEST_F(TabCompletionTest, DuplicateRemoval)
 {
@@ -268,7 +268,7 @@ TEST_F(TabCompletionTest, DuplicateRemoval)
     input->handleTabCompletion();
 
     // Should complete to "orc" (first match found)
-    EXPECT_EQ(input->text(), "orc ") << "First match should win with duplicates";
+    EXPECT_EQ(input->text(), "orc") << "First match should win with duplicates";
 }
 
 /**
@@ -296,7 +296,7 @@ TEST_F(TabCompletionTest, MatchMustBeLonger)
  * Test 12: Cursor positioning after completion
  * Output buffer: ["north"]
  * Input: "nor" + Tab
- * Expected: cursor at position 6 (after "north ")
+ * Expected: cursor at position 5 (after "north")
  */
 TEST_F(TabCompletionTest, CursorPositioning)
 {
@@ -307,15 +307,15 @@ TEST_F(TabCompletionTest, CursorPositioning)
 
     input->handleTabCompletion();
 
-    EXPECT_EQ(input->text(), "north ") << "Text should be completed";
-    EXPECT_EQ(input->cursorPosition(), 6) << "Cursor should be positioned after 'north '";
+    EXPECT_EQ(input->text(), "north") << "Text should be completed";
+    EXPECT_EQ(input->cursorPosition(), 5) << "Cursor should be positioned after 'north'";
 }
 
 /**
  * Test 13: Completion preserves text after cursor
  * Output buffer: ["northern"]
  * Input: "nor| path" (| = cursor) + Tab
- * Expected: "northern  path" (completes "nor" to "northern ")
+ * Expected: "northern path" (completes "nor" to "northern")
  */
 TEST_F(TabCompletionTest, PreservesTextAfterCursor)
 {
@@ -326,15 +326,15 @@ TEST_F(TabCompletionTest, PreservesTextAfterCursor)
 
     input->handleTabCompletion();
 
-    // Should complete "nor" to "northern " and keep " path"
-    EXPECT_EQ(input->text(), "northern  path") << "Text after cursor should be preserved";
+    // Should complete "nor" to "northern" and keep " path"
+    EXPECT_EQ(input->text(), "northern path") << "Text after cursor should be preserved";
 }
 
 /**
  * Test 14: Multiple words in line - completes individual words
  * Output buffer: ["kill archer bronze"]
  * Input: "bron" + Tab
- * Expected: "bronze "
+ * Expected: "bronze"
  */
 TEST_F(TabCompletionTest, MultipleWordsInCommand)
 {
@@ -345,14 +345,14 @@ TEST_F(TabCompletionTest, MultipleWordsInCommand)
 
     input->handleTabCompletion();
 
-    EXPECT_EQ(input->text(), "bronze ") << "Should complete individual words from multi-word lines";
+    EXPECT_EQ(input->text(), "bronze") << "Should complete individual words from multi-word lines";
 }
 
 /**
  * Test 15: Completion at cursor position (not at end)
  * Output buffer: ["archer"]
  * Input: "ar| south" (| = cursor at position 2) + Tab
- * Expected: "archer  south"
+ * Expected: "archer south"
  */
 TEST_F(TabCompletionTest, CompletionNotAtEnd)
 {
@@ -363,8 +363,8 @@ TEST_F(TabCompletionTest, CompletionNotAtEnd)
 
     input->handleTabCompletion();
 
-    // Should complete "ar" to "archer " and keep " south"
-    EXPECT_EQ(input->text(), "archer  south") << "Completion should work when cursor not at end";
+    // Should complete "ar" to "archer" and keep " south"
+    EXPECT_EQ(input->text(), "archer south") << "Completion should work when cursor not at end";
 }
 
 // Main function required for GoogleTest
