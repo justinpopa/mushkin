@@ -1,10 +1,10 @@
 # Find Qt6::Test for QSignalSpy (used by miniwindow tests)
 find_package(Qt6 COMPONENTS Test QUIET)
 
-# For static Qt builds, we need to link the offscreen platform plugin
+# For static Qt builds on Linux, we need to link the offscreen platform plugin
 # so tests can run headlessly (QT_QPA_PLATFORM=offscreen)
-if(STATIC_BUILD)
-    find_package(Qt6 COMPONENTS GuiPrivate QUIET)
+# macOS static Qt doesn't include the offscreen plugin (only Cocoa)
+if(STATIC_BUILD AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
     # The offscreen plugin target name
     set(QT_STATIC_PLUGINS Qt6::QOffscreenIntegrationPlugin)
 else()
@@ -41,9 +41,12 @@ target_link_libraries(test-pipeline-gtest PRIVATE
 )
 
 # Register with CTest for automatic test discovery
-# Register tests with CTest (add_test avoids running binaries at configure time)
+# Register tests with CTest using gtest_discover_tests for granular test discovery
 include(GoogleTest)
-add_test(NAME test-pipeline-gtest COMMAND test-pipeline-gtest)
+gtest_discover_tests(test-pipeline-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Trigger execution test (GoogleTest version)
 add_executable(test-trigger-execution-gtest
@@ -58,7 +61,10 @@ target_link_libraries(test-trigger-execution-gtest PRIVATE
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
-add_test(NAME test-trigger-execution-gtest COMMAND test-trigger-execution-gtest)
+gtest_discover_tests(test-trigger-execution-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Timer structure test (GoogleTest version)
 add_executable(test-timer-structure-gtest
@@ -74,7 +80,10 @@ target_link_libraries(test-timer-structure-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-timer-structure-gtest COMMAND test-timer-structure-gtest)
+gtest_discover_tests(test-timer-structure-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Lua basics test (GoogleTest version)
 add_executable(test-lua-basics-gtest
@@ -90,7 +99,10 @@ target_link_libraries(test-lua-basics-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-lua-basics-gtest COMMAND test-lua-basics-gtest)
+gtest_discover_tests(test-lua-basics-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Note methods test (GoogleTest version)
 add_executable(test-note-methods-gtest
@@ -106,7 +118,10 @@ target_link_libraries(test-note-methods-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-note-methods-gtest COMMAND test-note-methods-gtest)
+gtest_discover_tests(test-note-methods-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Script loading test (GoogleTest version)
 add_executable(test-script-loading-gtest
@@ -122,7 +137,10 @@ target_link_libraries(test-script-loading-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-script-loading-gtest COMMAND test-script-loading-gtest)
+gtest_discover_tests(test-script-loading-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Lua API test (GoogleTest version)
 add_executable(test-lua-api-gtest
@@ -138,7 +156,10 @@ target_link_libraries(test-lua-api-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-lua-api-gtest COMMAND test-lua-api-gtest)
+gtest_discover_tests(test-lua-api-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Triggers and aliases data structures test (GoogleTest version)
 add_executable(test-triggers-aliases-gtest
@@ -154,7 +175,10 @@ target_link_libraries(test-triggers-aliases-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-triggers-aliases-gtest COMMAND test-triggers-aliases-gtest)
+gtest_discover_tests(test-triggers-aliases-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Timer fire calculation test (GoogleTest version)
 add_executable(test-timer-fire-calculation-gtest
@@ -170,7 +194,10 @@ target_link_libraries(test-timer-fire-calculation-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-timer-fire-calculation-gtest COMMAND test-timer-fire-calculation-gtest)
+gtest_discover_tests(test-timer-fire-calculation-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Timer evaluation test (GoogleTest version)
 add_executable(test-timer-evaluation-gtest
@@ -186,7 +213,10 @@ target_link_libraries(test-timer-evaluation-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-timer-evaluation-gtest COMMAND test-timer-evaluation-gtest)
+gtest_discover_tests(test-timer-evaluation-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Timer execution test (GoogleTest version)
 add_executable(test-timer-execution-gtest
@@ -202,7 +232,10 @@ target_link_libraries(test-timer-execution-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-timer-execution-gtest COMMAND test-timer-execution-gtest)
+gtest_discover_tests(test-timer-execution-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Timer Lua API test (GoogleTest version)
 add_executable(test-timer-api-gtest
@@ -218,7 +251,10 @@ target_link_libraries(test-timer-api-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-timer-api-gtest COMMAND test-timer-api-gtest)
+gtest_discover_tests(test-timer-api-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Alias execution test (GoogleTest version)
 add_executable(test-alias-execution-gtest
@@ -234,7 +270,10 @@ target_link_libraries(test-alias-execution-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-alias-execution-gtest COMMAND test-alias-execution-gtest)
+gtest_discover_tests(test-alias-execution-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Alias integration test (GoogleTest version)
 add_executable(test-alias-integration-gtest
@@ -250,7 +289,10 @@ target_link_libraries(test-alias-integration-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-alias-integration-gtest COMMAND test-alias-integration-gtest)
+gtest_discover_tests(test-alias-integration-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Speedwalk test (GoogleTest version)
 add_executable(test-speedwalk-gtest
@@ -266,7 +308,10 @@ target_link_libraries(test-speedwalk-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-speedwalk-gtest COMMAND test-speedwalk-gtest)
+gtest_discover_tests(test-speedwalk-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Command execution test (GoogleTest version)
 add_executable(test-command-execution-gtest
@@ -282,7 +327,10 @@ target_link_libraries(test-command-execution-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-command-execution-gtest COMMAND test-command-execution-gtest)
+gtest_discover_tests(test-command-execution-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Command stacking test (GoogleTest version)
 add_executable(test-command-stacking-gtest
@@ -298,7 +346,10 @@ target_link_libraries(test-command-stacking-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-command-stacking-gtest COMMAND test-command-stacking-gtest)
+gtest_discover_tests(test-command-stacking-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Trigger matching test (GoogleTest version)
 add_executable(test-trigger-matching-gtest
@@ -314,7 +365,10 @@ target_link_libraries(test-trigger-matching-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-trigger-matching-gtest COMMAND test-trigger-matching-gtest)
+gtest_discover_tests(test-trigger-matching-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Plugin API test (GoogleTest version)
 add_executable(test-plugin-api-gtest
@@ -330,7 +384,10 @@ target_link_libraries(test-plugin-api-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-plugin-api-gtest COMMAND test-plugin-api-gtest)
+gtest_discover_tests(test-plugin-api-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Variable expansion test (GoogleTest version)
 add_executable(test-variable-expansion-gtest
@@ -346,7 +403,10 @@ target_link_libraries(test-variable-expansion-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-variable-expansion-gtest COMMAND test-variable-expansion-gtest)
+gtest_discover_tests(test-variable-expansion-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Plugin callbacks test (GoogleTest version)
 add_executable(test-plugin-callbacks-gtest
@@ -362,7 +422,10 @@ target_link_libraries(test-plugin-callbacks-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-plugin-callbacks-gtest COMMAND test-plugin-callbacks-gtest)
+gtest_discover_tests(test-plugin-callbacks-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Plugin error path test (GoogleTest version)
 add_executable(test-plugin-errors-gtest
@@ -378,7 +441,10 @@ target_link_libraries(test-plugin-errors-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-plugin-errors-gtest COMMAND test-plugin-errors-gtest)
+gtest_discover_tests(test-plugin-errors-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Trigger/Alias Lua API test (GoogleTest version)
 add_executable(test-trigger-alias-api-gtest
@@ -394,7 +460,10 @@ target_link_libraries(test-trigger-alias-api-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-trigger-alias-api-gtest COMMAND test-trigger-alias-api-gtest)
+gtest_discover_tests(test-trigger-alias-api-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Command Window and Color Lua API test (GoogleTest version)
 add_executable(test-command-color-api-gtest
@@ -410,7 +479,10 @@ target_link_libraries(test-command-color-api-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-command-color-api-gtest COMMAND test-command-color-api-gtest)
+gtest_discover_tests(test-command-color-api-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Notepad API test (GoogleTest version)
 add_executable(test-notepad-api-gtest
@@ -426,7 +498,10 @@ target_link_libraries(test-notepad-api-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-notepad-api-gtest COMMAND test-notepad-api-gtest)
+gtest_discover_tests(test-notepad-api-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Plugin evaluation order test (GoogleTest version)
 add_executable(test-plugin-evaluation-gtest
@@ -442,7 +517,10 @@ target_link_libraries(test-plugin-evaluation-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-plugin-evaluation-gtest COMMAND test-plugin-evaluation-gtest)
+gtest_discover_tests(test-plugin-evaluation-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Plugin state saving test (GoogleTest version)
 add_executable(test-plugin-state-gtest
@@ -458,7 +536,10 @@ target_link_libraries(test-plugin-state-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-plugin-state-gtest COMMAND test-plugin-state-gtest)
+gtest_discover_tests(test-plugin-state-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Command history navigation test (GoogleTest version)
 add_executable(test-command-history-navigation-gtest
@@ -474,7 +555,10 @@ target_link_libraries(test-command-history-navigation-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-command-history-navigation-gtest COMMAND test-command-history-navigation-gtest)
+gtest_discover_tests(test-command-history-navigation-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Plugin serialization test (GoogleTest version)
 add_executable(test-plugin-serialization-gtest
@@ -490,7 +574,10 @@ target_link_libraries(test-plugin-serialization-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-plugin-serialization-gtest COMMAND test-plugin-serialization-gtest)
+gtest_discover_tests(test-plugin-serialization-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Text data classes test (GoogleTest version)
 add_executable(test-text-data-classes-gtest
@@ -506,7 +593,10 @@ target_link_libraries(test-text-data-classes-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-text-data-classes-gtest COMMAND test-text-data-classes-gtest)
+gtest_discover_tests(test-text-data-classes-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Retrospective logging test (GoogleTest version)
 add_executable(test-retrospective-logging-gtest
@@ -522,7 +612,10 @@ target_link_libraries(test-retrospective-logging-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-retrospective-logging-gtest COMMAND test-retrospective-logging-gtest)
+gtest_discover_tests(test-retrospective-logging-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Tab completion test (GoogleTest version)
 add_executable(test-tab-completion-gtest
@@ -538,7 +631,10 @@ target_link_libraries(test-tab-completion-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-tab-completion-gtest COMMAND test-tab-completion-gtest)
+gtest_discover_tests(test-tab-completion-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Word wrap test (GoogleTest version)
 add_executable(test-word-wrap-gtest
@@ -554,7 +650,10 @@ target_link_libraries(test-word-wrap-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-word-wrap-gtest COMMAND test-word-wrap-gtest)
+gtest_discover_tests(test-word-wrap-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Line logging test (GoogleTest version)
 add_executable(test-line-logging-gtest
@@ -570,7 +669,10 @@ target_link_libraries(test-line-logging-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-line-logging-gtest COMMAND test-line-logging-gtest)
+gtest_discover_tests(test-line-logging-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Database test (GoogleTest version)
 add_executable(test-database-gtest
@@ -587,7 +689,10 @@ target_link_libraries(test-database-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-database-gtest COMMAND test-database-gtest)
+gtest_discover_tests(test-database-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Lua Database API test (GoogleTest version)
 add_executable(test-lua-database-gtest
@@ -603,7 +708,10 @@ target_link_libraries(test-lua-database-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-lua-database-gtest COMMAND test-lua-database-gtest)
+gtest_discover_tests(test-lua-database-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # XML serialization test (GoogleTest version)
 add_executable(test-xml-serialization-gtest
@@ -619,7 +727,10 @@ target_link_libraries(test-xml-serialization-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-xml-serialization-gtest COMMAND test-xml-serialization-gtest)
+gtest_discover_tests(test-xml-serialization-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Options tables test (GoogleTest version)
 add_executable(test-options-tables-gtest
@@ -635,7 +746,10 @@ target_link_libraries(test-options-tables-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-options-tables-gtest COMMAND test-options-tables-gtest)
+gtest_discover_tests(test-options-tables-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 
 # XML roundtrip test (GoogleTest version)
@@ -652,7 +766,10 @@ target_link_libraries(test-xml-roundtrip-gtest PRIVATE
     ui
 )
 
-add_test(NAME test-xml-roundtrip-gtest COMMAND test-xml-roundtrip-gtest)
+gtest_discover_tests(test-xml-roundtrip-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Miniwindow creation test (doesn't require Catch2)
 add_executable(test-miniwindow-creation
@@ -694,8 +811,14 @@ file(COPY
 )
 
 # Register miniwindow tests with CTest
-add_test(NAME test-miniwindow-creation COMMAND test-miniwindow-creation)
-add_test(NAME test-miniwindow-drawing COMMAND test-miniwindow-drawing)
+gtest_discover_tests(test-miniwindow-creation
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
+gtest_discover_tests(test-miniwindow-drawing
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # SendTo integration test (GoogleTest version)
 add_executable(test-sendto-integration-gtest
@@ -711,7 +834,10 @@ target_link_libraries(test-sendto-integration-gtest PRIVATE
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
-add_test(NAME test-sendto-integration-gtest COMMAND test-sendto-integration-gtest)
+gtest_discover_tests(test-sendto-integration-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Sound API test (GoogleTest version)
 add_executable(test-sound-api-gtest
@@ -728,7 +854,10 @@ target_link_libraries(test-sound-api-gtest PRIVATE
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
-add_test(NAME test-sound-api-gtest COMMAND test-sound-api-gtest)
+gtest_discover_tests(test-sound-api-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Unique ID API test (GoogleTest version)
 add_executable(test-unique-id-api-gtest
@@ -744,7 +873,10 @@ target_link_libraries(test-unique-id-api-gtest PRIVATE
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
-add_test(NAME test-unique-id-api-gtest COMMAND test-unique-id-api-gtest)
+gtest_discover_tests(test-unique-id-api-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Bit library compatibility test (GoogleTest version)
 add_executable(test-bit-library-gtest
@@ -760,7 +892,10 @@ target_link_libraries(test-bit-library-gtest PRIVATE
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
-add_test(NAME test-bit-library-gtest COMMAND test-bit-library-gtest)
+gtest_discover_tests(test-bit-library-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Progress library compatibility test (GoogleTest version)
 add_executable(test-progress-library-gtest
@@ -776,7 +911,10 @@ target_link_libraries(test-progress-library-gtest PRIVATE
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
-add_test(NAME test-progress-library-gtest COMMAND test-progress-library-gtest)
+gtest_discover_tests(test-progress-library-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Utility string functions test (GoogleTest version)
 add_executable(test-utility-string-functions-gtest
@@ -792,7 +930,10 @@ target_link_libraries(test-utility-string-functions-gtest PRIVATE
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
-add_test(NAME test-utility-string-functions-gtest COMMAND test-utility-string-functions-gtest)
+gtest_discover_tests(test-utility-string-functions-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # Utils hashing and encoding test (GoogleTest version)
 add_executable(test-utils-hashing-gtest
@@ -808,7 +949,10 @@ target_link_libraries(test-utils-hashing-gtest PRIVATE
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
-add_test(NAME test-utils-hashing-gtest COMMAND test-utils-hashing-gtest)
+gtest_discover_tests(test-utils-hashing-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # MXP (MUD eXtension Protocol) test (GoogleTest version)
 add_executable(test-mxp-gtest
@@ -824,7 +968,10 @@ target_link_libraries(test-mxp-gtest PRIVATE
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
-add_test(NAME test-mxp-gtest COMMAND test-mxp-gtest)
+gtest_discover_tests(test-mxp-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # ========== Array API Tests ==========
 add_executable(test-array-api-gtest
@@ -840,7 +987,10 @@ target_link_libraries(test-array-api-gtest PRIVATE
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
-add_test(NAME test-array-api-gtest COMMAND test-array-api-gtest)
+gtest_discover_tests(test-array-api-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # ========== URL Detection Tests ==========
 add_executable(test-url-detection-gtest
@@ -856,4 +1006,7 @@ target_link_libraries(test-url-detection-gtest PRIVATE
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
-add_test(NAME test-url-detection-gtest COMMAND test-url-detection-gtest)
+gtest_discover_tests(test-url-detection-gtest
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
