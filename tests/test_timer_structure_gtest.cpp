@@ -3,6 +3,7 @@
 //
 // Verifies Timer class fields and basic operations
 
+#include "test_qt_static.h"
 #include "../src/automation/timer.h"
 #include <QCoreApplication>
 #include <QDateTime>

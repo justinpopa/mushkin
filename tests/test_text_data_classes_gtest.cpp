@@ -6,6 +6,7 @@
 // - Style: Text formatting and styling
 // - Line: Text lines with embedded styles and actions
 
+#include "test_qt_static.h"
 #include "../src/text/action.h"
 #include "../src/text/line.h"
 #include "../src/text/style.h"

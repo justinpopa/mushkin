@@ -5,6 +5,7 @@
  * Tests for utils.md5, utils.sha256, utils.base64encode, and utils.base64decode
  */
 
+#include "test_qt_static.h"
 #include "../src/world/script_engine.h"
 #include "../src/world/world_document.h"
 #include <QApplication>

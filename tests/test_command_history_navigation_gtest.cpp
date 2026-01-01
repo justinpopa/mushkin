@@ -14,6 +14,7 @@
  * fixtures, and assertion messages.
  */
 
+#include "test_qt_static.h"
 #include "../src/world/world_document.h"
 #include "../src/world/xml_serialization.h"
 #include <QCoreApplication>

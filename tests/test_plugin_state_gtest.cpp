@@ -11,6 +11,7 @@
  * - Multiple save/load cycles
  */
 
+#include "test_qt_static.h"
 #include "../src/automation/plugin.h"
 #include "../src/automation/variable.h"
 #include "../src/storage/global_options.h"

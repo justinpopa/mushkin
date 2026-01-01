@@ -12,6 +12,7 @@
  * 8. Script execution (Lua callbacks with wildcards)
  */
 
+#include "test_qt_static.h"
 #include "../src/automation/alias.h"
 #include "../src/world/script_engine.h"
 #include "../src/world/world_document.h"

@@ -5,6 +5,7 @@
  * Comprehensive tests for loading and saving MUSHclient world files (.mcl)
  */
 
+#include "test_qt_static.h"
 #include "../src/automation/alias.h"
 #include "../src/automation/trigger.h"
 #include "../src/world/world_document.h"

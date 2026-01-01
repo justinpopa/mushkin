@@ -14,6 +14,7 @@
  * Migrated from Catch2 to GoogleTest for consistency with other tests.
  */
 
+#include "test_qt_static.h"
 #include "../src/storage/database.h"
 #include <QCoreApplication>
 #include <QFile>

@@ -16,6 +16,7 @@
  * fixtures, and assertion messages.
  */
 
+#include "test_qt_static.h"
 #include "../src/world/world_document.h"
 #include <QCoreApplication>
 #include <QFile>

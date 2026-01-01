@@ -11,6 +11,7 @@
  * m_nWrapColumn controls the column width at which wrapping occurs.
  */
 
+#include "test_qt_static.h"
 #include "../src/text/line.h"
 #include "../src/text/style.h"
 #include "../src/world/color_utils.h"

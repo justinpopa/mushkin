@@ -1,6 +1,16 @@
 # Find Qt6::Test for QSignalSpy (used by miniwindow tests)
 find_package(Qt6 COMPONENTS Test QUIET)
 
+# For static Qt builds, we need to link the offscreen platform plugin
+# so tests can run headlessly (QT_QPA_PLATFORM=offscreen)
+if(STATIC_BUILD)
+    find_package(Qt6 COMPONENTS GuiPrivate QUIET)
+    # The offscreen plugin target name
+    set(QT_STATIC_PLUGINS Qt6::QOffscreenIntegrationPlugin)
+else()
+    set(QT_STATIC_PLUGINS "")
+endif()
+
 # Create symlinks from tests directory to lua and lib directories
 # This allows tests to find Lua modules via relative paths
 execute_process(
@@ -60,6 +70,7 @@ target_link_libraries(test-timer-structure-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -75,6 +86,7 @@ target_link_libraries(test-lua-basics-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -90,6 +102,7 @@ target_link_libraries(test-note-methods-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -105,6 +118,7 @@ target_link_libraries(test-script-loading-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -120,6 +134,7 @@ target_link_libraries(test-lua-api-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -135,6 +150,7 @@ target_link_libraries(test-triggers-aliases-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -150,6 +166,7 @@ target_link_libraries(test-timer-fire-calculation-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -165,6 +182,7 @@ target_link_libraries(test-timer-evaluation-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -180,6 +198,7 @@ target_link_libraries(test-timer-execution-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -195,6 +214,7 @@ target_link_libraries(test-timer-api-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -210,6 +230,7 @@ target_link_libraries(test-alias-execution-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -225,6 +246,7 @@ target_link_libraries(test-alias-integration-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -240,6 +262,7 @@ target_link_libraries(test-speedwalk-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -255,6 +278,7 @@ target_link_libraries(test-command-execution-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -270,6 +294,7 @@ target_link_libraries(test-command-stacking-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -285,6 +310,7 @@ target_link_libraries(test-trigger-matching-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -300,6 +326,7 @@ target_link_libraries(test-plugin-api-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -315,6 +342,7 @@ target_link_libraries(test-variable-expansion-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -330,6 +358,7 @@ target_link_libraries(test-plugin-callbacks-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -345,6 +374,7 @@ target_link_libraries(test-plugin-errors-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -360,6 +390,7 @@ target_link_libraries(test-trigger-alias-api-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -375,6 +406,7 @@ target_link_libraries(test-command-color-api-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -390,6 +422,7 @@ target_link_libraries(test-notepad-api-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -405,6 +438,7 @@ target_link_libraries(test-plugin-evaluation-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -420,6 +454,7 @@ target_link_libraries(test-plugin-state-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -435,6 +470,7 @@ target_link_libraries(test-command-history-navigation-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -450,6 +486,7 @@ target_link_libraries(test-plugin-serialization-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -465,6 +502,7 @@ target_link_libraries(test-text-data-classes-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -480,6 +518,7 @@ target_link_libraries(test-retrospective-logging-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -495,6 +534,7 @@ target_link_libraries(test-tab-completion-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -510,6 +550,7 @@ target_link_libraries(test-word-wrap-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -525,6 +566,7 @@ target_link_libraries(test-line-logging-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -540,6 +582,7 @@ target_link_libraries(test-database-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     Qt6::Sql
     ui
 )
@@ -556,6 +599,7 @@ target_link_libraries(test-lua-database-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -571,6 +615,7 @@ target_link_libraries(test-xml-serialization-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -586,6 +631,7 @@ target_link_libraries(test-options-tables-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -602,6 +648,7 @@ target_link_libraries(test-xml-roundtrip-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
@@ -616,6 +663,7 @@ target_link_libraries(test-miniwindow-creation PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     Qt6::Test
         ui          # Transitively brings: world, text, storage, automation, utils
                 # world includes Lua API (scripting merged into world)
@@ -630,6 +678,7 @@ target_link_libraries(test-miniwindow-drawing PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     Qt6::Test
         ui          # Transitively brings: world, text, storage, automation, utils
                 # world includes Lua API (scripting merged into world)
@@ -658,6 +707,7 @@ target_link_libraries(test-sendto-integration-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
@@ -673,6 +723,7 @@ target_link_libraries(test-sound-api-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     Qt6::Multimedia
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
@@ -689,6 +740,7 @@ target_link_libraries(test-unique-id-api-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
@@ -704,6 +756,7 @@ target_link_libraries(test-bit-library-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
@@ -719,6 +772,7 @@ target_link_libraries(test-progress-library-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
@@ -734,6 +788,7 @@ target_link_libraries(test-utility-string-functions-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
@@ -749,6 +804,7 @@ target_link_libraries(test-utils-hashing-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
@@ -764,6 +820,7 @@ target_link_libraries(test-mxp-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
@@ -779,6 +836,7 @@ target_link_libraries(test-array-api-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
@@ -794,6 +852,7 @@ target_link_libraries(test-url-detection-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 

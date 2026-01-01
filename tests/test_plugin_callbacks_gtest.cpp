@@ -9,6 +9,7 @@
  * - Return value propagation (true/false from callbacks)
  */
 
+#include "test_qt_static.h"
 #include "../src/automation/plugin.h"
 #include "../src/world/script_engine.h"
 #include "../src/world/world_document.h"

@@ -5,6 +5,7 @@
 // Verifies that triggers, aliases, and timers save and load correctly with all
 // compatibility fixes applied (user attribute, style decomposition, etc.)
 
+#include "test_qt_static.h"
 #include "../src/automation/alias.h"
 #include "../src/automation/timer.h"
 #include "../src/automation/trigger.h"

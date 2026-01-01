@@ -6,6 +6,7 @@
  * including verification of <include> elements and plugin ordering by sequence.
  */
 
+#include "test_qt_static.h"
 #include "../src/automation/plugin.h"
 #include "../src/world/world_document.h"
 #include "../src/world/xml_serialization.h"
