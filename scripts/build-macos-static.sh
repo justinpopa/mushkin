@@ -159,7 +159,7 @@ build_mushkin() {
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_PREFIX_PATH="$QT_STATIC_DIR"
 
-    cmake --build . --target mushkin -j"$NUM_CORES"
+    cmake --build . -j"$NUM_CORES"
 }
 
 # ============================================================
