@@ -1347,6 +1347,29 @@ void WorldDocument::sendToMud(const QString& text)
     qCDebug(lcWorld) << "sendToMud:" << text;
 }
 
+/**
+ * connectedTime - Get the duration of the current connection
+ *
+ * @return Seconds connected, or -1 if not connected
+ */
+qint64 WorldDocument::connectedTime() const
+{
+    if (!m_tConnectTime.isValid()) {
+        return -1;
+    }
+    return m_tConnectTime.secsTo(QDateTime::currentDateTime());
+}
+
+/**
+ * resetConnectedTime - Reset the connection timer to now
+ *
+ * Called when user double-clicks the time indicator in the status bar.
+ */
+void WorldDocument::resetConnectedTime()
+{
+    m_tConnectTime = QDateTime::currentDateTime();
+}
+
 // ========== Command Execution Pipeline ==========
 
 /**

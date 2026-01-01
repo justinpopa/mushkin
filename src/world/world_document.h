@@ -1255,6 +1255,13 @@ class WorldDocument : public QObject {
     void disconnectFromMud();            // Disconnect from MUD
     void sendToMud(const QString& text); // Send text to MUD
 
+    // Connection time methods (for status bar)
+    qint64 connectedTime() const;  // Returns seconds connected, or -1 if not connected
+    void resetConnectedTime();     // Reset connection timer to now
+
+    // Logging status (for status bar)
+    bool isLogging() const { return m_logfile != nullptr; }
+
     // ========== Telnet State Machine ==========
 
     // Main byte processor - routes incoming bytes to phase handlers
