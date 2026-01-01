@@ -119,6 +119,8 @@ jobs:
 
       - name: Build Static Binary
         run: ./scripts/build-linux-static.sh
+        env:
+          QT_QPA_PLATFORM: offscreen
 
       - name: Run Tests
         run: ctest --test-dir build-static --output-on-failure --build-config Release
