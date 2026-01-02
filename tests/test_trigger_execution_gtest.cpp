@@ -10,6 +10,7 @@
  * 6. Script execution (Lua callbacks with wildcards)
  */
 
+#include "test_qt_static.h"
 #include "../src/automation/trigger.h"
 #include "../src/text/line.h"
 #include "../src/text/style.h"

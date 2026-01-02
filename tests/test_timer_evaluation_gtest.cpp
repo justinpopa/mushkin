@@ -19,6 +19,7 @@
  * 11. nMatched, tWhenFired, m_iTimersFiredCount updated
  */
 
+#include "test_qt_static.h"
 #include "../src/automation/timer.h"
 #include "../src/world/world_document.h"
 #include <QCoreApplication>

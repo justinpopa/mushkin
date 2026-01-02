@@ -12,6 +12,7 @@
  * 7. error_code table exists
  */
 
+#include "test_qt_static.h"
 #include "../src/text/line.h"
 #include "../src/text/style.h"
 #include "../src/world/script_engine.h"

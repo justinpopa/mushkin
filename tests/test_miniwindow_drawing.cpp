@@ -15,6 +15,7 @@
  * 8. WindowFontInfo
  */
 
+#include "test_qt_static.h"
 #include "../src/world/miniwindow.h"
 #include "../src/world/script_engine.h"
 #include "../src/world/world_document.h"

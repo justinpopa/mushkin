@@ -7,6 +7,7 @@
  * - eSendToExecute: Re-execute commands with alias expansion
  */
 
+#include "test_qt_static.h"
 #include "../src/automation/alias.h"
 #include "../src/automation/sendto.h"
 #include "../src/world/world_document.h"

@@ -8,7 +8,7 @@
 # x86_64 on Intel). Homebrew doesn't provide universal dynamic libraries.
 #
 # Prerequisites:
-#   xcode-select --install
+#   Full Xcode (not just command line tools) - required for Qt's Metal shader compiler
 #   brew install cmake ninja pcre luajit sqlite openssl
 #   pip3 install aqtinstall
 #
@@ -49,6 +49,29 @@ NATIVE_ARCH=$(uname -m)
 check_prerequisites() {
     echo_info "Checking prerequisites..."
     local missing=()
+
+    # Check for full Xcode (not just command line tools)
+    # Building Qt from source requires the Metal compiler which is only in full Xcode
+    # Note: GitHub runners use paths like /Applications/Xcode_16.4.app/Contents/Developer
+    local dev_path=$(xcode-select -p 2>/dev/null || echo '')
+    if [[ ! "$dev_path" =~ Xcode.*\.app ]]; then
+        echo_error "Full Xcode installation required (not just Command Line Tools)"
+        echo_error "Building Qt from source requires the Metal shader compiler."
+        echo_error ""
+        echo_error "Current developer path: ${dev_path:-not set}"
+        echo_error ""
+        echo_error "To fix:"
+        echo_error "  1. Install Xcode from the App Store"
+        echo_error "  2. Run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer"
+        echo_error "  3. Accept license: sudo xcodebuild -license accept"
+        exit 1
+    fi
+
+    # Verify Metal compiler is available
+    if ! xcrun -f metal &>/dev/null; then
+        echo_error "Metal compiler not found. Ensure Xcode is properly installed."
+        exit 1
+    fi
 
     command -v cmake &>/dev/null || missing+=("cmake")
     command -v ninja &>/dev/null || missing+=("ninja")
@@ -136,7 +159,7 @@ build_mushkin() {
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_PREFIX_PATH="$QT_STATIC_DIR"
 
-    cmake --build . --target mushkin -j"$NUM_CORES"
+    cmake --build . -j"$NUM_CORES"
 }
 
 # ============================================================
@@ -144,10 +167,11 @@ build_mushkin() {
 # ============================================================
 
 verify_build() {
-    local binary="$BUILD_DIR/mushkin"
+    local bundle="$BUILD_DIR/mushkin.app"
+    local binary="$bundle/Contents/MacOS/mushkin"
 
-    if [ ! -f "$binary" ]; then
-        echo_error "Build failed - binary not found"
+    if [ ! -d "$bundle" ] || [ ! -f "$binary" ]; then
+        echo_error "Build failed - app bundle not found"
         exit 1
     fi
 
@@ -157,8 +181,8 @@ verify_build() {
     # Check architecture
     local archs=$(lipo -archs "$binary" 2>/dev/null)
     echo "  Architecture: $archs"
-    echo "  Size: $(du -h "$binary" | cut -f1)"
-    echo "  Location: $binary"
+    echo "  Size: $(du -sh "$bundle" | cut -f1)"
+    echo "  Location: $bundle"
     echo ""
 
     # Show dynamic dependencies

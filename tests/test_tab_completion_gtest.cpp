@@ -14,6 +14,7 @@
  * fixtures, and assertion messages.
  */
 
+#include "test_qt_static.h"
 #include "../src/text/line.h"
 #include "../src/ui/views/input_view.h"
 #include "../src/world/world_document.h"

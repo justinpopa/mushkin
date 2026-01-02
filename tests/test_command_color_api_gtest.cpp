@@ -8,6 +8,7 @@
  * - world.GetUdpPort
  */
 
+#include "test_qt_static.h"
 #include "../src/ui/views/input_view.h"
 #include "../src/world/script_engine.h"
 #include "../src/world/world_document.h"

@@ -9,6 +9,7 @@
  * - One-shot triggers/aliases deleted from correct plugin context
  */
 
+#include "test_qt_static.h"
 #include "../src/automation/alias.h"
 #include "../src/automation/plugin.h"
 #include "../src/automation/sendto.h"

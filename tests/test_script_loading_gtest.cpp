@@ -12,6 +12,7 @@
  * 7. Timing statistics are tracked
  */
 
+#include "test_qt_static.h"
 #include "../src/automation/script_language.h"
 #include "../src/text/line.h"
 #include "../src/text/style.h"

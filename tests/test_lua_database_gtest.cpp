@@ -9,6 +9,7 @@
  * These functions provide SQLite database access for plugins to store persistent data.
  */
 
+#include "test_qt_static.h"
 #include "../src/world/script_engine.h"
 #include "../src/world/world_document.h"
 #include <QCoreApplication>

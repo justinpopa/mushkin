@@ -7,6 +7,7 @@
  * - All methods work correctly (status, range, position, setstep, step, checkcancel, close)
  */
 
+#include "test_qt_static.h"
 #include "../src/world/script_engine.h"
 #include "../src/world/world_document.h"
 #include <QApplication>

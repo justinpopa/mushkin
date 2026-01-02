@@ -15,6 +15,7 @@
  * 11. Statistics tracking
  */
 
+#include "test_qt_static.h"
 #include "../src/automation/trigger.h"
 #include "../src/text/line.h"
 #include "../src/text/style.h"

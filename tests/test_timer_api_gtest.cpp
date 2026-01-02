@@ -18,6 +18,7 @@
  * - DeleteTimer
  */
 
+#include "test_qt_static.h"
 #include "../src/automation/sendto.h"
 #include "../src/automation/timer.h"
 #include "../src/world/script_engine.h"

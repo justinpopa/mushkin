@@ -7,6 +7,7 @@
 // - Splitting styles at URL boundaries
 // - Preserving original text and style properties
 
+#include "test_qt_static.h"
 #include "../src/text/action.h"
 #include "../src/text/line.h"
 #include "../src/text/style.h"

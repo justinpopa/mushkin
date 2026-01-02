@@ -11,6 +11,7 @@
  * m_nWrapColumn controls the column width at which wrapping occurs.
  */
 
+#include "test_qt_static.h"
 #include "../src/text/line.h"
 #include "../src/text/style.h"
 #include "../src/world/color_utils.h"
@@ -221,19 +222,24 @@ TEST_F(WordWrapTest, SpaceAtWrapBoundary)
 
 /**
  * Test 8: Text with no spaces (word wrap enabled)
- * Long text with no spaces should fall back to hard wrap
+ * Long text with no spaces should NOT wrap - preserves ASCII art
  */
-TEST_F(WordWrapTest, NoSpacesFallsBackToHardWrap)
+TEST_F(WordWrapTest, NoSpacesDoesNotWrapWhenWordWrapEnabled)
 {
-    doc->m_wrap = 1;
+    doc->m_wrap = 1;  // Word wrap enabled
     doc->m_nWrapColumn = 20;
 
-    // No spaces - should hard wrap even with word wrap enabled
+    // No spaces - should NOT wrap, line extends past wrap column
+    // This preserves ASCII art that has no spaces
     const char* text = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     doc->AddToLine(text, strlen(text));
 
-    // Should have wrapped
-    EXPECT_GE(getLineCount(), 1) << "Should hard wrap when no spaces found";
+    // Should NOT have wrapped - m_lineList should be empty (no lines completed)
+    EXPECT_EQ(getLineCount(), 0) << "No completed lines (preserves ASCII art)";
+
+    // The current line should contain all the text (not flushed to lineList)
+    QString currentText = getCurrentLineText();
+    EXPECT_EQ(currentText.length(), 26) << "Current line should contain all 26 characters";
 }
 
 /**

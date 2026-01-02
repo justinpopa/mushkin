@@ -9,6 +9,7 @@
  * - Helper functions (test, clear, tonumber, tostring, mod)
  */
 
+#include "test_qt_static.h"
 #include "../src/world/script_engine.h"
 #include "../src/world/world_document.h"
 #include <QApplication>

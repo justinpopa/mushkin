@@ -6,6 +6,7 @@
 // - AlphaOptionsTable (string options)
 // - Verifies table structure and offsets
 
+#include "test_qt_static.h"
 #include "../src/world/config_options.h"
 #include "../src/world/world_document.h"
 #include <QCoreApplication>

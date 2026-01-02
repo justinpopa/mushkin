@@ -6,6 +6,7 @@
  * for interval timers and at-time timers with various configurations.
  */
 
+#include "test_qt_static.h"
 #include "../src/automation/timer.h"
 #include "../src/world/world_document.h"
 #include <QCoreApplication>

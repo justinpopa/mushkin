@@ -1,6 +1,16 @@
 # Find Qt6::Test for QSignalSpy (used by miniwindow tests)
 find_package(Qt6 COMPONENTS Test QUIET)
 
+# For static Qt builds on Linux, we need to link the offscreen platform plugin
+# so tests can run headlessly (QT_QPA_PLATFORM=offscreen)
+# macOS static Qt doesn't include the offscreen plugin (only Cocoa)
+if(STATIC_BUILD AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    # The offscreen plugin target name
+    set(QT_STATIC_PLUGINS Qt6::QOffscreenIntegrationPlugin)
+else()
+    set(QT_STATIC_PLUGINS "")
+endif()
+
 # Create symlinks from tests directory to lua and lib directories
 # This allows tests to find Lua modules via relative paths
 execute_process(
@@ -27,14 +37,16 @@ target_link_libraries(test-pipeline-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
 # Register with CTest for automatic test discovery
-# GoogleTest provides automatic test discovery via gtest_discover_tests()
+# Register tests with CTest using gtest_discover_tests for granular test discovery
 include(GoogleTest)
 gtest_discover_tests(test-pipeline-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Trigger execution test (GoogleTest version)
@@ -47,11 +59,13 @@ target_link_libraries(test-trigger-execution-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
 gtest_discover_tests(test-trigger-execution-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Timer structure test (GoogleTest version)
@@ -64,11 +78,13 @@ target_link_libraries(test-timer-structure-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-timer-structure-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Lua basics test (GoogleTest version)
@@ -81,11 +97,13 @@ target_link_libraries(test-lua-basics-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-lua-basics-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Note methods test (GoogleTest version)
@@ -98,11 +116,13 @@ target_link_libraries(test-note-methods-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-note-methods-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Script loading test (GoogleTest version)
@@ -115,11 +135,13 @@ target_link_libraries(test-script-loading-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-script-loading-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Lua API test (GoogleTest version)
@@ -132,11 +154,13 @@ target_link_libraries(test-lua-api-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-lua-api-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Triggers and aliases data structures test (GoogleTest version)
@@ -149,11 +173,13 @@ target_link_libraries(test-triggers-aliases-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-triggers-aliases-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Timer fire calculation test (GoogleTest version)
@@ -166,11 +192,13 @@ target_link_libraries(test-timer-fire-calculation-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-timer-fire-calculation-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Timer evaluation test (GoogleTest version)
@@ -183,11 +211,13 @@ target_link_libraries(test-timer-evaluation-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-timer-evaluation-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Timer execution test (GoogleTest version)
@@ -200,11 +230,13 @@ target_link_libraries(test-timer-execution-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-timer-execution-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Timer Lua API test (GoogleTest version)
@@ -217,11 +249,13 @@ target_link_libraries(test-timer-api-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-timer-api-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Alias execution test (GoogleTest version)
@@ -234,11 +268,13 @@ target_link_libraries(test-alias-execution-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-alias-execution-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Alias integration test (GoogleTest version)
@@ -251,11 +287,13 @@ target_link_libraries(test-alias-integration-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-alias-integration-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Speedwalk test (GoogleTest version)
@@ -268,11 +306,13 @@ target_link_libraries(test-speedwalk-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-speedwalk-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Command execution test (GoogleTest version)
@@ -285,11 +325,13 @@ target_link_libraries(test-command-execution-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-command-execution-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Command stacking test (GoogleTest version)
@@ -302,11 +344,13 @@ target_link_libraries(test-command-stacking-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-command-stacking-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Trigger matching test (GoogleTest version)
@@ -319,11 +363,13 @@ target_link_libraries(test-trigger-matching-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-trigger-matching-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Plugin API test (GoogleTest version)
@@ -336,11 +382,13 @@ target_link_libraries(test-plugin-api-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-plugin-api-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Variable expansion test (GoogleTest version)
@@ -353,11 +401,13 @@ target_link_libraries(test-variable-expansion-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-variable-expansion-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Plugin callbacks test (GoogleTest version)
@@ -370,11 +420,13 @@ target_link_libraries(test-plugin-callbacks-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-plugin-callbacks-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Plugin error path test (GoogleTest version)
@@ -387,11 +439,13 @@ target_link_libraries(test-plugin-errors-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-plugin-errors-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Trigger/Alias Lua API test (GoogleTest version)
@@ -404,11 +458,13 @@ target_link_libraries(test-trigger-alias-api-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-trigger-alias-api-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Command Window and Color Lua API test (GoogleTest version)
@@ -421,11 +477,13 @@ target_link_libraries(test-command-color-api-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-command-color-api-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Notepad API test (GoogleTest version)
@@ -438,11 +496,13 @@ target_link_libraries(test-notepad-api-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-notepad-api-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Plugin evaluation order test (GoogleTest version)
@@ -455,11 +515,13 @@ target_link_libraries(test-plugin-evaluation-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-plugin-evaluation-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Plugin state saving test (GoogleTest version)
@@ -472,11 +534,13 @@ target_link_libraries(test-plugin-state-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-plugin-state-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Command history navigation test (GoogleTest version)
@@ -489,11 +553,13 @@ target_link_libraries(test-command-history-navigation-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-command-history-navigation-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Plugin serialization test (GoogleTest version)
@@ -506,11 +572,13 @@ target_link_libraries(test-plugin-serialization-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-plugin-serialization-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Text data classes test (GoogleTest version)
@@ -523,11 +591,13 @@ target_link_libraries(test-text-data-classes-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-text-data-classes-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Retrospective logging test (GoogleTest version)
@@ -540,11 +610,13 @@ target_link_libraries(test-retrospective-logging-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-retrospective-logging-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Tab completion test (GoogleTest version)
@@ -557,11 +629,13 @@ target_link_libraries(test-tab-completion-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-tab-completion-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Word wrap test (GoogleTest version)
@@ -574,11 +648,13 @@ target_link_libraries(test-word-wrap-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-word-wrap-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Line logging test (GoogleTest version)
@@ -591,11 +667,13 @@ target_link_libraries(test-line-logging-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-line-logging-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Database test (GoogleTest version)
@@ -608,12 +686,14 @@ target_link_libraries(test-database-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     Qt6::Sql
     ui
 )
 
 gtest_discover_tests(test-database-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Lua Database API test (GoogleTest version)
@@ -626,11 +706,13 @@ target_link_libraries(test-lua-database-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-lua-database-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # XML serialization test (GoogleTest version)
@@ -643,11 +725,13 @@ target_link_libraries(test-xml-serialization-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-xml-serialization-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Options tables test (GoogleTest version)
@@ -660,11 +744,13 @@ target_link_libraries(test-options-tables-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-options-tables-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 
@@ -678,11 +764,13 @@ target_link_libraries(test-xml-roundtrip-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui
 )
 
 gtest_discover_tests(test-xml-roundtrip-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Miniwindow creation test (doesn't require Catch2)
@@ -694,6 +782,7 @@ target_link_libraries(test-miniwindow-creation PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     Qt6::Test
         ui          # Transitively brings: world, text, storage, automation, utils
                 # world includes Lua API (scripting merged into world)
@@ -708,6 +797,7 @@ target_link_libraries(test-miniwindow-drawing PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     Qt6::Test
         ui          # Transitively brings: world, text, storage, automation, utils
                 # world includes Lua API (scripting merged into world)
@@ -723,8 +813,14 @@ file(COPY
 )
 
 # Register miniwindow tests with CTest
-add_test(NAME test-miniwindow-creation COMMAND test-miniwindow-creation)
-add_test(NAME test-miniwindow-drawing COMMAND test-miniwindow-drawing)
+gtest_discover_tests(test-miniwindow-creation
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
+gtest_discover_tests(test-miniwindow-drawing
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+)
 
 # SendTo integration test (GoogleTest version)
 add_executable(test-sendto-integration-gtest
@@ -736,11 +832,13 @@ target_link_libraries(test-sendto-integration-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
 gtest_discover_tests(test-sendto-integration-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Sound API test (GoogleTest version)
@@ -753,12 +851,14 @@ target_link_libraries(test-sound-api-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     Qt6::Multimedia
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
 gtest_discover_tests(test-sound-api-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Unique ID API test (GoogleTest version)
@@ -771,11 +871,13 @@ target_link_libraries(test-unique-id-api-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
 gtest_discover_tests(test-unique-id-api-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Bit library compatibility test (GoogleTest version)
@@ -788,11 +890,13 @@ target_link_libraries(test-bit-library-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
 gtest_discover_tests(test-bit-library-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Progress library compatibility test (GoogleTest version)
@@ -805,11 +909,13 @@ target_link_libraries(test-progress-library-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
 gtest_discover_tests(test-progress-library-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Utility string functions test (GoogleTest version)
@@ -822,11 +928,13 @@ target_link_libraries(test-utility-string-functions-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
 gtest_discover_tests(test-utility-string-functions-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # Utils hashing and encoding test (GoogleTest version)
@@ -839,11 +947,13 @@ target_link_libraries(test-utils-hashing-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
 gtest_discover_tests(test-utils-hashing-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # MXP (MUD eXtension Protocol) test (GoogleTest version)
@@ -856,11 +966,13 @@ target_link_libraries(test-mxp-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
 gtest_discover_tests(test-mxp-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # ========== Array API Tests ==========
@@ -873,11 +985,13 @@ target_link_libraries(test-array-api-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
 gtest_discover_tests(test-array-api-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )
 
 # ========== URL Detection Tests ==========
@@ -890,9 +1004,11 @@ target_link_libraries(test-url-detection-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
 gtest_discover_tests(test-url-detection-gtest
-    DISCOVERY_TIMEOUT 30
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
 )

@@ -13,6 +13,7 @@
  * 8. Element collection and routing
  */
 
+#include "test_qt_static.h"
 #include "../src/world/mxp_types.h"
 #include "../src/world/world_document.h"
 #include <QApplication>

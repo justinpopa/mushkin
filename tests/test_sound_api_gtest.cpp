@@ -9,6 +9,7 @@
  * 5. Functions return correct error codes
  */
 
+#include "test_qt_static.h"
 #include "../src/world/lua_api/lua_common.h"
 #include "../src/world/script_engine.h"
 #include "../src/world/world_document.h"

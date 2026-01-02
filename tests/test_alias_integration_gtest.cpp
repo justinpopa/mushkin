@@ -8,6 +8,7 @@
  * 4. Command history respects bOmitFromCommandHistory
  */
 
+#include "test_qt_static.h"
 #include "../src/automation/alias.h"
 #include "../src/world/world_document.h"
 #include <QCoreApplication>
