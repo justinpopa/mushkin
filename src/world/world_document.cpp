@@ -2920,8 +2920,27 @@ void WorldDocument::handleLineWrap()
             }
         }
     } else {
-        // Hard break: split at the wrap column
-        // Save text beyond the wrap column
+        // No space found before wrap column
+        // Check if word-wrap is enabled and line truly has NO spaces at all
+        bool hasAnySpace = false;
+        if (m_wrap != 0) {
+            const char* lineText = m_currentLine->text();
+            for (qint32 i = 0; i < lineLen; i++) {
+                if (lineText[i] == ' ') {
+                    hasAnySpace = true;
+                    break;
+                }
+            }
+        }
+
+        // If word-wrap enabled and NO spaces at all, let line extend (preserves ASCII art)
+        // Otherwise, hard break at the wrap column
+        if (m_wrap != 0 && !hasAnySpace) {
+            // ASCII art with no spaces - don't break, let it extend
+            return;
+        }
+
+        // Hard break at the wrap column
         int splitPoint = static_cast<int>(m_nWrapColumn);
         int carryOverLen = lineLen - splitPoint;
 
