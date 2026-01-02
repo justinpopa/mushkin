@@ -20,10 +20,6 @@ option(STATIC_BUILD "Build with static Qt (dynamic deps from package manager)" O
 
 if(STATIC_BUILD)
     message(STATUS "Static build enabled - Qt will be statically linked")
-    # Disable app bundle for static builds (we want a single binary)
-    if(APPLE)
-        set(BUILD_APP_BUNDLE OFF)
-    endif()
 endif()
 
 # Qt setup - enable automatic MOC/UIC/RCC processing

@@ -55,7 +55,8 @@ jobs:
       - name: Package
         run: |
           mkdir -p package
-          cp build-static/mushkin package/
+          cp -R build-static/mushkin.app package/
+          codesign --force --deep --sign - package/mushkin.app
           cp README.md LICENSE package/ 2>/dev/null || true
           cd package
           zip -r ../mushkin-${{ needs.version.outputs.version }}-macos-${{ runner.arch }}.zip .
