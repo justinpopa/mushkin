@@ -167,10 +167,11 @@ build_mushkin() {
 # ============================================================
 
 verify_build() {
-    local binary="$BUILD_DIR/mushkin"
+    local bundle="$BUILD_DIR/mushkin.app"
+    local binary="$bundle/Contents/MacOS/mushkin"
 
-    if [ ! -f "$binary" ]; then
-        echo_error "Build failed - binary not found"
+    if [ ! -d "$bundle" ] || [ ! -f "$binary" ]; then
+        echo_error "Build failed - app bundle not found"
         exit 1
     fi
 
@@ -180,8 +181,8 @@ verify_build() {
     # Check architecture
     local archs=$(lipo -archs "$binary" 2>/dev/null)
     echo "  Architecture: $archs"
-    echo "  Size: $(du -h "$binary" | cut -f1)"
-    echo "  Location: $binary"
+    echo "  Size: $(du -sh "$bundle" | cut -f1)"
+    echo "  Location: $bundle"
     echo ""
 
     # Show dynamic dependencies
