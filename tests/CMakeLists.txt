@@ -37,6 +37,7 @@ target_link_libraries(test-pipeline-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
@@ -58,6 +59,7 @@ target_link_libraries(test-trigger-execution-gtest PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    ${QT_STATIC_PLUGINS}
     ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
 )
 
