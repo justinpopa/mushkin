@@ -17,6 +17,7 @@
       "Bash(xcrun *)",
       "Bash(which *)",
       "Bash(ls *)",
+      "Bash(ls)",
       "Bash(head *)",
       "Bash(tail *)",
       "Bash(cat *)",
