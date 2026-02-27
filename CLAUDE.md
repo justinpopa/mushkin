@@ -11,6 +11,10 @@
 - **Fix:** clang-tidy -p build --fix --checks='modernize-*,performance-*'
 - **Visual Check:** ./build/bin/mushkin (Requires manual UI verification)
 
+## Filesystem Scope
+- Do NOT modify files outside of this repository unless explicitly instructed.
+- Exception: `~/.claude/` (global settings, scripts, audit logs) may be modified when configuring Claude Code itself.
+
 ## Safety Principles (Non-Negotiable)
 - **Buffers:** `std::span` for all buffer passing. C-style arrays are forbidden.
 - **Ownership:** Every raw `new` is a bug. Use Qt parent-child or `std::unique_ptr`.
