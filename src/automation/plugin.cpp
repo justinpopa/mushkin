@@ -580,7 +580,7 @@ bool Plugin::SaveState()
     }
 
     // Need a state files directory
-    QString stateDir = GlobalOptions::instance()->stateFilesDirectory();
+    QString stateDir = GlobalOptions::instance().stateFilesDirectory();
     if (stateDir.isEmpty()) {
         qCDebug(lcAutomation) << "Plugin::SaveState() - no state files directory configured";
         return false;
@@ -715,7 +715,7 @@ bool Plugin::LoadState()
     }
 
     // Need a state files directory
-    QString stateDir = GlobalOptions::instance()->stateFilesDirectory();
+    QString stateDir = GlobalOptions::instance().stateFilesDirectory();
     if (stateDir.isEmpty()) {
         return true; // No state directory configured
     }

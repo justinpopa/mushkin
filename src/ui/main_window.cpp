@@ -1,15 +1,16 @@
 #include "main_window.h"
 #include "../automation/plugin.h" // For plugin callback constants
 #include "../storage/database.h"
-#include "../utils/app_paths.h"
 #include "../storage/global_options.h"
 #include "../text/line.h"
+#include "../utils/app_paths.h"
 #include "../world/notepad_widget.h"
 #include "../world/world_document.h"
 #include "dialogs/alias_list_dialog.h"
 #include "dialogs/ascii_art_dialog.h"
 #include "dialogs/command_history_dialog.h"
 #include "dialogs/confirm_preamble_dialog.h"
+#include "dialogs/debug_world_input_dialog.h"
 #include "dialogs/find_dialog.h"
 #include "dialogs/generate_id_dialog.h"
 #include "dialogs/generate_name_dialog.h"
@@ -21,7 +22,6 @@
 #include "dialogs/import_xml_dialog.h"
 #include "dialogs/insert_unicode_dialog.h"
 #include "dialogs/key_name_dialog.h"
-#include "dialogs/debug_world_input_dialog.h"
 #include "dialogs/map_comment_dialog.h"
 #include "dialogs/map_dialog.h"
 #include "dialogs/multiline_trigger_dialog.h"
@@ -35,8 +35,8 @@
 #include "dialogs/timer_list_dialog.h"
 #include "dialogs/trigger_list_dialog.h"
 #include "dialogs/world_properties_dialog.h"
-#include "preferences/unified_preferences_dialog.h"
 #include "logging.h"
+#include "preferences/unified_preferences_dialog.h"
 #include "views/input_view.h"
 #include "views/output_view.h"
 #include "views/world_widget.h"
@@ -52,27 +52,27 @@
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QFrame>
+#include <QHBoxLayout>
 #include <QHeaderView>
 #include <QInputDialog>
 #include <QMdiSubWindow>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QPainter>
 #include <QRegularExpression>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <QStyle>
+#include <QStyleHints>
+#include <QSvgRenderer>
 #include <QTableWidget>
 #include <QTextStream>
 #include <QTimer>
 #include <QToolBar>
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QFrame>
 #include <QToolButton>
-#include <QPainter>
-#include <QStyleHints>
-#include <QSvgRenderer>
+#include <QVBoxLayout>
 #include <functional>
 
 MainWindow::MainWindow(QWidget* parent)
@@ -481,17 +481,18 @@ void MainWindow::createMenus()
     m_connectToAllAction->setStatusTip("Connect to all open but disconnected worlds");
     connect(m_connectToAllAction, &QAction::triggered, this, &MainWindow::connectToAllOpenWorlds);
 
-    m_connectToStartupListAction = m_connectionMenu->addAction("Connect to Worlds &In Startup List");
+    m_connectToStartupListAction =
+        m_connectionMenu->addAction("Connect to Worlds &In Startup List");
     m_connectToStartupListAction->setStatusTip(
         "Open and connect to all worlds in the startup list");
     connect(m_connectToStartupListAction, &QAction::triggered, this,
             &MainWindow::connectToStartupList);
 
     // Set initial state from database
-    Database* db = Database::instance();
-    bool autoConnect = db->getPreferenceInt("AutoConnectWorlds", 0) != 0;
+    auto& db = Database::instance();
+    bool autoConnect = db.getPreferenceInt("AutoConnectWorlds", 0) != 0;
     m_autoConnectAction->setChecked(autoConnect);
-    bool reconnectOnDisconnect = db->getPreferenceInt("ReconnectOnDisconnect", 0) != 0;
+    bool reconnectOnDisconnect = db.getPreferenceInt("ReconnectOnDisconnect", 0) != 0;
     m_reconnectOnDisconnectAction->setChecked(reconnectOnDisconnect);
 
     // Game Menu (matches original MUSHclient structure)
@@ -522,13 +523,15 @@ void MainWindow::createMenus()
     m_configureConnectionAction->setShortcut(QKeySequence(Qt::ALT | Qt::Key_1));
     m_configureConnectionAction->setStatusTip("Configure MUD address and connection settings");
     m_configureConnectionAction->setMenuRole(QAction::NoRole);
-    connect(m_configureConnectionAction, &QAction::triggered, this, &MainWindow::configureConnection);
+    connect(m_configureConnectionAction, &QAction::triggered, this,
+            &MainWindow::configureConnection);
 
     m_configureConnectingAction = configureMenu->addAction("C&onnecting...");
     m_configureConnectingAction->setShortcut(QKeySequence(Qt::ALT | Qt::Key_2));
     m_configureConnectingAction->setStatusTip("Configure connection name and password");
     m_configureConnectingAction->setMenuRole(QAction::NoRole);
-    connect(m_configureConnectingAction, &QAction::triggered, this, &MainWindow::configureConnection);
+    connect(m_configureConnectingAction, &QAction::triggered, this,
+            &MainWindow::configureConnection);
 
     m_configureLoggingAction = configureMenu->addAction("&Logging...");
     m_configureLoggingAction->setShortcut(QKeySequence(Qt::ALT | Qt::Key_3));
@@ -567,7 +570,8 @@ void MainWindow::createMenus()
     m_configureCustomColoursAction->setShortcut(QKeySequence(Qt::ALT | Qt::Key_8));
     m_configureCustomColoursAction->setStatusTip("Configure custom colours");
     m_configureCustomColoursAction->setMenuRole(QAction::NoRole);
-    connect(m_configureCustomColoursAction, &QAction::triggered, this, &MainWindow::configureColours);
+    connect(m_configureCustomColoursAction, &QAction::triggered, this,
+            &MainWindow::configureColours);
 
     configureMenu->addSeparator();
 
@@ -1018,7 +1022,8 @@ void MainWindow::createMenus()
 
     m_closeAllNotepadAction = m_windowMenu->addAction("Close A&ll Notepad Windows");
     m_closeAllNotepadAction->setStatusTip("Close all notepad windows");
-    connect(m_closeAllNotepadAction, &QAction::triggered, this, &MainWindow::closeAllNotepadWindows);
+    connect(m_closeAllNotepadAction, &QAction::triggered, this,
+            &MainWindow::closeAllNotepadWindows);
 
     // We'll manually populate the window menu in Qt 6
     // (Qt 5's QMdiArea::setWindowMenu is not available in Qt 6)
@@ -1282,10 +1287,10 @@ void MainWindow::infoBarSetBackground(const QColor& color)
 
 void MainWindow::applyToolbarPreferences()
 {
-    Database* db = Database::instance();
+    auto& db = Database::instance();
 
     // Apply flat toolbar style
-    bool flatToolbars = db->getPreferenceInt("FlatToolbars", 1) != 0;
+    bool flatToolbars = db.getPreferenceInt("FlatToolbars", 1) != 0;
     QString toolbarStyle;
     if (flatToolbars) {
         // Flat style - no button borders
@@ -1302,7 +1307,7 @@ void MainWindow::applyToolbarPreferences()
 
     // Apply activity button bar style
     // Style values: 0-5 correspond to different Qt::ToolButtonStyle options
-    int buttonStyle = db->getPreferenceInt("ActivityButtonBarStyle", 0);
+    int buttonStyle = db.getPreferenceInt("ActivityButtonBarStyle", 0);
     Qt::ToolButtonStyle tbStyle;
     switch (buttonStyle) {
         case 1:
@@ -1329,8 +1334,8 @@ void MainWindow::applyToolbarPreferences()
 
 void MainWindow::applyTheme()
 {
-    Database* db = Database::instance();
-    int mode = db->getPreferenceInt("ThemeMode", ThemeSystem);
+    auto& db = Database::instance();
+    int mode = db.getPreferenceInt("ThemeMode", ThemeSystem);
 
     qDebug() << "applyTheme: mode =" << mode << "(0=Light, 1=Dark, 2=System)";
 
@@ -1365,8 +1370,8 @@ QIcon MainWindow::loadThemedIcon(const QString& name)
     file.close();
 
     // Determine icon color based on effective color scheme
-    Database* db = Database::instance();
-    int mode = db->getPreferenceInt("ThemeMode", ThemeSystem);
+    auto& db = Database::instance();
+    int mode = db.getPreferenceInt("ThemeMode", ThemeSystem);
 
     bool useDark = false;
     if (mode == ThemeDark) {
@@ -1591,8 +1596,8 @@ void MainWindow::changeEvent(QEvent* event)
     if (event->type() == QEvent::WindowStateChange) {
         // Check if minimizing and tray is enabled
         if (isMinimized() && m_trayIcon && m_trayIcon->isVisible()) {
-            Database* db = Database::instance();
-            int iconPlacement = db->getPreferenceInt("IconPlacement", 0);
+            auto& db = Database::instance();
+            int iconPlacement = db.getPreferenceInt("IconPlacement", 0);
 
             // If system tray only (1), hide from taskbar when minimized
             if (iconPlacement == 1) {
@@ -1640,8 +1645,8 @@ void MainWindow::setupSystemTray()
         return;
     }
 
-    Database* db = Database::instance();
-    int iconPlacement = db->getPreferenceInt("IconPlacement", 0);
+    auto& db = Database::instance();
+    int iconPlacement = db.getPreferenceInt("IconPlacement", 0);
 
     // 0 = taskbar only (no tray icon)
     // 1 = system tray only
@@ -1654,11 +1659,11 @@ void MainWindow::setupSystemTray()
     m_trayIcon = new QSystemTrayIcon(this);
 
     // Set icon - check for custom icon first
-    int trayIconType = db->getPreferenceInt("TrayIcon", 0);
+    int trayIconType = db.getPreferenceInt("TrayIcon", 0);
     QIcon trayIcon;
 
     if (trayIconType == 10) {
-        QString customIconPath = db->getPreference("TrayIconFileName", "");
+        QString customIconPath = db.getPreference("TrayIconFileName", "");
         if (!customIconPath.isEmpty() && QFile::exists(customIconPath)) {
             trayIcon = QIcon(customIconPath);
         }
@@ -1817,8 +1822,8 @@ void MainWindow::updateMenus()
     m_autoSayAction->setEnabled(hasActiveWorld);
 
     // Connection menu - startup list action enabled only if startup list exists
-    Database* db = Database::instance();
-    QString startupList = db->getPreference("WorldList", "");
+    auto& db = Database::instance();
+    QString startupList = db.getPreference("WorldList", "");
     m_connectToStartupListAction->setEnabled(!startupList.isEmpty());
 
     // Update Log Session checked state
@@ -1917,8 +1922,8 @@ void MainWindow::updateWindowMenu()
 
 void MainWindow::updateRecentFilesMenu()
 {
-    Database* db = Database::instance();
-    QStringList recentFiles = db->getRecentFiles();
+    auto& db = Database::instance();
+    QStringList recentFiles = db.getRecentFiles();
 
     int numRecentFiles = qMin(recentFiles.size(), MaxRecentFiles);
 
@@ -1940,8 +1945,8 @@ void MainWindow::updateRecentFilesMenu()
 
 void MainWindow::addRecentFile(const QString& filename)
 {
-    Database* db = Database::instance();
-    db->addRecentFile(filename);
+    auto& db = Database::instance();
+    db.addRecentFile(filename);
     updateRecentFilesMenu();
 }
 
@@ -1960,8 +1965,8 @@ void MainWindow::openStartupWorlds()
 
     // Read WorldList preference (asterisk-separated paths)
     // Matches original MUSHclient.cpp
-    Database* db = Database::instance();
-    QString worldList = db->getPreference("WorldList", "");
+    auto& db = Database::instance();
+    QString worldList = db.getPreference("WorldList", "");
 
     if (!worldList.isEmpty()) {
         // Split by asterisk delimiter
@@ -2027,7 +2032,8 @@ void MainWindow::newWorld()
     // On macOS, use frameless subwindow - WorldWidget has its own custom title bar
     subWindow->setWindowFlags(Qt::FramelessWindowHint);
     // Connect to window state changes to update minimized bar
-    connect(subWindow, &QMdiSubWindow::windowStateChanged, this, &MainWindow::onSubWindowStateChanged);
+    connect(subWindow, &QMdiSubWindow::windowStateChanged, this,
+            &MainWindow::onSubWindowStateChanged);
     // Connect to window state changes to update WorldWidget frame (hide border when maximized)
     connect(subWindow, &QMdiSubWindow::windowStateChanged, worldWidget,
             [worldWidget](Qt::WindowStates, Qt::WindowStates newState) {
@@ -2061,9 +2067,9 @@ void MainWindow::newWorld()
         }
 
         // Save current window geometry to database
-        Database* db = Database::instance();
+        auto& db = Database::instance();
         QRect geometry = subWindow->geometry();
-        db->saveWindowGeometry(worldWidget->worldName(), geometry);
+        db.saveWindowGeometry(worldWidget->worldName(), geometry);
     });
 
     // Show the subwindow
@@ -2079,7 +2085,7 @@ void MainWindow::newWorld()
 void MainWindow::openWorld()
 {
     // Use configured world directory (matches original MUSHclient behavior)
-    QString startDir = GlobalOptions::instance()->defaultWorldFileDirectory();
+    QString startDir = GlobalOptions::instance().defaultWorldFileDirectory();
 
     QString filename = QFileDialog::getOpenFileName(
         this, "Open World File", startDir, "MUSHclient World Files (*.mcl);;All Files (*)");
@@ -2120,7 +2126,8 @@ void MainWindow::openWorld(const QString& filename)
     // On macOS, use frameless subwindow - WorldWidget has its own custom title bar
     subWindow->setWindowFlags(Qt::FramelessWindowHint);
     // Connect to window state changes to update minimized bar
-    connect(subWindow, &QMdiSubWindow::windowStateChanged, this, &MainWindow::onSubWindowStateChanged);
+    connect(subWindow, &QMdiSubWindow::windowStateChanged, this,
+            &MainWindow::onSubWindowStateChanged);
     // Connect to window state changes to update WorldWidget frame (hide border when maximized)
     connect(subWindow, &QMdiSubWindow::windowStateChanged, worldWidget,
             [worldWidget](Qt::WindowStates, Qt::WindowStates newState) {
@@ -2155,9 +2162,9 @@ void MainWindow::openWorld(const QString& filename)
         }
 
         // Save current window geometry to database
-        Database* db = Database::instance();
+        auto& db = Database::instance();
         QRect geometry = subWindow->geometry();
-        db->saveWindowGeometry(worldWidget->worldName(), geometry);
+        db.saveWindowGeometry(worldWidget->worldName(), geometry);
     });
 
     // Show the subwindow
@@ -2165,12 +2172,10 @@ void MainWindow::openWorld(const QString& filename)
 
     // Try to restore saved window geometry from database
     // Matches original MUSHclient winplace.cpp behavior
-    Database* db = Database::instance();
-    QRect savedGeometry;
-    if (db->loadWindowGeometry(worldWidget->worldName(), savedGeometry)) {
-        subWindow->setGeometry(savedGeometry);
-        qCDebug(lcUI) << "Restored window geometry for" << worldWidget->worldName() << ":"
-                      << savedGeometry;
+    auto& db = Database::instance();
+    if (auto geom = db.loadWindowGeometry(worldWidget->worldName())) {
+        subWindow->setGeometry(*geom);
+        qCDebug(lcUI) << "Restored window geometry for" << worldWidget->worldName() << ":" << *geom;
     } else {
         // No saved geometry - use reasonable default size
         subWindow->resize(800, 600);
@@ -2180,7 +2185,7 @@ void MainWindow::openWorld(const QString& filename)
     updateMenus();
 
     // Check if auto-connect is enabled (matches original MUSHclient doc.cpp)
-    bool autoConnect = db->getPreferenceInt("AutoConnectWorlds", 0) != 0;
+    bool autoConnect = db.getPreferenceInt("AutoConnectWorlds", 0) != 0;
     if (autoConnect) {
         worldWidget->connectToMud();
         statusBar()->showMessage(
@@ -2223,9 +2228,9 @@ void MainWindow::saveWorld()
     // If no filename (new world), prompt for one (Save As behavior)
     if (filename.isEmpty()) {
         // Use configured world directory (matches original MUSHclient behavior)
-        QString startDir = GlobalOptions::instance()->defaultWorldFileDirectory();
-        filename = QFileDialog::getSaveFileName(
-            this, "Save World File", startDir, "MUSHclient World Files (*.mcl);;All Files (*)");
+        QString startDir = GlobalOptions::instance().defaultWorldFileDirectory();
+        filename = QFileDialog::getSaveFileName(this, "Save World File", startDir,
+                                                "MUSHclient World Files (*.mcl);;All Files (*)");
 
         if (filename.isEmpty()) {
             return; // User cancelled
@@ -2256,7 +2261,7 @@ void MainWindow::saveWorldAs()
     }
 
     // Use configured world directory (matches original MUSHclient behavior)
-    QString startDir = GlobalOptions::instance()->defaultWorldFileDirectory();
+    QString startDir = GlobalOptions::instance().defaultWorldFileDirectory();
     QString filename = QFileDialog::getSaveFileName(
         this, "Save World File As", startDir, "MUSHclient World Files (*.mcl);;All Files (*)");
 
@@ -2290,7 +2295,7 @@ void MainWindow::worldProperties()
 
     // Open Unified Preferences dialog to Connection page
     UnifiedPreferencesDialog dialog(worldWidget->document(),
-                                     UnifiedPreferencesDialog::Page::Connection, this);
+                                    UnifiedPreferencesDialog::Page::Connection, this);
     dialog.exec();
 }
 
@@ -2304,8 +2309,7 @@ void MainWindow::globalPreferences()
 void MainWindow::reloadDefaults()
 {
     // TODO: Implement reload defaults functionality
-    QMessageBox::information(this, "Reload Defaults",
-                             "Reload defaults is not yet implemented.");
+    QMessageBox::information(this, "Reload Defaults", "Reload defaults is not yet implemented.");
 }
 
 void MainWindow::toggleLogSession()
@@ -2339,10 +2343,10 @@ void MainWindow::toggleLogSession()
                                   .arg(QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss"));
 
         // Use configured log directory (matches original MUSHclient behavior)
-        QString logDir = GlobalOptions::instance()->defaultLogFileDirectory();
-        QString filename = QFileDialog::getSaveFileName(
-            this, "Save Log File", logDir + "/" + defaultName,
-            "Log Files (*.log *.txt);;All Files (*)");
+        QString logDir = GlobalOptions::instance().defaultLogFileDirectory();
+        QString filename =
+            QFileDialog::getSaveFileName(this, "Save Log File", logDir + "/" + defaultName,
+                                         "Log Files (*.log *.txt);;All Files (*)");
 
         if (filename.isEmpty()) {
             // User cancelled - uncheck the menu item
@@ -2485,7 +2489,7 @@ void MainWindow::pasteToWorld()
     QString text = clipboard->text();
 
     if (text.isEmpty()) {
-            return;
+        return;
     }
 
     // Get settings from confirm dialog or use defaults
@@ -2516,7 +2520,7 @@ void MainWindow::pasteToWorld()
         dlg.setEcho(echo);
 
         if (dlg.exec() != QDialog::Accepted) {
-                return;
+            return;
         }
 
         // Use values from dialog (user may have modified them)
@@ -2802,7 +2806,6 @@ void MainWindow::showCommandHistory()
     // Open Command History Dialog
     CommandHistoryDialog dialog(worldWidget->document(), this);
     dialog.exec();
-
 }
 
 void MainWindow::globalChange()
@@ -2890,7 +2893,6 @@ void MainWindow::globalChange()
         inputView->selectAll();
         inputView->textCursor().insertText(newText);
     }
-
 }
 
 void MainWindow::discardQueuedCommands()
@@ -2955,25 +2957,23 @@ void MainWindow::disconnectFromMud()
 void MainWindow::toggleAutoConnect()
 {
     // Toggle the global AutoConnectWorlds preference
-    Database* db = Database::instance();
-    bool currentValue = db->getPreferenceInt("AutoConnectWorlds", 0) != 0;
+    auto& db = Database::instance();
+    bool currentValue = db.getPreferenceInt("AutoConnectWorlds", 0) != 0;
     bool newValue = !currentValue;
 
-    db->setPreferenceInt("AutoConnectWorlds", newValue ? 1 : 0);
+    db.setPreferenceInt("AutoConnectWorlds", newValue ? 1 : 0);
     m_autoConnectAction->setChecked(newValue);
-
 }
 
 void MainWindow::toggleReconnectOnDisconnect()
 {
     // Toggle the global ReconnectOnDisconnect preference
-    Database* db = Database::instance();
-    bool currentValue = db->getPreferenceInt("ReconnectOnDisconnect", 0) != 0;
+    auto& db = Database::instance();
+    bool currentValue = db.getPreferenceInt("ReconnectOnDisconnect", 0) != 0;
     bool newValue = !currentValue;
 
-    db->setPreferenceInt("ReconnectOnDisconnect", newValue ? 1 : 0);
+    db.setPreferenceInt("ReconnectOnDisconnect", newValue ? 1 : 0);
     m_reconnectOnDisconnectAction->setChecked(newValue);
-
 }
 
 void MainWindow::connectToAllOpenWorlds()
@@ -2990,8 +2990,8 @@ void MainWindow::connectToAllOpenWorlds()
 void MainWindow::connectToStartupList()
 {
     // Open and connect to all worlds in the startup list
-    Database* db = Database::instance();
-    QString startupList = db->getPreference("WorldList", "");
+    auto& db = Database::instance();
+    QString startupList = db.getPreference("WorldList", "");
 
     if (startupList.isEmpty()) {
         return;
@@ -3070,7 +3070,6 @@ void MainWindow::toggleAutoSay()
     // Toggle Auto-Say setting
     bool newValue = m_autoSayAction->isChecked();
     doc->m_bEnableAutoSay = newValue ? 1 : 0;
-
 }
 
 void MainWindow::toggleWrapOutput()
@@ -3101,7 +3100,7 @@ void MainWindow::minimizeToTray()
     if (m_trayIcon && m_trayIcon->isVisible()) {
         hide();
         m_trayIcon->showMessage("Mushkin", "Application minimized to system tray",
-                                 QSystemTrayIcon::Information, 2000);
+                                QSystemTrayIcon::Information, 2000);
     } else {
         // No tray icon, just minimize normally
         showMinimized();
@@ -3128,7 +3127,6 @@ void MainWindow::toggleTrace()
     // Toggle trace mode
     bool traceEnabled = m_traceAction->isChecked();
     doc->m_bTrace = traceEnabled ? 1 : 0;
-
 }
 
 void MainWindow::testTrigger()
@@ -3189,11 +3187,10 @@ void MainWindow::editScriptFile()
     // Open the script file in the system's default text editor
     QUrl fileUrl = QUrl::fromLocalFile(doc->m_strScriptFilename);
     if (!QDesktopServices::openUrl(fileUrl)) {
-        QMessageBox::warning(
-            this, "Cannot Open File",
-            QString("Could not open script file:\n%1\n\n"
-                    "No application is associated with this file type.")
-                .arg(doc->m_strScriptFilename));
+        QMessageBox::warning(this, "Cannot Open File",
+                             QString("Could not open script file:\n%1\n\n"
+                                     "No application is associated with this file type.")
+                                 .arg(doc->m_strScriptFilename));
     }
 }
 
@@ -3319,9 +3316,8 @@ void MainWindow::configureTriggers()
 
     // Open Unified Preferences dialog to Triggers page
     UnifiedPreferencesDialog dialog(worldWidget->document(),
-                                     UnifiedPreferencesDialog::Page::Triggers, this);
+                                    UnifiedPreferencesDialog::Page::Triggers, this);
     dialog.exec();
-
 }
 
 void MainWindow::configureAliases()
@@ -3338,9 +3334,8 @@ void MainWindow::configureAliases()
 
     // Open Unified Preferences dialog to Aliases page
     UnifiedPreferencesDialog dialog(worldWidget->document(),
-                                     UnifiedPreferencesDialog::Page::Aliases, this);
+                                    UnifiedPreferencesDialog::Page::Aliases, this);
     dialog.exec();
-
 }
 
 void MainWindow::configureTimers()
@@ -3356,10 +3351,9 @@ void MainWindow::configureTimers()
     }
 
     // Open Unified Preferences dialog to Timers page
-    UnifiedPreferencesDialog dialog(worldWidget->document(),
-                                     UnifiedPreferencesDialog::Page::Timers, this);
+    UnifiedPreferencesDialog dialog(worldWidget->document(), UnifiedPreferencesDialog::Page::Timers,
+                                    this);
     dialog.exec();
-
 }
 
 void MainWindow::configureAll()
@@ -3376,7 +3370,7 @@ void MainWindow::configureAll()
 
     // Open Unified Preferences dialog to Connection page (first page)
     UnifiedPreferencesDialog dialog(worldWidget->document(),
-                                     UnifiedPreferencesDialog::Page::Connection, this);
+                                    UnifiedPreferencesDialog::Page::Connection, this);
     dialog.exec();
 }
 
@@ -3393,7 +3387,7 @@ void MainWindow::configureConnection()
     }
 
     UnifiedPreferencesDialog dialog(worldWidget->document(),
-                                     UnifiedPreferencesDialog::Page::Connection, this);
+                                    UnifiedPreferencesDialog::Page::Connection, this);
     dialog.exec();
 }
 
@@ -3410,7 +3404,7 @@ void MainWindow::configureLogging()
     }
 
     UnifiedPreferencesDialog dialog(worldWidget->document(),
-                                     UnifiedPreferencesDialog::Page::Logging, this);
+                                    UnifiedPreferencesDialog::Page::Logging, this);
     dialog.exec();
 }
 
@@ -3426,8 +3420,8 @@ void MainWindow::configureInfo()
         return;
     }
 
-    UnifiedPreferencesDialog dialog(worldWidget->document(),
-                                     UnifiedPreferencesDialog::Page::Info, this);
+    UnifiedPreferencesDialog dialog(worldWidget->document(), UnifiedPreferencesDialog::Page::Info,
+                                    this);
     dialog.exec();
 }
 
@@ -3443,8 +3437,8 @@ void MainWindow::configureOutput()
         return;
     }
 
-    UnifiedPreferencesDialog dialog(worldWidget->document(),
-                                     UnifiedPreferencesDialog::Page::Output, this);
+    UnifiedPreferencesDialog dialog(worldWidget->document(), UnifiedPreferencesDialog::Page::Output,
+                                    this);
     dialog.exec();
 }
 
@@ -3460,8 +3454,8 @@ void MainWindow::configureMxp()
         return;
     }
 
-    UnifiedPreferencesDialog dialog(worldWidget->document(),
-                                     UnifiedPreferencesDialog::Page::MXP, this);
+    UnifiedPreferencesDialog dialog(worldWidget->document(), UnifiedPreferencesDialog::Page::MXP,
+                                    this);
     dialog.exec();
 }
 
@@ -3477,8 +3471,8 @@ void MainWindow::configureColours()
         return;
     }
 
-    UnifiedPreferencesDialog dialog(worldWidget->document(),
-                                     UnifiedPreferencesDialog::Page::Colors, this);
+    UnifiedPreferencesDialog dialog(worldWidget->document(), UnifiedPreferencesDialog::Page::Colors,
+                                    this);
     dialog.exec();
 }
 
@@ -3495,7 +3489,7 @@ void MainWindow::configureCommands()
     }
 
     UnifiedPreferencesDialog dialog(worldWidget->document(),
-                                     UnifiedPreferencesDialog::Page::Commands, this);
+                                    UnifiedPreferencesDialog::Page::Commands, this);
     dialog.exec();
 }
 
@@ -3511,8 +3505,8 @@ void MainWindow::configureKeypad()
         return;
     }
 
-    UnifiedPreferencesDialog dialog(worldWidget->document(),
-                                     UnifiedPreferencesDialog::Page::Keypad, this);
+    UnifiedPreferencesDialog dialog(worldWidget->document(), UnifiedPreferencesDialog::Page::Keypad,
+                                    this);
     dialog.exec();
 }
 
@@ -3528,8 +3522,8 @@ void MainWindow::configureMacros()
         return;
     }
 
-    UnifiedPreferencesDialog dialog(worldWidget->document(),
-                                     UnifiedPreferencesDialog::Page::Macros, this);
+    UnifiedPreferencesDialog dialog(worldWidget->document(), UnifiedPreferencesDialog::Page::Macros,
+                                    this);
     dialog.exec();
 }
 
@@ -3546,7 +3540,7 @@ void MainWindow::configureAutoSay()
     }
 
     UnifiedPreferencesDialog dialog(worldWidget->document(),
-                                     UnifiedPreferencesDialog::Page::AutoSay, this);
+                                    UnifiedPreferencesDialog::Page::AutoSay, this);
     dialog.exec();
 }
 
@@ -3563,7 +3557,7 @@ void MainWindow::configurePaste()
     }
 
     UnifiedPreferencesDialog dialog(worldWidget->document(),
-                                     UnifiedPreferencesDialog::Page::PasteSend, this);
+                                    UnifiedPreferencesDialog::Page::PasteSend, this);
     dialog.exec();
 }
 
@@ -3580,7 +3574,7 @@ void MainWindow::configureScripting()
     }
 
     UnifiedPreferencesDialog dialog(worldWidget->document(),
-                                     UnifiedPreferencesDialog::Page::Scripting, this);
+                                    UnifiedPreferencesDialog::Page::Scripting, this);
     dialog.exec();
 }
 
@@ -3597,7 +3591,7 @@ void MainWindow::configureVariables()
     }
 
     UnifiedPreferencesDialog dialog(worldWidget->document(),
-                                     UnifiedPreferencesDialog::Page::Variables, this);
+                                    UnifiedPreferencesDialog::Page::Variables, this);
     dialog.exec();
 }
 
@@ -3616,7 +3610,6 @@ void MainWindow::configurePlugins()
     // Open Plugin Dialog
     PluginDialog dialog(worldWidget->document(), this);
     dialog.exec();
-
 }
 
 void MainWindow::pluginWizard()
@@ -3840,7 +3833,6 @@ void MainWindow::toggleAlwaysOnTop(bool enabled)
 
     // setWindowFlags hides the window, so we need to show it again
     show();
-
 }
 
 void MainWindow::toggleFullScreen(bool enabled)
@@ -3850,7 +3842,6 @@ void MainWindow::toggleFullScreen(bool enabled)
     } else {
         showNormal();
     }
-
 }
 
 void MainWindow::resetToolbars()
@@ -3884,7 +3875,6 @@ void MainWindow::resetToolbars()
     m_gameToolBarAction->setChecked(true);
     m_activityToolBarAction->setChecked(true);
     m_infoBarAction->setChecked(false);
-
 }
 
 int MainWindow::setToolBarPosition(int which, bool floating, int side, int top, int left)
@@ -4042,14 +4032,15 @@ void MainWindow::about()
 {
     QMessageBox::about(
         this, "About Mushkin",
-        QString("<h2>Mushkin</h2>"
-                "<p><b>Version %1</b></p>"
-                "<p>Cross-platform MUD client built with Qt 6</p>"
-                "<hr>"
-                "<p>A ground-up rewrite inspired by MUSHclient, "
-                "preserving its behavior and compatibility across multiple platforms.</p>"
-                "<p>Original MUSHclient by Nick Gammon:<br>"
-                "<a href='https://www.gammon.com.au/mushclient'>www.gammon.com.au/mushclient</a></p>")
+        QString(
+            "<h2>Mushkin</h2>"
+            "<p><b>Version %1</b></p>"
+            "<p>Cross-platform MUD client built with Qt 6</p>"
+            "<hr>"
+            "<p>A ground-up rewrite inspired by MUSHclient, "
+            "preserving its behavior and compatibility across multiple platforms.</p>"
+            "<p>Original MUSHclient by Nick Gammon:<br>"
+            "<a href='https://www.gammon.com.au/mushclient'>www.gammon.com.au/mushclient</a></p>")
             .arg(QCoreApplication::applicationVersion()));
 }
 
@@ -4138,7 +4129,6 @@ void MainWindow::clearOutput()
         if (outputView) {
             outputView->update();
         }
-
     }
 }
 
@@ -4180,7 +4170,6 @@ void MainWindow::recallText()
     QString title = QString("Recall: %1").arg(dialog.searchText());
     doc->SendToNotepad(title, result);
     doc->ActivateNotepad(title);
-
 }
 
 void MainWindow::stopSound()
@@ -4219,7 +4208,6 @@ void MainWindow::toggleCommandEcho()
     // Toggle the echo command flag
     bool newValue = m_commandEchoAction->isChecked();
     doc->m_display_my_input = newValue ? 1 : 0;
-
 }
 
 void MainWindow::toggleFreezeOutput()
@@ -4236,7 +4224,6 @@ void MainWindow::toggleFreezeOutput()
 
     bool newValue = m_freezeOutputAction->isChecked();
     worldWidget->outputView()->setFrozen(newValue);
-
 }
 
 void MainWindow::goToLine()
@@ -4383,7 +4370,6 @@ void MainWindow::goToBookmark()
         }
         current = (current + 1) % lines.count();
     } while (current != searchStart);
-
 }
 
 void MainWindow::activityList()
@@ -4931,7 +4917,8 @@ void MainWindow::createNotepadWindow(NotepadWidget* notepad)
     // On macOS, use frameless subwindow for consistency with world windows
     subWindow->setWindowFlags(Qt::FramelessWindowHint);
     // Connect to window state changes to update minimized bar
-    connect(subWindow, &QMdiSubWindow::windowStateChanged, this, &MainWindow::onSubWindowStateChanged);
+    connect(subWindow, &QMdiSubWindow::windowStateChanged, this,
+            &MainWindow::onSubWindowStateChanged);
     // Clean up minimized bar when destroyed
     connect(subWindow, &QObject::destroyed, [this, subWindow]() {
         if (m_minimizedBars.contains(subWindow)) {
@@ -5453,10 +5440,8 @@ void MainWindow::updateTimeIndicator()
     int hours = secs / 3600;
     int mins = (secs % 3600) / 60;
     int s = secs % 60;
-    m_timeIndicator->setText(QString("%1:%2:%3")
-                                 .arg(hours)
-                                 .arg(mins, 2, 10, QChar('0'))
-                                 .arg(s, 2, 10, QChar('0')));
+    m_timeIndicator->setText(
+        QString("%1:%2:%3").arg(hours).arg(mins, 2, 10, QChar('0')).arg(s, 2, 10, QChar('0')));
 }
 
 void MainWindow::onFreezeIndicatorClicked()
@@ -5533,24 +5518,20 @@ void MainWindow::onSubWindowStateChanged(Qt::WindowStates oldState, Qt::WindowSt
         QToolButton* restoreBtn = new QToolButton(bar);
         restoreBtn->setText("□");
         restoreBtn->setFixedSize(18, 18);
-        restoreBtn->setStyleSheet(
-            "QToolButton { border: 1px solid #666; border-radius: 2px; background: #444; color: #aaa; }"
-            "QToolButton:hover { background: #555; }");
-        connect(restoreBtn, &QToolButton::clicked, [subWindow]() {
-            subWindow->showNormal();
-        });
+        restoreBtn->setStyleSheet("QToolButton { border: 1px solid #666; border-radius: 2px; "
+                                  "background: #444; color: #aaa; }"
+                                  "QToolButton:hover { background: #555; }");
+        connect(restoreBtn, &QToolButton::clicked, [subWindow]() { subWindow->showNormal(); });
         barLayout->addWidget(restoreBtn);
 
         // Close button
         QToolButton* closeBtn = new QToolButton(bar);
         closeBtn->setText("×");
         closeBtn->setFixedSize(18, 18);
-        closeBtn->setStyleSheet(
-            "QToolButton { border: 1px solid #666; border-radius: 2px; background: #444; color: #aaa; }"
-            "QToolButton:hover { background: #744; color: #fcc; }");
-        connect(closeBtn, &QToolButton::clicked, [subWindow]() {
-            subWindow->close();
-        });
+        closeBtn->setStyleSheet("QToolButton { border: 1px solid #666; border-radius: 2px; "
+                                "background: #444; color: #aaa; }"
+                                "QToolButton:hover { background: #744; color: #fcc; }");
+        connect(closeBtn, &QToolButton::clicked, [subWindow]() { subWindow->close(); });
         barLayout->addWidget(closeBtn);
 
         // Insert before the stretch

@@ -18,16 +18,9 @@
 #include <QVBoxLayout>
 
 CommandHistoryDialog::CommandHistoryDialog(WorldDocument* doc, QWidget* parent)
-    : QDialog(parent)
-    , m_doc(doc)
-    , m_commandList(nullptr)
-    , m_filterEdit(nullptr)
-    , m_sendButton(nullptr)
-    , m_editButton(nullptr)
-    , m_deleteButton(nullptr)
-    , m_clearButton(nullptr)
-    , m_saveButton(nullptr)
-    , m_buttonBox(nullptr)
+    : QDialog(parent), m_doc(doc), m_commandList(nullptr), m_filterEdit(nullptr),
+      m_sendButton(nullptr), m_editButton(nullptr), m_deleteButton(nullptr), m_clearButton(nullptr),
+      m_saveButton(nullptr), m_buttonBox(nullptr)
 {
     setupUi();
     setupConnections();
@@ -111,8 +104,10 @@ void CommandHistoryDialog::setupConnections()
     connect(m_filterEdit, &QLineEdit::textChanged, this, &CommandHistoryDialog::filterChanged);
 
     // List connections
-    connect(m_commandList, &QListWidget::itemDoubleClicked, this, &CommandHistoryDialog::commandDoubleClicked);
-    connect(m_commandList, &QListWidget::itemSelectionChanged, this, &CommandHistoryDialog::selectionChanged);
+    connect(m_commandList, &QListWidget::itemDoubleClicked, this,
+            &CommandHistoryDialog::commandDoubleClicked);
+    connect(m_commandList, &QListWidget::itemSelectionChanged, this,
+            &CommandHistoryDialog::selectionChanged);
 
     // Dialog buttons
     connect(m_buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
@@ -143,7 +138,8 @@ void CommandHistoryDialog::populateList()
     if (filter.isEmpty()) {
         setWindowTitle(QString("Command History (%1 commands)").arg(totalCount));
     } else {
-        setWindowTitle(QString("Command History (%1 of %2 commands)").arg(displayedCount).arg(totalCount));
+        setWindowTitle(
+            QString("Command History (%1 of %2 commands)").arg(displayedCount).arg(totalCount));
     }
 }
 
@@ -188,14 +184,8 @@ void CommandHistoryDialog::editCommand()
 
     // Show input dialog
     bool ok;
-    QString edited = QInputDialog::getText(
-        this,
-        "Edit Command",
-        "Command:",
-        QLineEdit::Normal,
-        command,
-        &ok
-    );
+    QString edited =
+        QInputDialog::getText(this, "Edit Command", "Command:", QLineEdit::Normal, command, &ok);
 
     if (ok && !edited.isEmpty()) {
         // Find the actual index in the full history list
@@ -248,11 +238,8 @@ void CommandHistoryDialog::clearAll()
         return;
 
     QMessageBox::StandardButton reply = QMessageBox::question(
-        this,
-        "Clear History",
-        "Are you sure you want to clear all command history?",
-        QMessageBox::Yes | QMessageBox::No
-    );
+        this, "Clear History", "Are you sure you want to clear all command history?",
+        QMessageBox::Yes | QMessageBox::No);
 
     if (reply == QMessageBox::Yes) {
         m_doc->m_commandHistory.clear();
@@ -278,10 +265,10 @@ void CommandHistoryDialog::saveToFile()
         return;
 
     // Use configured log directory (matches original MUSHclient behavior)
-    QString logDir = GlobalOptions::instance()->defaultLogFileDirectory();
-    QString filename = QFileDialog::getSaveFileName(
-        this, "Save Command History", logDir + "/command_history.txt",
-        "Text Files (*.txt);;All Files (*)");
+    QString logDir = GlobalOptions::instance().defaultLogFileDirectory();
+    QString filename =
+        QFileDialog::getSaveFileName(this, "Save Command History", logDir + "/command_history.txt",
+                                     "Text Files (*.txt);;All Files (*)");
 
     if (filename.isEmpty())
         return;

@@ -46,7 +46,7 @@ class PluginErrorTest : public ::testing::Test {
         doc->m_strWorldID = "{ERROR-TEST-WORLD-ID-123456789012}";
 
         // Configure state files directory
-        GlobalOptions::instance()->setStateFilesDirectory(tempDir->path());
+        GlobalOptions::instance().setStateFilesDirectory(tempDir->path());
     }
 
     void TearDown() override

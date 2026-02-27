@@ -12,18 +12,16 @@
  * Ported from: globalregistryoptions.cpp (original MUSHclient)
  *
  * Usage:
- *   GlobalOptions* opts = GlobalOptions::instance();
- *   bool autoConnect = opts->autoConnectWorlds();
- *   opts->setAutoConnectWorlds(false);
- *   opts->save();  // Persist to storage
+ *   GlobalOptions& opts = GlobalOptions::instance();
+ *   bool autoConnect = opts.autoConnectWorlds();
+ *   opts.setAutoConnectWorlds(false);
+ *   opts.save();  // Persist to storage
  */
 
 #ifndef GLOBAL_OPTIONS_H
 #define GLOBAL_OPTIONS_H
 
 #include <QString>
-
-class QSettings;
 
 // Theme mode enumeration
 enum ThemeMode { ThemeLight = 0, ThemeDark = 1, ThemeSystem = 2 };
@@ -36,7 +34,7 @@ enum ThemeMode { ThemeLight = 0, ThemeDark = 1, ThemeSystem = 2 };
  */
 class GlobalOptions {
   public:
-    static GlobalOptions* instance();
+    static GlobalOptions& instance();
 
     // Load all options from QSettings
     void load();
@@ -649,10 +647,6 @@ class GlobalOptions {
     GlobalOptions(const GlobalOptions&) = delete;
     GlobalOptions& operator=(const GlobalOptions&) = delete;
 
-    // Helper to get QSettings configured for MUSHclient Registry path
-    QSettings* createSettings() const;
-
-    static GlobalOptions* s_instance;
     bool m_loaded = false;
 
     // ========================================================================

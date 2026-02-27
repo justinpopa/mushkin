@@ -104,7 +104,7 @@ class PluginApiTest : public ::testing::Test {
         doc->m_strWorldID = "{API-TEST-WORLD-ID-1234567890}";
 
         // Configure state files directory
-        GlobalOptions::instance()->setStateFilesDirectory(tempDir->path());
+        GlobalOptions::instance().setStateFilesDirectory(tempDir->path());
 
         // Create test plugin files
         plugin1Path = tempDir->path() + "/plugin1.xml";

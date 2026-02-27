@@ -146,13 +146,13 @@ int main(int argc, char* argv[])
     qputenv("LUA_CPATH", newLuaCPath.toLocal8Bit());
 
     // Open preferences database
-    Database* db = Database::instance();
-    if (!db->open()) {
+    auto& db = Database::instance();
+    if (!db.open()) {
         qWarning() << "Failed to open preferences database";
     }
 
     // Load global options from database
-    GlobalOptions::instance()->load();
+    GlobalOptions::instance().load();
 
     // Register Lua dialog callbacks (connects ui module dialogs to world module)
     LuaDialogRegistration::registerDialogCallbacks();

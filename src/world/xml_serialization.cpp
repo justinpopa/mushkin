@@ -50,8 +50,8 @@ QString resolvePluginPath(const QString& pluginPath, const QString& worldFilePat
     QString worldDir = worldFileInfo.absolutePath();
 
     // Get plugins directory
-    Database* db = Database::instance();
-    QString pluginsDir = db->getPreference("PluginsDirectory", "./worlds/plugins/");
+    auto& db = Database::instance();
+    QString pluginsDir = db.getPreference("PluginsDirectory", "./worlds/plugins/");
 
     // Convert Windows backslashes in plugins directory path
     pluginsDir.replace('\\', '/');

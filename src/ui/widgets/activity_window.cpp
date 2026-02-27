@@ -61,8 +61,8 @@ ActivityWindow::ActivityWindow(MainWindow* mainWindow)
     connect(m_refreshTimer, &QTimer::timeout, this, &ActivityWindow::refresh);
 
     // Get refresh interval from preferences (default 15 seconds)
-    Database* db = Database::instance();
-    int intervalSecs = db->getPreferenceInt("ActivityWindowRefreshInterval", 15);
+    auto& db = Database::instance();
+    int intervalSecs = db.getPreferenceInt("ActivityWindowRefreshInterval", 15);
     m_refreshTimer->start(intervalSecs * 1000);
 
     // Initial refresh
@@ -347,7 +347,7 @@ void ActivityWindow::saveWorldAs()
         return;
 
     // Use configured world directory (matches original MUSHclient behavior)
-    QString startDir = GlobalOptions::instance()->defaultWorldFileDirectory();
+    QString startDir = GlobalOptions::instance().defaultWorldFileDirectory();
     QString filename = QFileDialog::getSaveFileName(
         this, tr("Save World As"), startDir, tr("MUSHclient World Files (*.mcl);;All Files (*)"));
 

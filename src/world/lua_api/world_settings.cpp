@@ -691,8 +691,8 @@ int L_GetInfo(lua_State* L)
         case 60: // Plugins directory (global)
         {
             // Return global plugins directory, resolved to absolute path
-            Database* db = Database::instance();
-            QString pluginsDir = db->getPreference("PluginsDirectory", "./worlds/plugins/");
+            auto& db = Database::instance();
+            QString pluginsDir = db.getPreference("PluginsDirectory", "./worlds/plugins/");
             pluginsDir.replace('\\', '/');
 
             // If relative, resolve against application directory

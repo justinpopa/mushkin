@@ -86,7 +86,7 @@ class PluginStateTest : public ::testing::Test {
         doc->m_strWorldID = worldID;
 
         // Configure state files directory to use temp directory
-        GlobalOptions::instance()->setStateFilesDirectory(tempDir->path());
+        GlobalOptions::instance().setStateFilesDirectory(tempDir->path());
 
         // Create test plugin file
         pluginPath = tempDir->path() + "/test-plugin.xml";

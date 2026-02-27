@@ -115,10 +115,10 @@ void RecallSearchDialog::setupUi()
 
 void RecallSearchDialog::loadSettings()
 {
-    Database* db = Database::instance();
+    auto& db = Database::instance();
 
     // Load search history
-    QString historyStr = db->getPreference("RecallHistory", "");
+    QString historyStr = db.getPreference("RecallHistory", "");
     if (!historyStr.isEmpty()) {
         m_searchHistory = historyStr.split('\n', Qt::SkipEmptyParts);
         for (const QString& text : m_searchHistory) {
@@ -127,32 +127,32 @@ void RecallSearchDialog::loadSettings()
     }
 
     // Load last search options
-    m_matchCaseCheck->setChecked(db->getPreferenceInt("RecallMatchCase", 0) != 0);
-    m_useRegexCheck->setChecked(db->getPreferenceInt("RecallUseRegex", 0) != 0);
-    m_includeOutputCheck->setChecked(db->getPreferenceInt("RecallIncludeOutput", 1) != 0);
-    m_includeCommandsCheck->setChecked(db->getPreferenceInt("RecallIncludeCommands", 0) != 0);
-    m_includeNotesCheck->setChecked(db->getPreferenceInt("RecallIncludeNotes", 0) != 0);
-    m_linePreambleEdit->setText(db->getPreference("RecallLinePreamble", ""));
+    m_matchCaseCheck->setChecked(db.getPreferenceInt("RecallMatchCase", 0) != 0);
+    m_useRegexCheck->setChecked(db.getPreferenceInt("RecallUseRegex", 0) != 0);
+    m_includeOutputCheck->setChecked(db.getPreferenceInt("RecallIncludeOutput", 1) != 0);
+    m_includeCommandsCheck->setChecked(db.getPreferenceInt("RecallIncludeCommands", 0) != 0);
+    m_includeNotesCheck->setChecked(db.getPreferenceInt("RecallIncludeNotes", 0) != 0);
+    m_linePreambleEdit->setText(db.getPreference("RecallLinePreamble", ""));
 }
 
 void RecallSearchDialog::saveSettings()
 {
-    Database* db = Database::instance();
+    auto& db = Database::instance();
 
     // Save search history (limit to 20)
     while (m_searchHistory.size() > 20) {
         m_searchHistory.removeLast();
     }
     QString historyStr = m_searchHistory.join('\n');
-    db->setPreference("RecallHistory", historyStr);
+    db.setPreference("RecallHistory", historyStr);
 
     // Save search options
-    db->setPreferenceInt("RecallMatchCase", m_matchCaseCheck->isChecked() ? 1 : 0);
-    db->setPreferenceInt("RecallUseRegex", m_useRegexCheck->isChecked() ? 1 : 0);
-    db->setPreferenceInt("RecallIncludeOutput", m_includeOutputCheck->isChecked() ? 1 : 0);
-    db->setPreferenceInt("RecallIncludeCommands", m_includeCommandsCheck->isChecked() ? 1 : 0);
-    db->setPreferenceInt("RecallIncludeNotes", m_includeNotesCheck->isChecked() ? 1 : 0);
-    db->setPreference("RecallLinePreamble", m_linePreambleEdit->text());
+    db.setPreferenceInt("RecallMatchCase", m_matchCaseCheck->isChecked() ? 1 : 0);
+    db.setPreferenceInt("RecallUseRegex", m_useRegexCheck->isChecked() ? 1 : 0);
+    db.setPreferenceInt("RecallIncludeOutput", m_includeOutputCheck->isChecked() ? 1 : 0);
+    db.setPreferenceInt("RecallIncludeCommands", m_includeCommandsCheck->isChecked() ? 1 : 0);
+    db.setPreferenceInt("RecallIncludeNotes", m_includeNotesCheck->isChecked() ? 1 : 0);
+    db.setPreference("RecallLinePreamble", m_linePreambleEdit->text());
 }
 
 void RecallSearchDialog::onOkClicked()

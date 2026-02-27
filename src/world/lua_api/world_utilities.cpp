@@ -423,8 +423,8 @@ int L_GetGlobalOption(lua_State* L)
     const char* name = luaL_checkstring(L, 1);
     QString qName = QString::fromUtf8(name);
 
-    Database* db = Database::instance();
-    if (!db || !db->isOpen()) {
+    auto& db = Database::instance();
+    if (!db.isOpen()) {
         lua_pushnil(L);
         return 1;
     }
@@ -484,13 +484,13 @@ int L_GetGlobalOption(lua_State* L)
 
     // Check if it's a numeric option
     if (numericOptions.contains(qName)) {
-        int value = db->getPreferenceInt(qName, 0);
+        int value = db.getPreferenceInt(qName, 0);
         lua_pushnumber(L, value);
         return 1;
     }
 
     // String options (from AlphaGlobalOptionsTable in original)
-    QString value = db->getPreference(qName, QString());
+    QString value = db.getPreference(qName, QString());
     if (!value.isNull()) {
         QByteArray ba = value.toUtf8();
         lua_pushlstring(L, ba.constData(), ba.length());
@@ -4671,8 +4671,8 @@ int L_Save(lua_State* L)
     // If still empty (new unsaved world), show Save As dialog
     if (filename.isEmpty()) {
         // Get default world directory
-        Database* db = Database::instance();
-        QString defaultDir = db->getPreference("DefaultWorldFileDirectory", "./worlds/");
+        auto& db = Database::instance();
+        QString defaultDir = db.getPreference("DefaultWorldFileDirectory", "./worlds/");
 
         // Resolve relative path against application directory
         if (!QDir::isAbsolutePath(defaultDir)) {
