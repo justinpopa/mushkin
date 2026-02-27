@@ -945,9 +945,7 @@ QString PluginWizard::generatePluginXml()
     QString purpose = field("purpose").toString();
     QString version = field("version").toString();
     QString dateWritten = field("dateWritten").toString();
-    double
-        requires
-    = field("requires").toDouble();
+    double requiresVersion = field("requires").toDouble();
     QString description = field("description").toString();
     bool generateHelp = field("generateHelp").toBool();
     QString helpAlias = field("helpAlias").toString();
@@ -984,7 +982,7 @@ QString PluginWizard::generatePluginXml()
     out << QString("   purpose=\"%1\"\n").arg(purpose);
     out << QString("   save_state=\"%1\"\n").arg(saveState ? "y" : "n");
     out << QString("   date_written=\"%1\"\n").arg(dateWritten);
-    out << QString("   requires=\"%1\"\n").arg(requires, 0, 'f', 2);
+    out << QString("   requires=\"%1\"\n").arg(requiresVersion, 0, 'f', 2);
     out << QString("   version=\"%1\"\n").arg(version);
     out << "   >\n";
 
@@ -1117,7 +1115,7 @@ bool PluginWizard::savePluginXml(const QString& xml)
     QString suggestedFilename = pluginName + ".xml";
 
     // Use configured plugins directory (matches original MUSHclient behavior)
-    QString pluginDir = GlobalOptions::instance()->pluginsDirectory();
+    QString pluginDir = GlobalOptions::instance().pluginsDirectory();
 
     // File save dialog
     QString filename = QFileDialog::getSaveFileName(this, tr("Save Plugin As"),

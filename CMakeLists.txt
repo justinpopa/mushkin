@@ -4,8 +4,24 @@ project(mushkin VERSION 0.1.0 LANGUAGES C CXX)
 # x-release-please-end
 
 # C++ standard
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Workaround: Homebrew LLVM + macOS 26 SDK header incompatibility.
+# When Qt (or other imported targets) add the SDK include path via -isystem,
+# it breaks LLVM's libc++ header wrapping (size_t, wint_t etc. not found).
+# Marking the SDK include path as implicit prevents CMake from emitting -isystem for it,
+# allowing LLVM's internal header ordering to work correctly.
+if(APPLE AND NOT CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+    execute_process(
+        COMMAND xcrun --show-sdk-path
+        OUTPUT_VARIABLE _sdk_path
+        OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(_sdk_path)
+        list(APPEND CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES "${_sdk_path}/usr/include")
+        list(APPEND CMAKE_C_IMPLICIT_INCLUDE_DIRECTORIES "${_sdk_path}/usr/include")
+    endif()
+endif()
 
 # ========== macOS App Bundle Option ==========
 if(APPLE)

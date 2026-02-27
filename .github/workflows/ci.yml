@@ -106,6 +106,14 @@ jobs:
         env:
           QT_QPA_PLATFORM: ${{ matrix.os == 'Linux' && 'offscreen' || '' }}
 
+      - name: Lint (Unix)
+        if: matrix.os != 'Windows'
+        run: |
+          # Run clang-tidy on changed source files only (faster than full scan)
+          cmake -B build -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+          git diff --name-only origin/main...HEAD -- 'src/*.cpp' 'src/*.h' | \
+            xargs -r clang-tidy -p build --warnings-as-errors='cppcoreguidelines-owning-memory,bugprone-use-after-move' 2>&1 || true
+
       - name: Test (Unix)
         if: matrix.os != 'Windows'
         run: ctest --test-dir build --output-on-failure --build-config Release
