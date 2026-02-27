@@ -950,7 +950,7 @@ int L_SendPkt(lua_State* L)
     WorldDocument* pDoc = doc(L);
 
     // Check if connected (eWorldClosed = 1, eOK = 0)
-    if (pDoc->m_iConnectPhase != eConnectConnectedToMud) {
+    if (pDoc->m_connectionManager->m_iConnectPhase != eConnectConnectedToMud) {
         lua_pushnumber(L, 1); // eWorldClosed
         return 1;
     }
@@ -1004,9 +1004,9 @@ int L_SaveState(lua_State* L)
     }
 
     // Save state
-    bool success = currentPlugin->SaveState();
+    auto result = currentPlugin->SaveState();
 
-    if (success) {
+    if (result.has_value()) {
         lua_pushnumber(L, eOK);
     } else {
         lua_pushnumber(L, ePluginCouldNotSaveState);
@@ -1058,7 +1058,7 @@ int L_GetPluginVariable(lua_State* L)
     QString varName = QString::fromUtf8(variableName);
     auto it = plugin->m_VariableMap.find(varName);
     if (it != plugin->m_VariableMap.end()) {
-        lua_pushstring(L, it->second->strContents.toUtf8().constData());
+        lua_pushstring(L, it->second->contents.toUtf8().constData());
     } else {
         lua_pushnil(L);
     }

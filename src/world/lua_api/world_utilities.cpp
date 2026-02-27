@@ -1275,7 +1275,7 @@ int L_Metaphone(lua_State* L)
 int L_ResetIP(lua_State* L)
 {
     Q_UNUSED(L);
-    // Original just zeroed m_sockAddr, proxy support was removed
+    // Proxy support was removed during MFC→Qt port
     return 0;
 }
 
@@ -1651,28 +1651,28 @@ int L_EnableGroup(lua_State* L)
     long count = 0;
 
     // Enable/disable triggers in the group
-    for (const auto& [name, triggerPtr] : pDoc->m_TriggerMap) {
+    for (const auto& [name, triggerPtr] : pDoc->m_automationRegistry->m_TriggerMap) {
         Trigger* trigger = triggerPtr.get();
-        if (trigger && trigger->strGroup == qGroupName) {
-            trigger->bEnabled = enabled;
+        if (trigger && trigger->group == qGroupName) {
+            trigger->enabled = enabled;
             count++;
         }
     }
 
     // Enable/disable aliases in the group
-    for (const auto& [name, aliasPtr] : pDoc->m_AliasMap) {
+    for (const auto& [name, aliasPtr] : pDoc->m_automationRegistry->m_AliasMap) {
         Alias* alias = aliasPtr.get();
-        if (alias && alias->strGroup == qGroupName) {
-            alias->bEnabled = enabled;
+        if (alias && alias->group == qGroupName) {
+            alias->enabled = enabled;
             count++;
         }
     }
 
     // Enable/disable timers in the group
-    for (const auto& [name, timerPtr] : pDoc->m_TimerMap) {
+    for (const auto& [name, timerPtr] : pDoc->m_automationRegistry->m_TimerMap) {
         Timer* timer = timerPtr.get();
-        if (timer && timer->strGroup == qGroupName) {
-            timer->bEnabled = enabled;
+        if (timer && timer->group == qGroupName) {
+            timer->enabled = enabled;
             count++;
         }
     }
@@ -1722,40 +1722,40 @@ int L_DeleteGroup(lua_State* L)
 
     // Collect triggers to delete (can't modify map while iterating)
     QStringList triggersToDelete;
-    for (const auto& [name, triggerPtr] : pDoc->m_TriggerMap) {
+    for (const auto& [name, triggerPtr] : pDoc->m_automationRegistry->m_TriggerMap) {
         Trigger* trigger = triggerPtr.get();
-        if (trigger && trigger->strGroup == qGroupName) {
+        if (trigger && trigger->group == qGroupName) {
             triggersToDelete.append(name);
         }
     }
     for (const QString& name : triggersToDelete) {
-        pDoc->deleteTrigger(name);
+        (void)pDoc->deleteTrigger(name); // intentional: bulk group delete
         count++;
     }
 
     // Collect aliases to delete
     QStringList aliasesToDelete;
-    for (const auto& [name, aliasPtr] : pDoc->m_AliasMap) {
+    for (const auto& [name, aliasPtr] : pDoc->m_automationRegistry->m_AliasMap) {
         Alias* alias = aliasPtr.get();
-        if (alias && alias->strGroup == qGroupName) {
+        if (alias && alias->group == qGroupName) {
             aliasesToDelete.append(name);
         }
     }
     for (const QString& name : aliasesToDelete) {
-        pDoc->deleteAlias(name);
+        (void)pDoc->deleteAlias(name); // intentional: bulk group delete
         count++;
     }
 
     // Collect timers to delete
     QStringList timersToDelete;
-    for (const auto& [name, timerPtr] : pDoc->m_TimerMap) {
+    for (const auto& [name, timerPtr] : pDoc->m_automationRegistry->m_TimerMap) {
         Timer* timer = timerPtr.get();
-        if (timer && timer->strGroup == qGroupName) {
+        if (timer && timer->group == qGroupName) {
             timersToDelete.append(name);
         }
     }
     for (const QString& name : timersToDelete) {
-        pDoc->deleteTimer(name);
+        (void)pDoc->deleteTimer(name); // intentional: bulk group delete
         count++;
     }
 
@@ -2366,8 +2366,8 @@ int L_GetTriggerWildcard(lua_State* L)
     QString name = QString::fromUtf8(triggerName).trimmed().toLower();
 
     // Find the trigger
-    auto it = pDoc->m_TriggerMap.find(name);
-    if (it == pDoc->m_TriggerMap.end()) {
+    auto it = pDoc->m_automationRegistry->m_TriggerMap.find(name);
+    if (it == pDoc->m_automationRegistry->m_TriggerMap.end()) {
         lua_pushnil(L);
         return 1;
     }
@@ -2421,8 +2421,8 @@ int L_GetAliasWildcard(lua_State* L)
     QString name = QString::fromUtf8(aliasName).trimmed().toLower();
 
     // Find the alias
-    auto it = pDoc->m_AliasMap.find(name);
-    if (it == pDoc->m_AliasMap.end()) {
+    auto it = pDoc->m_automationRegistry->m_AliasMap.find(name);
+    if (it == pDoc->m_automationRegistry->m_AliasMap.end()) {
         lua_pushnil(L);
         return 1;
     }
@@ -2596,7 +2596,7 @@ int L_SetTrace(lua_State* L)
 int L_GetEchoInput(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    lua_pushboolean(L, pDoc->m_display_my_input != 0);
+    lua_pushboolean(L, pDoc->m_display_my_input);
     return 1;
 }
 
@@ -2620,7 +2620,7 @@ int L_SetEchoInput(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
     bool enable = lua_toboolean(L, 1);
-    pDoc->m_display_my_input = enable ? 1 : 0;
+    pDoc->m_display_my_input = enable;
     return 0;
 }
 
@@ -2931,7 +2931,7 @@ int L_GetWorldIdList(lua_State* L)
 int L_GetLogInput(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    lua_pushboolean(L, pDoc->m_log_input != 0);
+    lua_pushboolean(L, pDoc->m_log_input);
     return 1;
 }
 
@@ -2959,7 +2959,7 @@ int L_SetLogInput(lua_State* L)
     WorldDocument* pDoc = doc(L);
     // Default to true if no argument provided (matches original optboolean behavior)
     bool enable = lua_isnone(L, 1) ? true : lua_toboolean(L, 1);
-    pDoc->m_log_input = enable ? 1 : 0;
+    pDoc->m_log_input = enable;
     return 0;
 }
 
@@ -2981,7 +2981,7 @@ int L_SetLogInput(lua_State* L)
 int L_GetLogNotes(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    lua_pushboolean(L, pDoc->m_bLogNotes != 0);
+    lua_pushboolean(L, pDoc->m_bLogNotes);
     return 1;
 }
 
@@ -3007,7 +3007,7 @@ int L_SetLogNotes(lua_State* L)
     WorldDocument* pDoc = doc(L);
     // Default to true if no argument provided (matches original optboolean behavior)
     bool enable = lua_isnone(L, 1) ? true : lua_toboolean(L, 1);
-    pDoc->m_bLogNotes = enable ? 1 : 0;
+    pDoc->m_bLogNotes = enable;
     return 0;
 }
 
@@ -3029,7 +3029,7 @@ int L_SetLogNotes(lua_State* L)
 int L_GetLogOutput(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    lua_pushboolean(L, pDoc->m_bLogOutput != 0);
+    lua_pushboolean(L, pDoc->m_bLogOutput);
     return 1;
 }
 
@@ -3057,7 +3057,7 @@ int L_SetLogOutput(lua_State* L)
     WorldDocument* pDoc = doc(L);
     // Default to true if no argument provided (matches original optboolean behavior)
     bool enable = lua_isnone(L, 1) ? true : lua_toboolean(L, 1);
-    pDoc->m_bLogOutput = enable ? 1 : 0;
+    pDoc->m_bLogOutput = enable;
     return 0;
 }
 
@@ -3089,7 +3089,7 @@ int L_LogSend(lua_State* L)
     WorldDocument* pDoc = doc(L);
 
     // Check if connected
-    if (pDoc->m_iConnectPhase != eConnectConnectedToMud) {
+    if (pDoc->m_connectionManager->m_iConnectPhase != eConnectConnectedToMud) {
         return luaReturnError(L, eWorldClosed);
     }
 
@@ -4703,10 +4703,10 @@ int L_Save(lua_State* L)
     if (!pDoc->m_strWorldSave.isEmpty() && pDoc->m_ScriptEngine) {
         QList<double> nparams;
         QList<QString> sparams;
-        long nInvocationCount = 0;
+        long invocation_count = 0;
         pDoc->m_ScriptEngine->executeLua(pDoc->m_dispidWorldSave, pDoc->m_strWorldSave,
                                          eWorldAction, "world", "world save", nparams, sparams,
-                                         nInvocationCount);
+                                         invocation_count);
     }
 
     // Notify plugins via ON_PLUGIN_WORLD_SAVE callback

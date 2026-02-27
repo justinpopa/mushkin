@@ -4,21 +4,20 @@
 #include "dialogs/timer_edit_dialog.h"
 #include "world/world_document.h"
 
-TimersPage::TimersPage(WorldDocument* doc, QWidget* parent)
-    : ItemListPageBase(doc, parent)
+TimersPage::TimersPage(WorldDocument* doc, QWidget* parent) : ItemListPageBase(doc, parent)
 {
     setupUi();
 }
 
 int TimersPage::itemCount() const
 {
-    return static_cast<int>(m_doc->m_TimerMap.size());
+    return static_cast<int>(m_doc->m_automationRegistry->m_TimerMap.size());
 }
 
 QStringList TimersPage::itemNames() const
 {
     QStringList names;
-    for (const auto& [name, timerPtr] : m_doc->m_TimerMap) {
+    for (const auto& [name, timerPtr] : m_doc->m_automationRegistry->m_TimerMap) {
         names.append(name);
     }
     return names;
@@ -31,44 +30,44 @@ bool TimersPage::itemExists(const QString& name) const
 
 void TimersPage::deleteItem(const QString& name)
 {
-    m_doc->deleteTimer(name);
+    (void)m_doc->deleteTimer(name); // UI: item selected for deletion; not-found is a no-op
 }
 
 QString TimersPage::getItemGroup(const QString& name) const
 {
     Timer* timer = m_doc->getTimer(name);
-    return timer ? timer->strGroup : QString();
+    return timer ? timer->group : QString();
 }
 
 bool TimersPage::getItemEnabled(const QString& name) const
 {
     Timer* timer = m_doc->getTimer(name);
-    return timer ? timer->bEnabled : false;
+    return timer ? timer->enabled : false;
 }
 
 void TimersPage::setItemEnabled(const QString& name, bool enabled)
 {
     Timer* timer = m_doc->getTimer(name);
     if (timer) {
-        timer->bEnabled = enabled;
+        timer->enabled = enabled;
     }
 }
 
 QString TimersPage::formatTimerTiming(Timer* timer) const
 {
-    if (timer->iType == Timer::eAtTime) {
+    if (timer->type == Timer::eAtTime) {
         return QString("At %1:%2:%3")
-            .arg(timer->iAtHour, 2, 10, QChar('0'))
-            .arg(timer->iAtMinute, 2, 10, QChar('0'))
-            .arg(timer->fAtSecond, 4, 'f', 1, QChar('0'));
+            .arg(timer->at_hour, 2, 10, QChar('0'))
+            .arg(timer->at_minute, 2, 10, QChar('0'))
+            .arg(timer->at_second, 4, 'f', 1, QChar('0'));
     } else {
         QString result = "Every ";
-        if (timer->iEveryHour > 0)
-            result += QString("%1h ").arg(timer->iEveryHour);
-        if (timer->iEveryMinute > 0)
-            result += QString("%1m ").arg(timer->iEveryMinute);
-        if (timer->fEverySecond > 0)
-            result += QString("%1s").arg(timer->fEverySecond, 0, 'f', 1);
+        if (timer->every_hour > 0)
+            result += QString("%1h ").arg(timer->every_hour);
+        if (timer->every_minute > 0)
+            result += QString("%1m ").arg(timer->every_minute);
+        if (timer->every_second > 0)
+            result += QString("%1s").arg(timer->every_second, 0, 'f', 1);
         return result.trimmed();
     }
 }
@@ -79,13 +78,13 @@ void TimersPage::populateRow(int row, const QString& name)
     if (!timer)
         return;
 
-    setCheckboxItem(row, COL_ENABLED, timer->bEnabled, name);
-    setReadOnlyItem(row, COL_LABEL, timer->strLabel);
-    setReadOnlyItem(row, COL_TYPE, timer->iType == Timer::eAtTime ? tr("At Time") : tr("Interval"));
+    setCheckboxItem(row, COL_ENABLED, timer->enabled, name);
+    setReadOnlyItem(row, COL_LABEL, timer->label);
+    setReadOnlyItem(row, COL_TYPE, timer->type == Timer::eAtTime ? tr("At Time") : tr("Interval"));
     setReadOnlyItem(row, COL_TIMING, formatTimerTiming(timer));
-    setReadOnlyItem(row, COL_GROUP, timer->strGroup);
-    setReadOnlyItem(row, COL_SENDTO, sendToDisplayName(timer->iSendTo));
-    setReadOnlyItemWithData(row, COL_FIRED, QString::number(timer->nMatched), timer->nMatched);
+    setReadOnlyItem(row, COL_GROUP, timer->group);
+    setReadOnlyItem(row, COL_SENDTO, sendToDisplayName(timer->send_to));
+    setReadOnlyItemWithData(row, COL_FIRED, QString::number(timer->matched), timer->matched);
 }
 
 bool TimersPage::openEditDialog(const QString& name)
@@ -101,6 +100,6 @@ bool TimersPage::openEditDialog(const QString& name)
 
 QStringList TimersPage::columnHeaders() const
 {
-    return {tr("Enabled"), tr("Label"), tr("Type"), tr("Timing"),
+    return {tr("Enabled"), tr("Label"),   tr("Type"), tr("Timing"),
             tr("Group"),   tr("Send To"), tr("Fired")};
 }

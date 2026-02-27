@@ -10,8 +10,7 @@
 #include <QTabWidget>
 #include <QVBoxLayout>
 
-PasteSendPage::PasteSendPage(WorldDocument* doc, QWidget* parent)
-    : PreferencesPageBase(doc, parent)
+PasteSendPage::PasteSendPage(WorldDocument* doc, QWidget* parent) : PreferencesPageBase(doc, parent)
 {
     setupUi();
 }
@@ -120,8 +119,8 @@ QWidget* PasteSendPage::createSendFileTab()
     QVBoxLayout* layout = new QVBoxLayout(tab);
 
     // Info label
-    QLabel* infoLabel = new QLabel(
-        tr("Configure how text is sent when sending a file to the MUD."), this);
+    QLabel* infoLabel =
+        new QLabel(tr("Configure how text is sent when sending a file to the MUD."), this);
     infoLabel->setWordWrap(true);
     layout->addWidget(infoLabel);
 
@@ -233,9 +232,9 @@ void PasteSendPage::loadSettings()
     m_pasteLinePostambleEdit->setText(m_doc->m_pasteline_postamble);
     m_pasteDelaySpin->setValue(m_doc->m_nPasteDelay);
     m_pasteDelayPerLinesSpin->setValue(m_doc->m_nPasteDelayPerLines);
-    m_pasteCommentedSoftcodeCheck->setChecked(m_doc->m_bPasteCommentedSoftcode != 0);
-    m_pasteEchoCheck->setChecked(m_doc->m_bPasteEcho != 0);
-    m_pasteConfirmCheck->setChecked(m_doc->m_bConfirmOnPaste != 0);
+    m_pasteCommentedSoftcodeCheck->setChecked(m_doc->m_bPasteCommentedSoftcode);
+    m_pasteEchoCheck->setChecked(m_doc->m_bPasteEcho);
+    m_pasteConfirmCheck->setChecked(m_doc->m_bConfirmOnPaste);
 
     // Load Send File settings
     m_filePreambleEdit->setText(m_doc->m_file_preamble);
@@ -244,9 +243,9 @@ void PasteSendPage::loadSettings()
     m_fileLinePostambleEdit->setText(m_doc->m_line_postamble);
     m_fileDelaySpin->setValue(m_doc->m_nFileDelay);
     m_fileDelayPerLinesSpin->setValue(m_doc->m_nFileDelayPerLines);
-    m_fileCommentedSoftcodeCheck->setChecked(m_doc->m_bFileCommentedSoftcode != 0);
-    m_fileEchoCheck->setChecked(m_doc->m_bSendEcho != 0);
-    m_fileConfirmCheck->setChecked(m_doc->m_bConfirmOnSend != 0);
+    m_fileCommentedSoftcodeCheck->setChecked(m_doc->m_bFileCommentedSoftcode);
+    m_fileEchoCheck->setChecked(m_doc->m_bSendEcho);
+    m_fileConfirmCheck->setChecked(m_doc->m_bConfirmOnSend);
 
     // Unblock signals - Paste settings
     m_pastePreambleEdit->blockSignals(false);
@@ -285,9 +284,9 @@ void PasteSendPage::saveSettings()
     m_doc->m_pasteline_postamble = m_pasteLinePostambleEdit->text();
     m_doc->m_nPasteDelay = m_pasteDelaySpin->value();
     m_doc->m_nPasteDelayPerLines = m_pasteDelayPerLinesSpin->value();
-    m_doc->m_bPasteCommentedSoftcode = m_pasteCommentedSoftcodeCheck->isChecked() ? 1 : 0;
-    m_doc->m_bPasteEcho = m_pasteEchoCheck->isChecked() ? 1 : 0;
-    m_doc->m_bConfirmOnPaste = m_pasteConfirmCheck->isChecked() ? 1 : 0;
+    m_doc->m_bPasteCommentedSoftcode = m_pasteCommentedSoftcodeCheck->isChecked();
+    m_doc->m_bPasteEcho = m_pasteEchoCheck->isChecked();
+    m_doc->m_bConfirmOnPaste = m_pasteConfirmCheck->isChecked();
 
     // Save Send File settings
     m_doc->m_file_preamble = m_filePreambleEdit->text();
@@ -296,9 +295,9 @@ void PasteSendPage::saveSettings()
     m_doc->m_line_postamble = m_fileLinePostambleEdit->text();
     m_doc->m_nFileDelay = m_fileDelaySpin->value();
     m_doc->m_nFileDelayPerLines = m_fileDelayPerLinesSpin->value();
-    m_doc->m_bFileCommentedSoftcode = m_fileCommentedSoftcodeCheck->isChecked() ? 1 : 0;
-    m_doc->m_bSendEcho = m_fileEchoCheck->isChecked() ? 1 : 0;
-    m_doc->m_bConfirmOnSend = m_fileConfirmCheck->isChecked() ? 1 : 0;
+    m_doc->m_bFileCommentedSoftcode = m_fileCommentedSoftcodeCheck->isChecked();
+    m_doc->m_bSendEcho = m_fileEchoCheck->isChecked();
+    m_doc->m_bConfirmOnSend = m_fileConfirmCheck->isChecked();
 
     m_doc->setModified(true);
 

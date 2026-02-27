@@ -204,17 +204,17 @@ void AliasEditDialog::loadAliasData()
     }
 
     // Load data into form
-    m_labelEdit->setText(alias->strLabel);
+    m_labelEdit->setText(alias->label);
     m_matchEdit->setText(alias->name);
-    m_enabledCheck->setChecked(alias->bEnabled);
-    m_regexpCheck->setChecked(alias->bRegexp);
-    m_sequenceSpin->setValue(alias->iSequence);
-    m_groupEdit->setText(alias->strGroup);
+    m_enabledCheck->setChecked(alias->enabled);
+    m_regexpCheck->setChecked(alias->use_regexp);
+    m_sequenceSpin->setValue(alias->sequence);
+    m_groupEdit->setText(alias->group);
     m_sendTextEdit->setPlainText(alias->contents);
-    m_scriptEdit->setText(alias->strProcedure);
+    m_scriptEdit->setText(alias->procedure);
 
     // Set send-to combo
-    int index = m_sendToCombo->findData(alias->iSendTo);
+    int index = m_sendToCombo->findData(alias->send_to);
     if (index >= 0) {
         m_sendToCombo->setCurrentIndex(index);
     }
@@ -226,12 +226,12 @@ void AliasEditDialog::loadAliasData()
     }
 
     // Options
-    m_echoAliasCheck->setChecked(alias->bEchoAlias);
-    m_keepEvaluatingCheck->setChecked(alias->bKeepEvaluating);
-    m_expandVariablesCheck->setChecked(alias->bExpandVariables);
-    m_omitFromOutputCheck->setChecked(alias->bOmitFromOutput);
-    m_omitFromLogCheck->setChecked(alias->bOmitFromLog);
-    m_omitFromHistoryCheck->setChecked(alias->bOmitFromCommandHistory);
+    m_echoAliasCheck->setChecked(alias->echo_alias);
+    m_keepEvaluatingCheck->setChecked(alias->keep_evaluating);
+    m_expandVariablesCheck->setChecked(alias->expand_variables);
+    m_omitFromOutputCheck->setChecked(alias->omit_from_output);
+    m_omitFromLogCheck->setChecked(alias->omit_from_log);
+    m_omitFromHistoryCheck->setChecked(alias->omit_from_command_history);
 }
 
 bool AliasEditDialog::validateForm()
@@ -272,29 +272,29 @@ bool AliasEditDialog::saveAlias()
         }
 
         // Save form data to alias
-        alias->strLabel = m_labelEdit->text().trimmed();
+        alias->label = m_labelEdit->text().trimmed();
         alias->name = m_matchEdit->text();
-        alias->bEnabled = m_enabledCheck->isChecked();
-        alias->bRegexp = m_regexpCheck->isChecked();
-        alias->iSequence = m_sequenceSpin->value();
-        alias->strGroup = m_groupEdit->text().trimmed();
+        alias->enabled = m_enabledCheck->isChecked();
+        alias->use_regexp = m_regexpCheck->isChecked();
+        alias->sequence = m_sequenceSpin->value();
+        alias->group = m_groupEdit->text().trimmed();
         alias->contents = m_sendTextEdit->toPlainText();
-        alias->strProcedure = m_scriptEdit->text().trimmed();
-        alias->iSendTo = m_sendToCombo->currentData().toInt();
+        alias->procedure = m_scriptEdit->text().trimmed();
+        alias->send_to = m_sendToCombo->currentData().toInt();
         alias->scriptLanguage =
             static_cast<ScriptLanguage>(m_scriptLanguageCombo->currentData().toInt());
 
         // Options
-        alias->bEchoAlias = m_echoAliasCheck->isChecked();
-        alias->bKeepEvaluating = m_keepEvaluatingCheck->isChecked();
-        alias->bExpandVariables = m_expandVariablesCheck->isChecked();
-        alias->bOmitFromOutput = m_omitFromOutputCheck->isChecked();
-        alias->bOmitFromLog = m_omitFromLogCheck->isChecked();
-        alias->bOmitFromCommandHistory = m_omitFromHistoryCheck->isChecked();
+        alias->echo_alias = m_echoAliasCheck->isChecked();
+        alias->keep_evaluating = m_keepEvaluatingCheck->isChecked();
+        alias->expand_variables = m_expandVariablesCheck->isChecked();
+        alias->omit_from_output = m_omitFromOutputCheck->isChecked();
+        alias->omit_from_log = m_omitFromLogCheck->isChecked();
+        alias->omit_from_command_history = m_omitFromHistoryCheck->isChecked();
 
         // Compile regexp if needed
-        if (alias->bRegexp) {
-            alias->compileRegexp();
+        if (alias->use_regexp) {
+            (void)alias->compileRegexp();
         }
     } else {
         // Create new alias
@@ -308,43 +308,43 @@ bool AliasEditDialog::saveAlias()
             if (match.length() > 50) {
                 match = match.left(50) + "...";
             }
-            newAlias->strInternalName =
+            newAlias->internal_name =
                 QString("alias_%1_%2").arg(QDateTime::currentMSecsSinceEpoch()).arg(qHash(match));
         } else {
-            newAlias->strInternalName = label;
+            newAlias->internal_name = label;
         }
 
         // Save form data to alias
-        newAlias->strLabel = m_labelEdit->text().trimmed();
+        newAlias->label = m_labelEdit->text().trimmed();
         newAlias->name = m_matchEdit->text();
-        newAlias->bEnabled = m_enabledCheck->isChecked();
-        newAlias->bRegexp = m_regexpCheck->isChecked();
-        newAlias->iSequence = m_sequenceSpin->value();
-        newAlias->strGroup = m_groupEdit->text().trimmed();
+        newAlias->enabled = m_enabledCheck->isChecked();
+        newAlias->use_regexp = m_regexpCheck->isChecked();
+        newAlias->sequence = m_sequenceSpin->value();
+        newAlias->group = m_groupEdit->text().trimmed();
         newAlias->contents = m_sendTextEdit->toPlainText();
-        newAlias->strProcedure = m_scriptEdit->text().trimmed();
-        newAlias->iSendTo = m_sendToCombo->currentData().toInt();
+        newAlias->procedure = m_scriptEdit->text().trimmed();
+        newAlias->send_to = m_sendToCombo->currentData().toInt();
         newAlias->scriptLanguage =
             static_cast<ScriptLanguage>(m_scriptLanguageCombo->currentData().toInt());
 
         // Options
-        newAlias->bEchoAlias = m_echoAliasCheck->isChecked();
-        newAlias->bKeepEvaluating = m_keepEvaluatingCheck->isChecked();
-        newAlias->bExpandVariables = m_expandVariablesCheck->isChecked();
-        newAlias->bOmitFromOutput = m_omitFromOutputCheck->isChecked();
-        newAlias->bOmitFromLog = m_omitFromLogCheck->isChecked();
-        newAlias->bOmitFromCommandHistory = m_omitFromHistoryCheck->isChecked();
+        newAlias->echo_alias = m_echoAliasCheck->isChecked();
+        newAlias->keep_evaluating = m_keepEvaluatingCheck->isChecked();
+        newAlias->expand_variables = m_expandVariablesCheck->isChecked();
+        newAlias->omit_from_output = m_omitFromOutputCheck->isChecked();
+        newAlias->omit_from_log = m_omitFromLogCheck->isChecked();
+        newAlias->omit_from_command_history = m_omitFromHistoryCheck->isChecked();
 
         // Compile regexp if needed
-        if (newAlias->bRegexp) {
-            newAlias->compileRegexp();
+        if (newAlias->use_regexp) {
+            (void)newAlias->compileRegexp();
         }
 
         // Add to document
-        QString internalName = newAlias->strInternalName;
-        if (!m_doc->addAlias(internalName, std::move(newAlias))) {
+        QString internalName = newAlias->internal_name;
+        if (auto res = m_doc->addAlias(internalName, std::move(newAlias)); !res.has_value()) {
             QMessageBox::warning(this, "Error",
-                                 "Failed to add alias. An alias with this name may already exist.");
+                                 QString("Failed to add alias: %1").arg(res.error().message));
             return false;
         }
     }

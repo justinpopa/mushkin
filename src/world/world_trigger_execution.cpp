@@ -62,9 +62,9 @@ QString WorldDocument::replaceWildcards(const QString& text, const QVector<QStri
  *
  * Modifies the style runs in the line to change colors based on trigger settings.
  * Handles:
- * - iOtherForeground: RGB foreground color
- * - iOtherBackground: RGB background color
- * - iColourChangeType: Which colors to change (both, foreground only, background only)
+ * - other_foreground: RGB foreground color
+ * - other_background: RGB background color
+ * - colour_change_type: Which colors to change (both, foreground only, background only)
  *
  * **KNOWN LIMITATION :**
  * This implementation colors the ENTIRE line, not just the matched portion.
@@ -75,7 +75,7 @@ QString WorldDocument::replaceWildcards(const QString& text, const QVector<QStri
  * - Colors only the matched portion
  * - Handles RGB, custom colors, and ANSI colors
  * - Updates both Line styles AND StyledLine (for scripts)
- * - Repeats for bRepeat triggers
+ * - Repeats for repeat triggers
  *
  * Our simplified implementation (36 lines):
  * - Changes ALL style runs in the entire line
@@ -103,32 +103,32 @@ QString WorldDocument::replaceWildcards(const QString& text, const QVector<QStri
 void WorldDocument::changeLineColors(Trigger* trigger, Line* line)
 {
     // No color change requested
-    if (trigger->iOtherForeground == 0 && trigger->iOtherBackground == 0) {
+    if (trigger->other_foreground == 0 && trigger->other_background == 0) {
         return;
     }
 
     // Modify all style runs in the line
     // TODO: Only modify style runs in matched portion (iStartCol to iEndCol)
     for (const auto& style : line->styleList) {
-        switch (trigger->iColourChangeType) {
+        switch (trigger->colour_change_type) {
             case TRIGGER_COLOUR_CHANGE_BOTH:
-                if (trigger->iOtherForeground != 0) {
-                    style->iForeColour = trigger->iOtherForeground;
+                if (trigger->other_foreground != 0) {
+                    style->iForeColour = trigger->other_foreground;
                 }
-                if (trigger->iOtherBackground != 0) {
-                    style->iBackColour = trigger->iOtherBackground;
+                if (trigger->other_background != 0) {
+                    style->iBackColour = trigger->other_background;
                 }
                 break;
 
             case TRIGGER_COLOUR_CHANGE_FOREGROUND:
-                if (trigger->iOtherForeground != 0) {
-                    style->iForeColour = trigger->iOtherForeground;
+                if (trigger->other_foreground != 0) {
+                    style->iForeColour = trigger->other_foreground;
                 }
                 break;
 
             case TRIGGER_COLOUR_CHANGE_BACKGROUND:
-                if (trigger->iOtherBackground != 0) {
-                    style->iBackColour = trigger->iOtherBackground;
+                if (trigger->other_background != 0) {
+                    style->iBackColour = trigger->other_background;
                 }
                 break;
         }
@@ -142,15 +142,15 @@ void WorldDocument::changeLineColors(Trigger* trigger, Line* line)
  * executeTrigger - Execute a trigger's action
  *
  * Called when a trigger matches. Performs all trigger actions:
- * - Updates statistics (nMatched, tWhenMatched)
+ * - Updates statistics (matched, when_matched)
  * - Replaces wildcards in contents
- * - Expands variables (if bExpandVariables)
- * - Copies wildcard to clipboard (if iClipboardArg set)
+ * - Expands variables (if expand_variables)
+ * - Copies wildcard to clipboard (if clipboard_arg set)
  * - Changes line colors
  * - Omits from output/log
- * - Executes action based on iSendTo
- * - Calls Lua script (if strProcedure set)
- * - Deletes trigger (if bOneShot)
+ * - Executes action based on send_to
+ * - Calls Lua script (if procedure set)
+ * - Deletes trigger (if one_shot)
  *
  * @param trigger The trigger that matched
  * @param line The matched line
@@ -159,8 +159,8 @@ void WorldDocument::changeLineColors(Trigger* trigger, Line* line)
 void WorldDocument::executeTrigger(Trigger* trigger, Line* line, const QString& matchedText)
 {
     // Update statistics
-    trigger->nMatched++;
-    trigger->tWhenMatched = QDateTime::currentDateTime();
+    trigger->matched++;
+    trigger->when_matched = QDateTime::currentDateTime();
 
     // Prepare contents (send text)
     QString contents = trigger->contents;
@@ -169,15 +169,15 @@ void WorldDocument::executeTrigger(Trigger* trigger, Line* line, const QString& 
     contents = replaceWildcards(contents, trigger->wildcards);
 
     // Expand variables (@variablename → value)
-    if (trigger->bExpandVariables) {
+    if (trigger->expand_variables) {
         contents = expandVariables(contents);
     }
 
     // Copy wildcard to clipboard
-    if (trigger->iClipboardArg > 0 && trigger->iClipboardArg <= trigger->wildcards.size()) {
-        QString wildcard = trigger->wildcards[trigger->iClipboardArg - 1];
+    if (trigger->clipboard_arg > 0 && trigger->clipboard_arg <= trigger->wildcards.size()) {
+        QString wildcard = trigger->wildcards[trigger->clipboard_arg - 1];
         QGuiApplication::clipboard()->setText(wildcard);
-        qCDebug(lcWorld) << "Copied wildcard" << trigger->iClipboardArg
+        qCDebug(lcWorld) << "Copied wildcard" << trigger->clipboard_arg
                          << "to clipboard:" << wildcard;
     }
 
@@ -185,7 +185,7 @@ void WorldDocument::executeTrigger(Trigger* trigger, Line* line, const QString& 
     changeLineColors(trigger, line);
 
     // Omit from output
-    if (trigger->bOmitFromOutput) {
+    if (trigger->omit_from_output) {
         // TODO: Mark line as omitted
         // line->flags |= OMITTED;
         qCDebug(lcWorld) << "Trigger omit from output (not yet implemented)";
@@ -200,8 +200,8 @@ void WorldDocument::executeTrigger(Trigger* trigger, Line* line, const QString& 
 
     // Play sound
     if (!trigger->sound_to_play.isEmpty()) {
-        // Check bSoundIfInactive flag - only play if window is inactive, or flag is not set
-        if (!trigger->bSoundIfInactive || !IsWindowActive()) {
+        // Check sound_if_inactive flag - only play if window is inactive, or flag is not set
+        if (!trigger->sound_if_inactive || !IsWindowActive()) {
             PlaySoundFile(trigger->sound_to_play);
             qCDebug(lcWorld) << "Trigger playing sound:" << trigger->sound_to_play;
         } else {
@@ -215,10 +215,10 @@ void WorldDocument::executeTrigger(Trigger* trigger, Line* line, const QString& 
     QString strExtraOutput; // Accumulates eSendToOutput text
     QString triggerDescription =
         QString("Trigger: %1")
-            .arg(trigger->strLabel.isEmpty() ? trigger->strInternalName : trigger->strLabel);
+            .arg(trigger->label.isEmpty() ? trigger->internal_name : trigger->label);
 
-    sendTo(trigger->iSendTo, contents, trigger->bOmitFromOutput, trigger->omit_from_log,
-           triggerDescription, trigger->strVariable, strExtraOutput, trigger->scriptLanguage);
+    sendTo(trigger->send_to, contents, trigger->omit_from_output, trigger->omit_from_log,
+           triggerDescription, trigger->variable, strExtraOutput, trigger->scriptLanguage);
 
     // Display any output that was accumulated
     if (!strExtraOutput.isEmpty()) {
@@ -227,12 +227,12 @@ void WorldDocument::executeTrigger(Trigger* trigger, Line* line, const QString& 
 
     // Call Lua script if needed (sendTo handles eSendToScript, but for triggers
     // we also need to call executeTriggerScript for eSendToScriptAfterOmit)
-    if (!trigger->strProcedure.isEmpty() &&
-        (trigger->iSendTo == eSendToScript || trigger->iSendTo == eSendToScriptAfterOmit)) {
+    if (!trigger->procedure.isEmpty() &&
+        (trigger->send_to == eSendToScript || trigger->send_to == eSendToScriptAfterOmit)) {
         executeTriggerScript(trigger, matchedText);
     }
 
-    qCDebug(lcWorld) << "Trigger executed:" << trigger->strLabel << "matched:" << trigger->nMatched
+    qCDebug(lcWorld) << "Trigger executed:" << trigger->label << "matched:" << trigger->matched
                      << "times";
 }
 
@@ -242,7 +242,7 @@ void WorldDocument::executeTrigger(Trigger* trigger, Line* line, const QString& 
  * Trigger Script Execution
  * Based on CMUSHclientDoc::ExecuteTriggerScript() from doc.cpp
  *
- * Calls the Lua function specified in trigger->strProcedure with parameters:
+ * Calls the Lua function specified in trigger->procedure with parameters:
  * 1. Trigger name (string)
  * 2. Matched line (string)
  * 3. Wildcards (table) - indexed 0..N where 0 is full match, 1+ are capture groups
@@ -254,7 +254,7 @@ void WorldDocument::executeTrigger(Trigger* trigger, Line* line, const QString& 
 void WorldDocument::executeTriggerScript(Trigger* trigger, const QString& matchedText)
 {
     // Safety check - need a procedure name
-    if (trigger->strProcedure.isEmpty()) {
+    if (trigger->procedure.isEmpty()) {
         return;
     }
 
@@ -277,7 +277,7 @@ void WorldDocument::executeTriggerScript(Trigger* trigger, const QString& matche
     // dispid caching: DISPID_UNKNOWN = check needed, 1 = exists (cached)
     // We re-check each time it's DISPID_UNKNOWN (allows function to be defined later)
     if (trigger->dispid == DISPID_UNKNOWN) {
-        trigger->dispid = engine->getLuaDispid(trigger->strProcedure);
+        trigger->dispid = engine->getLuaDispid(trigger->procedure);
 
         if (trigger->dispid == DISPID_UNKNOWN) {
             return; // Function doesn't exist, skip it
@@ -297,14 +297,13 @@ void WorldDocument::executeTriggerScript(Trigger* trigger, const QString& matche
     // wildcards needs to be passed as a table parameter, not just strings.
 
     // Parameter 1: Trigger name (use label if set, otherwise internal name)
-    QString triggerName =
-        trigger->strLabel.isEmpty() ? trigger->strInternalName : trigger->strLabel;
+    QString triggerName = trigger->label.isEmpty() ? trigger->internal_name : trigger->label;
 
     // Save stack top for cleanup
     int stackTop = lua_gettop(L);
 
     // Push the function onto the stack
-    lua_getglobal(L, trigger->strProcedure.toUtf8().constData());
+    lua_getglobal(L, trigger->procedure.toUtf8().constData());
     if (!lua_isfunction(L, -1)) {
         lua_settop(L, stackTop);
         trigger->dispid = DISPID_UNKNOWN;
@@ -317,7 +316,7 @@ void WorldDocument::executeTriggerScript(Trigger* trigger, const QString& matche
     lua_newtable(L);
     for (int i = 0; i < trigger->wildcards.size(); ++i) {
         QString wildcard = trigger->wildcards[i];
-        if (trigger->bLowercaseWildcard && i > 0) {
+        if (trigger->lowercase_wildcard && i > 0) {
             wildcard = wildcard.toLower();
         }
         lua_pushinteger(L, i);
@@ -328,7 +327,7 @@ void WorldDocument::executeTriggerScript(Trigger* trigger, const QString& matche
     for (auto it = trigger->namedWildcards.constBegin(); it != trigger->namedWildcards.constEnd();
          ++it) {
         QString value = it.value();
-        if (trigger->bLowercaseWildcard) {
+        if (trigger->lowercase_wildcard) {
             value = value.toLower();
         }
         QByteArray nameBytes = it.key().toUtf8();
@@ -355,7 +354,7 @@ void WorldDocument::executeTriggerScript(Trigger* trigger, const QString& matche
         QString wildcard = trigger->wildcards[i];
 
         // Apply lowercase conversion if requested (skip %0 - the whole match)
-        if (trigger->bLowercaseWildcard && i > 0) {
+        if (trigger->lowercase_wildcard && i > 0) {
             wildcard = wildcard.toLower();
         }
 
@@ -377,7 +376,7 @@ void WorldDocument::executeTriggerScript(Trigger* trigger, const QString& matche
         QString value = it.value();
 
         // Apply lowercase conversion if requested
-        if (trigger->bLowercaseWildcard) {
+        if (trigger->lowercase_wildcard) {
             value = value.toLower();
         }
 
@@ -397,7 +396,7 @@ void WorldDocument::executeTriggerScript(Trigger* trigger, const QString& matche
     lua_newtable(L);
 
     // Prevent deletion during script execution
-    trigger->bExecutingScript = true;
+    trigger->executing_script = true;
 
     // Call the function with 4 arguments, 0 results
     int callResult = lua_pcall(L, 4, 0, 0);
@@ -414,30 +413,30 @@ void WorldDocument::executeTriggerScript(Trigger* trigger, const QString& matche
         qWarning() << "=== Lua Error ===" << "\"Run-time error\"";
         qWarning() << "  Context:"
                    << QString("\"Function/Sub: %1 called by trigger\\nReason: %2\"")
-                          .arg(trigger->strProcedure, strReason);
+                          .arg(trigger->procedure, strReason);
         qWarning() << "  Message:" << QString("\"%1\"").arg(errorStr);
 
         lua_pop(L, 1); // Pop error message
     }
 
     // Update invocation count
-    trigger->nInvocationCount++;
+    trigger->invocation_count++;
 
     // Allow deletion again
-    trigger->bExecutingScript = false;
+    trigger->executing_script = false;
 
     // If function failed, mark it as DISPID_UNKNOWN so we don't keep trying
     if (error) {
         trigger->dispid = DISPID_UNKNOWN;
-        qDebug() << "TRIGGER SCRIPT ERROR:" << trigger->strProcedure;
+        qDebug() << "TRIGGER SCRIPT ERROR:" << trigger->procedure;
     } else {
         // DEBUG: Log successful script execution for command_executed
-        if (trigger->strProcedure == "command_executed") {
+        if (trigger->procedure == "command_executed") {
             qDebug() << "command_executed script ran successfully, invocations:"
-                     << trigger->nInvocationCount;
+                     << trigger->invocation_count;
         }
     }
 
-    qCDebug(lcWorld) << "Trigger script executed:" << trigger->strProcedure
-                     << "invocations:" << trigger->nInvocationCount;
+    qCDebug(lcWorld) << "Trigger script executed:" << trigger->procedure
+                     << "invocations:" << trigger->invocation_count;
 }

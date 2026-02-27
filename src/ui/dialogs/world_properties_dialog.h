@@ -3,6 +3,7 @@
 
 #include <QDialog>
 #include <QFont>
+#include <array>
 
 // Forward declarations
 class WorldDocument;
@@ -104,8 +105,8 @@ class WorldPropertiesDialog : public QDialog {
     QPushButton* m_outputFontButton;
     QLabel* m_outputFontLabel;
     QFont m_outputFont;
-    QPushButton* m_colorButtons[16]; // 8 normal + 8 bright ANSI colors
-    QRgb m_ansiColors[16];
+    std::array<QPushButton*, 16> m_colorButtons{}; // 8 normal + 8 bright ANSI colors
+    std::array<QRgb, 16> m_ansiColors{};
     QCheckBox* m_flashIconCheck;
 
     // Helper for Output tab

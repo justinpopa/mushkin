@@ -51,7 +51,7 @@ std::expected<void, StartError> RemoteAccessServer::start(quint16 port,
                 &RemoteAccessServer::onIncompleteLine);
 
         // Initialize line tracking
-        m_lastLineIndex = m_pDoc->m_lineList.count() - 1;
+        m_lastLineIndex = static_cast<int>(m_pDoc->m_lineList.size()) - 1;
     }
 
     emit serverStarted(m_pServer->serverPort());
@@ -204,11 +204,11 @@ void RemoteAccessServer::onLinesAdded()
     }
 
     // Send any new lines since last update
-    int totalLines = m_pDoc->m_lineList.count();
+    int totalLines = static_cast<int>(m_pDoc->m_lineList.size());
     int startIndex = m_lastLineIndex + 1;
 
     for (int i = startIndex; i < totalLines; ++i) {
-        Line* line = m_pDoc->m_lineList.at(i);
+        Line* line = m_pDoc->m_lineList.at(i).get();
         if (line) {
             broadcastLine(line);
         }
@@ -223,7 +223,7 @@ void RemoteAccessServer::onIncompleteLine()
         return;
     }
 
-    broadcastIncompleteLine(m_pDoc->m_currentLine);
+    broadcastIncompleteLine(m_pDoc->m_currentLine.get());
 }
 
 void RemoteAccessServer::broadcastLine(const Line* line)

@@ -53,7 +53,7 @@ class TriggerExecutionTest : public ::testing::Test {
         // Set the text
         int len = strlen(text);
         line->textBuffer.resize(len);
-        memcpy(line->text(), text, len);
+        memcpy(line->textBuffer.data(), text, len);
         line->textBuffer.push_back('\0');
         // memcpy already done above
 
@@ -74,9 +74,9 @@ class TriggerExecutionTest : public ::testing::Test {
     {
         Trigger* trigger = new Trigger();
         trigger->trigger = pattern;
-        trigger->bEnabled = true;
-        trigger->strLabel = label;
-        trigger->strInternalName = label;
+        trigger->enabled = true;
+        trigger->label = label;
+        trigger->internal_name = label;
 
         doc->addTrigger(label, std::unique_ptr<Trigger>(trigger));
         doc->rebuildTriggerArray();
@@ -93,8 +93,8 @@ TEST_F(TriggerExecutionTest, WildcardReplacementInContents)
     // Create a trigger that sends text with wildcards
     Trigger* t = addTrigger("gold_notify", "You have * gold");
     t->contents = "Gold amount: %1 pieces"; // Will replace %1 with captured wildcard
-    t->iSendTo = 2;                         // eSendToOutput (note)
-    t->iSequence = 100;
+    t->send_to = 2;                         // eSendToOutput (note)
+    t->sequence = 100;
 
     // Create a line that matches
     Line* line = createTestLine("You have 500 gold");
@@ -103,7 +103,7 @@ TEST_F(TriggerExecutionTest, WildcardReplacementInContents)
     doc->evaluateTriggers(line);
 
     // Verify trigger executed
-    EXPECT_EQ(t->nMatched, 1) << "Trigger should have executed once";
+    EXPECT_EQ(t->matched, 1) << "Trigger should have executed once";
 
     // Verify wildcards were captured
     ASSERT_GT(t->wildcards.size(), 1) << "Should have captured wildcards";
@@ -118,9 +118,9 @@ TEST_F(TriggerExecutionTest, ColorChanging)
 {
     // Create a trigger that changes line color
     Trigger* t = addTrigger("warning_color", "Warning: *");
-    t->iOtherForeground = qRgb(255, 0, 0); // Red foreground
-    t->iColourChangeType = 1;              // TRIGGER_COLOUR_CHANGE_FOREGROUND
-    t->iSequence = 200;
+    t->other_foreground = qRgb(255, 0, 0); // Red foreground
+    t->colour_change_type = 1;              // TRIGGER_COLOUR_CHANGE_FOREGROUND
+    t->sequence = 200;
 
     Line* line = createTestLine("Warning: Low health");
 
@@ -141,8 +141,8 @@ TEST_F(TriggerExecutionTest, OneShotTrigger)
 {
     // Create a one-shot trigger
     Trigger* t = addTrigger("level_up", "You level up!");
-    t->bOneShot = true; // Delete after first match
-    t->iSequence = 300;
+    t->one_shot = true; // Delete after first match
+    t->sequence = 300;
 
     // Verify trigger exists
     ASSERT_NE(doc->getTrigger("level_up"), nullptr) << "One-shot trigger should be created";
@@ -166,8 +166,8 @@ TEST_F(TriggerExecutionTest, MultipleWildcardsInContents)
     // Create a trigger that captures multiple wildcards
     Trigger* t = addTrigger("tell_format", "* tells you: *");
     t->contents = "Message from %1: %2";
-    t->iSendTo = 2; // eSendToOutput
-    t->iSequence = 400;
+    t->send_to = 2; // eSendToOutput
+    t->sequence = 400;
 
     Line* line = createTestLine("Alice tells you: Hello!");
 
@@ -222,9 +222,9 @@ end
 
     // Create a trigger that calls the Lua function
     Trigger* t = addTrigger("health_trigger", "Your health is *%");
-    t->strProcedure = "on_health_trigger"; // Lua function to call
-    t->iSendTo = 12;                       // eSendToScript
-    t->iSequence = 500;
+    t->procedure = "on_health_trigger"; // Lua function to call
+    t->send_to = 12;                       // eSendToScript
+    t->sequence = 500;
 
     Line* line = createTestLine("Your health is 75%");
 
@@ -267,7 +267,7 @@ end
     EXPECT_EQ(wildcard1, "75") << "wildcards[1] should be '75'";
 
     // Verify invocation count incremented
-    EXPECT_EQ(t->nInvocationCount, 1) << "Invocation count should be incremented";
+    EXPECT_EQ(t->invocation_count, 1) << "Invocation count should be incremented";
 
     // Cleanup
     delete line;

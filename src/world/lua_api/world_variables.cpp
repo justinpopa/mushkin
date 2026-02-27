@@ -42,7 +42,7 @@ int L_GetVariable(lua_State* L)
         // Get from plugin's variable map
         auto it = currentPlugin->m_VariableMap.find(qName);
         if (it != currentPlugin->m_VariableMap.end()) {
-            value = it->second->strContents;
+            value = it->second->contents;
         }
     } else {
         value = pDoc->getVariable(qName);
@@ -103,12 +103,12 @@ int L_SetVariable(lua_State* L)
         auto it = currentPlugin->m_VariableMap.find(qName);
         if (it != currentPlugin->m_VariableMap.end()) {
             // Update existing variable
-            it->second->strContents = QString::fromUtf8(value);
+            it->second->contents = QString::fromUtf8(value);
         } else {
             // Create new variable
             auto var = std::make_unique<Variable>();
-            var->strLabel = qName;
-            var->strContents = QString::fromUtf8(value);
+            var->label = qName;
+            var->contents = QString::fromUtf8(value);
             currentPlugin->m_VariableMap[qName] = std::move(var);
         }
         result = eOK;

@@ -5,8 +5,8 @@
  *
  * The m_wrap setting controls whether lines wrap at word boundaries (spaces)
  * or at the exact column boundary:
- * - m_wrap = 1 (enabled): Break at last space before wrap column
- * - m_wrap = 0 (disabled): Hard break at wrap column
+ * - m_wrap = true (enabled): Break at last space before wrap column
+ * - m_wrap = false (disabled): Hard break at wrap column
  *
  * m_nWrapColumn controls the column width at which wrapping occurs.
  */
@@ -27,16 +27,16 @@ class WordWrapTest : public ::testing::Test {
         // Set a small wrap column for easier testing
         doc->m_nWrapColumn = 20;
         // Enable word wrap by default
-        doc->m_wrap = 1;
+        doc->m_wrap = true;
 
         // Create initial line for AddToLine to work
         // (normally done when connecting to a MUD)
-        doc->m_currentLine = new Line(1,                    // line number
-                                      doc->m_nWrapColumn,   // wrap column
-                                      0,                    // flags
-                                      qRgb(255, 255, 255),  // foreground (white)
-                                      qRgb(0, 0, 0),        // background (black)
-                                      false);               // UTF-8 mode
+        doc->m_currentLine = std::make_unique<Line>(1,                   // line number
+                                                    doc->m_nWrapColumn,  // wrap column
+                                                    0,                   // flags
+                                                    qRgb(255, 255, 255), // foreground (white)
+                                                    qRgb(0, 0, 0),       // background (black)
+                                                    false);              // UTF-8 mode
 
         // Create initial empty style
         auto initialStyle = std::make_unique<Style>();
@@ -57,7 +57,8 @@ class WordWrapTest : public ::testing::Test {
     QString getCurrentLineText()
     {
         if (doc->m_currentLine) {
-            return QString::fromUtf8(doc->m_currentLine->text(), doc->m_currentLine->len());
+            return QString::fromUtf8(doc->m_currentLine->text().data(),
+                                     doc->m_currentLine->text().size());
         }
         return QString();
     }
@@ -65,15 +66,15 @@ class WordWrapTest : public ::testing::Test {
     // Helper to get the number of lines in buffer
     int getLineCount()
     {
-        return doc->m_lineList.count();
+        return static_cast<int>(doc->m_lineList.size());
     }
 
     // Helper to get text of a specific line from buffer
     QString getLineText(int index)
     {
-        if (index >= 0 && index < doc->m_lineList.count()) {
-            Line* line = doc->m_lineList.at(index);
-            return QString::fromUtf8(line->text(), line->len());
+        if (index >= 0 && index < static_cast<int>(doc->m_lineList.size())) {
+            Line* line = doc->m_lineList.at(index).get();
+            return QString::fromUtf8(line->text().data(), line->text().size());
         }
         return QString();
     }
@@ -83,11 +84,11 @@ class WordWrapTest : public ::testing::Test {
 
 /**
  * Test 1: Word wrap breaks at last space
- * With m_wrap=1, text should break at the last space before wrap column
+ * With m_wrap=true, text should break at the last space before wrap column
  */
 TEST_F(WordWrapTest, WordWrapBreaksAtSpace)
 {
-    doc->m_wrap = 1;
+    doc->m_wrap = true;
     doc->m_nWrapColumn = 20;
 
     // Add text with spaces: "Hello world this is a test"
@@ -112,11 +113,11 @@ TEST_F(WordWrapTest, WordWrapBreaksAtSpace)
 
 /**
  * Test 2: Hard wrap when word-wrap disabled
- * With m_wrap=0, text should break exactly at wrap column
+ * With m_wrap=false, text should break exactly at wrap column
  */
 TEST_F(WordWrapTest, HardWrapWhenDisabled)
 {
-    doc->m_wrap = 0;  // Disable word wrap
+    doc->m_wrap = false; // Disable word wrap
     doc->m_nWrapColumn = 20;
 
     // Add text longer than wrap column
@@ -137,14 +138,15 @@ TEST_F(WordWrapTest, HardWrapWhenDisabled)
  */
 TEST_F(WordWrapTest, NoWrapWhenTextFits)
 {
-    doc->m_wrap = 1;
+    doc->m_wrap = true;
     doc->m_nWrapColumn = 80;
 
     const char* text = "Short text";
     doc->AddToLine(text, strlen(text));
 
     // Should NOT have wrapped - text is still in current line
-    EXPECT_EQ(getLineCount(), 0) << "Should have no lines in buffer (current line not yet complete)";
+    EXPECT_EQ(getLineCount(), 0)
+        << "Should have no lines in buffer (current line not yet complete)";
     EXPECT_EQ(getCurrentLineText(), "Short text") << "Current line should contain the text";
 }
 
@@ -154,7 +156,7 @@ TEST_F(WordWrapTest, NoWrapWhenTextFits)
  */
 TEST_F(WordWrapTest, MultipleWraps)
 {
-    doc->m_wrap = 1;
+    doc->m_wrap = true;
     doc->m_nWrapColumn = 20;
 
     // Text that will wrap multiple times
@@ -171,10 +173,11 @@ TEST_F(WordWrapTest, MultipleWraps)
  */
 TEST_F(WordWrapTest, WrapColumnZeroDisablesWrap)
 {
-    doc->m_wrap = 1;
-    doc->m_nWrapColumn = 0;  // Disable wrapping
+    doc->m_wrap = true;
+    doc->m_nWrapColumn = 0; // Disable wrapping
 
-    const char* text = "This is a very long line that would normally wrap but should not because wrap column is zero";
+    const char* text = "This is a very long line that would normally wrap but should not because "
+                       "wrap column is zero";
     doc->AddToLine(text, strlen(text));
 
     // Should NOT have wrapped
@@ -189,7 +192,7 @@ TEST_F(WordWrapTest, WrapColumnZeroDisablesWrap)
  */
 TEST_F(WordWrapTest, SoftWrapHasHardReturnFalse)
 {
-    doc->m_wrap = 1;
+    doc->m_wrap = true;
     doc->m_nWrapColumn = 20;
 
     const char* text = "Hello world this is a wrapped line";
@@ -197,7 +200,7 @@ TEST_F(WordWrapTest, SoftWrapHasHardReturnFalse)
 
     // Check that wrapped line has hard_return = false
     if (getLineCount() > 0) {
-        Line* wrappedLine = doc->m_lineList.at(0);
+        Line* wrappedLine = doc->m_lineList.at(0).get();
         EXPECT_FALSE(wrappedLine->hard_return) << "Soft-wrapped line should have hard_return=false";
     }
 }
@@ -208,7 +211,7 @@ TEST_F(WordWrapTest, SoftWrapHasHardReturnFalse)
  */
 TEST_F(WordWrapTest, SpaceAtWrapBoundary)
 {
-    doc->m_wrap = 1;
+    doc->m_wrap = true;
     doc->m_nWrapColumn = 10;
 
     // "1234567890 text" - space at position 10
@@ -225,7 +228,7 @@ TEST_F(WordWrapTest, SpaceAtWrapBoundary)
  */
 TEST_F(WordWrapTest, NoSpacesFallsBackToHardWrap)
 {
-    doc->m_wrap = 1;
+    doc->m_wrap = true;
     doc->m_nWrapColumn = 20;
 
     // No spaces - should hard wrap even with word wrap enabled
@@ -243,11 +246,11 @@ TEST_F(WordWrapTest, NoSpacesFallsBackToHardWrap)
 TEST_F(WordWrapTest, GetSetOptionWrap)
 {
     // Set wrap via direct assignment
-    doc->m_wrap = 0;
-    EXPECT_EQ(doc->m_wrap, 0) << "m_wrap should be 0";
+    doc->m_wrap = false;
+    EXPECT_FALSE(doc->m_wrap) << "m_wrap should be false";
 
-    doc->m_wrap = 1;
-    EXPECT_EQ(doc->m_wrap, 1) << "m_wrap should be 1";
+    doc->m_wrap = true;
+    EXPECT_TRUE(doc->m_wrap) << "m_wrap should be true";
 }
 
 /**
@@ -258,7 +261,7 @@ TEST_F(WordWrapTest, GetSetOptionWrap)
  */
 TEST_F(WordWrapTest, TrailingSpacePreserved)
 {
-    doc->m_wrap = 1;
+    doc->m_wrap = true;
     doc->m_nWrapColumn = 15;
 
     // "Hello world test" - space after "world" at position 11
@@ -280,7 +283,7 @@ TEST_F(WordWrapTest, TrailingSpacePreserved)
     // When soft-wrapped lines are joined, the result should have the space
     // Simulate what getSelectedText does for soft-wrapped lines
     QString currentLine = getCurrentLineText();
-    QString joined = firstLine + currentLine;  // No newline for soft-wrap
+    QString joined = firstLine + currentLine; // No newline for soft-wrap
 
     // The joined text should have a space between "world" and "test"
     EXPECT_TRUE(joined.contains("world test"))
@@ -294,7 +297,7 @@ TEST_F(WordWrapTest, TrailingSpacePreserved)
  */
 TEST_F(WordWrapTest, MultipleSpacesHandled)
 {
-    doc->m_wrap = 1;
+    doc->m_wrap = true;
     doc->m_nWrapColumn = 15;
 
     // Text with multiple spaces

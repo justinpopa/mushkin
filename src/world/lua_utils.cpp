@@ -6,9 +6,9 @@
  * Based on lua_utils.cpp from original MUSHclient, ported to Qt/cross-platform
  */
 
-#include "lua_api/lua_common.h"
 #include "../utils/app_paths.h"
 #include "color_utils.h"
+#include "lua_api/lua_common.h"
 #include "lua_dialog_callbacks.h"
 #include "script_engine.h"
 #include "world_document.h"
@@ -2031,7 +2031,7 @@ static int L_utils_infotypes(lua_State* L)
         // More numbers (310+)
         {310, "Newlines received"},
 
-        {0, nullptr}  // end of table marker
+        {0, nullptr} // end of table marker
     };
 
     lua_newtable(L);
@@ -2379,9 +2379,9 @@ static int L_utils_activatenotepad(lua_State* L)
     WorldDocument* pDoc = doc(L);
     const char* title = luaL_checkstring(L, 1);
 
-    bool result = pDoc->ActivateNotepad(QString::fromUtf8(title));
+    auto result = pDoc->ActivateNotepad(QString::fromUtf8(title));
 
-    lua_pushboolean(L, result);
+    lua_pushboolean(L, result.has_value() ? 1 : 0);
     return 1;
 }
 
@@ -2403,9 +2403,9 @@ static int L_utils_appendtonotepad(lua_State* L)
     const char* title = luaL_checkstring(L, 1);
     const char* contents = luaL_checkstring(L, 2);
 
-    bool result = pDoc->AppendToNotepad(QString::fromUtf8(title), QString::fromUtf8(contents));
+    auto result = pDoc->AppendToNotepad(QString::fromUtf8(title), QString::fromUtf8(contents));
 
-    lua_pushboolean(L, result);
+    lua_pushboolean(L, result.has_value() ? 1 : 0);
     return 1;
 }
 

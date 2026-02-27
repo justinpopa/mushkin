@@ -17,13 +17,13 @@ AliasListDialog::AliasListDialog(WorldDocument* doc, QWidget* parent)
 
 int AliasListDialog::itemCount() const
 {
-    return static_cast<int>(m_doc->m_AliasMap.size());
+    return static_cast<int>(m_doc->m_automationRegistry->m_AliasMap.size());
 }
 
 QStringList AliasListDialog::itemNames() const
 {
     QStringList names;
-    for (const auto& [name, aliasPtr] : m_doc->m_AliasMap) {
+    for (const auto& [name, aliasPtr] : m_doc->m_automationRegistry->m_AliasMap) {
         names.append(name);
     }
     return names;
@@ -36,26 +36,26 @@ bool AliasListDialog::itemExists(const QString& name) const
 
 void AliasListDialog::deleteItem(const QString& name)
 {
-    m_doc->deleteAlias(name);
+    (void)m_doc->deleteAlias(name); // UI: item selected for deletion; not-found is a no-op
 }
 
 QString AliasListDialog::getItemGroup(const QString& name) const
 {
     Alias* alias = m_doc->getAlias(name);
-    return alias ? alias->strGroup : QString();
+    return alias ? alias->group : QString();
 }
 
 bool AliasListDialog::getItemEnabled(const QString& name) const
 {
     Alias* alias = m_doc->getAlias(name);
-    return alias ? alias->bEnabled : false;
+    return alias ? alias->enabled : false;
 }
 
 void AliasListDialog::setItemEnabled(const QString& name, bool enabled)
 {
     Alias* alias = m_doc->getAlias(name);
     if (alias) {
-        alias->bEnabled = enabled;
+        alias->enabled = enabled;
     }
 }
 
@@ -65,13 +65,13 @@ void AliasListDialog::populateRow(int row, const QString& name)
     if (!alias)
         return;
 
-    setCheckboxItem(row, COL_ENABLED, alias->bEnabled, name);
-    setReadOnlyItem(row, COL_LABEL, alias->strLabel);
+    setCheckboxItem(row, COL_ENABLED, alias->enabled, name);
+    setReadOnlyItem(row, COL_LABEL, alias->label);
     setReadOnlyItem(row, COL_MATCH, alias->name);
-    setReadOnlyItem(row, COL_GROUP, alias->strGroup);
-    setReadOnlyItemWithData(row, COL_SEQUENCE, QString::number(alias->iSequence), alias->iSequence);
-    setReadOnlyItem(row, COL_SENDTO, sendToDisplayName(alias->iSendTo));
-    setReadOnlyItemWithData(row, COL_MATCHED, QString::number(alias->nMatched), alias->nMatched);
+    setReadOnlyItem(row, COL_GROUP, alias->group);
+    setReadOnlyItemWithData(row, COL_SEQUENCE, QString::number(alias->sequence), alias->sequence);
+    setReadOnlyItem(row, COL_SENDTO, sendToDisplayName(alias->send_to));
+    setReadOnlyItemWithData(row, COL_MATCHED, QString::number(alias->matched), alias->matched);
 }
 
 bool AliasListDialog::openEditDialog(const QString& name)

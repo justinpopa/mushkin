@@ -47,8 +47,8 @@ OutputView::OutputView(WorldDocument* doc, QWidget* parent)
     : QWidget(parent), m_doc(doc), m_lineHeight(0), m_charWidth(0), m_scrollPos(0),
       m_visibleLines(0), m_selectionActive(false), m_selectionStartLine(-1),
       m_selectionStartChar(-1), m_selectionEndLine(-1), m_selectionEndChar(-1),
-      m_mouseDownButton(Qt::NoButton), m_freeze(false), m_frozenLineCount(0),
-      m_hasBeenShown(false), m_lastAlertTime(0)
+      m_mouseDownButton(Qt::NoButton), m_freeze(false), m_frozenLineCount(0), m_hasBeenShown(false),
+      m_lastAlertTime(0)
 {
     // Set up fixed-width font for MUD display
     // Read font from WorldDocument if available, otherwise use default
@@ -243,7 +243,7 @@ bool OutputView::isAtBottom() const
     if (!m_doc)
         return true;
 
-    int totalLines = m_doc->m_lineList.count();
+    int totalLines = static_cast<int>(m_doc->m_lineList.size());
     if (totalLines <= m_visibleLines)
         return true; // All lines visible, always "at bottom"
 
@@ -289,7 +289,7 @@ void OutputView::onNewLinesAdded()
 
     // If at bottom, stay at bottom (auto-scroll)
     if (isAtBottom()) {
-        int totalLines = m_doc->m_lineList.count();
+        int totalLines = static_cast<int>(m_doc->m_lineList.size());
         m_scrollPos = qMax(0, totalLines - m_visibleLines);
     }
 
@@ -347,7 +347,7 @@ void OutputView::wheelEvent(QWheelEvent* event)
     // Clamp to valid range
     m_scrollPos = qMax(0, m_scrollPos);
 
-    int totalLines = m_doc->m_lineList.count();
+    int totalLines = static_cast<int>(m_doc->m_lineList.size());
     int maxScroll = qMax(0, totalLines - m_visibleLines);
     m_scrollPos = qMin(maxScroll, m_scrollPos);
 
@@ -485,8 +485,8 @@ void OutputView::paintEvent(QPaintEvent* event)
 
         // Draw text lines (clipped to text rectangle)
         int y = 0;
-        if (!m_doc->m_lineList.isEmpty()) {
-            int totalLines = m_doc->m_lineList.count();
+        if (!m_doc->m_lineList.empty()) {
+            int totalLines = static_cast<int>(m_doc->m_lineList.size());
             int maxScroll = qMax(0, totalLines - m_visibleLines);
             // Clamp scroll position to valid range (was incorrectly using totalLines-1)
             m_scrollPos = qBound(0, m_scrollPos, maxScroll);
@@ -500,12 +500,13 @@ void OutputView::paintEvent(QPaintEvent* event)
                                             QString());
 
             for (int i = firstLine; i < lastLine; i++) {
-                if (i < 0 || i >= m_doc->m_lineList.count()) {
+                if (i < 0 || i >= static_cast<int>(m_doc->m_lineList.size())) {
                     qCDebug(lcUI) << "OutputView::paintEvent - index" << i
-                                  << "out of bounds, lineList size:" << m_doc->m_lineList.count();
+                                  << "out of bounds, lineList size:"
+                                  << static_cast<int>(m_doc->m_lineList.size());
                     break;
                 }
-                Line* line = m_doc->m_lineList[i];
+                Line* line = m_doc->m_lineList[i].get();
                 drawLine(painter, y, line, i);
                 y += m_lineHeight;
             }
@@ -513,7 +514,8 @@ void OutputView::paintEvent(QPaintEvent* event)
 
         // Draw incomplete line (prompt)
         if (isAtBottom() && m_doc->m_currentLine && m_doc->m_currentLine->len() > 0) {
-            drawLine(painter, y, m_doc->m_currentLine, m_doc->m_lineList.count());
+            drawLine(painter, y, m_doc->m_currentLine.get(),
+                     static_cast<int>(m_doc->m_lineList.size()));
         }
 
         // Restore painter state (remove clipping)
@@ -556,9 +558,9 @@ void OutputView::paintEvent(QPaintEvent* event)
         int y = 0;
 
         // Draw complete lines from buffer (if any)
-        if (!m_doc->m_lineList.isEmpty()) {
+        if (!m_doc->m_lineList.empty()) {
             // Calculate which lines to draw
-            int totalLines = m_doc->m_lineList.count();
+            int totalLines = static_cast<int>(m_doc->m_lineList.size());
 
             // Clamp scroll position to valid range
             int maxScroll = qMax(0, totalLines - m_visibleLines);
@@ -575,12 +577,13 @@ void OutputView::paintEvent(QPaintEvent* event)
             // Draw each visible line (selection handled within drawLine)
             for (int i = firstLine; i < lastLine; i++) {
                 // Bounds check before accessing list
-                if (i < 0 || i >= m_doc->m_lineList.count()) {
+                if (i < 0 || i >= static_cast<int>(m_doc->m_lineList.size())) {
                     qCDebug(lcUI) << "OutputView::paintEvent - index" << i
-                                  << "out of bounds, lineList size:" << m_doc->m_lineList.count();
+                                  << "out of bounds, lineList size:"
+                                  << static_cast<int>(m_doc->m_lineList.size());
                     break;
                 }
-                Line* line = m_doc->m_lineList[i];
+                Line* line = m_doc->m_lineList[i].get();
                 drawLine(painter, y, line, i);
                 y += m_lineHeight;
             }
@@ -592,7 +595,8 @@ void OutputView::paintEvent(QPaintEvent* event)
         if (isAtBottom() && m_doc->m_currentLine && m_doc->m_currentLine->len() > 0) {
             // Draw the incomplete line at the current y position (after all complete lines)
             // Use the line count as the "line index" for this pseudo-line
-            drawLine(painter, y, m_doc->m_currentLine, m_doc->m_lineList.count());
+            drawLine(painter, y, m_doc->m_currentLine.get(),
+                     static_cast<int>(m_doc->m_lineList.size()));
         }
 
         // Draw normal miniwindows last (on top of text)
@@ -622,7 +626,7 @@ void OutputView::paintEvent(QPaintEvent* event)
  */
 void OutputView::drawLine(QPainter& painter, int y, Line* line, int lineIndex)
 {
-    if (!line || !line->text() || line->len() == 0) {
+    if (!line || line->text().empty()) {
         // Empty line - just leave blank
         return;
     }
@@ -654,11 +658,13 @@ void OutputView::drawLine(QPainter& painter, int y, Line* line, int lineIndex)
     if (!strPreamble.isEmpty()) {
         // Calculate elapsed time from world start (%e)
         double fElapsedTime = 0.0;
-        if (m_doc->m_whenWorldStartedHighPrecision != 0 && line->m_lineHighPerformanceTime != 0) {
+        if (m_doc->m_connectionManager->m_whenWorldStartedHighPrecision != 0 &&
+            line->m_lineHighPerformanceTime != 0) {
             // High precision elapsed time in seconds
             // Note: QElapsedTimer uses nanoseconds on some platforms, milliseconds on others
             // For now, use QDateTime which is sufficient for timestamp display
-            fElapsedTime = m_doc->m_whenWorldStarted.msecsTo(line->m_theTime) / 1000.0;
+            fElapsedTime =
+                m_doc->m_connectionManager->m_whenWorldStarted.msecsTo(line->m_theTime) / 1000.0;
         }
         QString strElapsedTime = QString::asprintf("%.6f", fElapsedTime);
         strPreamble.replace("%e", strElapsedTime);
@@ -724,7 +730,7 @@ void OutputView::drawLine(QPainter& painter, int y, Line* line, int lineIndex)
 
         // Convert style run bytes to QString using UTF-8
         // This properly handles multi-byte UTF-8 sequences (e.g., box-drawing characters)
-        QString styleText = QString::fromUtf8(line->text() + textPos, styleLength);
+        QString styleText = QString::fromUtf8(line->text().data() + textPos, styleLength);
 
         // Draw the style run character by character, switching colors for selected portions
         // We need to track byte positions for selection, which is byte-based
@@ -828,8 +834,8 @@ void OutputView::mousePressEvent(QMouseEvent* event)
             int clickLine, clickChar;
             positionToLineChar(event->pos(), clickLine, clickChar);
 
-            if (clickLine >= 0 && clickLine < m_doc->m_lineList.count()) {
-                Line* pLine = m_doc->m_lineList[clickLine];
+            if (clickLine >= 0 && clickLine < static_cast<int>(m_doc->m_lineList.size())) {
+                Line* pLine = m_doc->m_lineList[clickLine].get();
                 m_selectionStartLine = clickLine;
                 m_selectionStartChar = 0;
                 m_selectionEndLine = clickLine;
@@ -1009,7 +1015,7 @@ void OutputView::keyPressEvent(QKeyEvent* event)
         int scrollAmount = qMax(1, m_visibleLines - 2);
         m_scrollPos += scrollAmount;
 
-        int totalLines = m_doc->m_lineList.count();
+        int totalLines = static_cast<int>(m_doc->m_lineList.size());
         int maxScroll = qMax(0, totalLines - m_visibleLines);
         m_scrollPos = qMin(maxScroll, m_scrollPos);
 
@@ -1046,7 +1052,7 @@ void OutputView::keyPressEvent(QKeyEvent* event)
             return;
         }
         // Ctrl+End: Scroll to bottom and unfreeze
-        int totalLines = m_doc->m_lineList.count();
+        int totalLines = static_cast<int>(m_doc->m_lineList.size());
         m_scrollPos = qMax(0, totalLines - m_visibleLines);
         if (m_freeze) {
             setFrozen(false);
@@ -1077,7 +1083,7 @@ void OutputView::keyPressEvent(QKeyEvent* event)
             return;
         }
         // Ctrl+Down: Scroll down one line
-        int totalLines = m_doc->m_lineList.count();
+        int totalLines = static_cast<int>(m_doc->m_lineList.size());
         int maxScroll = qMax(0, totalLines - m_visibleLines);
         m_scrollPos = qMin(maxScroll, m_scrollPos + 1);
         // Auto-unfreeze if we've reached the bottom
@@ -1158,18 +1164,18 @@ void OutputView::positionToLineChar(const QPoint& pos, int& line, int& charOffse
     // Clamp to buffer bounds
     if (lineIndex < 0)
         lineIndex = 0;
-    if (lineIndex >= m_doc->m_lineList.count())
-        lineIndex = m_doc->m_lineList.count() - 1;
+    if (lineIndex >= static_cast<int>(m_doc->m_lineList.size()))
+        lineIndex = static_cast<int>(m_doc->m_lineList.size()) - 1;
 
     line = lineIndex;
 
     // Convert pixel X to character offset
-    if (lineIndex < 0 || lineIndex >= m_doc->m_lineList.count()) {
+    if (lineIndex < 0 || lineIndex >= static_cast<int>(m_doc->m_lineList.size())) {
         charOffset = 0;
         return;
     }
 
-    Line* pLine = m_doc->m_lineList[lineIndex];
+    Line* pLine = m_doc->m_lineList[lineIndex].get();
     if (!pLine || pLine->len() == 0) {
         charOffset = 0;
         return;
@@ -1229,7 +1235,7 @@ void OutputView::positionToLineChar(const QPoint& pos, int& line, int& charOffse
         QFontMetrics fm(font, const_cast<OutputView*>(this));
 
         // Convert style text to QString using UTF-8 (matches drawLine)
-        QString styleText = QString::fromUtf8(pLine->text() + textPos, styleLength);
+        QString styleText = QString::fromUtf8(pLine->text().data() + textPos, styleLength);
 
         // Calculate byte length for each character (for proper byte offset tracking)
         int bytePos = textPos;
@@ -1298,11 +1304,11 @@ std::shared_ptr<Action> OutputView::getActionAtPosition(const QPoint& pos)
     positionToLineChar(pos, lineIndex, charOffset);
 
     // Validate line index
-    if (lineIndex < 0 || lineIndex >= m_doc->m_lineList.count()) {
+    if (lineIndex < 0 || lineIndex >= static_cast<int>(m_doc->m_lineList.size())) {
         return nullptr;
     }
 
-    Line* pLine = m_doc->m_lineList[lineIndex];
+    Line* pLine = m_doc->m_lineList[lineIndex].get();
     if (!pLine || charOffset < 0 || charOffset >= pLine->len()) {
         return nullptr;
     }
@@ -1357,10 +1363,10 @@ QString OutputView::getSelectedText() const
     QString result;
 
     for (int lineIdx = startLine; lineIdx <= endLine; lineIdx++) {
-        if (lineIdx < 0 || lineIdx >= m_doc->m_lineList.count())
+        if (lineIdx < 0 || lineIdx >= static_cast<int>(m_doc->m_lineList.size()))
             continue;
 
-        Line* pLine = m_doc->m_lineList[lineIdx];
+        Line* pLine = m_doc->m_lineList[lineIdx].get();
         if (!pLine || pLine->len() == 0)
             continue;
 
@@ -1372,7 +1378,8 @@ QString OutputView::getSelectedText() const
         rangeEnd = qBound(0, rangeEnd, pLine->len());
 
         // Extract text
-        QString lineText = QString::fromUtf8(pLine->text() + rangeStart, rangeEnd - rangeStart);
+        QString lineText =
+            QString::fromUtf8(pLine->text().data() + rangeStart, rangeEnd - rangeStart);
         result += lineText;
 
         // Add newline between lines (except at end)
@@ -1402,8 +1409,8 @@ QString OutputView::getSelectedTextAsHtml() const
 
     // Get default background color from first style
     QColor defaultBackColor = Qt::black;
-    if (startLine >= 0 && startLine < m_doc->m_lineList.count()) {
-        Line* pLine = m_doc->m_lineList[startLine];
+    if (startLine >= 0 && startLine < static_cast<int>(m_doc->m_lineList.size())) {
+        Line* pLine = m_doc->m_lineList[startLine].get();
         if (pLine && !pLine->styleList.empty()) {
             Style* firstStyle = pLine->styleList.front().get();
             if (firstStyle) {
@@ -1432,10 +1439,10 @@ QString OutputView::getSelectedTextAsHtml() const
     bool inSpan = false;
 
     for (int lineIdx = startLine; lineIdx <= endLine; lineIdx++) {
-        if (lineIdx < 0 || lineIdx >= m_doc->m_lineList.count())
+        if (lineIdx < 0 || lineIdx >= static_cast<int>(m_doc->m_lineList.size()))
             continue;
 
-        Line* pLine = m_doc->m_lineList[lineIdx];
+        Line* pLine = m_doc->m_lineList[lineIdx].get();
         if (!pLine || pLine->len() == 0)
             continue;
 
@@ -1507,7 +1514,7 @@ QString OutputView::getSelectedTextAsHtml() const
                 html += "<u>";
 
             // Extract text for this style segment
-            QString text = QString::fromUtf8(pLine->text() + start, length);
+            QString text = QString::fromUtf8(pLine->text().data() + start, length);
 
             // HTML-escape the text
             text = text.toHtmlEscaped();
@@ -1549,14 +1556,14 @@ void OutputView::copyAsHtml()
 
 void OutputView::selectAll()
 {
-    if (!m_doc || m_doc->m_lineList.isEmpty())
+    if (!m_doc || m_doc->m_lineList.empty())
         return;
 
     m_selectionStartLine = 0;
     m_selectionStartChar = 0;
-    m_selectionEndLine = m_doc->m_lineList.count() - 1;
+    m_selectionEndLine = static_cast<int>(m_doc->m_lineList.size()) - 1;
 
-    Line* lastLine = m_doc->m_lineList.last();
+    Line* lastLine = m_doc->m_lineList.back().get();
     m_selectionEndChar = lastLine ? lastLine->len() : 0;
 
     // Update selection state in document
@@ -1631,7 +1638,7 @@ void OutputView::scrollToBottom()
         qCDebug(lcUI) << "OutputView::scrollToBottom - not initialized";
         return;
     }
-    int totalLines = m_doc->m_lineList.count();
+    int totalLines = static_cast<int>(m_doc->m_lineList.size());
     m_scrollPos = qMax(0, totalLines - m_visibleLines);
     // Unfreeze when scrolling to bottom
     if (m_freeze) {
@@ -1662,7 +1669,7 @@ void OutputView::scrollPageDown()
     }
     int scrollAmount = qMax(1, m_visibleLines - 2);
     m_scrollPos += scrollAmount;
-    int totalLines = m_doc->m_lineList.count();
+    int totalLines = static_cast<int>(m_doc->m_lineList.size());
     int maxScroll = qMax(0, totalLines - m_visibleLines);
     m_scrollPos = qMin(maxScroll, m_scrollPos);
     // Auto-unfreeze if we've reached the bottom
@@ -1690,7 +1697,7 @@ void OutputView::scrollLineDown()
         qCDebug(lcUI) << "OutputView::scrollLineDown - not initialized";
         return;
     }
-    int totalLines = m_doc->m_lineList.count();
+    int totalLines = static_cast<int>(m_doc->m_lineList.size());
     int maxScroll = qMax(0, totalLines - m_visibleLines);
     m_scrollPos = qMin(maxScroll, m_scrollPos + 1);
     // Auto-unfreeze if we've reached the bottom
@@ -1706,7 +1713,7 @@ void OutputView::scrollToLine(int lineIndex)
     if (!m_doc || m_lineHeight <= 0) {
         return;
     }
-    int totalLines = m_doc->m_lineList.count();
+    int totalLines = static_cast<int>(m_doc->m_lineList.size());
     int maxScroll = qMax(0, totalLines - m_visibleLines);
     m_scrollPos = qBound(0, lineIndex, maxScroll);
     update();
@@ -1719,7 +1726,7 @@ void OutputView::scrollToLine(int lineIndex)
  */
 void OutputView::selectTextAt(int lineIndex, int charOffset, int length)
 {
-    if (!m_doc || lineIndex < 0 || lineIndex >= m_doc->m_lineList.count())
+    if (!m_doc || lineIndex < 0 || lineIndex >= static_cast<int>(m_doc->m_lineList.size()))
         return;
 
     // Set selection range
@@ -2025,7 +2032,7 @@ void OutputView::setFrozen(bool frozen)
     } else {
         // Unfreezing - scroll to bottom if we have new lines
         if (m_frozenLineCount > 0 && m_doc) {
-            int totalLines = m_doc->m_lineList.count();
+            int totalLines = static_cast<int>(m_doc->m_lineList.size());
             m_scrollPos = qMax(0, totalLines - m_visibleLines);
         }
         m_frozenLineCount = 0;

@@ -11,8 +11,7 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 
-LoggingPage::LoggingPage(WorldDocument* doc, QWidget* parent)
-    : PreferencesPageBase(doc, parent)
+LoggingPage::LoggingPage(WorldDocument* doc, QWidget* parent) : PreferencesPageBase(doc, parent)
 {
     setupUi();
 }
@@ -90,7 +89,7 @@ void LoggingPage::loadSettings()
     m_logInputCheck->blockSignals(true);
     m_logNotesCheck->blockSignals(true);
 
-    m_enableLogCheck->setChecked(m_doc->m_bLogOutput != 0);
+    m_enableLogCheck->setChecked(m_doc->m_bLogOutput);
     m_logFileEdit->setText(m_doc->m_strAutoLogFileName);
     // Determine format from flags: HTML if m_bLogHTML, Raw if m_bLogRaw, else Text
     if (m_doc->m_bLogHTML)
@@ -101,7 +100,7 @@ void LoggingPage::loadSettings()
         m_logFormatCombo->setCurrentIndex(0);
     m_appendLogCheck->setChecked(false); // Not stored in WorldDocument
     m_logInputCheck->setChecked(false);  // Not stored in WorldDocument
-    m_logNotesCheck->setChecked(m_doc->m_bLogNotes != 0);
+    m_logNotesCheck->setChecked(m_doc->m_bLogNotes);
 
     // Unblock signals
     m_enableLogCheck->blockSignals(false);
@@ -119,13 +118,13 @@ void LoggingPage::saveSettings()
     if (!m_doc)
         return;
 
-    m_doc->m_bLogOutput = m_enableLogCheck->isChecked() ? 1 : 0;
+    m_doc->m_bLogOutput = m_enableLogCheck->isChecked();
     m_doc->m_strAutoLogFileName = m_logFileEdit->text();
     // Save format as flags
-    m_doc->m_bLogHTML = (m_logFormatCombo->currentIndex() == 1) ? 1 : 0;
-    m_doc->m_bLogRaw = (m_logFormatCombo->currentIndex() == 2) ? 1 : 0;
+    m_doc->m_bLogHTML = (m_logFormatCombo->currentIndex() == 1);
+    m_doc->m_bLogRaw = (m_logFormatCombo->currentIndex() == 2);
     // m_appendLogCheck and m_logInputCheck not stored in WorldDocument
-    m_doc->m_bLogNotes = m_logNotesCheck->isChecked() ? 1 : 0;
+    m_doc->m_bLogNotes = m_logNotesCheck->isChecked();
 
     m_doc->setModified(true);
 

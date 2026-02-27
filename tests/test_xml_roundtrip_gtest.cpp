@@ -90,30 +90,30 @@ TEST_F(XmlRoundtripTest, TriggerStyleDecomposition)
     doc1->m_mush_name = "Trigger Round-trip Test";
 
     Trigger* trigger = new Trigger();
-    trigger->strLabel = "test_trigger";
-    trigger->strInternalName = "test_trigger";
+    trigger->label = "test_trigger";
+    trigger->internal_name = "test_trigger";
     trigger->trigger = "You have * gold";
     trigger->contents = "say I have %1 gold!";
-    trigger->strProcedure = "on_gold";
-    trigger->bEnabled = true;
-    trigger->iSendTo = 0; // SendToWorld
-    trigger->iSequence = 100;
+    trigger->procedure = "on_gold";
+    trigger->enabled = true;
+    trigger->send_to = 0; // SendToWorld
+    trigger->sequence = 100;
     trigger->ignore_case = false;
-    trigger->bRegexp = false;
-    trigger->bKeepEvaluating = true;
-    trigger->bOmitFromOutput = false;
+    trigger->use_regexp = false;
+    trigger->keep_evaluating = true;
+    trigger->omit_from_output = false;
     trigger->omit_from_log = false;
-    trigger->bExpandVariables = true;
-    trigger->strGroup = "Combat";
+    trigger->expand_variables = true;
+    trigger->group = "Combat";
 
     // Set style attributes (these should decompose into individual XML attributes)
-    trigger->iStyle = 0x0001 | 0x0004; // HILITE | BLINK (make_bold | make_italic)
+    trigger->style = 0x0001 | 0x0004; // HILITE | BLINK (make_bold | make_italic)
 
     doc1->addTrigger("test_trigger", std::unique_ptr<Trigger>(trigger));
 
     QString content = saveAndReadXml(doc1);
 
-    // Verify decomposed style attributes (not raw iStyle number)
+    // Verify decomposed style attributes (not raw style number)
     EXPECT_TRUE(content.contains("make_bold=\"y\"")) << "Missing make_bold attribute";
     EXPECT_TRUE(content.contains("make_italic=\"y\"")) << "Missing make_italic attribute";
     EXPECT_FALSE(content.contains("istyle="))
@@ -127,18 +127,18 @@ TEST_F(XmlRoundtripTest, TriggerStyleDecomposition)
     Trigger* loaded = doc2->getTrigger("test_trigger");
     ASSERT_NE(loaded, nullptr) << "Trigger not found after load";
 
-    EXPECT_EQ(loaded->strLabel, trigger->strLabel);
+    EXPECT_EQ(loaded->label, trigger->label);
     EXPECT_EQ(loaded->trigger, trigger->trigger);
     EXPECT_EQ(loaded->contents, trigger->contents);
-    EXPECT_EQ(loaded->strProcedure, trigger->strProcedure);
-    EXPECT_EQ(loaded->bEnabled, trigger->bEnabled);
-    EXPECT_EQ(loaded->iSendTo, trigger->iSendTo);
-    EXPECT_EQ(loaded->iSequence, trigger->iSequence);
-    EXPECT_EQ(loaded->strGroup, trigger->strGroup);
+    EXPECT_EQ(loaded->procedure, trigger->procedure);
+    EXPECT_EQ(loaded->enabled, trigger->enabled);
+    EXPECT_EQ(loaded->send_to, trigger->send_to);
+    EXPECT_EQ(loaded->sequence, trigger->sequence);
+    EXPECT_EQ(loaded->group, trigger->group);
 
-    // Verify iStyle was composed correctly from individual attributes
-    EXPECT_EQ(loaded->iStyle, trigger->iStyle)
-        << "iStyle mismatch (make_bold/italic not composed correctly)";
+    // Verify style was composed correctly from individual attributes
+    EXPECT_EQ(loaded->style, trigger->style)
+        << "style mismatch (make_bold/italic not composed correctly)";
 }
 
 // Test 2: Trigger round-trip with match attribute decomposition
@@ -148,14 +148,14 @@ TEST_F(XmlRoundtripTest, TriggerMatchDecomposition)
     doc1->m_mush_name = "Trigger Match Test";
 
     Trigger* trigger = new Trigger();
-    trigger->strLabel = "match_trigger";
-    trigger->strInternalName = "match_trigger";
+    trigger->label = "match_trigger";
+    trigger->internal_name = "match_trigger";
     trigger->trigger = "test pattern";
 
     // Set match attributes (should decompose into text_colour, back_colour, bold, italic, etc.)
     // Bit layout: bits 0-3: style flags, bits 4-7: text_colour, bits 8-11: back_colour, bits
     // 12-15: match flags
-    trigger->iMatch = (5 << 4) | (2 << 8) | 0x0001 | 0x4000; // text=5, back=2, bold, match_italic
+    trigger->match_type = (5 << 4) | (2 << 8) | 0x0001 | 0x4000; // text=5, back=2, bold, match_italic
 
     doc1->addTrigger("match_trigger", std::unique_ptr<Trigger>(trigger));
 
@@ -176,9 +176,9 @@ TEST_F(XmlRoundtripTest, TriggerMatchDecomposition)
     Trigger* loaded = doc2->getTrigger("match_trigger");
     ASSERT_NE(loaded, nullptr);
 
-    // Verify iMatch was composed correctly
-    EXPECT_EQ(loaded->iMatch, trigger->iMatch)
-        << "iMatch mismatch (text/back colour or style flags not composed correctly)";
+    // Verify match_type was composed correctly
+    EXPECT_EQ(loaded->match_type, trigger->match_type)
+        << "match_type mismatch (text/back colour or style flags not composed correctly)";
 }
 
 // Test 3: Trigger round-trip with custom colors
@@ -188,16 +188,16 @@ TEST_F(XmlRoundtripTest, TriggerCustomColors)
     doc1->m_mush_name = "Trigger Color Test";
 
     Trigger* trigger = new Trigger();
-    trigger->strLabel = "color_trigger";
-    trigger->strInternalName = "color_trigger";
+    trigger->label = "color_trigger";
+    trigger->internal_name = "color_trigger";
     trigger->trigger = "color test";
 
     // Set custom color (should save as +1)
     trigger->colour = 42;
 
     // Set BGR colors (MUSHclient COLORREF format, should save as hex RGB names)
-    trigger->iOtherForeground = BGR(255, 128, 64);  // Will save as #FF8040
-    trigger->iOtherBackground = BGR(32, 64, 128);   // Will save as #204080
+    trigger->other_foreground = BGR(255, 128, 64);  // Will save as #FF8040
+    trigger->other_background = BGR(32, 64, 128);   // Will save as #204080
 
     doc1->addTrigger("color_trigger", std::unique_ptr<Trigger>(trigger));
 
@@ -224,8 +224,8 @@ TEST_F(XmlRoundtripTest, TriggerCustomColors)
         << "colour mismatch (custom_colour not decremented correctly)";
 
     // Verify RGB colors
-    EXPECT_EQ(loaded->iOtherForeground, trigger->iOtherForeground) << "iOtherForeground mismatch";
-    EXPECT_EQ(loaded->iOtherBackground, trigger->iOtherBackground) << "iOtherBackground mismatch";
+    EXPECT_EQ(loaded->other_foreground, trigger->other_foreground) << "other_foreground mismatch";
+    EXPECT_EQ(loaded->other_background, trigger->other_background) << "other_background mismatch";
 }
 
 // Test 4: Trigger round-trip with user attribute
@@ -235,12 +235,12 @@ TEST_F(XmlRoundtripTest, TriggerUserAttribute)
     doc1->m_mush_name = "Trigger User Test";
 
     Trigger* trigger = new Trigger();
-    trigger->strLabel = "user_trigger";
-    trigger->strInternalName = "user_trigger";
+    trigger->label = "user_trigger";
+    trigger->internal_name = "user_trigger";
     trigger->trigger = "user test";
 
     // Set user option (should save as "user" not "user_option")
-    trigger->iUserOption = 123;
+    trigger->user_option = 123;
 
     doc1->addTrigger("user_trigger", std::unique_ptr<Trigger>(trigger));
 
@@ -258,7 +258,7 @@ TEST_F(XmlRoundtripTest, TriggerUserAttribute)
     ASSERT_NE(loaded, nullptr);
 
     // Verify user option
-    EXPECT_EQ(loaded->iUserOption, trigger->iUserOption) << "iUserOption mismatch";
+    EXPECT_EQ(loaded->user_option, trigger->user_option) << "user_option mismatch";
 }
 
 // Test 5: Complete trigger round-trip with all attributes
@@ -268,27 +268,27 @@ TEST_F(XmlRoundtripTest, TriggerCompleteRoundtrip)
     doc1->m_mush_name = "Complete Trigger Test";
 
     Trigger* trigger = new Trigger();
-    trigger->strLabel = "complete_trigger";
-    trigger->strInternalName = "complete_trigger";
+    trigger->label = "complete_trigger";
+    trigger->internal_name = "complete_trigger";
     trigger->trigger = "You have * gold";
     trigger->contents = "say I have %1 gold!";
-    trigger->strProcedure = "on_gold";
-    trigger->bEnabled = true;
-    trigger->iSendTo = 0;
-    trigger->iSequence = 100;
+    trigger->procedure = "on_gold";
+    trigger->enabled = true;
+    trigger->send_to = 0;
+    trigger->sequence = 100;
     trigger->ignore_case = false;
-    trigger->bRegexp = false;
-    trigger->bKeepEvaluating = true;
-    trigger->bOmitFromOutput = false;
+    trigger->use_regexp = false;
+    trigger->keep_evaluating = true;
+    trigger->omit_from_output = false;
     trigger->omit_from_log = false;
-    trigger->bExpandVariables = true;
-    trigger->strGroup = "Combat";
-    trigger->iStyle = 0x0001 | 0x0004;
-    trigger->iMatch = (5 << 4) | (2 << 8) | 0x0001 | 0x4000;
+    trigger->expand_variables = true;
+    trigger->group = "Combat";
+    trigger->style = 0x0001 | 0x0004;
+    trigger->match_type = (5 << 4) | (2 << 8) | 0x0001 | 0x4000;
     trigger->colour = 42;
-    trigger->iOtherForeground = BGR(255, 128, 64);  // Stored as BGR/COLORREF
-    trigger->iOtherBackground = BGR(32, 64, 128);   // Stored as BGR/COLORREF
-    trigger->iUserOption = 123;
+    trigger->other_foreground = BGR(255, 128, 64);  // Stored as BGR/COLORREF
+    trigger->other_background = BGR(32, 64, 128);   // Stored as BGR/COLORREF
+    trigger->user_option = 123;
 
     doc1->addTrigger("complete_trigger", std::unique_ptr<Trigger>(trigger));
 
@@ -301,20 +301,20 @@ TEST_F(XmlRoundtripTest, TriggerCompleteRoundtrip)
     Trigger* loaded = doc2->getTrigger("complete_trigger");
     ASSERT_NE(loaded, nullptr);
 
-    EXPECT_EQ(loaded->strLabel, trigger->strLabel);
+    EXPECT_EQ(loaded->label, trigger->label);
     EXPECT_EQ(loaded->trigger, trigger->trigger);
     EXPECT_EQ(loaded->contents, trigger->contents);
-    EXPECT_EQ(loaded->strProcedure, trigger->strProcedure);
-    EXPECT_EQ(loaded->bEnabled, trigger->bEnabled);
-    EXPECT_EQ(loaded->iSendTo, trigger->iSendTo);
-    EXPECT_EQ(loaded->iSequence, trigger->iSequence);
-    EXPECT_EQ(loaded->strGroup, trigger->strGroup);
-    EXPECT_EQ(loaded->iStyle, trigger->iStyle);
-    EXPECT_EQ(loaded->iMatch, trigger->iMatch);
+    EXPECT_EQ(loaded->procedure, trigger->procedure);
+    EXPECT_EQ(loaded->enabled, trigger->enabled);
+    EXPECT_EQ(loaded->send_to, trigger->send_to);
+    EXPECT_EQ(loaded->sequence, trigger->sequence);
+    EXPECT_EQ(loaded->group, trigger->group);
+    EXPECT_EQ(loaded->style, trigger->style);
+    EXPECT_EQ(loaded->match_type, trigger->match_type);
     EXPECT_EQ(loaded->colour, trigger->colour);
-    EXPECT_EQ(loaded->iOtherForeground, trigger->iOtherForeground);
-    EXPECT_EQ(loaded->iOtherBackground, trigger->iOtherBackground);
-    EXPECT_EQ(loaded->iUserOption, trigger->iUserOption);
+    EXPECT_EQ(loaded->other_foreground, trigger->other_foreground);
+    EXPECT_EQ(loaded->other_background, trigger->other_background);
+    EXPECT_EQ(loaded->user_option, trigger->user_option);
 }
 
 // Test 6: Alias round-trip with user attribute
@@ -324,34 +324,34 @@ TEST_F(XmlRoundtripTest, AliasUserAttribute)
     doc1->m_mush_name = "Alias Round-trip Test";
 
     auto alias = std::make_unique<Alias>();
-    alias->strLabel = "test_alias";
-    alias->strInternalName = "test_alias";
+    alias->label = "test_alias";
+    alias->internal_name = "test_alias";
     alias->name = "n";
     alias->contents = "north";
-    alias->strProcedure = "on_north";
-    alias->bEnabled = true;
-    alias->iSendTo = 0;
-    alias->iSequence = 100;
-    alias->bIgnoreCase = true;
-    alias->bRegexp = false;
-    alias->bKeepEvaluating = false;
-    alias->bExpandVariables = true;
-    alias->bEchoAlias = true;
-    alias->strGroup = "Movement";
-    alias->iUserOption = 456;
+    alias->procedure = "on_north";
+    alias->enabled = true;
+    alias->send_to = 0;
+    alias->sequence = 100;
+    alias->ignore_case = true;
+    alias->use_regexp = false;
+    alias->keep_evaluating = false;
+    alias->expand_variables = true;
+    alias->echo_alias = true;
+    alias->group = "Movement";
+    alias->user_option = 456;
 
     // Save expected values before move
-    QString expectedLabel = alias->strLabel;
+    QString expectedLabel = alias->label;
     QString expectedName = alias->name;
     QString expectedContents = alias->contents;
-    QString expectedProcedure = alias->strProcedure;
-    bool expectedEnabled = alias->bEnabled;
-    int expectedSendTo = alias->iSendTo;
-    int expectedSequence = alias->iSequence;
-    bool expectedIgnoreCase = alias->bIgnoreCase;
-    bool expectedEchoAlias = alias->bEchoAlias;
-    QString expectedGroup = alias->strGroup;
-    int expectedUserOption = alias->iUserOption;
+    QString expectedProcedure = alias->procedure;
+    bool expectedEnabled = alias->enabled;
+    int expectedSendTo = alias->send_to;
+    int expectedSequence = alias->sequence;
+    bool expectedIgnoreCase = alias->ignore_case;
+    bool expectedEchoAlias = alias->echo_alias;
+    QString expectedGroup = alias->group;
+    int expectedUserOption = alias->user_option;
 
     doc1->addAlias("test_alias", std::move(alias));
 
@@ -368,17 +368,17 @@ TEST_F(XmlRoundtripTest, AliasUserAttribute)
     Alias* loaded = doc2->getAlias("test_alias");
     ASSERT_NE(loaded, nullptr) << "Alias not found after load";
 
-    EXPECT_EQ(loaded->strLabel, expectedLabel);
+    EXPECT_EQ(loaded->label, expectedLabel);
     EXPECT_EQ(loaded->name, expectedName);
     EXPECT_EQ(loaded->contents, expectedContents);
-    EXPECT_EQ(loaded->strProcedure, expectedProcedure);
-    EXPECT_EQ(loaded->bEnabled, expectedEnabled);
-    EXPECT_EQ(loaded->iSendTo, expectedSendTo);
-    EXPECT_EQ(loaded->iSequence, expectedSequence);
-    EXPECT_EQ(loaded->bIgnoreCase, expectedIgnoreCase);
-    EXPECT_EQ(loaded->bEchoAlias, expectedEchoAlias);
-    EXPECT_EQ(loaded->strGroup, expectedGroup);
-    EXPECT_EQ(loaded->iUserOption, expectedUserOption);
+    EXPECT_EQ(loaded->procedure, expectedProcedure);
+    EXPECT_EQ(loaded->enabled, expectedEnabled);
+    EXPECT_EQ(loaded->send_to, expectedSendTo);
+    EXPECT_EQ(loaded->sequence, expectedSequence);
+    EXPECT_EQ(loaded->ignore_case, expectedIgnoreCase);
+    EXPECT_EQ(loaded->echo_alias, expectedEchoAlias);
+    EXPECT_EQ(loaded->group, expectedGroup);
+    EXPECT_EQ(loaded->user_option, expectedUserOption);
 }
 
 // Test 7: Timer round-trip with interval type
@@ -388,25 +388,25 @@ TEST_F(XmlRoundtripTest, TimerIntervalRoundtrip)
     doc1->m_mush_name = "Timer Round-trip Test";
 
     Timer* timer = new Timer();
-    timer->strLabel = "test_timer";
-    timer->bEnabled = true;
-    timer->iType = Timer::eInterval;
-    timer->iEveryHour = 0;
-    timer->iEveryMinute = 5;
-    timer->fEverySecond = 30.5;
-    timer->iOffsetHour = 0;
-    timer->iOffsetMinute = 2;
-    timer->fOffsetSecond = 15.25;
-    timer->strContents = "say Timer fired!";
-    timer->iSendTo = 0;
-    timer->strProcedure = "onTimerFire";
-    timer->strVariable = "";
-    timer->bOneShot = false;
-    timer->bActiveWhenClosed = true;
-    timer->bOmitFromOutput = false;
-    timer->bOmitFromLog = false;
-    timer->strGroup = "Maintenance";
-    timer->iUserOption = 789;
+    timer->label = "test_timer";
+    timer->enabled = true;
+    timer->type = Timer::eInterval;
+    timer->every_hour = 0;
+    timer->every_minute = 5;
+    timer->every_second = 30.5;
+    timer->offset_hour = 0;
+    timer->offset_minute = 2;
+    timer->offset_second = 15.25;
+    timer->contents = "say Timer fired!";
+    timer->send_to = 0;
+    timer->procedure = "onTimerFire";
+    timer->variable = "";
+    timer->one_shot = false;
+    timer->active_when_closed = true;
+    timer->omit_from_output = false;
+    timer->omit_from_log = false;
+    timer->group = "Maintenance";
+    timer->user_option = 789;
 
     doc1->addTimer("test_timer", std::unique_ptr<Timer>(timer));
 
@@ -435,22 +435,22 @@ TEST_F(XmlRoundtripTest, TimerIntervalRoundtrip)
     Timer* loaded = doc2->getTimer("test_timer");
     ASSERT_NE(loaded, nullptr) << "Timer not found after load";
 
-    EXPECT_EQ(loaded->strLabel, timer->strLabel);
-    EXPECT_EQ(loaded->bEnabled, timer->bEnabled);
-    EXPECT_EQ(loaded->iType, timer->iType);
-    EXPECT_EQ(loaded->iEveryMinute, timer->iEveryMinute);
-    EXPECT_DOUBLE_EQ(loaded->fEverySecond, timer->fEverySecond);
-    EXPECT_EQ(loaded->iOffsetMinute, timer->iOffsetMinute);
-    EXPECT_DOUBLE_EQ(loaded->fOffsetSecond, timer->fOffsetSecond);
-    EXPECT_EQ(loaded->strContents, timer->strContents);
-    EXPECT_EQ(loaded->iSendTo, timer->iSendTo);
-    EXPECT_EQ(loaded->strProcedure, timer->strProcedure);
-    EXPECT_EQ(loaded->bOneShot, timer->bOneShot);
-    EXPECT_EQ(loaded->bActiveWhenClosed, timer->bActiveWhenClosed);
-    EXPECT_EQ(loaded->bOmitFromOutput, timer->bOmitFromOutput);
-    EXPECT_EQ(loaded->bOmitFromLog, timer->bOmitFromLog);
-    EXPECT_EQ(loaded->strGroup, timer->strGroup);
-    EXPECT_EQ(loaded->iUserOption, timer->iUserOption);
+    EXPECT_EQ(loaded->label, timer->label);
+    EXPECT_EQ(loaded->enabled, timer->enabled);
+    EXPECT_EQ(loaded->type, timer->type);
+    EXPECT_EQ(loaded->every_minute, timer->every_minute);
+    EXPECT_DOUBLE_EQ(loaded->every_second, timer->every_second);
+    EXPECT_EQ(loaded->offset_minute, timer->offset_minute);
+    EXPECT_DOUBLE_EQ(loaded->offset_second, timer->offset_second);
+    EXPECT_EQ(loaded->contents, timer->contents);
+    EXPECT_EQ(loaded->send_to, timer->send_to);
+    EXPECT_EQ(loaded->procedure, timer->procedure);
+    EXPECT_EQ(loaded->one_shot, timer->one_shot);
+    EXPECT_EQ(loaded->active_when_closed, timer->active_when_closed);
+    EXPECT_EQ(loaded->omit_from_output, timer->omit_from_output);
+    EXPECT_EQ(loaded->omit_from_log, timer->omit_from_log);
+    EXPECT_EQ(loaded->group, timer->group);
+    EXPECT_EQ(loaded->user_option, timer->user_option);
 }
 
 // Main function required for GoogleTest

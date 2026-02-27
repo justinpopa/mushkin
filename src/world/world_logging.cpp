@@ -15,10 +15,10 @@
 
 #include "../text/line.h"  // For Line and LOG_LINE flag
 #include "../text/style.h" // For Style
+#include "../utils/app_paths.h"
 #include "color_utils.h"
 #include "logging.h"
 #include "world_document.h"
-#include "../utils/app_paths.h"
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QDebug>
@@ -187,7 +187,7 @@ qint32 WorldDocument::OpenLog(const QString& filename, bool append)
     m_logfile_name = logName;
 
     // Create QFile
-    m_logfile = new QFile(logName);
+    m_logfile = std::make_unique<QFile>(logName);
 
     // Set open mode
     QIODevice::OpenMode mode = QIODevice::WriteOnly | QIODevice::Text;
@@ -201,8 +201,7 @@ qint32 WorldDocument::OpenLog(const QString& filename, bool append)
     if (!m_logfile->open(mode)) {
         qCDebug(lcLogging) << "OpenLog: Failed to open" << logName << ":"
                            << m_logfile->errorString();
-        delete m_logfile;
-        m_logfile = nullptr;
+        m_logfile.reset();
         return eCouldNotOpenFile;
     }
 
@@ -275,10 +274,9 @@ qint32 WorldDocument::CloseLog()
         WriteToLog("\n");
     }
 
-    // Close and delete
+    // Close and release
     m_logfile->close();
-    delete m_logfile;
-    m_logfile = nullptr;
+    m_logfile.reset();
 
     qCDebug(lcLogging) << "CloseLog: Log file closed";
 
@@ -308,7 +306,7 @@ void WorldDocument::WriteToLog(const QString& text)
     }
 
     // Write using QTextStream for proper encoding
-    QTextStream stream(m_logfile);
+    QTextStream stream(m_logfile.get());
     stream.setEncoding(QStringConverter::Utf8);
     stream << text;
 }
@@ -464,7 +462,7 @@ void WorldDocument::LogLineInHTMLcolour(Line* line)
 
     // If line has no styles, write as plain text
     if (line->styleList.empty()) {
-        QString lineText = QString::fromUtf8(line->text(), line->len());
+        QString lineText = QString::fromUtf8(line->text().data(), line->text().size());
         WriteToLog(FixHTMLString(lineText));
         WriteToLog("\n");
         return;
@@ -472,7 +470,7 @@ void WorldDocument::LogLineInHTMLcolour(Line* line)
 
     // Process all style runs in the line
     qint32 iCol = 0; // Column position in line
-    QString lineText = QString::fromUtf8(line->text(), line->len());
+    QString lineText = QString::fromUtf8(line->text().data(), line->text().size());
 
     for (const auto& pStyle : line->styleList) {
         // Skip zero-length styles
@@ -624,7 +622,7 @@ void WorldDocument::logCompletedLine(Line* line)
         WriteToLog(preamble);
 
         // Write line content
-        QString lineText = QString::fromUtf8(line->text(), line->len());
+        QString lineText = QString::fromUtf8(line->text().data(), line->text().size());
 
         if (m_bLogHTML && m_bLogInColour) {
             // HTML logging with colors
@@ -646,7 +644,7 @@ void WorldDocument::logCompletedLine(Line* line)
         }
     } else if (bShouldLog && m_logfile && m_bLogRaw) {
         // Raw mode: just write the line as-is
-        QString lineText = QString::fromUtf8(line->text(), line->len());
+        QString lineText = QString::fromUtf8(line->text().data(), line->text().size());
         WriteToLog(lineText);
         WriteToLog("\n");
     }
@@ -674,7 +672,7 @@ void WorldDocument::logCompletedLine(Line* line)
  */
 void WorldDocument::writeRetrospectiveLog()
 {
-    if (!m_logfile || m_lineList.isEmpty()) {
+    if (!m_logfile || m_lineList.empty()) {
         return;
     }
 
@@ -683,7 +681,8 @@ void WorldDocument::writeRetrospectiveLog()
     int linesWritten = 0;
 
     // Iterate through all buffered lines in chronological order
-    for (Line* line : m_lineList) {
+    for (const auto& linePtr : m_lineList) {
+        Line* line = linePtr.get();
         if (!line) {
             continue;
         }
@@ -712,7 +711,7 @@ void WorldDocument::writeRetrospectiveLog()
         // Write the line (respecting raw/HTML modes)
         if (m_bLogRaw) {
             // Raw mode: just write the line as-is
-            QString lineText = QString::fromUtf8(line->text(), line->len());
+            QString lineText = QString::fromUtf8(line->text().data(), line->text().size());
             WriteToLog(lineText);
             WriteToLog("\n");
         } else {
@@ -729,7 +728,7 @@ void WorldDocument::writeRetrospectiveLog()
 
             WriteToLog(preamble);
 
-            QString lineText = QString::fromUtf8(line->text(), line->len());
+            QString lineText = QString::fromUtf8(line->text().data(), line->text().size());
 
             if (m_bLogHTML && m_bLogInColour) {
                 // HTML logging with colors

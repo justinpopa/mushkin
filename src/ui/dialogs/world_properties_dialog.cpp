@@ -134,7 +134,7 @@ void WorldPropertiesDialog::setupOutputTab()
 
     QGridLayout* colorGrid = new QGridLayout();
 
-    const char* colorNames[16] = {
+    static constexpr std::array<const char*, 16> colorNames = {
         "Black",        "Red",           "Green",       "Yellow",         "Blue",
         "Magenta",      "Cyan",          "White",       "Bright Black",   "Bright Red",
         "Bright Green", "Bright Yellow", "Bright Blue", "Bright Magenta", "Bright Cyan",
@@ -474,7 +474,7 @@ void WorldPropertiesDialog::loadSettings()
     m_portSpin->setValue(m_doc->m_port);
     m_nameEdit->setText(m_doc->m_mush_name);
     m_passwordEdit->setText(m_doc->m_password);
-    m_autoConnectCheck->setChecked(m_doc->m_connect_now != 0);
+    m_autoConnectCheck->setChecked(m_doc->m_connect_now);
 
     // Output tab
     // Reconstruct QFont from WorldDocument font properties
@@ -486,7 +486,7 @@ void WorldPropertiesDialog::loadSettings()
 
     // TODO: ANSI colors - WorldDocument needs m_normalColour[8] and m_boldColour[8] arrays
     // For now, initialize with default colors
-    QRgb defaultColors[16] = {
+    const std::array<QRgb, 16> defaultColors = {
         qRgb(0, 0, 0),       // Black
         qRgb(128, 0, 0),     // Red
         qRgb(0, 128, 0),     // Green
@@ -510,7 +510,7 @@ void WorldPropertiesDialog::loadSettings()
     }
 
     // Activity settings
-    m_flashIconCheck->setChecked(m_doc->m_bFlashIcon != 0);
+    m_flashIconCheck->setChecked(m_doc->m_bFlashIcon);
 
     // Input tab
     m_inputFont.setFamily(m_doc->m_input_font_name);
@@ -520,19 +520,19 @@ void WorldPropertiesDialog::loadSettings()
     m_inputFontLabel->setText(
         QString("%1, %2pt").arg(m_inputFont.family()).arg(m_inputFont.pointSize()));
 
-    m_echoInputCheck->setChecked(m_doc->m_display_my_input != 0);
+    m_echoInputCheck->setChecked(m_doc->m_display_my_input);
     // TODO: m_echoColorCombo - needs echo color setting in WorldDocument
 
     // Command history size
     m_historySizeSpin->setValue(m_doc->m_maxCommandHistory);
 
     // Logging tab
-    m_enableLogCheck->setChecked(m_doc->m_bLogOutput != 0);
+    m_enableLogCheck->setChecked(m_doc->m_bLogOutput);
     m_logFileEdit->setText(m_doc->m_strAutoLogFileName);
     // TODO: m_logFormatCombo - WorldDocument needs log format enum
 
     // Scripting tab
-    m_enableScriptCheck->setChecked(m_doc->m_bEnableScripts != 0);
+    m_enableScriptCheck->setChecked(m_doc->m_bEnableScripts);
     m_scriptFileEdit->setText(m_doc->m_strScriptFilename);
     // TODO: m_scriptLanguageCombo - WorldDocument needs script language setting
 
@@ -543,9 +543,9 @@ void WorldPropertiesDialog::loadSettings()
     m_pasteLinePostambleEdit->setText(m_doc->m_pasteline_postamble);
     m_pasteDelaySpin->setValue(m_doc->m_nPasteDelay);
     m_pasteDelayPerLinesSpin->setValue(m_doc->m_nPasteDelayPerLines);
-    m_pasteCommentedSoftcodeCheck->setChecked(m_doc->m_bPasteCommentedSoftcode != 0);
-    m_pasteEchoCheck->setChecked(m_doc->m_bPasteEcho != 0);
-    m_pasteConfirmCheck->setChecked(m_doc->m_bConfirmOnPaste != 0);
+    m_pasteCommentedSoftcodeCheck->setChecked(m_doc->m_bPasteCommentedSoftcode);
+    m_pasteEchoCheck->setChecked(m_doc->m_bPasteEcho);
+    m_pasteConfirmCheck->setChecked(m_doc->m_bConfirmOnPaste);
 
     // Send File tab
     m_filePreambleEdit->setText(m_doc->m_file_preamble);
@@ -554,12 +554,12 @@ void WorldPropertiesDialog::loadSettings()
     m_fileLinePostambleEdit->setText(m_doc->m_line_postamble);
     m_fileDelaySpin->setValue(m_doc->m_nFileDelay);
     m_fileDelayPerLinesSpin->setValue(m_doc->m_nFileDelayPerLines);
-    m_fileCommentedSoftcodeCheck->setChecked(m_doc->m_bFileCommentedSoftcode != 0);
-    m_fileEchoCheck->setChecked(m_doc->m_bSendEcho != 0);
-    m_fileConfirmCheck->setChecked(m_doc->m_bConfirmOnSend != 0);
+    m_fileCommentedSoftcodeCheck->setChecked(m_doc->m_bFileCommentedSoftcode);
+    m_fileEchoCheck->setChecked(m_doc->m_bSendEcho);
+    m_fileConfirmCheck->setChecked(m_doc->m_bConfirmOnSend);
 
     // Remote Access tab
-    m_enableRemoteAccessCheck->setChecked(m_doc->m_bEnableRemoteAccess != 0);
+    m_enableRemoteAccessCheck->setChecked(m_doc->m_bEnableRemoteAccess);
     m_remotePortSpin->setValue(m_doc->m_iRemotePort > 0 ? m_doc->m_iRemotePort : 4001);
     m_remotePasswordEdit->setText(m_doc->m_strRemotePassword);
     m_remoteScrollbackSpin->setValue(m_doc->m_iRemoteScrollbackLines);
@@ -578,7 +578,7 @@ void WorldPropertiesDialog::saveSettings()
     m_doc->m_port = m_portSpin->value();
     m_doc->m_mush_name = m_nameEdit->text();
     m_doc->m_password = m_passwordEdit->text();
-    m_doc->m_connect_now = m_autoConnectCheck->isChecked() ? 1 : 0;
+    m_doc->m_connect_now = m_autoConnectCheck->isChecked();
 
     // Output tab
     m_doc->m_font_name = m_outputFont.family();
@@ -587,25 +587,25 @@ void WorldPropertiesDialog::saveSettings()
     // TODO: ANSI colors - save to m_normalColour[] and m_boldColour[] when they exist
 
     // Activity settings
-    m_doc->m_bFlashIcon = m_flashIconCheck->isChecked() ? 1 : 0;
+    m_doc->m_bFlashIcon = m_flashIconCheck->isChecked();
 
     // Input tab
     m_doc->m_input_font_name = m_inputFont.family();
     m_doc->m_input_font_height = m_inputFont.pointSize();
     m_doc->m_input_font_weight = m_inputFont.weight();
     m_doc->m_input_font_italic = m_inputFont.italic() ? 1 : 0;
-    m_doc->m_display_my_input = m_echoInputCheck->isChecked() ? 1 : 0;
+    m_doc->m_display_my_input = m_echoInputCheck->isChecked();
     // TODO: m_echoColorCombo - save when WorldDocument has echo color setting
 
     // Command history size
     m_doc->m_maxCommandHistory = m_historySizeSpin->value();
 
     // Logging tab
-    m_doc->m_bLogOutput = m_enableLogCheck->isChecked() ? 1 : 0;
+    m_doc->m_bLogOutput = m_enableLogCheck->isChecked();
     m_doc->m_strAutoLogFileName = m_logFileEdit->text();
 
     // Scripting tab
-    m_doc->m_bEnableScripts = m_enableScriptCheck->isChecked() ? 1 : 0;
+    m_doc->m_bEnableScripts = m_enableScriptCheck->isChecked();
     m_doc->m_strScriptFilename = m_scriptFileEdit->text();
     // TODO: m_scriptLanguageCombo - save when WorldDocument has script language
 
@@ -616,9 +616,9 @@ void WorldPropertiesDialog::saveSettings()
     m_doc->m_pasteline_postamble = m_pasteLinePostambleEdit->text();
     m_doc->m_nPasteDelay = m_pasteDelaySpin->value();
     m_doc->m_nPasteDelayPerLines = m_pasteDelayPerLinesSpin->value();
-    m_doc->m_bPasteCommentedSoftcode = m_pasteCommentedSoftcodeCheck->isChecked() ? 1 : 0;
-    m_doc->m_bPasteEcho = m_pasteEchoCheck->isChecked() ? 1 : 0;
-    m_doc->m_bConfirmOnPaste = m_pasteConfirmCheck->isChecked() ? 1 : 0;
+    m_doc->m_bPasteCommentedSoftcode = m_pasteCommentedSoftcodeCheck->isChecked();
+    m_doc->m_bPasteEcho = m_pasteEchoCheck->isChecked();
+    m_doc->m_bConfirmOnPaste = m_pasteConfirmCheck->isChecked();
 
     // Send File tab
     m_doc->m_file_preamble = m_filePreambleEdit->text();
@@ -627,12 +627,12 @@ void WorldPropertiesDialog::saveSettings()
     m_doc->m_line_postamble = m_fileLinePostambleEdit->text();
     m_doc->m_nFileDelay = m_fileDelaySpin->value();
     m_doc->m_nFileDelayPerLines = m_fileDelayPerLinesSpin->value();
-    m_doc->m_bFileCommentedSoftcode = m_fileCommentedSoftcodeCheck->isChecked() ? 1 : 0;
-    m_doc->m_bSendEcho = m_fileEchoCheck->isChecked() ? 1 : 0;
-    m_doc->m_bConfirmOnSend = m_fileConfirmCheck->isChecked() ? 1 : 0;
+    m_doc->m_bFileCommentedSoftcode = m_fileCommentedSoftcodeCheck->isChecked();
+    m_doc->m_bSendEcho = m_fileEchoCheck->isChecked();
+    m_doc->m_bConfirmOnSend = m_fileConfirmCheck->isChecked();
 
     // Remote Access tab
-    m_doc->m_bEnableRemoteAccess = m_enableRemoteAccessCheck->isChecked() ? 1 : 0;
+    m_doc->m_bEnableRemoteAccess = m_enableRemoteAccessCheck->isChecked();
     m_doc->m_iRemotePort = m_remotePortSpin->value();
     m_doc->m_strRemotePassword = m_remotePasswordEdit->text();
     m_doc->m_iRemoteScrollbackLines = m_remoteScrollbackSpin->value();

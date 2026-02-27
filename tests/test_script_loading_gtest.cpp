@@ -38,7 +38,7 @@ class ScriptLoadingTest : public ::testing::Test {
         doc->m_mush_name = "Test World";
         doc->m_server = "test.mud.com";
         doc->m_port = 4000;
-        doc->m_iConnectPhase = eConnectConnectedToMud;
+        doc->m_connectionManager->m_iConnectPhase = eConnectConnectedToMud;
         doc->m_bUTF_8 = true;
 
         // Initialize note() settings
@@ -48,7 +48,8 @@ class ScriptLoadingTest : public ::testing::Test {
         doc->m_iNoteStyle = 0;                        // No special styling
 
         // Create initial line (needed for note() to work)
-        doc->m_currentLine = new Line(1, 80, 0, qRgb(192, 192, 192), qRgb(0, 0, 0), true);
+        doc->m_currentLine =
+            std::make_unique<Line>(1, 80, 0, qRgb(192, 192, 192), qRgb(0, 0, 0), true);
         auto initialStyle = std::make_unique<Style>();
         initialStyle->iLength = 0;
         initialStyle->iFlags = COLOUR_RGB;
@@ -382,7 +383,8 @@ TEST_F(ScriptLoadingTest, YueScriptParseScript)
     QString yueCode = R"(
 global yue_parse_value = 100
 )";
-    bool error = doc->m_ScriptEngine->parseScript(yueCode, "YueScript parseScript", ScriptLanguage::YueScript);
+    bool error = doc->m_ScriptEngine->parseScript(yueCode, "YueScript parseScript",
+                                                  ScriptLanguage::YueScript);
     EXPECT_FALSE(error) << "parseScript with YueScript should succeed";
 
     lua_State* L = doc->m_ScriptEngine->L;
@@ -445,7 +447,8 @@ TEST_F(ScriptLoadingTest, TealParseScript)
 local y: number = 200
 teal_parse_value = y
 )";
-    bool error = doc->m_ScriptEngine->parseScript(tealCode, "Teal parseScript", ScriptLanguage::Teal);
+    bool error =
+        doc->m_ScriptEngine->parseScript(tealCode, "Teal parseScript", ScriptLanguage::Teal);
     EXPECT_FALSE(error) << "parseScript with Teal should succeed";
 
     lua_State* L = doc->m_ScriptEngine->L;
@@ -506,7 +509,8 @@ TEST_F(ScriptLoadingTest, FennelParseScript)
     QString fennelCode = R"(
 (global fennel_parse_value 300)
 )";
-    bool error = doc->m_ScriptEngine->parseScript(fennelCode, "Fennel parseScript", ScriptLanguage::Fennel);
+    bool error =
+        doc->m_ScriptEngine->parseScript(fennelCode, "Fennel parseScript", ScriptLanguage::Fennel);
     EXPECT_FALSE(error) << "parseScript with Fennel should succeed";
 
     lua_State* L = doc->m_ScriptEngine->L;
@@ -605,7 +609,8 @@ TEST_F(ScriptLoadingTest, MoonScriptParseScript)
     QString moonCode = R"(
 export moon_parse_value = 100
 )";
-    bool error = doc->m_ScriptEngine->parseScript(moonCode, "MoonScript parseScript", ScriptLanguage::MoonScript);
+    bool error = doc->m_ScriptEngine->parseScript(moonCode, "MoonScript parseScript",
+                                                  ScriptLanguage::MoonScript);
     EXPECT_FALSE(error) << "parseScript with MoonScript should succeed";
 
     lua_State* L = doc->m_ScriptEngine->L;
@@ -622,7 +627,8 @@ TEST_F(ScriptLoadingTest, MoonScriptErrorHandling)
     QString invalidMoon = R"(
 @@@ invalid syntax here ###
 )";
-    QString transpiled = doc->m_ScriptEngine->transpileMoonScript(invalidMoon, "Invalid MoonScript");
+    QString transpiled =
+        doc->m_ScriptEngine->transpileMoonScript(invalidMoon, "Invalid MoonScript");
     EXPECT_TRUE(transpiled.isEmpty()) << "Invalid MoonScript should return empty string";
 }
 

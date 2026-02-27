@@ -2,11 +2,10 @@
 #define KEYPAD_PAGE_H
 
 #include "../preferences_page_base.h"
+#include "world/world_document.h"
 
 class QLineEdit;
 class QCheckBox;
-
-#define KEYPAD_MAX_ITEMS 30
 
 /**
  * KeypadPage - Numeric keypad configuration
@@ -20,7 +19,10 @@ class KeypadPage : public PreferencesPageBase {
   public:
     explicit KeypadPage(WorldDocument* doc, QWidget* parent = nullptr);
 
-    QString pageName() const override { return tr("Keypad"); }
+    QString pageName() const override
+    {
+        return tr("Keypad");
+    }
     QString pageDescription() const override
     {
         return tr("Configure numeric keypad for speedwalking and quick commands.");

@@ -152,11 +152,11 @@ TEST_F(LineTest, LineWithTextAndStyles)
 
     // Resize buffer and copy text
     testLine->textBuffer.resize(textLen);
-    memcpy(testLine->text(), testText, textLen);
+    memcpy(testLine->textBuffer.data(), testText, textLen);
     testLine->textBuffer.push_back('\0');
 
     EXPECT_EQ(testLine->len(), textLen); // Text length (len() doesn't count null terminator)
-    EXPECT_STREQ(testLine->text(), "Hello world bold!");
+    EXPECT_STREQ(testLine->text().data(), "Hello world bold!");
 
     delete testLine;
 }
@@ -192,7 +192,7 @@ TEST_F(LineTest, ActionLifecycleWithLine)
     const char* testText = "Hello world sword";
     int textLen = qstrlen(testText);
     testLine->textBuffer.resize(textLen);
-    memcpy(testLine->text(), testText, textLen);
+    memcpy(testLine->textBuffer.data(), testText, textLen);
     testLine->textBuffer.push_back('\0');
 
     EXPECT_EQ(testLine->styleList.size(), 2);

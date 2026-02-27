@@ -7,6 +7,7 @@
 #include "trigger.h"
 #include "sendto.h"
 #include <QDebug>
+#include <expected>
 
 // Default trigger sequence (OtherTypes.h)
 #define DEFAULT_TRIGGER_SEQUENCE 100
@@ -19,18 +20,15 @@
  *
  * Based on CTrigger::CTrigger() from OtherTypes.h
  */
-Trigger::Trigger(QObject* parent) : QObject(parent), regexp(nullptr)
+Trigger::Trigger(QObject* parent) : QObject(parent)
 {
     initializeDefaults();
 }
 
 /**
- * Destructor - Clean up regexp
+ * Destructor - unique_ptr handles regexp cleanup automatically
  */
-Trigger::~Trigger()
-{
-    delete regexp;
-}
+Trigger::~Trigger() = default;
 
 /**
  * Initialize all fields to default values
@@ -42,45 +40,45 @@ void Trigger::initializeDefaults()
     // Pattern matching
     ignore_case = false;
     omit_from_log = false;
-    bOmitFromOutput = false;
-    bKeepEvaluating = true; // MUSHclient default: continue evaluating other triggers after match
-    bExpandVariables = false;
-    bEnabled = true;
-    bRegexp = false;
-    bRepeat = false;
-    iSequence = DEFAULT_TRIGGER_SEQUENCE;
-    iMatch = 0;
-    iStyle = 0;
-    bSoundIfInactive = false;
-    bLowercaseWildcard = false;
-    bMultiLine = false;
-    iLinesToMatch = 0;
+    omit_from_output = false;
+    keep_evaluating = true; // MUSHclient default: continue evaluating other triggers after match
+    expand_variables = false;
+    enabled = true;
+    use_regexp = false;
+    repeat = false;
+    sequence = DEFAULT_TRIGGER_SEQUENCE;
+    match_type = 0;
+    style = 0;
+    sound_if_inactive = false;
+    lowercase_wildcard = false;
+    multi_line = false;
+    lines_to_match = 0;
 
     // Actions
-    iSendTo = eSendToWorld;
-    iClipboardArg = 0;
+    send_to = eSendToWorld;
+    clipboard_arg = 0;
     scriptLanguage = ScriptLanguage::Lua;
 
     // Display
     colour = 0; // Custom color 1
-    iOtherForeground = 0;
-    iOtherBackground = 0;
-    iColourChangeType = TRIGGER_COLOUR_CHANGE_BOTH;
+    other_foreground = 0;
+    other_background = 0;
+    colour_change_type = TRIGGER_COLOUR_CHANGE_BOTH;
 
     // Metadata
-    iUserOption = 0;
-    bOneShot = false;
+    user_option = 0;
+    one_shot = false;
 
     // Runtime state
     dispid = DISPID_UNKNOWN;
-    nUpdateNumber = 0;
-    nInvocationCount = 0;
-    nMatched = 0;
-    tWhenMatched = QDateTime();
-    bTemporary = false;
-    bIncluded = false;
-    bSelected = false;
-    bExecutingScript = false;
+    update_number = 0;
+    invocation_count = 0;
+    matched = 0;
+    when_matched = QDateTime();
+    temporary = false;
+    included = false;
+    selected = false;
+    executing_script = false;
     owningPlugin = nullptr;
 
     // Resize wildcards vector
@@ -97,18 +95,17 @@ bool Trigger::operator==(const Trigger& rhs) const
     return trigger == rhs.trigger && contents == rhs.contents &&
            sound_to_play == rhs.sound_to_play && ignore_case == rhs.ignore_case &&
            colour == rhs.colour && omit_from_log == rhs.omit_from_log &&
-           bOmitFromOutput == rhs.bOmitFromOutput && bKeepEvaluating == rhs.bKeepEvaluating &&
-           bEnabled == rhs.bEnabled && strLabel == rhs.strLabel &&
-           strProcedure == rhs.strProcedure && scriptLanguage == rhs.scriptLanguage &&
-           iClipboardArg == rhs.iClipboardArg && iSendTo == rhs.iSendTo &&
-           bRegexp == rhs.bRegexp && bRepeat == rhs.bRepeat && iSequence == rhs.iSequence &&
-           iMatch == rhs.iMatch && iStyle == rhs.iStyle &&
-           bSoundIfInactive == rhs.bSoundIfInactive && bExpandVariables == rhs.bExpandVariables &&
-           bLowercaseWildcard == rhs.bLowercaseWildcard && strGroup == rhs.strGroup &&
-           strVariable == rhs.strVariable && iUserOption == rhs.iUserOption &&
-           iOtherForeground == rhs.iOtherForeground && iOtherBackground == rhs.iOtherBackground &&
-           bMultiLine == rhs.bMultiLine && iLinesToMatch == rhs.iLinesToMatch &&
-           iColourChangeType == rhs.iColourChangeType && bOneShot == rhs.bOneShot;
+           omit_from_output == rhs.omit_from_output && keep_evaluating == rhs.keep_evaluating &&
+           enabled == rhs.enabled && label == rhs.label && procedure == rhs.procedure &&
+           scriptLanguage == rhs.scriptLanguage && clipboard_arg == rhs.clipboard_arg &&
+           send_to == rhs.send_to && use_regexp == rhs.use_regexp && repeat == rhs.repeat &&
+           sequence == rhs.sequence && match_type == rhs.match_type && style == rhs.style &&
+           sound_if_inactive == rhs.sound_if_inactive && expand_variables == rhs.expand_variables &&
+           lowercase_wildcard == rhs.lowercase_wildcard && group == rhs.group &&
+           variable == rhs.variable && user_option == rhs.user_option &&
+           other_foreground == rhs.other_foreground && other_background == rhs.other_background &&
+           multi_line == rhs.multi_line && lines_to_match == rhs.lines_to_match &&
+           colour_change_type == rhs.colour_change_type && one_shot == rhs.one_shot;
 }
 
 /**
@@ -118,40 +115,37 @@ bool Trigger::operator==(const Trigger& rhs) const
  * Handles case-sensitivity based on ignore_case flag.
  * For multi-line triggers, enables MultiLineOption so ^ and $ match line boundaries.
  *
- * @return true on success, false on error
+ * @return empty expected on success, error string on failure
  */
-bool Trigger::compileRegexp()
+std::expected<void, QString> Trigger::compileRegexp()
 {
-    if (!bRegexp) {
+    if (!use_regexp) {
         // Not a regexp trigger, nothing to compile
-        return true;
+        return {};
     }
 
-    // Clean up old regexp if exists
-    delete regexp;
-    regexp = nullptr;
-
-    // Compile new regexp
+    // Compile new regexp (reset releases old one)
     QRegularExpression::PatternOptions options = QRegularExpression::NoPatternOption;
     if (ignore_case) {
         options |= QRegularExpression::CaseInsensitiveOption;
     }
     // For multi-line triggers, ^ and $ match at line boundaries within the text
-    if (bMultiLine) {
+    if (multi_line) {
         options |= QRegularExpression::MultilineOption;
     }
 
-    regexp = new QRegularExpression(trigger, options);
+    auto compiled = std::make_unique<QRegularExpression>(trigger, options);
 
-    if (!regexp->isValid()) {
+    if (!compiled->isValid()) {
+        QString error = compiled->errorString();
         qWarning() << "Failed to compile trigger regexp:" << trigger;
-        qWarning() << "Error:" << regexp->errorString();
-        delete regexp;
-        regexp = nullptr;
-        return false;
+        qWarning() << "Error:" << error;
+        regexp.reset();
+        return std::unexpected(error);
     }
 
-    return true;
+    regexp = std::move(compiled);
+    return {};
 }
 
 /**
@@ -174,36 +168,36 @@ bool Trigger::compileRegexp()
 bool Trigger::match(const QString& text, QRgb foreColor, QRgb backColor, quint16 style)
 {
     // Check if trigger is enabled
-    if (!bEnabled) {
+    if (!enabled) {
         return false;
     }
 
-    // TODO: Implement color/style matching (iMatch, iStyle)
+    // TODO: Implement color/style matching (match_type, style)
     Q_UNUSED(foreColor);
     Q_UNUSED(backColor);
     Q_UNUSED(style);
 
-    bool matched = false;
+    bool did_match = false;
 
-    if (bRegexp) {
+    if (use_regexp) {
         // Regular expression matching
         if (!regexp) {
             // Regexp not compiled yet
-            if (!compileRegexp()) {
+            if (!compileRegexp().has_value()) {
                 return false;
             }
         }
 
         QRegularExpressionMatch match = regexp->match(text);
-        matched = match.hasMatch();
+        did_match = match.hasMatch();
 
-        if (matched) {
+        if (did_match) {
             // Extract wildcards (captured groups)
             for (int i = 0; i < MAX_WILDCARDS && i <= match.lastCapturedIndex(); ++i) {
                 QString captured = match.captured(i);
 
                 // Apply lowercase conversion if requested
-                if (bLowercaseWildcard && i > 0) { // Don't lowercase %0 (whole match)
+                if (lowercase_wildcard && i > 0) { // Don't lowercase %0 (whole match)
                     captured = captured.toLower();
                 }
 
@@ -220,19 +214,19 @@ bool Trigger::match(const QString& text, QRgb foreColor, QRgb backColor, quint16
             searchPattern = searchPattern.toLower();
         }
 
-        matched = searchText.contains(searchPattern);
+        did_match = searchText.contains(searchPattern);
 
-        if (matched) {
+        if (did_match) {
             // For literal matches, wildcard 0 is the matched text
             wildcards[0] = trigger;
         }
     }
 
-    if (matched) {
+    if (did_match) {
         // Update statistics
-        nMatched++;
-        tWhenMatched = QDateTime::currentDateTime();
+        matched++;
+        when_matched = QDateTime::currentDateTime();
     }
 
-    return matched;
+    return did_match;
 }

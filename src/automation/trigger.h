@@ -1,6 +1,7 @@
 #ifndef TRIGGER_H
 #define TRIGGER_H
 
+#include "constants.h"
 #include "script_language.h"
 #include <QColor> // for QRgb typedef
 #include <QDateTime>
@@ -9,6 +10,8 @@
 #include <QRegularExpression>
 #include <QString>
 #include <QVector>
+#include <expected>
+#include <memory>
 
 // Forward declarations
 class WorldDocument;
@@ -30,12 +33,11 @@ class Plugin;
  */
 
 // Trigger color change types (OtherTypes.h)
-#define TRIGGER_COLOUR_CHANGE_BOTH 0
-#define TRIGGER_COLOUR_CHANGE_FOREGROUND 1
-#define TRIGGER_COLOUR_CHANGE_BACKGROUND 2
-
-// Maximum wildcards for trigger matching
-#define MAX_WILDCARDS 10
+// Stored as quint16; used directly in Lua API (lua_pushnumber), XML serialization,
+// and UI combo box integer values — so inline constexpr rather than enum class.
+inline constexpr quint16 TRIGGER_COLOUR_CHANGE_BOTH = 0;
+inline constexpr quint16 TRIGGER_COLOUR_CHANGE_FOREGROUND = 1;
+inline constexpr quint16 TRIGGER_COLOUR_CHANGE_BACKGROUND = 2;
 
 class Trigger : public QObject {
     Q_OBJECT
@@ -57,78 +59,78 @@ class Trigger : public QObject {
 
     // ========== Pattern Matching Fields ==========
 
-    QString trigger;       // Pattern to match
-    quint16 ignore_case;   // If true, case-insensitive matching
-    quint16 bRegexp;       // Use regular expressions
-    quint16 bRepeat;       // Repeat on same line until no matches
-    quint16 iMatch;        // Match on color/bold/italic (see TRIGGER_MATCH_* defines)
-    quint16 iStyle;        // Underline, italic, bold
-    quint16 bMultiLine;    // Do multi-line match
-    quint16 iLinesToMatch; // How many lines to match (if multi-line)
+    QString trigger;        // Pattern to match
+    bool ignore_case;       // If true, case-insensitive matching
+    bool use_regexp;        // Use regular expressions
+    bool repeat;            // Repeat on same line until no matches
+    quint16 match_type;     // Match on color/bold/italic (see TRIGGER_MATCH_* defines)
+    quint16 style;          // Underline, italic, bold
+    bool multi_line;        // Do multi-line match
+    quint16 lines_to_match; // How many lines to match (if multi-line)
 
     // ========== Action Fields ==========
 
     QString contents;              // What to send when triggered
     QString sound_to_play;         // Sound file to play
-    QString strProcedure;          // Script procedure to execute
+    QString procedure;             // Script procedure to execute
     ScriptLanguage scriptLanguage; // Script language (Lua or YueScript)
-    quint16 iSendTo;               // Where trigger is sent (see SendTo enum)
-    QString strVariable;   // Which variable to set (for send to variable)
-    quint16 iClipboardArg; // If non-zero, copy matching wildcard to clipboard
+    quint16 send_to;               // Where trigger is sent (see SendTo enum)
+    QString variable;              // Which variable to set (for send to variable)
+    quint16 clipboard_arg;         // If non-zero, copy matching wildcard to clipboard
 
     // ========== Behavior Fields ==========
 
-    quint16 bEnabled;         // If true, trigger is enabled
-    quint16 bKeepEvaluating;  // If true, keep evaluating triggers after match
-    quint16 bExpandVariables; // Expand variables in trigger (e.g., @food)
-    quint16 bSoundIfInactive; // Only play sound if window inactive
-    bool bLowercaseWildcard;  // Convert wildcards to lowercase
+    bool enabled;            // If true, trigger is enabled
+    bool keep_evaluating;    // If true, keep evaluating triggers after match
+    bool expand_variables;   // Expand variables in trigger (e.g., @food)
+    bool sound_if_inactive;  // Only play sound if window inactive
+    bool lowercase_wildcard; // Convert wildcards to lowercase
 
     // ========== Display Fields ==========
 
-    quint16 colour;            // User color to display in
-    quint16 omit_from_log;     // If true, do not log triggered line
-    quint16 bOmitFromOutput;   // If true, do not put triggered line in output
-    QRgb iOtherForeground;     // "Other" foreground color
-    QRgb iOtherBackground;     // "Other" background color
-    quint16 iColourChangeType; // Color change type (see TRIGGER_COLOUR_CHANGE_* defines)
+    quint16 colour;             // User color to display in
+    bool omit_from_log;         // If true, do not log triggered line
+    bool omit_from_output;      // If true, do not put triggered line in output
+    QRgb other_foreground;      // "Other" foreground color
+    QRgb other_background;      // "Other" background color
+    quint16 colour_change_type; // Color change type (see TRIGGER_COLOUR_CHANGE_* constants)
 
     // ========== Metadata Fields ==========
 
-    QString strLabel;   // Trigger label
-    QString strGroup;   // Group it belongs to
-    quint16 iSequence;  // Evaluation order (lower = sooner)
-    qint32 iUserOption; // User-settable flags
-    bool bOneShot;      // If true, trigger only fires once
+    QString label;      // Trigger label
+    QString group;      // Group it belongs to
+    quint16 sequence;   // Evaluation order (lower = sooner)
+    qint32 user_option; // User-settable flags
+    bool one_shot;      // If true, trigger only fires once
 
 #ifdef PANE
-    QString strPane; // Which pane to send to (for send to pane)
+    QString pane; // Which pane to send to (for send to pane)
 #endif
 
     // ========== Runtime State Fields ==========
 
-    qint32 dispid;                         // Dispatch ID for calling script
-    qint64 nUpdateNumber;                  // For detecting update clashes
-    qint32 nInvocationCount;               // How many times procedure called
-    qint32 nMatched;                       // How many times trigger fired
-    QVector<QString> wildcards;            // Matching wildcards (MAX_WILDCARDS)
-    QMap<QString, QString> namedWildcards; // Named capture groups from regex
-    QRegularExpression* regexp;            // Compiled regular expression
-    QDateTime tWhenMatched;                // When last matched
-    bool bTemporary;                       // If true, don't save it
-    bool bIncluded;                        // If true, included from plugin
-    bool bSelected;                        // If true, selected for use in plugin
-    bool bExecutingScript;                 // If true, executing script, cannot be deleted
-    QString strInternalName;               // Name stored in trigger map
+    qint32 dispid;                              // Dispatch ID for calling script
+    qint64 update_number;                       // For detecting update clashes
+    qint32 invocation_count;                    // How many times procedure called
+    qint32 matched;                             // How many times trigger fired
+    QVector<QString> wildcards;                 // Matching wildcards (MAX_WILDCARDS)
+    QMap<QString, QString> namedWildcards;      // Named capture groups from regex
+    std::unique_ptr<QRegularExpression> regexp; // Compiled regular expression
+    QDateTime when_matched;                     // When last matched
+    bool temporary;                             // If true, don't save it
+    bool included;                              // If true, included from plugin
+    bool selected;                              // If true, selected for use in plugin
+    bool executing_script;                      // If true, executing script, cannot be deleted
+    QString internal_name;                      // Name stored in trigger map
     Plugin* owningPlugin; // Plugin that owns this trigger (nullptr for world triggers)
 
     // ========== Helper Methods ==========
 
     /**
-     * Compile regular expression if bRegexp is true
-     * @return true on success, false on error
+     * Compile regular expression if use_regexp is true
+     * @return empty expected on success, error string on failure
      */
-    bool compileRegexp();
+    [[nodiscard]] std::expected<void, QString> compileRegexp();
 
     /**
      * Match this trigger against a line of text

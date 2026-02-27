@@ -42,7 +42,7 @@ QString WorldDocument::getVariable(const QString& name) const
 
     auto it = varMap.find(lowerName);
     if (it != varMap.end()) {
-        return it->second->strContents;
+        return it->second->contents;
     }
 
     return QString(); // Return empty if not found
@@ -53,7 +53,7 @@ QString WorldDocument::getVariable(const QString& name) const
  *
  * Variables are case-insensitive (stored as lowercase).
  * Creates new variable if doesn't exist, updates if it does.
- * Increments nUpdateNumber for change tracking.
+ * Increments update_number for change tracking.
  *
  * SetVariable()
  *
@@ -74,13 +74,13 @@ qint32 WorldDocument::setVariable(const QString& name, const QString& value)
     } else {
         // Create new variable
         auto newVar = std::make_unique<Variable>();
-        newVar->strLabel = lowerName;
+        newVar->label = lowerName;
         var = newVar.get();
         varMap[lowerName] = std::move(newVar);
     }
 
-    var->strContents = value;
-    var->nUpdateNumber++;
+    var->contents = value;
+    var->update_number++;
     m_bVariablesChanged = true;
 
     return 0; // eOK
@@ -195,7 +195,7 @@ QString WorldDocument::expandVariables(const QString& text, bool escapeRegex) co
                 QString lowerName = varName.toLower();
                 auto it = varMap.find(lowerName);
                 if (it != varMap.end()) {
-                    QString value = it->second->strContents;
+                    QString value = it->second->contents;
 
                     // Escape regex special characters if needed
                     if (shouldEscape) {

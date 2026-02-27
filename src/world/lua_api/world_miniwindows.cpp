@@ -14,6 +14,7 @@
 #include "../script_engine.h"
 #include <QMenu>
 #include <QStack>
+#include <span>
 
 // Lua 5.1 C headers
 extern "C" {
@@ -3035,8 +3036,9 @@ int L_WindowLoadImageMemory(lua_State* L)
         return luaReturnError(L, eNoSuchWindow);
     }
 
-    qint32 result = win->LoadImageMemory(QString::fromUtf8(imageId),
-                                         reinterpret_cast<const unsigned char*>(data), len, alpha);
+    qint32 result = win->LoadImageMemory(
+        QString::fromUtf8(imageId),
+        std::span<const unsigned char>(reinterpret_cast<const unsigned char*>(data), len), alpha);
 
     lua_pushnumber(L, result);
     return 1;

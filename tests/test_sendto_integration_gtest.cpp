@@ -41,8 +41,8 @@ TEST_F(SendToIntegrationTest, SendToVariableSetsVariable)
     // Send to variable
     doc->sendTo(eSendToVariable,
                 "test_value", // value to set
-                false,        // bOmitFromOutput
-                false,        // bOmitFromLog
+                false,        // omit_from_output
+                false,        // omit_from_log
                 "",           // strDescription
                 "test_var",   // variable name
                 output);
@@ -75,13 +75,13 @@ TEST_F(SendToIntegrationTest, SendToExecuteTriggersAliases)
 {
     // Create an alias that sets a variable via contents (not script)
     auto alias = std::make_unique<Alias>();
-    alias->strLabel = "test_alias";
+    alias->label = "test_alias";
     alias->name = "testalias";
     alias->contents = "dummy";              // Send something to world
-    alias->iSendTo = eSendToVariable;       // Send to variable instead
-    alias->strVariable = "alias_triggered"; // Variable name
-    alias->bEnabled = true;
-    alias->iSequence = 100;
+    alias->send_to = eSendToVariable;       // Send to variable instead
+    alias->variable = "alias_triggered"; // Variable name
+    alias->enabled = true;
+    alias->sequence = 100;
 
     doc->addAlias("test_alias", std::move(alias));
 

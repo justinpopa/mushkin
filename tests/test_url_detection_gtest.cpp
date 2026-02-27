@@ -81,7 +81,7 @@ class URLDetectionTest : public ::testing::Test {
         }
 
         Style* style = line->styleList[styleIdx].get();
-        return QString::fromUtf8(line->text() + currentPos, style->iLength);
+        return QString::fromUtf8(line->text().data() + currentPos, style->iLength);
     }
 
     WorldDocument* m_doc = nullptr;

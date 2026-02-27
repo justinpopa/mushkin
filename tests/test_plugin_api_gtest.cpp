@@ -375,8 +375,8 @@ TEST_F(PluginApiTest, GetPluginVariable)
 {
     // Add a variable to plugin1
     auto var = std::make_unique<Variable>();
-    var->strLabel = "test_var";
-    var->strContents = "test_value";
+    var->label = "test_var";
+    var->contents = "test_value";
     plugin1->m_VariableMap["test_var"] = std::move(var);
 
     lua_State* L2 = plugin2->m_ScriptEngine->L;
@@ -401,8 +401,8 @@ TEST_F(PluginApiTest, GetPluginVariableList)
 {
     // Add a variable to plugin1
     auto var = std::make_unique<Variable>();
-    var->strLabel = "test_var";
-    var->strContents = "test_value";
+    var->label = "test_var";
+    var->contents = "test_value";
     plugin1->m_VariableMap["test_var"] = std::move(var);
 
     lua_State* L2 = plugin2->m_ScriptEngine->L;

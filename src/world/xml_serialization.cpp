@@ -932,9 +932,9 @@ int ImportXML(WorldDocument* doc, const QString& xmlString, int flags)
     bool importMacros = (flags & XML_MACROS) != 0; // Accelerators
 
     // Track counts before import
-    int triggersBefore = doc->m_TriggerMap.size();
-    int aliasesBefore = doc->m_AliasMap.size();
-    int timersBefore = doc->m_TimerMap.size();
+    int triggersBefore = doc->m_automationRegistry->m_TriggerMap.size();
+    int aliasesBefore = doc->m_automationRegistry->m_AliasMap.size();
+    int timersBefore = doc->m_automationRegistry->m_TimerMap.size();
     int variablesBefore = doc->m_VariableMap.size();
 
     QXmlStreamReader reader(xmlData);
@@ -1092,9 +1092,9 @@ int ImportXML(WorldDocument* doc, const QString& xmlString, int flags)
     }
 
     // Calculate counts of imported items
-    int triggersAfter = doc->m_TriggerMap.size();
-    int aliasesAfter = doc->m_AliasMap.size();
-    int timersAfter = doc->m_TimerMap.size();
+    int triggersAfter = doc->m_automationRegistry->m_TriggerMap.size();
+    int aliasesAfter = doc->m_automationRegistry->m_AliasMap.size();
+    int timersAfter = doc->m_automationRegistry->m_TimerMap.size();
     int variablesAfter = doc->m_VariableMap.size();
 
     int totalImported = (triggersAfter - triggersBefore) + (aliasesAfter - aliasesBefore) +
@@ -1135,17 +1135,17 @@ QString ExportXML(WorldDocument* doc, int flags, const QString& comment)
     writer.writeStartElement("muclient");
 
     // Export triggers
-    if ((flags & XML_TRIGGERS) && !doc->m_TriggerMap.empty()) {
+    if ((flags & XML_TRIGGERS) && !doc->m_automationRegistry->m_TriggerMap.empty()) {
         doc->saveTriggersToXml(writer);
     }
 
     // Export aliases
-    if ((flags & XML_ALIASES) && !doc->m_AliasMap.empty()) {
+    if ((flags & XML_ALIASES) && !doc->m_automationRegistry->m_AliasMap.empty()) {
         doc->saveAliasesToXml(writer);
     }
 
     // Export timers
-    if ((flags & XML_TIMERS) && !doc->m_TimerMap.empty()) {
+    if ((flags & XML_TIMERS) && !doc->m_automationRegistry->m_TimerMap.empty()) {
         doc->saveTimersToXml(writer);
     }
 
@@ -1170,11 +1170,11 @@ QString ExportXML(WorldDocument* doc, int flags, const QString& comment)
 
     int totalExported = 0;
     if (flags & XML_TRIGGERS)
-        totalExported += doc->m_TriggerMap.size();
+        totalExported += doc->m_automationRegistry->m_TriggerMap.size();
     if (flags & XML_ALIASES)
-        totalExported += doc->m_AliasMap.size();
+        totalExported += doc->m_automationRegistry->m_AliasMap.size();
     if (flags & XML_TIMERS)
-        totalExported += doc->m_TimerMap.size();
+        totalExported += doc->m_automationRegistry->m_TimerMap.size();
     if (flags & XML_VARIABLES)
         totalExported += doc->m_VariableMap.size();
 

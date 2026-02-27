@@ -526,7 +526,7 @@ Plugin* WorldDocument::LoadPlugin(const QString& filepath, QString& errorMsg)
     // Load plugin state
     // ================================================================
 
-    pluginPtr->LoadState();
+    (void)pluginPtr->LoadState();
 
     // ================================================================
     // SORT PLUGIN LIST BY SEQUENCE
@@ -866,11 +866,11 @@ bool WorldDocument::SendToFirstPluginCallbacks(const QString& callbackName, cons
  * Called when lines are displayed on screen, for accessibility/screen reader support.
  * Uses a static recursion guard to prevent infinite loops.
  *
- * @param iType Line type: 0 = MUD output, 1 = note (COMMENT), 2 = command (USER_INPUT)
+ * @param type Line type: 0 = MUD output, 1 = note (COMMENT), 2 = command (USER_INPUT)
  * @param iLog Whether the line should be logged
  * @param sText The text being displayed
  */
-void WorldDocument::Screendraw(qint32 iType, bool iLog, const QString& sText)
+void WorldDocument::Screendraw(qint32 type, bool iLog, const QString& sText)
 {
     static bool bInScreendraw = false;
 
@@ -880,7 +880,7 @@ void WorldDocument::Screendraw(qint32 iType, bool iLog, const QString& sText)
     }
 
     bInScreendraw = true;
-    SendToAllPluginCallbacks(ON_PLUGIN_SCREENDRAW, iType, iLog ? 1 : 0, sText);
+    SendToAllPluginCallbacks(ON_PLUGIN_SCREENDRAW, type, iLog ? 1 : 0, sText);
     bInScreendraw = false;
 }
 

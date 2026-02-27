@@ -4,9 +4,9 @@
 #include "../../world/color_utils.h"
 #include "../../world/lua_api/lua_registration.h"
 #include "../../world/script_engine.h"
-#include "dialogs/complete_word_dialog.h"
 #include "../text/line.h"
 #include "../world/world_document.h"
+#include "dialogs/complete_word_dialog.h"
 #include "logging.h"
 #include <QDebug>
 #include <QKeyEvent>
@@ -356,13 +356,11 @@ void InputView::applyInputSettings()
     // Note: Use scaledFontSize() for cross-platform DPI-consistent sizing
     int fontSizePx = scaledFontSize(m_doc->m_input_font_height);
 
-    QString style = QString(
-        "QPlainTextEdit { color: %1; background-color: %2; "
-        "font-family: '%3'; font-size: %4px; font-style: %5; font-weight: %6; }"
-    ).arg(textColor.name(), bgColor.name(),
-          m_doc->m_input_font_name,
-          QString::number(fontSizePx),
-          fontStyle, fontWeight);
+    QString style =
+        QString("QPlainTextEdit { color: %1; background-color: %2; "
+                "font-family: '%3'; font-size: %4px; font-style: %5; font-weight: %6; }")
+            .arg(textColor.name(), bgColor.name(), m_doc->m_input_font_name,
+                 QString::number(fontSizePx), fontStyle, fontWeight);
     setStyleSheet(style);
 
     // Update height after font change
@@ -657,9 +655,9 @@ void InputView::handleTabCompletion()
 
     int iCount = 0;
 
-    for (int i = m_doc->m_lineList.count() - 1; i >= 0; i--) {
-        Line* pLine = m_doc->m_lineList[i];
-        QString strLine = QString::fromUtf8(pLine->text(), pLine->len());
+    for (int i = static_cast<int>(m_doc->m_lineList.size()) - 1; i >= 0; i--) {
+        Line* pLine = m_doc->m_lineList[i].get();
+        QString strLine = QString::fromUtf8(pLine->text().data(), pLine->text().size());
 
         if (++iCount > static_cast<int>(m_doc->m_iTabCompletionLines)) {
             qCDebug(lcUI) << "Hit line limit" << m_doc->m_iTabCompletionLines;

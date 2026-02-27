@@ -290,21 +290,21 @@ TEST_F(XmlSerializationTest, TriggersSaveAndLoadCorrectly)
 
     // Create a trigger
     Trigger* trigger = new Trigger();
-    trigger->strLabel = "test_trigger";
-    trigger->strInternalName = "test_trigger";
+    trigger->label = "test_trigger";
+    trigger->internal_name = "test_trigger";
     trigger->trigger = "You have * gold";
     trigger->contents = "say I have %1 gold!";
-    trigger->strProcedure = "on_gold";
-    trigger->bEnabled = true;
-    trigger->iSendTo = 0; // SendToWorld
-    trigger->iSequence = 100;
+    trigger->procedure = "on_gold";
+    trigger->enabled = true;
+    trigger->send_to = 0; // SendToWorld
+    trigger->sequence = 100;
     trigger->ignore_case = false;
-    trigger->bRegexp = false;
-    trigger->bKeepEvaluating = true;
-    trigger->bOmitFromOutput = false;
+    trigger->use_regexp = false;
+    trigger->keep_evaluating = true;
+    trigger->omit_from_output = false;
     trigger->omit_from_log = false;
-    trigger->bExpandVariables = true;
-    trigger->strGroup = "Combat";
+    trigger->expand_variables = true;
+    trigger->group = "Combat";
 
     doc1->addTrigger("test_trigger", std::unique_ptr<Trigger>(trigger));
 
@@ -334,16 +334,16 @@ TEST_F(XmlSerializationTest, TriggersSaveAndLoadCorrectly)
     // Verify trigger was loaded
     Trigger* loaded = doc2->getTrigger("test_trigger");
     ASSERT_NE(loaded, nullptr) << "Trigger should be loaded";
-    EXPECT_EQ(loaded->strLabel, "test_trigger") << "strLabel should match";
+    EXPECT_EQ(loaded->label, "test_trigger") << "label should match";
     EXPECT_EQ(loaded->trigger, "You have * gold") << "trigger should match";
     EXPECT_EQ(loaded->contents, "say I have %1 gold!") << "contents should match";
-    EXPECT_EQ(loaded->strProcedure, "on_gold") << "strProcedure should match";
-    EXPECT_EQ(loaded->bEnabled, true) << "bEnabled should match";
-    EXPECT_EQ(loaded->iSendTo, 0) << "iSendTo should match";
-    EXPECT_EQ(loaded->iSequence, 100) << "iSequence should match";
+    EXPECT_EQ(loaded->procedure, "on_gold") << "procedure should match";
+    EXPECT_EQ(loaded->enabled, true) << "enabled should match";
+    EXPECT_EQ(loaded->send_to, 0) << "send_to should match";
+    EXPECT_EQ(loaded->sequence, 100) << "sequence should match";
     EXPECT_EQ(loaded->ignore_case, false) << "ignore_case should match";
-    EXPECT_EQ(loaded->bKeepEvaluating, true) << "bKeepEvaluating should match";
-    EXPECT_EQ(loaded->strGroup, "Combat") << "strGroup should match";
+    EXPECT_EQ(loaded->keep_evaluating, true) << "keep_evaluating should match";
+    EXPECT_EQ(loaded->group, "Combat") << "group should match";
 
     delete doc1;
     delete doc2;
@@ -357,20 +357,20 @@ TEST_F(XmlSerializationTest, AliasesSaveAndLoadCorrectly)
 
     // Create an alias
     auto alias = std::make_unique<Alias>();
-    alias->strLabel = "test_alias";
-    alias->strInternalName = "test_alias";
+    alias->label = "test_alias";
+    alias->internal_name = "test_alias";
     alias->name = "n";
     alias->contents = "north";
-    alias->strProcedure = "on_north";
-    alias->bEnabled = true;
-    alias->iSendTo = 0; // SendToWorld
-    alias->iSequence = 100;
-    alias->bIgnoreCase = true;
-    alias->bRegexp = false;
-    alias->bKeepEvaluating = false;
-    alias->bExpandVariables = true;
-    alias->bEchoAlias = true;
-    alias->strGroup = "Movement";
+    alias->procedure = "on_north";
+    alias->enabled = true;
+    alias->send_to = 0; // SendToWorld
+    alias->sequence = 100;
+    alias->ignore_case = true;
+    alias->use_regexp = false;
+    alias->keep_evaluating = false;
+    alias->expand_variables = true;
+    alias->echo_alias = true;
+    alias->group = "Movement";
 
     doc1->addAlias("test_alias", std::move(alias));
 
@@ -400,16 +400,16 @@ TEST_F(XmlSerializationTest, AliasesSaveAndLoadCorrectly)
     // Verify alias was loaded
     Alias* loaded = doc2->getAlias("test_alias");
     ASSERT_NE(loaded, nullptr) << "Alias should be loaded";
-    EXPECT_EQ(loaded->strLabel, "test_alias") << "strLabel should match";
+    EXPECT_EQ(loaded->label, "test_alias") << "label should match";
     EXPECT_EQ(loaded->name, "n") << "name should match";
     EXPECT_EQ(loaded->contents, "north") << "contents should match";
-    EXPECT_EQ(loaded->strProcedure, "on_north") << "strProcedure should match";
-    EXPECT_EQ(loaded->bEnabled, true) << "bEnabled should match";
-    EXPECT_EQ(loaded->iSendTo, 0) << "iSendTo should match";
-    EXPECT_EQ(loaded->iSequence, 100) << "iSequence should match";
-    EXPECT_EQ(loaded->bIgnoreCase, true) << "bIgnoreCase should match";
-    EXPECT_EQ(loaded->bEchoAlias, true) << "bEchoAlias should match";
-    EXPECT_EQ(loaded->strGroup, "Movement") << "strGroup should match";
+    EXPECT_EQ(loaded->procedure, "on_north") << "procedure should match";
+    EXPECT_EQ(loaded->enabled, true) << "enabled should match";
+    EXPECT_EQ(loaded->send_to, 0) << "send_to should match";
+    EXPECT_EQ(loaded->sequence, 100) << "sequence should match";
+    EXPECT_EQ(loaded->ignore_case, true) << "ignore_case should match";
+    EXPECT_EQ(loaded->echo_alias, true) << "echo_alias should match";
+    EXPECT_EQ(loaded->group, "Movement") << "group should match";
 
     delete doc1;
     delete doc2;
@@ -424,25 +424,25 @@ TEST_F(XmlSerializationTest, MultipleTriggersAndAliases)
     // Create multiple triggers
     for (int i = 0; i < 3; i++) {
         Trigger* trigger = new Trigger();
-        trigger->strLabel = QString("trigger_%1").arg(i);
-        trigger->strInternalName = trigger->strLabel;
+        trigger->label = QString("trigger_%1").arg(i);
+        trigger->internal_name = trigger->label;
         trigger->trigger = QString("Pattern %1").arg(i);
         trigger->contents = QString("Response %1").arg(i);
-        trigger->bEnabled = true;
-        trigger->iSequence = 100 + i;
-        doc1->addTrigger(trigger->strLabel, std::unique_ptr<Trigger>(trigger));
+        trigger->enabled = true;
+        trigger->sequence = 100 + i;
+        doc1->addTrigger(trigger->label, std::unique_ptr<Trigger>(trigger));
     }
 
     // Create multiple aliases
     for (int i = 0; i < 3; i++) {
         auto alias = std::make_unique<Alias>();
-        alias->strLabel = QString("alias_%1").arg(i);
-        alias->strInternalName = alias->strLabel;
+        alias->label = QString("alias_%1").arg(i);
+        alias->internal_name = alias->label;
         alias->name = QString("cmd%1").arg(i);
         alias->contents = QString("command%1").arg(i);
-        alias->bEnabled = true;
-        alias->iSequence = 100 + i;
-        QString label = alias->strLabel;
+        alias->enabled = true;
+        alias->sequence = 100 + i;
+        QString label = alias->label;
         doc1->addAlias(label, std::move(alias));
     }
 
@@ -462,7 +462,7 @@ TEST_F(XmlSerializationTest, MultipleTriggersAndAliases)
         ASSERT_NE(trigger, nullptr) << "Trigger " << name.toStdString() << " should be loaded";
         EXPECT_EQ(trigger->trigger, QString("Pattern %1").arg(i))
             << "Trigger pattern should match for " << name.toStdString();
-        EXPECT_EQ(trigger->iSequence, 100 + i)
+        EXPECT_EQ(trigger->sequence, 100 + i)
             << "Trigger sequence should match for " << name.toStdString();
     }
 
@@ -473,7 +473,7 @@ TEST_F(XmlSerializationTest, MultipleTriggersAndAliases)
         ASSERT_NE(alias, nullptr) << "Alias " << name.toStdString() << " should be loaded";
         EXPECT_EQ(alias->name, QString("cmd%1").arg(i))
             << "Alias name should match for " << name.toStdString();
-        EXPECT_EQ(alias->iSequence, 100 + i)
+        EXPECT_EQ(alias->sequence, 100 + i)
             << "Alias sequence should match for " << name.toStdString();
     }
 

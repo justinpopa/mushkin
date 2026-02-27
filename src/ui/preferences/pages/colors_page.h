@@ -2,6 +2,7 @@
 #define COLORS_PAGE_H
 
 #include "../preferences_page_base.h"
+#include <array>
 
 class QTableWidget;
 class QPushButton;
@@ -18,7 +19,10 @@ class ColorsPage : public PreferencesPageBase {
   public:
     explicit ColorsPage(WorldDocument* doc, QWidget* parent = nullptr);
 
-    QString pageName() const override { return tr("Colors"); }
+    QString pageName() const override
+    {
+        return tr("Colors");
+    }
     QString pageDescription() const override
     {
         return tr("Configure custom color mappings for triggers and display.");
@@ -42,9 +46,9 @@ class ColorsPage : public PreferencesPageBase {
     QTableWidget* m_table;
 
     // Color storage
-    QRgb m_customText[16];
-    QRgb m_customBack[16];
-    QString m_customNames[16];
+    std::array<QRgb, 16> m_customText{};
+    std::array<QRgb, 16> m_customBack{};
+    std::array<QString, 16> m_customNames{};
 
     // Track changes
     bool m_hasChanges = false;

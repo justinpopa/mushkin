@@ -253,9 +253,9 @@ TEST_F(PluginErrorTest, LoadState_MalformedXML)
     malformedState.close();
 
     // Try to load the malformed state
-    bool loadSuccess = statePlugin->LoadState();
+    auto loadResult = statePlugin->LoadState();
 
-    EXPECT_FALSE(loadSuccess) << "LoadState should fail with malformed XML";
+    EXPECT_FALSE(loadResult.has_value()) << "LoadState should fail with malformed XML";
 }
 
 // Test 12: SaveState - Recursion Prevention
@@ -290,9 +290,9 @@ end
     ASSERT_NE(recursionPlugin, nullptr) << "LoadPlugin failed: " << errorMsg.toStdString();
 
     // Call SaveState - should succeed and not hang
-    bool saveSuccess = recursionPlugin->SaveState();
+    auto saveResult = recursionPlugin->SaveState();
 
-    EXPECT_TRUE(saveSuccess) << "SaveState should succeed (recursion prevention works)";
+    EXPECT_TRUE(saveResult.has_value()) << "SaveState should succeed (recursion prevention works)";
 }
 
 // GoogleTest main function

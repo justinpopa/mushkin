@@ -229,7 +229,7 @@ void RemoteClient::sendScrollback()
         return;
     }
 
-    int totalLines = m_pDoc->m_lineList.count();
+    int totalLines = static_cast<int>(m_pDoc->m_lineList.size());
     int startLine = qMax(0, totalLines - m_scrollbackLines);
 
     if (startLine < totalLines) {
@@ -237,7 +237,7 @@ void RemoteClient::sendScrollback()
     }
 
     for (int i = startLine; i < totalLines; ++i) {
-        Line* line = m_pDoc->m_lineList.at(i);
+        Line* line = m_pDoc->m_lineList.at(i).get();
         if (line) {
             sendLine(line);
         }

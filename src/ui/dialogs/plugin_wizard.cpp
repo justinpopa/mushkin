@@ -289,14 +289,14 @@ void PluginWizardPage3::initializePage()
     // Populate triggers from world (skip temporary ones)
     m_triggerTable->setRowCount(0);
 
-    for (Trigger* trigger : m_doc->m_TriggerArray) {
-        if (trigger->bTemporary)
+    for (Trigger* trigger : m_doc->m_automationRegistry->m_TriggerArray) {
+        if (trigger->temporary)
             continue;
 
         int row = m_triggerTable->rowCount();
         m_triggerTable->insertRow(row);
 
-        QTableWidgetItem* nameItem = new QTableWidgetItem(trigger->strLabel);
+        QTableWidgetItem* nameItem = new QTableWidgetItem(trigger->label);
         nameItem->setFlags(Qt::ItemIsUserCheckable | Qt::ItemIsEnabled);
         nameItem->setCheckState(Qt::Checked); // Select all by default
         nameItem->setData(Qt::UserRole, QVariant::fromValue<void*>(trigger));
@@ -304,7 +304,7 @@ void PluginWizardPage3::initializePage()
 
         m_triggerTable->setItem(row, COL_MATCH, new QTableWidgetItem(trigger->trigger));
         m_triggerTable->setItem(row, COL_SEND, new QTableWidgetItem(trigger->contents));
-        m_triggerTable->setItem(row, COL_GROUP, new QTableWidgetItem(trigger->strGroup));
+        m_triggerTable->setItem(row, COL_GROUP, new QTableWidgetItem(trigger->group));
     }
 
     // Set column widths
@@ -316,8 +316,8 @@ void PluginWizardPage3::initializePage()
 bool PluginWizardPage3::validatePage()
 {
     // Mark selected triggers in world document
-    for (Trigger* trigger : m_doc->m_TriggerArray) {
-        trigger->bSelected = false;
+    for (Trigger* trigger : m_doc->m_automationRegistry->m_TriggerArray) {
+        trigger->selected = false;
     }
 
     for (int row = 0; row < m_triggerTable->rowCount(); ++row) {
@@ -325,7 +325,7 @@ bool PluginWizardPage3::validatePage()
         if (item && item->checkState() == Qt::Checked) {
             Trigger* trigger = static_cast<Trigger*>(item->data(Qt::UserRole).value<void*>());
             if (trigger) {
-                trigger->bSelected = true;
+                trigger->selected = true;
             }
         }
     }
@@ -402,14 +402,14 @@ void PluginWizardPage4::initializePage()
     // Populate aliases from world (skip temporary ones)
     m_aliasTable->setRowCount(0);
 
-    for (Alias* alias : m_doc->m_AliasArray) {
-        if (alias->bTemporary)
+    for (Alias* alias : m_doc->m_automationRegistry->m_AliasArray) {
+        if (alias->temporary)
             continue;
 
         int row = m_aliasTable->rowCount();
         m_aliasTable->insertRow(row);
 
-        QTableWidgetItem* nameItem = new QTableWidgetItem(alias->strLabel);
+        QTableWidgetItem* nameItem = new QTableWidgetItem(alias->label);
         nameItem->setFlags(Qt::ItemIsUserCheckable | Qt::ItemIsEnabled);
         nameItem->setCheckState(Qt::Checked);
         nameItem->setData(Qt::UserRole, QVariant::fromValue<void*>(alias));
@@ -417,7 +417,7 @@ void PluginWizardPage4::initializePage()
 
         m_aliasTable->setItem(row, COL_MATCH, new QTableWidgetItem(alias->name));
         m_aliasTable->setItem(row, COL_SEND, new QTableWidgetItem(alias->contents));
-        m_aliasTable->setItem(row, COL_GROUP, new QTableWidgetItem(alias->strGroup));
+        m_aliasTable->setItem(row, COL_GROUP, new QTableWidgetItem(alias->group));
     }
 
     // Set column widths
@@ -429,8 +429,8 @@ void PluginWizardPage4::initializePage()
 bool PluginWizardPage4::validatePage()
 {
     // Mark selected aliases in world document
-    for (Alias* alias : m_doc->m_AliasArray) {
-        alias->bSelected = false;
+    for (Alias* alias : m_doc->m_automationRegistry->m_AliasArray) {
+        alias->selected = false;
     }
 
     for (int row = 0; row < m_aliasTable->rowCount(); ++row) {
@@ -438,7 +438,7 @@ bool PluginWizardPage4::validatePage()
         if (item && item->checkState() == Qt::Checked) {
             Alias* alias = static_cast<Alias*>(item->data(Qt::UserRole).value<void*>());
             if (alias) {
-                alias->bSelected = true;
+                alias->selected = true;
             }
         }
     }
@@ -515,15 +515,15 @@ void PluginWizardPage5::initializePage()
     // Populate timers from world (skip temporary ones)
     m_timerTable->setRowCount(0);
 
-    for (const auto& [name, timerPtr] : m_doc->m_TimerMap) {
+    for (const auto& [name, timerPtr] : m_doc->m_automationRegistry->m_TimerMap) {
         Timer* timer = timerPtr.get();
-        if (timer->bTemporary)
+        if (timer->temporary)
             continue;
 
         int row = m_timerTable->rowCount();
         m_timerTable->insertRow(row);
 
-        QTableWidgetItem* nameItem = new QTableWidgetItem(timer->strLabel);
+        QTableWidgetItem* nameItem = new QTableWidgetItem(timer->label);
         nameItem->setFlags(Qt::ItemIsUserCheckable | Qt::ItemIsEnabled);
         nameItem->setCheckState(Qt::Checked);
         nameItem->setData(Qt::UserRole, QVariant::fromValue<void*>(timer));
@@ -531,21 +531,21 @@ void PluginWizardPage5::initializePage()
 
         // Format time string
         QString timeStr;
-        if (timer->iType == 0) { // Interval timer
+        if (timer->type == 0) { // Interval timer
             timeStr = QString("Every %1:%2:%3")
-                          .arg(timer->iEveryHour, 2, 10, QChar('0'))
-                          .arg(timer->iEveryMinute, 2, 10, QChar('0'))
-                          .arg(timer->fEverySecond, 4, 'f', 2);
+                          .arg(timer->every_hour, 2, 10, QChar('0'))
+                          .arg(timer->every_minute, 2, 10, QChar('0'))
+                          .arg(timer->every_second, 4, 'f', 2);
         } else { // At time timer
             timeStr = QString("At %1:%2:%3")
-                          .arg(timer->iAtHour, 2, 10, QChar('0'))
-                          .arg(timer->iAtMinute, 2, 10, QChar('0'))
-                          .arg(timer->fAtSecond, 4, 'f', 2);
+                          .arg(timer->at_hour, 2, 10, QChar('0'))
+                          .arg(timer->at_minute, 2, 10, QChar('0'))
+                          .arg(timer->at_second, 4, 'f', 2);
         }
 
         m_timerTable->setItem(row, COL_TIME, new QTableWidgetItem(timeStr));
-        m_timerTable->setItem(row, COL_SEND, new QTableWidgetItem(timer->strContents));
-        m_timerTable->setItem(row, COL_GROUP, new QTableWidgetItem(timer->strGroup));
+        m_timerTable->setItem(row, COL_SEND, new QTableWidgetItem(timer->contents));
+        m_timerTable->setItem(row, COL_GROUP, new QTableWidgetItem(timer->group));
     }
 
     // Set column widths
@@ -557,8 +557,8 @@ void PluginWizardPage5::initializePage()
 bool PluginWizardPage5::validatePage()
 {
     // Mark selected timers in world document
-    for (const auto& [name, timerPtr] : m_doc->m_TimerMap) {
-        timerPtr->bSelected = false;
+    for (const auto& [name, timerPtr] : m_doc->m_automationRegistry->m_TimerMap) {
+        timerPtr->selected = false;
     }
 
     for (int row = 0; row < m_timerTable->rowCount(); ++row) {
@@ -566,7 +566,7 @@ bool PluginWizardPage5::validatePage()
         if (item && item->checkState() == Qt::Checked) {
             Timer* timer = static_cast<Timer*>(item->data(Qt::UserRole).value<void*>());
             if (timer) {
-                timer->bSelected = true;
+                timer->selected = true;
             }
         }
     }
@@ -655,13 +655,13 @@ void PluginWizardPage6::initializePage()
         int row = m_variableTable->rowCount();
         m_variableTable->insertRow(row);
 
-        QTableWidgetItem* nameItem = new QTableWidgetItem(variable->strLabel);
+        QTableWidgetItem* nameItem = new QTableWidgetItem(variable->label);
         nameItem->setFlags(Qt::ItemIsUserCheckable | Qt::ItemIsEnabled);
         nameItem->setCheckState(Qt::Checked);
         nameItem->setData(Qt::UserRole, QVariant::fromValue<void*>(variable));
         m_variableTable->setItem(row, COL_NAME, nameItem);
 
-        m_variableTable->setItem(row, COL_CONTENTS, new QTableWidgetItem(variable->strContents));
+        m_variableTable->setItem(row, COL_CONTENTS, new QTableWidgetItem(variable->contents));
 
         varCount++;
     }
@@ -680,7 +680,7 @@ bool PluginWizardPage6::validatePage()
     // Mark selected variables in world document
     // Variable system integration
     for (auto& [name, varPtr] : m_doc->m_VariableMap) {
-        varPtr->bSelected = false;
+        varPtr->selected = false;
     }
 
     for (int row = 0; row < m_variableTable->rowCount(); ++row) {
@@ -688,7 +688,7 @@ bool PluginWizardPage6::validatePage()
         if (item && item->checkState() == Qt::Checked) {
             Variable* variable = static_cast<Variable*>(item->data(Qt::UserRole).value<void*>());
             if (variable) {
-                variable->bSelected = true;
+                variable->selected = true;
             }
         }
     }
@@ -924,7 +924,7 @@ void PluginWizard::accept()
     QString xml = generatePluginXml();
 
     // Save to file
-    if (savePluginXml(xml)) {
+    if (auto result = savePluginXml(xml); result.has_value()) {
         // Remove items from world if requested
         if (field("removeItems").toBool()) {
             removeItemsFromWorld();
@@ -1005,15 +1005,15 @@ QString PluginWizard::generatePluginXml()
 
     // Triggers
     int triggerCount = 0;
-    for (Trigger* t : m_doc->m_TriggerArray) {
-        if (t->bSelected)
+    for (Trigger* t : m_doc->m_automationRegistry->m_TriggerArray) {
+        if (t->selected)
             triggerCount++;
     }
     if (triggerCount > 0) {
         out << "<!--  Triggers  -->\n\n";
         out << "<triggers>\n";
-        for (Trigger* t : m_doc->m_TriggerArray) {
-            if (t->bSelected) {
+        for (Trigger* t : m_doc->m_automationRegistry->m_TriggerArray) {
+            if (t->selected) {
                 // Call world document's trigger serialization
                 m_doc->Save_One_Trigger_XML(out, t);
             }
@@ -1023,15 +1023,15 @@ QString PluginWizard::generatePluginXml()
 
     // Aliases
     int aliasCount = 0;
-    for (Alias* a : m_doc->m_AliasArray) {
-        if (a->bSelected)
+    for (Alias* a : m_doc->m_automationRegistry->m_AliasArray) {
+        if (a->selected)
             aliasCount++;
     }
     if (aliasCount > 0) {
         out << "<!--  Aliases  -->\n\n";
         out << "<aliases>\n";
-        for (Alias* a : m_doc->m_AliasArray) {
-            if (a->bSelected) {
+        for (Alias* a : m_doc->m_automationRegistry->m_AliasArray) {
+            if (a->selected) {
                 m_doc->Save_One_Alias_XML(out, a);
             }
         }
@@ -1040,15 +1040,15 @@ QString PluginWizard::generatePluginXml()
 
     // Timers
     int timerCount = 0;
-    for (const auto& [name, timerPtr] : m_doc->m_TimerMap) {
-        if (timerPtr->bSelected)
+    for (const auto& [name, timerPtr] : m_doc->m_automationRegistry->m_TimerMap) {
+        if (timerPtr->selected)
             timerCount++;
     }
     if (timerCount > 0) {
         out << "<!--  Timers  -->\n\n";
         out << "<timers>\n";
-        for (const auto& [name, timerPtr] : m_doc->m_TimerMap) {
-            if (timerPtr->bSelected) {
+        for (const auto& [name, timerPtr] : m_doc->m_automationRegistry->m_TimerMap) {
+            if (timerPtr->selected) {
                 m_doc->Save_One_Timer_XML(out, timerPtr.get());
             }
         }
@@ -1059,14 +1059,14 @@ QString PluginWizard::generatePluginXml()
     // Variable system integration
     int variableCount = 0;
     for (const auto& [name, varPtr] : m_doc->m_VariableMap) {
-        if (varPtr->bSelected)
+        if (varPtr->selected)
             variableCount++;
     }
     if (variableCount > 0) {
         out << "<!--  Variables  -->\n\n";
         out << "<variables>\n";
         for (const auto& [name, varPtr] : m_doc->m_VariableMap) {
-            if (varPtr->bSelected) {
+            if (varPtr->selected) {
                 m_doc->Save_One_Variable_XML(out, varPtr.get());
             }
         }
@@ -1109,7 +1109,7 @@ QString PluginWizard::generatePluginXml()
     return xml;
 }
 
-bool PluginWizard::savePluginXml(const QString& xml)
+std::expected<void, QString> PluginWizard::savePluginXml(const QString& xml)
 {
     QString pluginName = field("name").toString();
     QString suggestedFilename = pluginName + ".xml";
@@ -1123,7 +1123,7 @@ bool PluginWizard::savePluginXml(const QString& xml)
                                                     tr("Plugin files (*.xml);;All files (*)"));
 
     if (filename.isEmpty()) {
-        return false; // User cancelled
+        return std::unexpected(QString("User cancelled save dialog"));
     }
 
     // Save file
@@ -1131,7 +1131,7 @@ bool PluginWizard::savePluginXml(const QString& xml)
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
         QMessageBox::critical(this, tr("Save Error"),
                               tr("Could not save plugin file:\n%1").arg(file.errorString()));
-        return false;
+        return std::unexpected(tr("Could not open file for writing: %1").arg(file.errorString()));
     }
 
     QTextStream out(&file);
@@ -1143,50 +1143,50 @@ bool PluginWizard::savePluginXml(const QString& xml)
     QMessageBox::information(this, tr("Plugin Created"),
                              tr("Plugin created successfully:\n%1").arg(filename));
 
-    return true;
+    return {};
 }
 
 void PluginWizard::removeItemsFromWorld()
 {
     // Remove selected triggers
     QList<QString> triggersToRemove;
-    for (Trigger* t : m_doc->m_TriggerArray) {
-        if (t->bSelected) {
-            triggersToRemove.append(t->strLabel);
+    for (Trigger* t : m_doc->m_automationRegistry->m_TriggerArray) {
+        if (t->selected) {
+            triggersToRemove.append(t->label);
         }
     }
     for (const QString& name : triggersToRemove) {
-        m_doc->deleteTrigger(name);
+        (void)m_doc->deleteTrigger(name); // UI: remove selected items; not-found is a no-op
     }
 
     // Remove selected aliases
     QList<QString> aliasesToRemove;
-    for (Alias* a : m_doc->m_AliasArray) {
-        if (a->bSelected) {
-            aliasesToRemove.append(a->strLabel);
+    for (Alias* a : m_doc->m_automationRegistry->m_AliasArray) {
+        if (a->selected) {
+            aliasesToRemove.append(a->label);
         }
     }
     for (const QString& name : aliasesToRemove) {
-        m_doc->deleteAlias(name);
+        (void)m_doc->deleteAlias(name); // UI: remove selected items; not-found is a no-op
     }
 
     // Remove selected timers
     QList<QString> timersToRemove;
-    for (const auto& [name, timerPtr] : m_doc->m_TimerMap) {
-        if (timerPtr->bSelected) {
-            timersToRemove.append(timerPtr->strLabel);
+    for (const auto& [name, timerPtr] : m_doc->m_automationRegistry->m_TimerMap) {
+        if (timerPtr->selected) {
+            timersToRemove.append(timerPtr->label);
         }
     }
     for (const QString& name : timersToRemove) {
-        m_doc->deleteTimer(name);
+        (void)m_doc->deleteTimer(name); // UI: remove selected items; not-found is a no-op
     }
 
     // Remove selected variables
     // Variable system integration
     QList<QString> variablesToRemove;
     for (const auto& [name, varPtr] : m_doc->m_VariableMap) {
-        if (varPtr->bSelected) {
-            variablesToRemove.append(varPtr->strLabel);
+        if (varPtr->selected) {
+            variablesToRemove.append(varPtr->label);
         }
     }
     for (const QString& name : variablesToRemove) {

@@ -52,7 +52,7 @@ int L_GetLineCount(lua_State* L)
 int L_GetSentBytes(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    lua_pushnumber(L, pDoc->m_nBytesOut);
+    lua_pushnumber(L, pDoc->m_connectionManager->m_nBytesOut);
     return 1;
 }
 
@@ -73,7 +73,7 @@ int L_GetSentBytes(lua_State* L)
 int L_GetReceivedBytes(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    lua_pushnumber(L, pDoc->m_nBytesIn);
+    lua_pushnumber(L, pDoc->m_connectionManager->m_nBytesIn);
     return 1;
 }
 
@@ -97,13 +97,13 @@ int L_GetConnectDuration(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    if (pDoc->m_iConnectPhase != eConnectConnectedToMud) {
+    if (pDoc->m_connectionManager->m_iConnectPhase != eConnectConnectedToMud) {
         lua_pushnumber(L, 0);
         return 1;
     }
 
     // Calculate seconds since connection
-    qint64 msecs = pDoc->m_tConnectTime.msecsTo(QDateTime::currentDateTime());
+    qint64 msecs = pDoc->m_connectionManager->m_tConnectTime.msecsTo(QDateTime::currentDateTime());
     qint64 seconds = msecs / 1000;
 
     lua_pushnumber(L, seconds);

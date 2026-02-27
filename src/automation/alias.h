@@ -1,6 +1,7 @@
 #ifndef ALIAS_H
 #define ALIAS_H
 
+#include "constants.h"
 #include "script_language.h"
 #include <QDateTime>
 #include <QMap>
@@ -8,6 +9,8 @@
 #include <QRegularExpression>
 #include <QString>
 #include <QVector>
+#include <expected>
+#include <memory>
 
 /**
  * Alias Data Structure
@@ -23,9 +26,6 @@
  * - Metadata (label, group, sequence, menu)
  * - Runtime state (DISPID, wildcards, statistics)
  */
-
-// Maximum wildcards for alias matching
-#define MAX_WILDCARDS 10
 
 class Alias : public QObject {
     Q_OBJECT
@@ -47,63 +47,63 @@ class Alias : public QObject {
 
     // ========== Pattern Matching Fields ==========
 
-    QString name;        // Alias pattern to match
-    quint16 bIgnoreCase; // If true, case-insensitive matching
-    quint16 bRegexp;     // Use regular expressions
+    QString name;     // Alias pattern to match
+    bool ignore_case; // If true, case-insensitive matching
+    bool use_regexp;  // Use regular expressions
 
     // ========== Action Fields ==========
 
     QString contents;              // What to send when matched
-    QString strProcedure;          // Script procedure to execute
+    QString procedure;             // Script procedure to execute
     ScriptLanguage scriptLanguage; // Script language (Lua or YueScript)
-    quint16 iSendTo;               // Where alias is sent (see SendTo enum)
-    QString strVariable;      // Which variable to set (for send to variable)
-    quint16 bExpandVariables; // Expand variables (e.g., @food)
+    quint16 send_to;               // Where alias is sent (see SendTo enum)
+    QString variable;              // Which variable to set (for send to variable)
+    bool expand_variables;         // Expand variables (e.g., @food)
 
     // ========== Behavior Fields ==========
 
-    quint16 bEnabled;        // If true, alias is enabled
-    quint16 bKeepEvaluating; // If true, keep evaluating aliases after match
+    bool enabled;         // If true, alias is enabled
+    bool keep_evaluating; // If true, keep evaluating aliases after match
 
     // ========== Display Fields ==========
 
-    quint16 bOmitFromLog;            // Omit from log file
-    quint16 bOmitFromOutput;         // Omit alias from output screen
-    quint16 bEchoAlias;              // Echo alias itself to output window
-    quint16 bOmitFromCommandHistory; // Omit from command history
+    bool omit_from_log;             // Omit from log file
+    bool omit_from_output;          // Omit alias from output screen
+    bool echo_alias;                // Echo alias itself to output window
+    bool omit_from_command_history; // Omit from command history
 
     // ========== Metadata Fields ==========
 
-    QString strLabel;   // Alias label
-    QString strGroup;   // Group it belongs to
-    quint16 iSequence;  // Evaluation order (lower = sooner)
-    quint16 bMenu;      // Make pop-up menu from this alias
-    qint32 iUserOption; // User-settable flags
-    bool bOneShot;      // If true, alias only fires once
+    QString label;      // Alias label
+    QString group;      // Group it belongs to
+    quint16 sequence;   // Evaluation order (lower = sooner)
+    bool menu;          // Make pop-up menu from this alias
+    qint32 user_option; // User-settable flags
+    bool one_shot;      // If true, alias only fires once
 
     // ========== Runtime State Fields ==========
 
-    qint32 dispid;                         // Dispatch ID for calling script
-    qint64 nUpdateNumber;                  // For detecting update clashes
-    qint32 nInvocationCount;               // How many times procedure called
-    qint32 nMatched;                       // How many times alias matched
-    QVector<QString> wildcards;            // Matching wildcards (MAX_WILDCARDS)
-    QMap<QString, QString> namedWildcards; // Named capture groups from regex
-    QRegularExpression* regexp;            // Compiled regular expression
-    QDateTime tWhenMatched;                // When last matched
-    bool bTemporary;                       // If true, don't save it
-    bool bIncluded;                        // If true, included from plugin
-    bool bSelected;                        // If true, selected for use in plugin
-    bool bExecutingScript;                 // If true, executing script, cannot be deleted
-    QString strInternalName;               // Name stored in alias map
+    qint32 dispid;                              // Dispatch ID for calling script
+    qint64 update_number;                       // For detecting update clashes
+    qint32 invocation_count;                    // How many times procedure called
+    qint32 matched;                             // How many times alias matched
+    QVector<QString> wildcards;                 // Matching wildcards (MAX_WILDCARDS)
+    QMap<QString, QString> namedWildcards;      // Named capture groups from regex
+    std::unique_ptr<QRegularExpression> regexp; // Compiled regular expression
+    QDateTime when_matched;                     // When last matched
+    bool temporary;                             // If true, don't save it
+    bool included;                              // If true, included from plugin
+    bool selected;                              // If true, selected for use in plugin
+    bool executing_script;                      // If true, executing script, cannot be deleted
+    QString internal_name;                      // Name stored in alias map
 
     // ========== Helper Methods ==========
 
     /**
-     * Compile regular expression if bRegexp is true
-     * @return true on success, false on error
+     * Compile regular expression if use_regexp is true
+     * @return empty expected on success, error string on failure
      */
-    bool compileRegexp();
+    [[nodiscard]] std::expected<void, QString> compileRegexp();
 
     /**
      * Match this alias against user input

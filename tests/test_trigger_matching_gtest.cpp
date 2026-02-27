@@ -6,11 +6,11 @@
  * 2. Regular expression matching
  * 3. Wildcard extraction (%0, %1, %2, etc.)
  * 4. Case-insensitive matching (ignore_case)
- * 5. Color/style matching (iMatch flags)
- * 6. Repeat matching (bRepeat flag)
- * 7. Multi-line matching (bMultiLine)
- * 8. bKeepEvaluating flag behavior
- * 9. bOneShot flag behavior
+ * 5. Color/style matching (match_type flags)
+ * 6. Repeat matching (repeat flag)
+ * 7. Multi-line matching (multi_line)
+ * 8. keep_evaluating flag behavior
+ * 9. one_shot flag behavior
  * 10. Sequence-based evaluation order
  * 11. Statistics tracking
  */
@@ -50,7 +50,7 @@ class TriggerMatchingTest : public ::testing::Test {
         // Set the text
         int len = strlen(text);
         line->textBuffer.resize(len);
-        memcpy(line->text(), text, len);
+        memcpy(line->textBuffer.data(), text, len);
         line->textBuffer.push_back('\0');
 
         // Add a default style covering the entire line
@@ -70,9 +70,9 @@ class TriggerMatchingTest : public ::testing::Test {
     {
         Trigger* trigger = new Trigger();
         trigger->trigger = pattern;
-        trigger->bEnabled = true;
-        trigger->strLabel = label;
-        trigger->strInternalName = label;
+        trigger->enabled = true;
+        trigger->label = label;
+        trigger->internal_name = label;
 
         doc->addTrigger(label, std::unique_ptr<Trigger>(trigger));
         doc->rebuildTriggerArray();
@@ -88,22 +88,22 @@ TEST_F(TriggerMatchingTest, BasicWildcardMatching)
 {
     // Create a trigger with wildcard pattern
     Trigger* t1 = addTrigger("gold_trigger", "You have * gold");
-    t1->iSequence = 100;
-    t1->bKeepEvaluating = true; // Allow other triggers to match too
+    t1->sequence = 100;
+    t1->keep_evaluating = true; // Allow other triggers to match too
 
     // Create a line that matches
     Line* line1 = createTestLine("You have 500 gold");
 
     // Evaluate triggers
-    int matchedBefore = doc->m_iTriggersMatchedCount;
+    int matchedBefore = doc->m_automationRegistry->m_iTriggersMatchedCount;
     doc->evaluateTriggers(line1);
-    int matchedAfter = doc->m_iTriggersMatchedCount;
+    int matchedAfter = doc->m_automationRegistry->m_iTriggersMatchedCount;
 
     // Verify pattern matched
     EXPECT_EQ(matchedAfter, matchedBefore + 1) << "Wildcard pattern should match";
 
     // Verify trigger match count incremented
-    EXPECT_EQ(t1->nMatched, 1) << "Trigger match count should be 1";
+    EXPECT_EQ(t1->matched, 1) << "Trigger match count should be 1";
 
     // Verify wildcard %0 captured full match
     ASSERT_GT(t1->wildcards.size(), 0) << "Should have captured wildcards";
@@ -123,17 +123,17 @@ TEST_F(TriggerMatchingTest, CaseInsensitiveMatching)
     // Create a case-insensitive trigger
     Trigger* t2 = addTrigger("hunger_trigger", "you are hungry");
     t2->ignore_case = true;
-    t2->iSequence = 200;
-    t2->bKeepEvaluating = true;
+    t2->sequence = 200;
+    t2->keep_evaluating = true;
 
     Line* line2 = createTestLine("YOU ARE HUNGRY");
 
-    int matchedBefore = doc->m_iTriggersMatchedCount;
+    int matchedBefore = doc->m_automationRegistry->m_iTriggersMatchedCount;
     doc->evaluateTriggers(line2);
-    int matchedAfter = doc->m_iTriggersMatchedCount;
+    int matchedAfter = doc->m_automationRegistry->m_iTriggersMatchedCount;
 
     EXPECT_EQ(matchedAfter, matchedBefore + 1) << "Case-insensitive pattern should match";
-    EXPECT_EQ(t2->nMatched, 1) << "Match count should be 1";
+    EXPECT_EQ(t2->matched, 1) << "Match count should be 1";
 
     // Cleanup
     delete line2;
@@ -144,14 +144,14 @@ TEST_F(TriggerMatchingTest, RegularExpressionMatching)
 {
     // Create a regex trigger
     Trigger* t3 = addTrigger("gold_regex", "^You have (\\d+) gold$");
-    t3->bRegexp = true;
-    t3->iSequence = 300;
+    t3->use_regexp = true;
+    t3->sequence = 300;
 
     Line* line3 = createTestLine("You have 1234 gold");
 
-    int matchedBefore = doc->m_iTriggersMatchedCount;
+    int matchedBefore = doc->m_automationRegistry->m_iTriggersMatchedCount;
     doc->evaluateTriggers(line3);
-    int matchedAfter = doc->m_iTriggersMatchedCount;
+    int matchedAfter = doc->m_automationRegistry->m_iTriggersMatchedCount;
 
     // Verify regex matched
     EXPECT_GE(matchedAfter, matchedBefore + 1) << "Regex pattern should match";
@@ -169,13 +169,13 @@ TEST_F(TriggerMatchingTest, MultipleWildcards)
 {
     // Create a trigger with multiple wildcards
     Trigger* t4 = addTrigger("tell_trigger", "* tells you: *");
-    t4->iSequence = 400;
+    t4->sequence = 400;
 
     Line* line4 = createTestLine("Bob tells you: Hello!");
 
-    int matchedBefore = doc->m_iTriggersMatchedCount;
+    int matchedBefore = doc->m_automationRegistry->m_iTriggersMatchedCount;
     doc->evaluateTriggers(line4);
-    int matchedAfter = doc->m_iTriggersMatchedCount;
+    int matchedAfter = doc->m_automationRegistry->m_iTriggersMatchedCount;
 
     EXPECT_EQ(matchedAfter, matchedBefore + 1) << "Multiple wildcard pattern should match";
 
@@ -199,9 +199,9 @@ TEST_F(TriggerMatchingTest, NonMatchingPattern)
 
     Line* line5 = createTestLine("This line doesn't match any trigger");
 
-    int matchedBefore = doc->m_iTriggersMatchedCount;
+    int matchedBefore = doc->m_automationRegistry->m_iTriggersMatchedCount;
     doc->evaluateTriggers(line5);
-    int matchedAfter = doc->m_iTriggersMatchedCount;
+    int matchedAfter = doc->m_automationRegistry->m_iTriggersMatchedCount;
 
     EXPECT_EQ(matchedAfter, matchedBefore) << "Non-matching line should not trigger any matches";
 
@@ -214,21 +214,21 @@ TEST_F(TriggerMatchingTest, SequenceBasedEvaluationOrder)
 {
     // Add triggers in reverse sequence order (highest to lowest)
     Trigger* tLast = addTrigger("last_trigger", "*");
-    tLast->iSequence = 300; // Evaluated last
+    tLast->sequence = 300; // Evaluated last
 
     Trigger* tFirst = addTrigger("first_trigger", "*");
-    tFirst->iSequence = 100; // Evaluated first
+    tFirst->sequence = 100; // Evaluated first
 
     Trigger* tMiddle = addTrigger("middle_trigger", "*");
-    tMiddle->iSequence = 200; // Evaluated middle
+    tMiddle->sequence = 200; // Evaluated middle
 
     doc->rebuildTriggerArray();
 
     // Verify array order
-    ASSERT_GE(doc->m_TriggerArray.size(), 3) << "Should have 3 triggers";
-    EXPECT_EQ(doc->m_TriggerArray[0]->iSequence, 100) << "First trigger should have sequence 100";
-    EXPECT_EQ(doc->m_TriggerArray[1]->iSequence, 200) << "Second trigger should have sequence 200";
-    EXPECT_EQ(doc->m_TriggerArray[2]->iSequence, 300) << "Third trigger should have sequence 300";
+    ASSERT_GE(doc->m_automationRegistry->m_TriggerArray.size(), 3) << "Should have 3 triggers";
+    EXPECT_EQ(doc->m_automationRegistry->m_TriggerArray[0]->sequence, 100) << "First trigger should have sequence 100";
+    EXPECT_EQ(doc->m_automationRegistry->m_TriggerArray[1]->sequence, 200) << "Second trigger should have sequence 200";
+    EXPECT_EQ(doc->m_automationRegistry->m_TriggerArray[2]->sequence, 300) << "Third trigger should have sequence 300";
 }
 
 // Test 7: Lowercase Wildcard Conversion
@@ -236,8 +236,8 @@ TEST_F(TriggerMatchingTest, LowercaseWildcardConversion)
 {
     // Create a trigger with lowercase wildcard conversion
     Trigger* t7 = addTrigger("lowercase_trigger", "You see *");
-    t7->bLowercaseWildcard = true;
-    t7->iSequence = 500;
+    t7->lowercase_wildcard = true;
+    t7->sequence = 500;
 
     Line* line7 = createTestLine("You see DRAGON");
 
@@ -256,19 +256,19 @@ TEST_F(TriggerMatchingTest, DisabledTrigger)
 {
     // Create a disabled trigger
     Trigger* t8 = addTrigger("disabled_trigger", "test pattern");
-    t8->bEnabled = false; // Disabled
-    t8->iSequence = 600;
+    t8->enabled = false; // Disabled
+    t8->sequence = 600;
 
     doc->rebuildTriggerArray();
 
     Line* line8 = createTestLine("test pattern");
 
-    int disabledMatchedBefore = doc->m_iTriggersMatchedCount;
+    int disabledMatchedBefore = doc->m_automationRegistry->m_iTriggersMatchedCount;
     doc->evaluateTriggers(line8);
-    int disabledMatchedAfter = doc->m_iTriggersMatchedCount;
+    int disabledMatchedAfter = doc->m_automationRegistry->m_iTriggersMatchedCount;
 
     EXPECT_EQ(disabledMatchedAfter, disabledMatchedBefore) << "Disabled trigger should not match";
-    EXPECT_EQ(t8->nMatched, 0) << "Disabled trigger match count should be 0";
+    EXPECT_EQ(t8->matched, 0) << "Disabled trigger match count should be 0";
 
     // Cleanup
     delete line8;

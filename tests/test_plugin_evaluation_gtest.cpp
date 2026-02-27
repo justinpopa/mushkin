@@ -5,7 +5,7 @@
  * Tests plugin sequence-based evaluation order including:
  * - Triggers: negative sequence → world → positive sequence
  * - Aliases: negative sequence → world → positive sequence
- * - bKeepEvaluating flag stopping evaluation at each phase
+ * - keep_evaluating flag stopping evaluation at each phase
  * - One-shot triggers/aliases deleted from correct plugin context
  */
 
@@ -140,7 +140,7 @@ class PluginEvaluationTest : public ::testing::Test {
         );
         int len = strlen(text);
         line->textBuffer.resize(len);
-        memcpy(line->text(), text, len);
+        memcpy(line->textBuffer.data(), text, len);
         line->textBuffer.push_back('\0');
         // memcpy already done above
         line->styleList.push_back(std::move(std::make_unique<Style>()));
@@ -162,38 +162,38 @@ TEST_F(PluginEvaluationTest, TriggerEvaluationOrder)
     // Add triggers to each context
     // Negative plugin trigger
     Trigger* trigNeg = new Trigger();
-    trigNeg->strInternalName = "trig_neg";
-    trigNeg->strLabel = "Trigger-Negative";
+    trigNeg->internal_name = "trig_neg";
+    trigNeg->label = "Trigger-Negative";
     trigNeg->trigger = "Hello*";
-    trigNeg->iSendTo = eSendToWorld;
-    trigNeg->bEnabled = true;
-    trigNeg->iSequence = 100;
-    trigNeg->bKeepEvaluating = true;
-    pluginNeg->m_TriggerMap[trigNeg->strInternalName] = std::unique_ptr<Trigger>(trigNeg);
+    trigNeg->send_to = eSendToWorld;
+    trigNeg->enabled = true;
+    trigNeg->sequence = 100;
+    trigNeg->keep_evaluating = true;
+    pluginNeg->m_TriggerMap[trigNeg->internal_name] = std::unique_ptr<Trigger>(trigNeg);
     pluginNeg->m_triggersNeedSorting = true;
 
     // World trigger
     Trigger* trigWorld = new Trigger();
-    trigWorld->strInternalName = "trig_world";
-    trigWorld->strLabel = "Trigger-World";
+    trigWorld->internal_name = "trig_world";
+    trigWorld->label = "Trigger-World";
     trigWorld->trigger = "Hello*";
-    trigWorld->iSendTo = eSendToWorld;
-    trigWorld->bEnabled = true;
-    trigWorld->iSequence = 100;
-    trigWorld->bKeepEvaluating = true;
-    doc->m_TriggerMap[trigWorld->strInternalName] = std::unique_ptr<Trigger>(trigWorld);
-    doc->m_triggersNeedSorting = true;
+    trigWorld->send_to = eSendToWorld;
+    trigWorld->enabled = true;
+    trigWorld->sequence = 100;
+    trigWorld->keep_evaluating = true;
+    doc->m_automationRegistry->m_TriggerMap[trigWorld->internal_name] = std::unique_ptr<Trigger>(trigWorld);
+    doc->m_automationRegistry->m_triggersNeedSorting = true;
 
     // Positive plugin trigger
     Trigger* trigPos = new Trigger();
-    trigPos->strInternalName = "trig_pos";
-    trigPos->strLabel = "Trigger-Positive";
+    trigPos->internal_name = "trig_pos";
+    trigPos->label = "Trigger-Positive";
     trigPos->trigger = "Hello*";
-    trigPos->iSendTo = eSendToWorld;
-    trigPos->bEnabled = true;
-    trigPos->iSequence = 100;
-    trigPos->bKeepEvaluating = true;
-    pluginPos->m_TriggerMap[trigPos->strInternalName] = std::unique_ptr<Trigger>(trigPos);
+    trigPos->send_to = eSendToWorld;
+    trigPos->enabled = true;
+    trigPos->sequence = 100;
+    trigPos->keep_evaluating = true;
+    pluginPos->m_TriggerMap[trigPos->internal_name] = std::unique_ptr<Trigger>(trigPos);
     pluginPos->m_triggersNeedSorting = true;
 
     // Create a test line
@@ -202,10 +202,10 @@ TEST_F(PluginEvaluationTest, TriggerEvaluationOrder)
     // Evaluate triggers
     doc->evaluateTriggers(testLine);
 
-    // Check that all three triggers matched (by checking nMatched counter)
-    EXPECT_EQ(trigNeg->nMatched, 1) << "Negative plugin trigger should have matched";
-    EXPECT_EQ(trigWorld->nMatched, 1) << "World trigger should have matched";
-    EXPECT_EQ(trigPos->nMatched, 1) << "Positive plugin trigger should have matched";
+    // Check that all three triggers matched (by checking matched counter)
+    EXPECT_EQ(trigNeg->matched, 1) << "Negative plugin trigger should have matched";
+    EXPECT_EQ(trigWorld->matched, 1) << "World trigger should have matched";
+    EXPECT_EQ(trigPos->matched, 1) << "Positive plugin trigger should have matched";
 
     // Cleanup
     delete testLine;
@@ -217,90 +217,90 @@ TEST_F(PluginEvaluationTest, AliasEvaluationOrder)
     // Add aliases to each context
     // Negative plugin alias
     auto aliasNeg = std::make_unique<Alias>();
-    aliasNeg->strInternalName = "alias_neg";
-    aliasNeg->strLabel = "Alias-Negative";
+    aliasNeg->internal_name = "alias_neg";
+    aliasNeg->label = "Alias-Negative";
     aliasNeg->name = "test*";
-    aliasNeg->bRegexp = false;
-    aliasNeg->iSendTo = eSendToWorld;
-    aliasNeg->bEnabled = true;
-    aliasNeg->iSequence = 100;
-    aliasNeg->bKeepEvaluating = true;
+    aliasNeg->use_regexp = false;
+    aliasNeg->send_to = eSendToWorld;
+    aliasNeg->enabled = true;
+    aliasNeg->sequence = 100;
+    aliasNeg->keep_evaluating = true;
     Alias* aliasNegPtr = aliasNeg.get();
-    pluginNeg->m_AliasMap[aliasNeg->strInternalName] = std::move(aliasNeg);
+    pluginNeg->m_AliasMap[aliasNeg->internal_name] = std::move(aliasNeg);
     pluginNeg->m_aliasesNeedSorting = true;
 
     // World alias
     auto aliasWorld = std::make_unique<Alias>();
-    aliasWorld->strInternalName = "alias_world";
-    aliasWorld->strLabel = "Alias-World";
+    aliasWorld->internal_name = "alias_world";
+    aliasWorld->label = "Alias-World";
     aliasWorld->name = "test*";
-    aliasWorld->bRegexp = false;
-    aliasWorld->iSendTo = eSendToWorld;
-    aliasWorld->bEnabled = true;
-    aliasWorld->iSequence = 100;
-    aliasWorld->bKeepEvaluating = true;
+    aliasWorld->use_regexp = false;
+    aliasWorld->send_to = eSendToWorld;
+    aliasWorld->enabled = true;
+    aliasWorld->sequence = 100;
+    aliasWorld->keep_evaluating = true;
     Alias* aliasWorldPtr = aliasWorld.get();
-    doc->m_AliasMap[aliasWorld->strInternalName] = std::move(aliasWorld);
-    doc->m_aliasesNeedSorting = true;
+    doc->m_automationRegistry->m_AliasMap[aliasWorld->internal_name] = std::move(aliasWorld);
+    doc->m_automationRegistry->m_aliasesNeedSorting = true;
 
     // Positive plugin alias
     auto aliasPos = std::make_unique<Alias>();
-    aliasPos->strInternalName = "alias_pos";
-    aliasPos->strLabel = "Alias-Positive";
+    aliasPos->internal_name = "alias_pos";
+    aliasPos->label = "Alias-Positive";
     aliasPos->name = "test*";
-    aliasPos->bRegexp = false;
-    aliasPos->iSendTo = eSendToWorld;
-    aliasPos->bEnabled = true;
-    aliasPos->iSequence = 100;
-    aliasPos->bKeepEvaluating = true;
+    aliasPos->use_regexp = false;
+    aliasPos->send_to = eSendToWorld;
+    aliasPos->enabled = true;
+    aliasPos->sequence = 100;
+    aliasPos->keep_evaluating = true;
     Alias* aliasPosPtr = aliasPos.get();
-    pluginPos->m_AliasMap[aliasPos->strInternalName] = std::move(aliasPos);
+    pluginPos->m_AliasMap[aliasPos->internal_name] = std::move(aliasPos);
     pluginPos->m_aliasesNeedSorting = true;
 
     // Evaluate aliases
     doc->evaluateAliases("test command");
 
-    // Check that all three aliases matched (by checking nMatched counter)
-    EXPECT_EQ(aliasNegPtr->nMatched, 1) << "Negative plugin alias should have matched";
-    EXPECT_EQ(aliasWorldPtr->nMatched, 1) << "World alias should have matched";
-    EXPECT_EQ(aliasPosPtr->nMatched, 1) << "Positive plugin alias should have matched";
+    // Check that all three aliases matched (by checking matched counter)
+    EXPECT_EQ(aliasNegPtr->matched, 1) << "Negative plugin alias should have matched";
+    EXPECT_EQ(aliasWorldPtr->matched, 1) << "World alias should have matched";
+    EXPECT_EQ(aliasPosPtr->matched, 1) << "Positive plugin alias should have matched";
 }
 
-// Test 3: bKeepEvaluating = false stops at negative phase
+// Test 3: keep_evaluating = false stops at negative phase
 TEST_F(PluginEvaluationTest, KeepEvaluatingStopsAtNegativePhase)
 {
     // Add triggers to each context
     Trigger* trigNeg = new Trigger();
-    trigNeg->strInternalName = "trig_neg";
-    trigNeg->strLabel = "Trigger-Negative";
+    trigNeg->internal_name = "trig_neg";
+    trigNeg->label = "Trigger-Negative";
     trigNeg->trigger = "Hello*";
-    trigNeg->iSendTo = eSendToWorld;
-    trigNeg->bEnabled = true;
-    trigNeg->iSequence = 100;
-    trigNeg->bKeepEvaluating = false; // Stop evaluation
-    pluginNeg->m_TriggerMap[trigNeg->strInternalName] = std::unique_ptr<Trigger>(trigNeg);
+    trigNeg->send_to = eSendToWorld;
+    trigNeg->enabled = true;
+    trigNeg->sequence = 100;
+    trigNeg->keep_evaluating = false; // Stop evaluation
+    pluginNeg->m_TriggerMap[trigNeg->internal_name] = std::unique_ptr<Trigger>(trigNeg);
     pluginNeg->m_triggersNeedSorting = true;
 
     Trigger* trigWorld = new Trigger();
-    trigWorld->strInternalName = "trig_world";
-    trigWorld->strLabel = "Trigger-World";
+    trigWorld->internal_name = "trig_world";
+    trigWorld->label = "Trigger-World";
     trigWorld->trigger = "Hello*";
-    trigWorld->iSendTo = eSendToWorld;
-    trigWorld->bEnabled = true;
-    trigWorld->iSequence = 100;
-    trigWorld->bKeepEvaluating = true;
-    doc->m_TriggerMap[trigWorld->strInternalName] = std::unique_ptr<Trigger>(trigWorld);
-    doc->m_triggersNeedSorting = true;
+    trigWorld->send_to = eSendToWorld;
+    trigWorld->enabled = true;
+    trigWorld->sequence = 100;
+    trigWorld->keep_evaluating = true;
+    doc->m_automationRegistry->m_TriggerMap[trigWorld->internal_name] = std::unique_ptr<Trigger>(trigWorld);
+    doc->m_automationRegistry->m_triggersNeedSorting = true;
 
     Trigger* trigPos = new Trigger();
-    trigPos->strInternalName = "trig_pos";
-    trigPos->strLabel = "Trigger-Positive";
+    trigPos->internal_name = "trig_pos";
+    trigPos->label = "Trigger-Positive";
     trigPos->trigger = "Hello*";
-    trigPos->iSendTo = eSendToWorld;
-    trigPos->bEnabled = true;
-    trigPos->iSequence = 100;
-    trigPos->bKeepEvaluating = true;
-    pluginPos->m_TriggerMap[trigPos->strInternalName] = std::unique_ptr<Trigger>(trigPos);
+    trigPos->send_to = eSendToWorld;
+    trigPos->enabled = true;
+    trigPos->sequence = 100;
+    trigPos->keep_evaluating = true;
+    pluginPos->m_TriggerMap[trigPos->internal_name] = std::unique_ptr<Trigger>(trigPos);
     pluginPos->m_triggersNeedSorting = true;
 
     // Create a test line
@@ -310,49 +310,49 @@ TEST_F(PluginEvaluationTest, KeepEvaluatingStopsAtNegativePhase)
     doc->evaluateTriggers(testLine);
 
     // Check that only negative plugin trigger matched (others should not match)
-    EXPECT_EQ(trigNeg->nMatched, 1) << "Negative plugin trigger should have matched";
-    EXPECT_EQ(trigWorld->nMatched, 0) << "World trigger should not have matched";
-    EXPECT_EQ(trigPos->nMatched, 0) << "Positive plugin trigger should not have matched";
+    EXPECT_EQ(trigNeg->matched, 1) << "Negative plugin trigger should have matched";
+    EXPECT_EQ(trigWorld->matched, 0) << "World trigger should not have matched";
+    EXPECT_EQ(trigPos->matched, 0) << "Positive plugin trigger should not have matched";
 
     // Cleanup
     delete testLine;
 }
 
-// Test 4: bKeepEvaluating = false stops at world phase
+// Test 4: keep_evaluating = false stops at world phase
 TEST_F(PluginEvaluationTest, KeepEvaluatingStopsAtWorldPhase)
 {
     // Add triggers to each context
     Trigger* trigNeg = new Trigger();
-    trigNeg->strInternalName = "trig_neg";
-    trigNeg->strLabel = "Trigger-Negative";
+    trigNeg->internal_name = "trig_neg";
+    trigNeg->label = "Trigger-Negative";
     trigNeg->trigger = "Hello*";
-    trigNeg->iSendTo = eSendToWorld;
-    trigNeg->bEnabled = true;
-    trigNeg->iSequence = 100;
-    trigNeg->bKeepEvaluating = true;
-    pluginNeg->m_TriggerMap[trigNeg->strInternalName] = std::unique_ptr<Trigger>(trigNeg);
+    trigNeg->send_to = eSendToWorld;
+    trigNeg->enabled = true;
+    trigNeg->sequence = 100;
+    trigNeg->keep_evaluating = true;
+    pluginNeg->m_TriggerMap[trigNeg->internal_name] = std::unique_ptr<Trigger>(trigNeg);
     pluginNeg->m_triggersNeedSorting = true;
 
     Trigger* trigWorld = new Trigger();
-    trigWorld->strInternalName = "trig_world";
-    trigWorld->strLabel = "Trigger-World";
+    trigWorld->internal_name = "trig_world";
+    trigWorld->label = "Trigger-World";
     trigWorld->trigger = "Hello*";
-    trigWorld->iSendTo = eSendToWorld;
-    trigWorld->bEnabled = true;
-    trigWorld->iSequence = 100;
-    trigWorld->bKeepEvaluating = false; // Stop evaluation
-    doc->m_TriggerMap[trigWorld->strInternalName] = std::unique_ptr<Trigger>(trigWorld);
-    doc->m_triggersNeedSorting = true;
+    trigWorld->send_to = eSendToWorld;
+    trigWorld->enabled = true;
+    trigWorld->sequence = 100;
+    trigWorld->keep_evaluating = false; // Stop evaluation
+    doc->m_automationRegistry->m_TriggerMap[trigWorld->internal_name] = std::unique_ptr<Trigger>(trigWorld);
+    doc->m_automationRegistry->m_triggersNeedSorting = true;
 
     Trigger* trigPos = new Trigger();
-    trigPos->strInternalName = "trig_pos";
-    trigPos->strLabel = "Trigger-Positive";
+    trigPos->internal_name = "trig_pos";
+    trigPos->label = "Trigger-Positive";
     trigPos->trigger = "Hello*";
-    trigPos->iSendTo = eSendToWorld;
-    trigPos->bEnabled = true;
-    trigPos->iSequence = 100;
-    trigPos->bKeepEvaluating = true;
-    pluginPos->m_TriggerMap[trigPos->strInternalName] = std::unique_ptr<Trigger>(trigPos);
+    trigPos->send_to = eSendToWorld;
+    trigPos->enabled = true;
+    trigPos->sequence = 100;
+    trigPos->keep_evaluating = true;
+    pluginPos->m_TriggerMap[trigPos->internal_name] = std::unique_ptr<Trigger>(trigPos);
     pluginPos->m_triggersNeedSorting = true;
 
     // Create a test line
@@ -362,9 +362,9 @@ TEST_F(PluginEvaluationTest, KeepEvaluatingStopsAtWorldPhase)
     doc->evaluateTriggers(testLine);
 
     // Check that negative and world matched, but not positive
-    EXPECT_EQ(trigNeg->nMatched, 1) << "Negative plugin trigger should have matched";
-    EXPECT_EQ(trigWorld->nMatched, 1) << "World trigger should have matched";
-    EXPECT_EQ(trigPos->nMatched, 0) << "Positive plugin trigger should not have matched";
+    EXPECT_EQ(trigNeg->matched, 1) << "Negative plugin trigger should have matched";
+    EXPECT_EQ(trigWorld->matched, 1) << "World trigger should have matched";
+    EXPECT_EQ(trigPos->matched, 0) << "Positive plugin trigger should not have matched";
 
     // Cleanup
     delete testLine;
@@ -375,14 +375,14 @@ TEST_F(PluginEvaluationTest, OneShotTriggerDeletedFromCorrectContext)
 {
     // Create one-shot trigger in negative plugin
     Trigger* trigOneShot = new Trigger();
-    trigOneShot->strInternalName = "trig_oneshot";
-    trigOneShot->strLabel = "Trigger-OneShot";
+    trigOneShot->internal_name = "trig_oneshot";
+    trigOneShot->label = "Trigger-OneShot";
     trigOneShot->trigger = "OneShot*";
-    trigOneShot->bEnabled = true;
-    trigOneShot->iSequence = 100;
-    trigOneShot->bOneShot = true;
-    trigOneShot->bKeepEvaluating = true;
-    pluginNeg->m_TriggerMap[trigOneShot->strInternalName] = std::unique_ptr<Trigger>(trigOneShot);
+    trigOneShot->enabled = true;
+    trigOneShot->sequence = 100;
+    trigOneShot->one_shot = true;
+    trigOneShot->keep_evaluating = true;
+    pluginNeg->m_TriggerMap[trigOneShot->internal_name] = std::unique_ptr<Trigger>(trigOneShot);
     pluginNeg->m_triggersNeedSorting = true;
 
     int triggerCountBefore = pluginNeg->m_TriggerMap.size();
@@ -411,36 +411,36 @@ TEST_F(PluginEvaluationTest, DisabledPluginNotEvaluated)
 {
     // Add triggers to each context
     Trigger* trigNeg = new Trigger();
-    trigNeg->strInternalName = "trig_neg";
-    trigNeg->strLabel = "Trigger-Negative";
+    trigNeg->internal_name = "trig_neg";
+    trigNeg->label = "Trigger-Negative";
     trigNeg->trigger = "Hello*";
-    trigNeg->iSendTo = eSendToWorld;
-    trigNeg->bEnabled = true;
-    trigNeg->iSequence = 100;
-    trigNeg->bKeepEvaluating = true;
-    pluginNeg->m_TriggerMap[trigNeg->strInternalName] = std::unique_ptr<Trigger>(trigNeg);
+    trigNeg->send_to = eSendToWorld;
+    trigNeg->enabled = true;
+    trigNeg->sequence = 100;
+    trigNeg->keep_evaluating = true;
+    pluginNeg->m_TriggerMap[trigNeg->internal_name] = std::unique_ptr<Trigger>(trigNeg);
     pluginNeg->m_triggersNeedSorting = true;
 
     Trigger* trigWorld = new Trigger();
-    trigWorld->strInternalName = "trig_world";
-    trigWorld->strLabel = "Trigger-World";
+    trigWorld->internal_name = "trig_world";
+    trigWorld->label = "Trigger-World";
     trigWorld->trigger = "Hello*";
-    trigWorld->iSendTo = eSendToWorld;
-    trigWorld->bEnabled = true;
-    trigWorld->iSequence = 100;
-    trigWorld->bKeepEvaluating = true;
-    doc->m_TriggerMap[trigWorld->strInternalName] = std::unique_ptr<Trigger>(trigWorld);
-    doc->m_triggersNeedSorting = true;
+    trigWorld->send_to = eSendToWorld;
+    trigWorld->enabled = true;
+    trigWorld->sequence = 100;
+    trigWorld->keep_evaluating = true;
+    doc->m_automationRegistry->m_TriggerMap[trigWorld->internal_name] = std::unique_ptr<Trigger>(trigWorld);
+    doc->m_automationRegistry->m_triggersNeedSorting = true;
 
     Trigger* trigPos = new Trigger();
-    trigPos->strInternalName = "trig_pos";
-    trigPos->strLabel = "Trigger-Positive";
+    trigPos->internal_name = "trig_pos";
+    trigPos->label = "Trigger-Positive";
     trigPos->trigger = "Hello*";
-    trigPos->iSendTo = eSendToWorld;
-    trigPos->bEnabled = true;
-    trigPos->iSequence = 100;
-    trigPos->bKeepEvaluating = true;
-    pluginPos->m_TriggerMap[trigPos->strInternalName] = std::unique_ptr<Trigger>(trigPos);
+    trigPos->send_to = eSendToWorld;
+    trigPos->enabled = true;
+    trigPos->sequence = 100;
+    trigPos->keep_evaluating = true;
+    pluginPos->m_TriggerMap[trigPos->internal_name] = std::unique_ptr<Trigger>(trigPos);
     pluginPos->m_triggersNeedSorting = true;
 
     // Disable negative plugin
@@ -453,9 +453,9 @@ TEST_F(PluginEvaluationTest, DisabledPluginNotEvaluated)
     doc->evaluateTriggers(testLine);
 
     // Check that negative plugin didn't match (disabled)
-    EXPECT_EQ(trigNeg->nMatched, 0) << "Negative plugin trigger should not have matched (disabled)";
-    EXPECT_EQ(trigWorld->nMatched, 1) << "World trigger should have matched";
-    EXPECT_EQ(trigPos->nMatched, 1) << "Positive plugin trigger should have matched";
+    EXPECT_EQ(trigNeg->matched, 0) << "Negative plugin trigger should not have matched (disabled)";
+    EXPECT_EQ(trigWorld->matched, 1) << "World trigger should have matched";
+    EXPECT_EQ(trigPos->matched, 1) << "Positive plugin trigger should have matched";
 
     // Cleanup
     delete testLine;
@@ -505,74 +505,74 @@ TEST_F(PluginEvaluationTest, MultiplePluginsInSamePhaseEvaluatedInSequenceOrder)
 
     // Add triggers to new plugins
     Trigger* trigNeg5 = new Trigger();
-    trigNeg5->strInternalName = "trig_neg5";
-    trigNeg5->strLabel = "Trigger-Negative-5";
+    trigNeg5->internal_name = "trig_neg5";
+    trigNeg5->label = "Trigger-Negative-5";
     trigNeg5->trigger = "MultiPlugin*";
-    trigNeg5->iSendTo = eSendToWorld;
-    trigNeg5->bEnabled = true;
-    trigNeg5->iSequence = 100;
-    trigNeg5->bKeepEvaluating = true;
-    pluginNeg5->m_TriggerMap[trigNeg5->strInternalName] = std::unique_ptr<Trigger>(trigNeg5);
+    trigNeg5->send_to = eSendToWorld;
+    trigNeg5->enabled = true;
+    trigNeg5->sequence = 100;
+    trigNeg5->keep_evaluating = true;
+    pluginNeg5->m_TriggerMap[trigNeg5->internal_name] = std::unique_ptr<Trigger>(trigNeg5);
     pluginNeg5->m_triggersNeedSorting = true;
 
     Trigger* trigPos15 = new Trigger();
-    trigPos15->strInternalName = "trig_pos15";
-    trigPos15->strLabel = "Trigger-Positive-15";
+    trigPos15->internal_name = "trig_pos15";
+    trigPos15->label = "Trigger-Positive-15";
     trigPos15->trigger = "MultiPlugin*";
-    trigPos15->iSendTo = eSendToWorld;
-    trigPos15->bEnabled = true;
-    trigPos15->iSequence = 100;
-    trigPos15->bKeepEvaluating = true;
-    pluginPos15->m_TriggerMap[trigPos15->strInternalName] = std::unique_ptr<Trigger>(trigPos15);
+    trigPos15->send_to = eSendToWorld;
+    trigPos15->enabled = true;
+    trigPos15->sequence = 100;
+    trigPos15->keep_evaluating = true;
+    pluginPos15->m_TriggerMap[trigPos15->internal_name] = std::unique_ptr<Trigger>(trigPos15);
     pluginPos15->m_triggersNeedSorting = true;
 
     // Add matching triggers to existing plugins and world
     Trigger* trigNeg10Multi = new Trigger();
-    trigNeg10Multi->strInternalName = "trig_neg10_multi";
-    trigNeg10Multi->strLabel = "Trigger-Negative-10-Multi";
+    trigNeg10Multi->internal_name = "trig_neg10_multi";
+    trigNeg10Multi->label = "Trigger-Negative-10-Multi";
     trigNeg10Multi->trigger = "MultiPlugin*";
-    trigNeg10Multi->iSendTo = eSendToWorld;
-    trigNeg10Multi->bEnabled = true;
-    trigNeg10Multi->iSequence = 100;
-    trigNeg10Multi->bKeepEvaluating = true;
-    pluginNeg->m_TriggerMap[trigNeg10Multi->strInternalName] =
+    trigNeg10Multi->send_to = eSendToWorld;
+    trigNeg10Multi->enabled = true;
+    trigNeg10Multi->sequence = 100;
+    trigNeg10Multi->keep_evaluating = true;
+    pluginNeg->m_TriggerMap[trigNeg10Multi->internal_name] =
         std::unique_ptr<Trigger>(trigNeg10Multi);
     pluginNeg->m_triggersNeedSorting = true;
 
     Trigger* trigZeroMulti = new Trigger();
-    trigZeroMulti->strInternalName = "trig_zero_multi";
-    trigZeroMulti->strLabel = "Trigger-Zero-Multi";
+    trigZeroMulti->internal_name = "trig_zero_multi";
+    trigZeroMulti->label = "Trigger-Zero-Multi";
     trigZeroMulti->trigger = "MultiPlugin*";
-    trigZeroMulti->iSendTo = eSendToWorld;
-    trigZeroMulti->bEnabled = true;
-    trigZeroMulti->iSequence = 100;
-    trigZeroMulti->bKeepEvaluating = true;
-    pluginZero->m_TriggerMap[trigZeroMulti->strInternalName] =
+    trigZeroMulti->send_to = eSendToWorld;
+    trigZeroMulti->enabled = true;
+    trigZeroMulti->sequence = 100;
+    trigZeroMulti->keep_evaluating = true;
+    pluginZero->m_TriggerMap[trigZeroMulti->internal_name] =
         std::unique_ptr<Trigger>(trigZeroMulti);
     pluginZero->m_triggersNeedSorting = true;
 
     Trigger* trigPos10Multi = new Trigger();
-    trigPos10Multi->strInternalName = "trig_pos10_multi";
-    trigPos10Multi->strLabel = "Trigger-Positive-10-Multi";
+    trigPos10Multi->internal_name = "trig_pos10_multi";
+    trigPos10Multi->label = "Trigger-Positive-10-Multi";
     trigPos10Multi->trigger = "MultiPlugin*";
-    trigPos10Multi->iSendTo = eSendToWorld;
-    trigPos10Multi->bEnabled = true;
-    trigPos10Multi->iSequence = 100;
-    trigPos10Multi->bKeepEvaluating = true;
-    pluginPos->m_TriggerMap[trigPos10Multi->strInternalName] =
+    trigPos10Multi->send_to = eSendToWorld;
+    trigPos10Multi->enabled = true;
+    trigPos10Multi->sequence = 100;
+    trigPos10Multi->keep_evaluating = true;
+    pluginPos->m_TriggerMap[trigPos10Multi->internal_name] =
         std::unique_ptr<Trigger>(trigPos10Multi);
     pluginPos->m_triggersNeedSorting = true;
 
     Trigger* trigWorldMulti = new Trigger();
-    trigWorldMulti->strInternalName = "trig_world_multi";
-    trigWorldMulti->strLabel = "Trigger-World-Multi";
+    trigWorldMulti->internal_name = "trig_world_multi";
+    trigWorldMulti->label = "Trigger-World-Multi";
     trigWorldMulti->trigger = "MultiPlugin*";
-    trigWorldMulti->iSendTo = eSendToWorld;
-    trigWorldMulti->bEnabled = true;
-    trigWorldMulti->iSequence = 100;
-    trigWorldMulti->bKeepEvaluating = true;
-    doc->m_TriggerMap[trigWorldMulti->strInternalName] = std::unique_ptr<Trigger>(trigWorldMulti);
-    doc->m_triggersNeedSorting = true;
+    trigWorldMulti->send_to = eSendToWorld;
+    trigWorldMulti->enabled = true;
+    trigWorldMulti->sequence = 100;
+    trigWorldMulti->keep_evaluating = true;
+    doc->m_automationRegistry->m_TriggerMap[trigWorldMulti->internal_name] = std::unique_ptr<Trigger>(trigWorldMulti);
+    doc->m_automationRegistry->m_triggersNeedSorting = true;
 
     // Create test line
     Line* multiLine = createTestLine("MultiPlugin test", 3);
@@ -582,12 +582,12 @@ TEST_F(PluginEvaluationTest, MultiplePluginsInSamePhaseEvaluatedInSequenceOrder)
 
     // Verify all triggers matched in correct order
     // Expected order: -10, -5, world, 0, 10, 15
-    EXPECT_EQ(trigNeg10Multi->nMatched, 1) << "Plugin seq=-10 trigger should have matched";
-    EXPECT_EQ(trigNeg5->nMatched, 1) << "Plugin seq=-5 trigger should have matched";
-    EXPECT_EQ(trigWorldMulti->nMatched, 1) << "World trigger should have matched";
-    EXPECT_EQ(trigZeroMulti->nMatched, 1) << "Plugin seq=0 trigger should have matched";
-    EXPECT_EQ(trigPos10Multi->nMatched, 1) << "Plugin seq=10 trigger should have matched";
-    EXPECT_EQ(trigPos15->nMatched, 1) << "Plugin seq=15 trigger should have matched";
+    EXPECT_EQ(trigNeg10Multi->matched, 1) << "Plugin seq=-10 trigger should have matched";
+    EXPECT_EQ(trigNeg5->matched, 1) << "Plugin seq=-5 trigger should have matched";
+    EXPECT_EQ(trigWorldMulti->matched, 1) << "World trigger should have matched";
+    EXPECT_EQ(trigZeroMulti->matched, 1) << "Plugin seq=0 trigger should have matched";
+    EXPECT_EQ(trigPos10Multi->matched, 1) << "Plugin seq=10 trigger should have matched";
+    EXPECT_EQ(trigPos15->matched, 1) << "Plugin seq=15 trigger should have matched";
 
     // Cleanup
     delete multiLine;

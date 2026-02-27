@@ -36,11 +36,12 @@ class LuaApiTest : public ::testing::Test {
         doc->m_mush_name = "Test World";
         doc->m_server = "test.mud.com";
         doc->m_port = 4000;
-        doc->m_iConnectPhase = eConnectConnectedToMud;
+        doc->m_connectionManager->m_iConnectPhase = eConnectConnectedToMud;
         doc->m_bUTF_8 = true;
 
         // Create initial line (needed for note() to work)
-        doc->m_currentLine = new Line(1, 80, 0, qRgb(192, 192, 192), qRgb(0, 0, 0), true);
+        doc->m_currentLine =
+            std::make_unique<Line>(1, 80, 0, qRgb(192, 192, 192), qRgb(0, 0, 0), true);
         auto initialStyle = std::make_unique<Style>();
         initialStyle->iLength = 0;
         initialStyle->iFlags = COLOUR_RGB;
@@ -109,10 +110,10 @@ TEST_F(LuaApiTest, WorldNote)
     executeLua("world.Note('Test note from Lua')");
 
     // Verify note was added to buffer
-    ASSERT_GE(doc->m_lineList.count(), 1) << "Note should be added to buffer";
+    ASSERT_GE(static_cast<int>(doc->m_lineList.size()), 1) << "Note should be added to buffer";
 
-    Line* lastLine = doc->m_lineList.last();
-    QString noteText = QString::fromUtf8(lastLine->text(), lastLine->len());
+    Line* lastLine = doc->m_lineList.back().get();
+    QString noteText = QString::fromUtf8(lastLine->text().data(), lastLine->text().size());
     EXPECT_TRUE(noteText.contains("Test note from Lua")) << "Note text should be correct";
 }
 
@@ -122,10 +123,10 @@ TEST_F(LuaApiTest, ColourNoteRGB)
     executeLua("world.ColourNote(0xFF0000, 0x000000, 'Red text')");
 
     // Verify colored note was added
-    ASSERT_GE(doc->m_lineList.count(), 1) << "Colored note should be added";
+    ASSERT_GE(static_cast<int>(doc->m_lineList.size()), 1) << "Colored note should be added";
 
-    Line* coloredLine = doc->m_lineList.last();
-    QString coloredText = QString::fromUtf8(coloredLine->text(), coloredLine->len());
+    Line* coloredLine = doc->m_lineList.back().get();
+    QString coloredText = QString::fromUtf8(coloredLine->text().data(), coloredLine->text().size());
     EXPECT_TRUE(coloredText.contains("Red text")) << "Colored note text should be correct";
 }
 
@@ -134,8 +135,9 @@ TEST_F(LuaApiTest, ColourNoteNames)
 {
     executeLua("world.ColourNote('red', 'black', 'Red by name')");
 
-    Line* namedColorLine = doc->m_lineList.last();
-    QString namedColorText = QString::fromUtf8(namedColorLine->text(), namedColorLine->len());
+    Line* namedColorLine = doc->m_lineList.back().get();
+    QString namedColorText =
+        QString::fromUtf8(namedColorLine->text().data(), namedColorLine->text().size());
     EXPECT_TRUE(namedColorText.contains("Red by name")) << "Color name note should work";
 }
 
@@ -144,8 +146,9 @@ TEST_F(LuaApiTest, ColourNoteMultiBlock)
 {
     executeLua("world.ColourNote('red', 'black', 'Error: ', 'yellow', 'black', 'Warning!')");
 
-    Line* multiBlockLine = doc->m_lineList.last();
-    QString multiBlockText = QString::fromUtf8(multiBlockLine->text(), multiBlockLine->len());
+    Line* multiBlockLine = doc->m_lineList.back().get();
+    QString multiBlockText =
+        QString::fromUtf8(multiBlockLine->text().data(), multiBlockLine->text().size());
     EXPECT_TRUE(multiBlockText.contains("Error:")) << "Multi-block should contain first part";
     EXPECT_TRUE(multiBlockText.contains("Warning!")) << "Multi-block should contain second part";
 }
@@ -245,8 +248,8 @@ TEST_F(LuaApiTest, NoteMultipleParameters)
 {
     executeLua("world.Note('HP: ', 100, '/', 150)");
 
-    Line* multiLine = doc->m_lineList.last();
-    QString multiText = QString::fromUtf8(multiLine->text(), multiLine->len());
+    Line* multiLine = doc->m_lineList.back().get();
+    QString multiText = QString::fromUtf8(multiLine->text().data(), multiLine->text().size());
     EXPECT_TRUE(multiText.contains("HP: 100/150")) << "Multiple parameters should be concatenated";
 }
 
@@ -260,8 +263,9 @@ TEST_F(LuaApiTest, ColourTellMultiColor)
         world.Note('')  -- Complete the line
     )");
 
-    Line* multiColorLine = doc->m_lineList.last();
-    QString multiColorText = QString::fromUtf8(multiColorLine->text(), multiColorLine->len());
+    Line* multiColorLine = doc->m_lineList.back().get();
+    QString multiColorText =
+        QString::fromUtf8(multiColorLine->text().data(), multiColorLine->text().size());
     EXPECT_TRUE(multiColorText.contains("Yellow")) << "Multi-color line should contain 'Yellow'";
     EXPECT_TRUE(multiColorText.contains("Magenta")) << "Multi-color line should contain 'Magenta'";
     EXPECT_TRUE(multiColorText.contains("Cyan")) << "Multi-color line should contain 'Cyan'";
@@ -271,21 +275,21 @@ TEST_F(LuaApiTest, ColourTellMultiColor)
 TEST_F(LuaApiTest, SendErrorCodes)
 {
     // Test Send() when connected - should return eOK
-    doc->m_iConnectPhase = eConnectConnectedToMud;
+    doc->m_connectionManager->m_iConnectPhase = eConnectConnectedToMud;
     doc->m_bPluginProcessingSent = false;
     executeLua("result_ok = world.Send('test command')");
     double resultOk = getGlobalNumber("result_ok");
     EXPECT_EQ(resultOk, 0.0) << "Send() should return eOK (0) when connected";
 
     // Test Send() when not connected - should return eWorldClosed
-    doc->m_iConnectPhase = eConnectNotConnected;
+    doc->m_connectionManager->m_iConnectPhase = eConnectNotConnected;
     executeLua("result_closed = world.Send('test command')");
     double resultClosed = getGlobalNumber("result_closed");
     EXPECT_EQ(resultClosed, 30002.0)
         << "Send() should return eWorldClosed (30002) when not connected";
 
     // Test Send() when plugin is processing - should return eItemInUse
-    doc->m_iConnectPhase = eConnectConnectedToMud;
+    doc->m_connectionManager->m_iConnectPhase = eConnectConnectedToMud;
     doc->m_bPluginProcessingSent = true;
     executeLua("result_in_use = world.Send('test command')");
     double resultInUse = getGlobalNumber("result_in_use");
@@ -297,13 +301,13 @@ TEST_F(LuaApiTest, SendErrorCodes)
 TEST_F(LuaApiTest, ConnectErrorCodes)
 {
     // Test Connect() when not connected - should return eOK
-    doc->m_iConnectPhase = eConnectNotConnected;
+    doc->m_connectionManager->m_iConnectPhase = eConnectNotConnected;
     executeLua("result_ok = world.Connect()");
     double resultOk = getGlobalNumber("result_ok");
     EXPECT_EQ(resultOk, 0.0) << "Connect() should return eOK (0) when not connected";
 
     // Test Connect() when already connected - should return eWorldOpen
-    doc->m_iConnectPhase = eConnectConnectedToMud;
+    doc->m_connectionManager->m_iConnectPhase = eConnectConnectedToMud;
     executeLua("result_open = world.Connect()");
     double resultOpen = getGlobalNumber("result_open");
     EXPECT_EQ(resultOpen, 30001.0)
@@ -314,20 +318,20 @@ TEST_F(LuaApiTest, ConnectErrorCodes)
 TEST_F(LuaApiTest, DisconnectErrorCodes)
 {
     // Test Disconnect() when connected - should return eOK
-    doc->m_iConnectPhase = eConnectConnectedToMud;
+    doc->m_connectionManager->m_iConnectPhase = eConnectConnectedToMud;
     executeLua("result_ok = world.Disconnect()");
     double resultOk = getGlobalNumber("result_ok");
     EXPECT_EQ(resultOk, 0.0) << "Disconnect() should return eOK (0) when connected";
 
     // Test Disconnect() when not connected - should return eWorldClosed
-    doc->m_iConnectPhase = eConnectNotConnected;
+    doc->m_connectionManager->m_iConnectPhase = eConnectNotConnected;
     executeLua("result_closed = world.Disconnect()");
     double resultClosed = getGlobalNumber("result_closed");
     EXPECT_EQ(resultClosed, 30002.0)
         << "Disconnect() should return eWorldClosed (30002) when not connected";
 
     // Test Disconnect() when disconnecting - should return eWorldClosed
-    doc->m_iConnectPhase = eConnectDisconnecting;
+    doc->m_connectionManager->m_iConnectPhase = eConnectDisconnecting;
     executeLua("result_disconnecting = world.Disconnect()");
     double resultDisconnecting = getGlobalNumber("result_disconnecting");
     EXPECT_EQ(resultDisconnecting, 30002.0)

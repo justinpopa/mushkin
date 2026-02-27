@@ -62,7 +62,8 @@ extern "C" {
  *
  * @example
  * -- Regex trigger with script callback
- * AddTrigger("mob_enters", "^(\\w+) arrives from", "", eEnabled + eAliasRegularExpression, 0, 0, "", "OnMobEnters", 0, 100)
+ * AddTrigger("mob_enters", "^(\\w+) arrives from", "", eEnabled + eAliasRegularExpression, 0, 0,
+ * "", "OnMobEnters", 0, 100)
  *
  * @see AddTriggerEx, DeleteTrigger, EnableTrigger, GetTrigger
  */
@@ -96,20 +97,29 @@ int L_AddTrigger(lua_State* L)
     Plugin* currentPlugin = plugin(L);
     bool replace = (flags & eReplace) != 0;
     if (currentPlugin) {
-        if (currentPlugin->m_TriggerMap.find(qName) != currentPlugin->m_TriggerMap.end()) {
+        auto it = currentPlugin->m_TriggerMap.find(qName);
+        if (it != currentPlugin->m_TriggerMap.end()) {
             if (!replace) {
                 return luaReturnError(L, eTriggerAlreadyExists);
             }
+            // Cannot replace a trigger whose script is currently executing (use-after-free guard)
+            if (it->second->executing_script) {
+                return luaReturnError(L, eItemInUse);
+            }
             // Delete existing trigger for replacement
-            currentPlugin->m_TriggerMap.erase(qName);
+            currentPlugin->m_TriggerMap.erase(it);
         }
     } else {
-        if (pDoc->getTrigger(qName)) {
+        Trigger* existing = pDoc->getTrigger(qName);
+        if (existing) {
             if (!replace) {
                 return luaReturnError(L, eTriggerAlreadyExists);
             }
-            // Delete existing trigger for replacement
-            pDoc->deleteTrigger(qName);
+            // Cannot replace a trigger whose script is currently executing (use-after-free guard)
+            if (existing->executing_script) {
+                return luaReturnError(L, eItemInUse);
+            }
+            (void)pDoc->deleteTrigger(qName); // safe: already checked executing_script
         }
     }
 
@@ -130,30 +140,30 @@ int L_AddTrigger(lua_State* L)
 
     // Create trigger
     auto trigger = std::make_unique<Trigger>();
-    trigger->strLabel = qName;
-    trigger->strInternalName = qName;
+    trigger->label = qName;
+    trigger->internal_name = qName;
     trigger->trigger = qMatch;
     trigger->contents = QString::fromUtf8(response);
-    trigger->bEnabled = (flags & eEnabled) != 0;
-    trigger->bOmitFromOutput = (flags & eAliasOmitFromOutput) != 0;
+    trigger->enabled = (flags & eEnabled) != 0;
+    trigger->omit_from_output = (flags & eAliasOmitFromOutput) != 0;
     trigger->omit_from_log = (flags & eOmitFromLogFile) != 0;
-    // Note: bKeepEvaluating defaults to true (MUSHclient behavior)
+    // Note: keep_evaluating defaults to true (MUSHclient behavior)
     // The eKeepEvaluating flag is only used to explicitly request keeping evaluation
     // When not set, we keep the default (true) rather than forcing false
     if (flags & eKeepEvaluating) {
-        trigger->bKeepEvaluating = true;
+        trigger->keep_evaluating = true;
     }
     // else: keep the default from Trigger constructor (true)
-    trigger->bRegexp = (flags & eAliasRegularExpression) != 0;
+    trigger->use_regexp = (flags & eAliasRegularExpression) != 0;
     trigger->ignore_case = (flags & eIgnoreAliasCase) != 0;
-    trigger->bExpandVariables = (flags & eExpandVariables) != 0;
-    trigger->bTemporary = (flags & eTemporary) != 0;
-    trigger->bOneShot = (flags & eAliasOneShot) != 0;
+    trigger->expand_variables = (flags & eExpandVariables) != 0;
+    trigger->temporary = (flags & eTemporary) != 0;
+    trigger->one_shot = (flags & eAliasOneShot) != 0;
     trigger->colour = color;
     trigger->sound_to_play = QString::fromUtf8(sound_file);
-    trigger->strProcedure = QString::fromUtf8(script);
-    trigger->iSendTo = send_to;
-    trigger->iSequence = sequence;
+    trigger->procedure = QString::fromUtf8(script);
+    trigger->send_to = send_to;
+    trigger->sequence = sequence;
 
     // Add to appropriate trigger map (plugin or world)
     if (currentPlugin) {
@@ -165,7 +175,7 @@ int L_AddTrigger(lua_State* L)
             currentPlugin->m_TriggerArray.push_back(t.get());
         }
     } else {
-        if (!pDoc->addTrigger(qName, std::move(trigger))) {
+        if (!pDoc->addTrigger(qName, std::move(trigger)).has_value()) {
             return luaReturnError(L, eTriggerAlreadyExists);
         }
     }
@@ -198,7 +208,7 @@ int L_DeleteTrigger(lua_State* L)
 
     QString qName = QString::fromUtf8(name);
 
-    if (!pDoc->deleteTrigger(qName)) {
+    if (!pDoc->deleteTrigger(qName).has_value()) {
         return luaReturnError(L, eTriggerNotFound);
     }
 
@@ -280,19 +290,19 @@ int L_GetTrigger(lua_State* L)
     int flags = 0;
     if (trigger->ignore_case)
         flags |= eIgnoreCase;
-    if (trigger->bOmitFromOutput)
+    if (trigger->omit_from_output)
         flags |= eOmitFromOutput;
-    if (trigger->bKeepEvaluating)
+    if (trigger->keep_evaluating)
         flags |= eKeepEvaluating;
     if (trigger->omit_from_log)
         flags |= eOmitFromLog;
-    if (trigger->bEnabled)
+    if (trigger->enabled)
         flags |= eEnabled;
-    if (trigger->bRegexp)
+    if (trigger->use_regexp)
         flags |= eTriggerRegularExpression;
-    if (trigger->bLowercaseWildcard)
+    if (trigger->lowercase_wildcard)
         flags |= eLowercaseWildcard;
-    if (trigger->bOneShot)
+    if (trigger->one_shot)
         flags |= eTriggerOneShot;
 
     // Return: error_code, match, response, flags, colour, wildcard, sound, script
@@ -301,9 +311,9 @@ int L_GetTrigger(lua_State* L)
     lua_pushstring(L, trigger->contents.toUtf8().constData());
     lua_pushnumber(L, flags);
     lua_pushnumber(L, trigger->colour == -1 ? -1 : trigger->colour);
-    lua_pushnumber(L, trigger->iClipboardArg);
+    lua_pushnumber(L, trigger->clipboard_arg);
     lua_pushstring(L, trigger->sound_to_play.toUtf8().constData());
-    lua_pushstring(L, trigger->strProcedure.toUtf8().constData());
+    lua_pushstring(L, trigger->procedure.toUtf8().constData());
 
     return 8;
 }
@@ -344,7 +354,7 @@ int L_EnableTrigger(lua_State* L)
         return luaReturnError(L, eTriggerNotFound);
     }
 
-    trigger->bEnabled = enabled;
+    trigger->enabled = enabled;
     return luaReturnOK(L);
 }
 
@@ -444,97 +454,97 @@ int L_GetTriggerInfo(lua_State* L)
             QByteArray ba = trigger->sound_to_play.toUtf8();
             lua_pushlstring(L, ba.constData(), ba.length());
         } break;
-        case 4: // strProcedure (script name)
+        case 4: // procedure (script name)
         {
-            QByteArray ba = trigger->strProcedure.toUtf8();
+            QByteArray ba = trigger->procedure.toUtf8();
             lua_pushlstring(L, ba.constData(), ba.length());
         } break;
         case 5: // omit_from_log
             lua_pushboolean(L, trigger->omit_from_log);
             break;
-        case 6: // bOmitFromOutput
-            lua_pushboolean(L, trigger->bOmitFromOutput);
+        case 6: // omit_from_output
+            lua_pushboolean(L, trigger->omit_from_output);
             break;
-        case 7: // bKeepEvaluating
-            lua_pushboolean(L, trigger->bKeepEvaluating);
+        case 7: // keep_evaluating
+            lua_pushboolean(L, trigger->keep_evaluating);
             break;
-        case 8: // bEnabled
-            lua_pushboolean(L, trigger->bEnabled);
+        case 8: // enabled
+            lua_pushboolean(L, trigger->enabled);
             break;
-        case 9: // bRegexp
-            lua_pushboolean(L, trigger->bRegexp);
+        case 9: // use_regexp
+            lua_pushboolean(L, trigger->use_regexp);
             break;
         case 10: // ignore_case
             lua_pushboolean(L, trigger->ignore_case);
             break;
-        case 11: // bRepeat
-            lua_pushboolean(L, trigger->bRepeat);
+        case 11: // repeat
+            lua_pushboolean(L, trigger->repeat);
             break;
-        case 12: // bSoundIfInactive
-            lua_pushboolean(L, trigger->bSoundIfInactive);
+        case 12: // sound_if_inactive
+            lua_pushboolean(L, trigger->sound_if_inactive);
             break;
-        case 13: // bExpandVariables
-            lua_pushboolean(L, trigger->bExpandVariables);
+        case 13: // expand_variables
+            lua_pushboolean(L, trigger->expand_variables);
             break;
-        case 14: // iClipboardArg
-            lua_pushnumber(L, trigger->iClipboardArg);
+        case 14: // clipboard_arg
+            lua_pushnumber(L, trigger->clipboard_arg);
             break;
-        case 15: // iSendTo
-            lua_pushnumber(L, trigger->iSendTo);
+        case 15: // send_to
+            lua_pushnumber(L, trigger->send_to);
             break;
-        case 16: // iSequence
-            lua_pushnumber(L, trigger->iSequence);
+        case 16: // sequence
+            lua_pushnumber(L, trigger->sequence);
             break;
-        case 17: // iMatch
-            lua_pushnumber(L, trigger->iMatch);
+        case 17: // match_type
+            lua_pushnumber(L, trigger->match_type);
             break;
-        case 18: // iStyle
-            lua_pushnumber(L, trigger->iStyle);
+        case 18: // style
+            lua_pushnumber(L, trigger->style);
             break;
         case 19: // colour
             lua_pushnumber(L, trigger->colour);
             break;
-        case 20: // nInvocationCount
-            lua_pushnumber(L, trigger->nInvocationCount);
+        case 20: // invocation_count
+            lua_pushnumber(L, trigger->invocation_count);
             break;
-        case 21: // nMatched
-            lua_pushnumber(L, trigger->nMatched);
+        case 21: // matched
+            lua_pushnumber(L, trigger->matched);
             break;
-        case 22: // tWhenMatched
-            if (trigger->tWhenMatched.isValid()) {
+        case 22: // when_matched
+            if (trigger->when_matched.isValid()) {
                 // Return as Unix timestamp (seconds since epoch)
-                lua_pushnumber(L, trigger->tWhenMatched.toSecsSinceEpoch());
+                lua_pushnumber(L, trigger->when_matched.toSecsSinceEpoch());
             } else {
                 lua_pushnil(L); // Return nil if never matched
             }
             break;
-        case 23: // bTemporary
-            lua_pushboolean(L, trigger->bTemporary);
+        case 23: // temporary
+            lua_pushboolean(L, trigger->temporary);
             break;
-        case 24: // bIncluded
-            lua_pushboolean(L, trigger->bIncluded);
+        case 24: // included
+            lua_pushboolean(L, trigger->included);
             break;
-        case 25: // bLowercaseWildcard
-            lua_pushboolean(L, trigger->bLowercaseWildcard);
+        case 25: // lowercase_wildcard
+            lua_pushboolean(L, trigger->lowercase_wildcard);
             break;
-        case 26: // strGroup
+        case 26: // group
         {
-            QByteArray ba = trigger->strGroup.toUtf8();
+            QByteArray ba = trigger->group.toUtf8();
             lua_pushlstring(L, ba.constData(), ba.length());
         } break;
-        case 27: // strVariable
+        case 27: // variable
         {
-            QByteArray ba = trigger->strVariable.toUtf8();
+            QByteArray ba = trigger->variable.toUtf8();
             lua_pushlstring(L, ba.constData(), ba.length());
         } break;
-        case 28: // iUserOption
-            lua_pushnumber(L, trigger->iUserOption);
+        case 28: // user_option
+            lua_pushnumber(L, trigger->user_option);
             break;
-        case 29: // iOtherForeground
-            lua_pushnumber(L, trigger->iOtherForeground);
+        case 29: // other_foreground
+            lua_pushnumber(L, trigger->other_foreground);
             break;
-        case 30: // iOtherBackground
-            lua_pushnumber(L, trigger->iOtherBackground);
+        case 30: // other_background
+            lua_pushnumber(L, trigger->other_background);
             break;
         case 31: // regexp match count
             if (trigger->regexp) {
@@ -553,8 +563,8 @@ int L_GetTriggerInfo(lua_State* L)
                 lua_pushstring(L, "");
             }
             break;
-        case 33: // bExecutingScript
-            lua_pushboolean(L, trigger->bExecutingScript);
+        case 33: // executing_script
+            lua_pushboolean(L, trigger->executing_script);
             break;
         case 34: // has script (dispid != DISPID_UNKNOWN)
             lua_pushboolean(L, trigger->dispid != -1);
@@ -563,8 +573,8 @@ int L_GetTriggerInfo(lua_State* L)
             // We don't track regexp errors in Qt (always 0)
             lua_pushnumber(L, 0);
             break;
-        case 36: // bOneShot
-            lua_pushboolean(L, trigger->bOneShot);
+        case 36: // one_shot
+            lua_pushboolean(L, trigger->one_shot);
             break;
         case 37: // regexp execution time
             // We don't track execution time (always 0)
@@ -626,7 +636,7 @@ int L_GetTriggerList(lua_State* L)
 
     lua_newtable(L);
     int i = 1;
-    for (const auto& [name, triggerPtr] : pDoc->m_TriggerMap) {
+    for (const auto& [name, triggerPtr] : pDoc->m_automationRegistry->m_TriggerMap) {
         QByteArray ba = name.toUtf8();
         lua_pushlstring(L, ba.constData(), ba.length());
         lua_rawseti(L, -2, i++);
@@ -742,96 +752,96 @@ int L_GetPluginTriggerInfo(lua_State* L)
             QByteArray ba = trigger->sound_to_play.toUtf8();
             lua_pushlstring(L, ba.constData(), ba.length());
         } break;
-        case 4: // strProcedure (script name)
+        case 4: // procedure (script name)
         {
-            QByteArray ba = trigger->strProcedure.toUtf8();
+            QByteArray ba = trigger->procedure.toUtf8();
             lua_pushlstring(L, ba.constData(), ba.length());
         } break;
         case 5: // omit_from_log
             lua_pushboolean(L, trigger->omit_from_log);
             break;
-        case 6: // bOmitFromOutput
-            lua_pushboolean(L, trigger->bOmitFromOutput);
+        case 6: // omit_from_output
+            lua_pushboolean(L, trigger->omit_from_output);
             break;
-        case 7: // bKeepEvaluating
-            lua_pushboolean(L, trigger->bKeepEvaluating);
+        case 7: // keep_evaluating
+            lua_pushboolean(L, trigger->keep_evaluating);
             break;
-        case 8: // bEnabled
-            lua_pushboolean(L, trigger->bEnabled);
+        case 8: // enabled
+            lua_pushboolean(L, trigger->enabled);
             break;
-        case 9: // bRegexp
-            lua_pushboolean(L, trigger->bRegexp);
+        case 9: // use_regexp
+            lua_pushboolean(L, trigger->use_regexp);
             break;
         case 10: // ignore_case
             lua_pushboolean(L, trigger->ignore_case);
             break;
-        case 11: // bRepeat
-            lua_pushboolean(L, trigger->bRepeat);
+        case 11: // repeat
+            lua_pushboolean(L, trigger->repeat);
             break;
-        case 12: // bSoundIfInactive
-            lua_pushboolean(L, trigger->bSoundIfInactive);
+        case 12: // sound_if_inactive
+            lua_pushboolean(L, trigger->sound_if_inactive);
             break;
-        case 13: // bExpandVariables
-            lua_pushboolean(L, trigger->bExpandVariables);
+        case 13: // expand_variables
+            lua_pushboolean(L, trigger->expand_variables);
             break;
-        case 14: // iClipboardArg
-            lua_pushnumber(L, trigger->iClipboardArg);
+        case 14: // clipboard_arg
+            lua_pushnumber(L, trigger->clipboard_arg);
             break;
-        case 15: // iSendTo
-            lua_pushnumber(L, trigger->iSendTo);
+        case 15: // send_to
+            lua_pushnumber(L, trigger->send_to);
             break;
-        case 16: // iSequence
-            lua_pushnumber(L, trigger->iSequence);
+        case 16: // sequence
+            lua_pushnumber(L, trigger->sequence);
             break;
-        case 17: // iMatch
-            lua_pushnumber(L, trigger->iMatch);
+        case 17: // match_type
+            lua_pushnumber(L, trigger->match_type);
             break;
-        case 18: // iStyle
-            lua_pushnumber(L, trigger->iStyle);
+        case 18: // style
+            lua_pushnumber(L, trigger->style);
             break;
         case 19: // colour
             lua_pushnumber(L, trigger->colour);
             break;
-        case 20: // nInvocationCount
-            lua_pushnumber(L, trigger->nInvocationCount);
+        case 20: // invocation_count
+            lua_pushnumber(L, trigger->invocation_count);
             break;
-        case 21: // nMatched
-            lua_pushnumber(L, trigger->nMatched);
+        case 21: // matched
+            lua_pushnumber(L, trigger->matched);
             break;
-        case 22: // tWhenMatched
-            if (trigger->tWhenMatched.isValid()) {
-                lua_pushnumber(L, trigger->tWhenMatched.toSecsSinceEpoch());
+        case 22: // when_matched
+            if (trigger->when_matched.isValid()) {
+                lua_pushnumber(L, trigger->when_matched.toSecsSinceEpoch());
             } else {
                 lua_pushnil(L);
             }
             break;
-        case 23: // bTemporary
-            lua_pushboolean(L, trigger->bTemporary);
+        case 23: // temporary
+            lua_pushboolean(L, trigger->temporary);
             break;
-        case 24: // bIncluded
-            lua_pushboolean(L, trigger->bIncluded);
+        case 24: // included
+            lua_pushboolean(L, trigger->included);
             break;
-        case 25: // bLowercaseWildcard
-            lua_pushboolean(L, trigger->bLowercaseWildcard);
+        case 25: // lowercase_wildcard
+            lua_pushboolean(L, trigger->lowercase_wildcard);
             break;
-        case 26: // strGroup
+        case 26: // group
         {
-            QByteArray ba = trigger->strGroup.toUtf8();
+            QByteArray ba = trigger->group.toUtf8();
             lua_pushlstring(L, ba.constData(), ba.length());
         } break;
-        case 27: // strVariable
+        case 27: // variable
         {
-            QByteArray ba = trigger->strVariable.toUtf8();
+            QByteArray ba = trigger->variable.toUtf8();
             lua_pushlstring(L, ba.constData(), ba.length());
         } break;
-        case 28: // iUserOption
-            lua_pushnumber(L, trigger->iUserOption);
+        case 28: // user_option
+            lua_pushnumber(L, trigger->user_option);
             break;
-        case 29: // iOtherForeground
-            lua_pushnumber(L, trigger->iOtherForeground);
+        case 29: // other_foreground
+            lua_pushnumber(L, trigger->other_foreground);
             break;
-        case 30: // iOtherBackground
-            lua_pushnumber(L, trigger->iOtherBackground);
+        case 30: // other_background
+            lua_pushnumber(L, trigger->other_background);
             break;
         case 31: // regexp match count
             if (trigger->regexp) {
@@ -848,8 +858,8 @@ int L_GetPluginTriggerInfo(lua_State* L)
                 lua_pushstring(L, "");
             }
             break;
-        case 33: // bExecutingScript
-            lua_pushboolean(L, trigger->bExecutingScript);
+        case 33: // executing_script
+            lua_pushboolean(L, trigger->executing_script);
             break;
         case 34: // has script (dispid != DISPID_UNKNOWN)
             lua_pushboolean(L, trigger->dispid != -1);
@@ -857,8 +867,8 @@ int L_GetPluginTriggerInfo(lua_State* L)
         case 35: // regexp execution error
             lua_pushnumber(L, 0);
             break;
-        case 36: // bOneShot
-            lua_pushboolean(L, trigger->bOneShot);
+        case 36: // one_shot
+            lua_pushboolean(L, trigger->one_shot);
             break;
         case 37: // regexp execution time
             lua_pushnumber(L, 0);
@@ -945,11 +955,11 @@ int L_GetPluginTriggerOption(lua_State* L)
     if (trigger) {
         QString option = QString::fromUtf8(optionName);
         if (option == "enabled") {
-            lua_pushboolean(L, trigger->bEnabled);
+            lua_pushboolean(L, trigger->enabled);
         } else if (option == "keep_evaluating") {
-            lua_pushboolean(L, trigger->bKeepEvaluating);
+            lua_pushboolean(L, trigger->keep_evaluating);
         } else if (option == "sequence") {
-            lua_pushnumber(L, trigger->iSequence);
+            lua_pushnumber(L, trigger->sequence);
         } else {
             lua_pushnil(L);
         }
@@ -1045,10 +1055,10 @@ int L_EnableTriggerGroup(lua_State* L)
     long count = 0;
 
     // Iterate through all triggers
-    for (const auto& [name, triggerPtr] : pDoc->m_TriggerMap) {
+    for (const auto& [name, triggerPtr] : pDoc->m_automationRegistry->m_TriggerMap) {
         Trigger* trigger = triggerPtr.get();
-        if (trigger && trigger->strGroup == qGroupName) {
-            trigger->bEnabled = enabled;
+        if (trigger && trigger->group == qGroupName) {
+            trigger->enabled = enabled;
             count++;
         }
     }
@@ -1057,8 +1067,8 @@ int L_EnableTriggerGroup(lua_State* L)
     if (pDoc->m_CurrentPlugin) {
         for (const auto& [name, triggerPtr] : pDoc->m_CurrentPlugin->m_TriggerMap) {
             Trigger* trigger = triggerPtr.get();
-            if (trigger && trigger->strGroup == qGroupName) {
-                trigger->bEnabled = enabled;
+            if (trigger && trigger->group == qGroupName) {
+                trigger->enabled = enabled;
                 count++;
             }
         }
@@ -1116,65 +1126,65 @@ int L_GetTriggerOption(lua_State* L)
 
     // Numeric options
     if (qOption == "clipboard_arg") {
-        lua_pushnumber(L, trigger->iClipboardArg);
+        lua_pushnumber(L, trigger->clipboard_arg);
     } else if (qOption == "colour_change_type") {
-        lua_pushnumber(L, trigger->iColourChangeType);
+        lua_pushnumber(L, trigger->colour_change_type);
     } else if (qOption == "custom_colour") {
         lua_pushnumber(L, trigger->colour);
     } else if (qOption == "lines_to_match") {
-        lua_pushnumber(L, trigger->iLinesToMatch);
+        lua_pushnumber(L, trigger->lines_to_match);
     } else if (qOption == "match_style") {
-        lua_pushnumber(L, trigger->iMatch);
+        lua_pushnumber(L, trigger->match_type);
     } else if (qOption == "new_style") {
-        lua_pushnumber(L, trigger->iStyle);
+        lua_pushnumber(L, trigger->style);
     } else if (qOption == "other_text_colour") {
-        lua_pushnumber(L, trigger->iOtherForeground);
+        lua_pushnumber(L, trigger->other_foreground);
     } else if (qOption == "other_back_colour") {
-        lua_pushnumber(L, trigger->iOtherBackground);
+        lua_pushnumber(L, trigger->other_background);
     } else if (qOption == "send_to") {
-        lua_pushnumber(L, trigger->iSendTo);
+        lua_pushnumber(L, trigger->send_to);
     } else if (qOption == "sequence") {
-        lua_pushnumber(L, trigger->iSequence);
+        lua_pushnumber(L, trigger->sequence);
     } else if (qOption == "user") {
-        lua_pushnumber(L, trigger->iUserOption);
+        lua_pushnumber(L, trigger->user_option);
     }
     // Boolean options
     else if (qOption == "enabled") {
-        lua_pushboolean(L, trigger->bEnabled);
+        lua_pushboolean(L, trigger->enabled);
     } else if (qOption == "expand_variables") {
-        lua_pushboolean(L, trigger->bExpandVariables);
+        lua_pushboolean(L, trigger->expand_variables);
     } else if (qOption == "ignore_case") {
         lua_pushboolean(L, trigger->ignore_case);
     } else if (qOption == "keep_evaluating") {
-        lua_pushboolean(L, trigger->bKeepEvaluating);
+        lua_pushboolean(L, trigger->keep_evaluating);
     } else if (qOption == "multi_line") {
-        lua_pushboolean(L, trigger->bMultiLine);
+        lua_pushboolean(L, trigger->multi_line);
     } else if (qOption == "omit_from_log") {
         lua_pushboolean(L, trigger->omit_from_log);
     } else if (qOption == "omit_from_output") {
-        lua_pushboolean(L, trigger->bOmitFromOutput);
+        lua_pushboolean(L, trigger->omit_from_output);
     } else if (qOption == "regexp") {
-        lua_pushboolean(L, trigger->bRegexp);
+        lua_pushboolean(L, trigger->use_regexp);
     } else if (qOption == "repeat") {
-        lua_pushboolean(L, trigger->bRepeat);
+        lua_pushboolean(L, trigger->repeat);
     } else if (qOption == "sound_if_inactive") {
-        lua_pushboolean(L, trigger->bSoundIfInactive);
+        lua_pushboolean(L, trigger->sound_if_inactive);
     } else if (qOption == "lowercase_wildcard") {
-        lua_pushboolean(L, trigger->bLowercaseWildcard);
+        lua_pushboolean(L, trigger->lowercase_wildcard);
     } else if (qOption == "temporary") {
-        lua_pushboolean(L, trigger->bTemporary);
+        lua_pushboolean(L, trigger->temporary);
     } else if (qOption == "one_shot") {
-        lua_pushboolean(L, trigger->bOneShot);
+        lua_pushboolean(L, trigger->one_shot);
     }
     // String options
     else if (qOption == "group") {
-        QByteArray ba = trigger->strGroup.toUtf8();
+        QByteArray ba = trigger->group.toUtf8();
         lua_pushlstring(L, ba.constData(), ba.length());
     } else if (qOption == "match") {
         QByteArray ba = trigger->trigger.toUtf8();
         lua_pushlstring(L, ba.constData(), ba.length());
     } else if (qOption == "script") {
-        QByteArray ba = trigger->strProcedure.toUtf8();
+        QByteArray ba = trigger->procedure.toUtf8();
         lua_pushlstring(L, ba.constData(), ba.length());
     } else if (qOption == "sound") {
         QByteArray ba = trigger->sound_to_play.toUtf8();
@@ -1183,7 +1193,7 @@ int L_GetTriggerOption(lua_State* L)
         QByteArray ba = trigger->contents.toUtf8();
         lua_pushlstring(L, ba.constData(), ba.length());
     } else if (qOption == "variable") {
-        QByteArray ba = trigger->strVariable.toUtf8();
+        QByteArray ba = trigger->variable.toUtf8();
         lua_pushlstring(L, ba.constData(), ba.length());
     } else {
         lua_pushnil(L);
@@ -1252,28 +1262,28 @@ int L_SetTriggerOption(lua_State* L)
         long value = luaL_checknumber(L, 3);
 
         if (qOption == "clipboard_arg") {
-            trigger->iClipboardArg = value;
+            trigger->clipboard_arg = value;
         } else if (qOption == "colour_change_type") {
-            trigger->iColourChangeType = value;
+            trigger->colour_change_type = value;
         } else if (qOption == "custom_colour") {
             trigger->colour = value;
         } else if (qOption == "lines_to_match") {
-            trigger->iLinesToMatch = value;
+            trigger->lines_to_match = value;
         } else if (qOption == "match_style") {
-            trigger->iMatch = value;
+            trigger->match_type = value;
         } else if (qOption == "new_style") {
-            trigger->iStyle = value;
+            trigger->style = value;
         } else if (qOption == "other_text_colour") {
-            trigger->iOtherForeground = value;
+            trigger->other_foreground = value;
         } else if (qOption == "other_back_colour") {
-            trigger->iOtherBackground = value;
+            trigger->other_background = value;
         } else if (qOption == "send_to") {
-            trigger->iSendTo = value;
+            trigger->send_to = value;
         } else if (qOption == "sequence") {
-            trigger->iSequence = value;
+            trigger->sequence = value;
             // TODO: Re-sort triggers
         } else if (qOption == "user") {
-            trigger->iUserOption = value;
+            trigger->user_option = value;
         }
     }
     // Boolean options
@@ -1285,33 +1295,33 @@ int L_SetTriggerOption(lua_State* L)
         bool value = lua_toboolean(L, 3);
 
         if (qOption == "enabled") {
-            trigger->bEnabled = value;
+            trigger->enabled = value;
         } else if (qOption == "expand_variables") {
-            trigger->bExpandVariables = value;
+            trigger->expand_variables = value;
         } else if (qOption == "ignore_case") {
             trigger->ignore_case = value;
-            trigger->compileRegexp(); // Recompile with new case sensitivity
+            (void)trigger->compileRegexp(); // Recompile with new case sensitivity
         } else if (qOption == "keep_evaluating") {
-            trigger->bKeepEvaluating = value;
+            trigger->keep_evaluating = value;
         } else if (qOption == "multi_line") {
-            trigger->bMultiLine = value;
-            trigger->compileRegexp(); // Recompile with new multiline setting
+            trigger->multi_line = value;
+            (void)trigger->compileRegexp(); // Recompile with new multiline setting
         } else if (qOption == "omit_from_log") {
             trigger->omit_from_log = value;
         } else if (qOption == "omit_from_output") {
-            trigger->bOmitFromOutput = value;
+            trigger->omit_from_output = value;
         } else if (qOption == "regexp") {
             return luaReturnError(L, ePluginCannotSetOption); // Cannot write
         } else if (qOption == "repeat") {
-            trigger->bRepeat = value;
+            trigger->repeat = value;
         } else if (qOption == "sound_if_inactive") {
-            trigger->bSoundIfInactive = value;
+            trigger->sound_if_inactive = value;
         } else if (qOption == "lowercase_wildcard") {
-            trigger->bLowercaseWildcard = value;
+            trigger->lowercase_wildcard = value;
         } else if (qOption == "temporary") {
-            trigger->bTemporary = value;
+            trigger->temporary = value;
         } else if (qOption == "one_shot") {
-            trigger->bOneShot = value;
+            trigger->one_shot = value;
         }
     }
     // String options
@@ -1321,22 +1331,22 @@ int L_SetTriggerOption(lua_State* L)
         QString qValue = QString::fromUtf8(value);
 
         if (qOption == "group") {
-            trigger->strGroup = qValue;
+            trigger->group = qValue;
         } else if (qOption == "match") {
             if (qValue.isEmpty()) {
                 return luaReturnError(L, eTriggerCannotBeEmpty);
             }
             trigger->trigger = qValue;
-            trigger->compileRegexp(); // Recompile with new pattern
+            (void)trigger->compileRegexp(); // Recompile with new pattern
         } else if (qOption == "script") {
-            trigger->strProcedure = qValue;
+            trigger->procedure = qValue;
             // TODO: Update dispid
         } else if (qOption == "sound") {
             trigger->sound_to_play = qValue;
         } else if (qOption == "send") {
             trigger->contents = qValue;
         } else if (qOption == "variable") {
-            trigger->strVariable = qValue;
+            trigger->variable = qValue;
         }
     } else {
         return luaReturnError(L, eUnknownOption);
@@ -1406,20 +1416,29 @@ int L_AddTriggerEx(lua_State* L)
     Plugin* currentPlugin = plugin(L);
     bool replace = (flags & eReplace) != 0;
     if (currentPlugin) {
-        if (currentPlugin->m_TriggerMap.find(qName) != currentPlugin->m_TriggerMap.end()) {
+        auto it = currentPlugin->m_TriggerMap.find(qName);
+        if (it != currentPlugin->m_TriggerMap.end()) {
             if (!replace) {
                 return luaReturnError(L, eTriggerAlreadyExists);
             }
+            // Cannot replace a trigger whose script is currently executing (use-after-free guard)
+            if (it->second->executing_script) {
+                return luaReturnError(L, eItemInUse);
+            }
             // Delete existing trigger for replacement
-            currentPlugin->m_TriggerMap.erase(qName);
+            currentPlugin->m_TriggerMap.erase(it);
         }
     } else {
-        if (pDoc->getTrigger(qName)) {
+        Trigger* existing = pDoc->getTrigger(qName);
+        if (existing) {
             if (!replace) {
                 return luaReturnError(L, eTriggerAlreadyExists);
             }
-            // Delete existing trigger for replacement
-            pDoc->deleteTrigger(qName);
+            // Cannot replace a trigger whose script is currently executing (use-after-free guard)
+            if (existing->executing_script) {
+                return luaReturnError(L, eItemInUse);
+            }
+            (void)pDoc->deleteTrigger(qName); // safe: already checked executing_script
         }
     }
 
@@ -1440,36 +1459,36 @@ int L_AddTriggerEx(lua_State* L)
 
     // Create trigger
     auto trigger = std::make_unique<Trigger>();
-    trigger->strLabel = qName;
-    trigger->strInternalName = qName;
+    trigger->label = qName;
+    trigger->internal_name = qName;
     trigger->trigger = qMatch;
     trigger->contents = QString::fromUtf8(response);
-    trigger->bEnabled = (flags & eEnabled) != 0;
-    trigger->bOmitFromOutput = (flags & eOmitFromOutput) != 0;
+    trigger->enabled = (flags & eEnabled) != 0;
+    trigger->omit_from_output = (flags & eOmitFromOutput) != 0;
     trigger->omit_from_log = (flags & eOmitFromLog) != 0;
-    // Note: bKeepEvaluating defaults to true (MUSHclient behavior)
+    // Note: keep_evaluating defaults to true (MUSHclient behavior)
     // The eKeepEvaluating flag is only used to explicitly request keeping evaluation
     // When not set, we keep the default (true) rather than forcing false
     if (flags & eKeepEvaluating) {
-        trigger->bKeepEvaluating = true;
+        trigger->keep_evaluating = true;
     }
     // else: keep the default from Trigger constructor (true)
-    trigger->bRegexp = (flags & eTriggerRegularExpression) != 0;
+    trigger->use_regexp = (flags & eTriggerRegularExpression) != 0;
     trigger->ignore_case = (flags & eIgnoreCase) != 0;
-    trigger->bExpandVariables = (flags & eExpandVariables) != 0;
-    trigger->bTemporary = (flags & eTemporary) != 0;
-    trigger->bLowercaseWildcard = (flags & eLowercaseWildcard) != 0;
-    trigger->bOneShot = (flags & eTriggerOneShot) != 0;
+    trigger->expand_variables = (flags & eExpandVariables) != 0;
+    trigger->temporary = (flags & eTemporary) != 0;
+    trigger->lowercase_wildcard = (flags & eLowercaseWildcard) != 0;
+    trigger->one_shot = (flags & eTriggerOneShot) != 0;
     trigger->colour = color;
-    trigger->iClipboardArg = wildcard;
+    trigger->clipboard_arg = wildcard;
     trigger->sound_to_play = QString::fromUtf8(sound_file);
-    trigger->strProcedure = QString::fromUtf8(script);
-    trigger->iSendTo = send_to;
-    trigger->iSequence = sequence;
-    trigger->strVariable = qName; // kludge from original
+    trigger->procedure = QString::fromUtf8(script);
+    trigger->send_to = send_to;
+    trigger->sequence = sequence;
+    trigger->variable = qName; // kludge from original
 
     // Compile regexp
-    if (!trigger->compileRegexp()) {
+    if (!trigger->compileRegexp().has_value()) {
         // unique_ptr will automatically delete on scope exit
         return luaReturnError(L, eBadRegularExpression);
     }
@@ -1484,7 +1503,7 @@ int L_AddTriggerEx(lua_State* L)
             currentPlugin->m_TriggerArray.push_back(t.get());
         }
     } else {
-        if (!pDoc->addTrigger(qName, std::move(trigger))) {
+        if (!pDoc->addTrigger(qName, std::move(trigger)).has_value()) {
             return luaReturnError(L, eTriggerAlreadyExists);
         }
     }
@@ -1518,15 +1537,15 @@ int L_DeleteTriggerGroup(lua_State* L)
     QStringList toDelete;
 
     // Find all triggers in this group
-    for (const auto& [name, triggerPtr] : pDoc->m_TriggerMap) {
-        if (triggerPtr->strGroup == qGroupName) {
+    for (const auto& [name, triggerPtr] : pDoc->m_automationRegistry->m_TriggerMap) {
+        if (triggerPtr->group == qGroupName) {
             toDelete.append(name);
         }
     }
 
     // Delete them
     for (const QString& name : toDelete) {
-        pDoc->deleteTrigger(name);
+        (void)pDoc->deleteTrigger(name); // intentional: bulk group/temporary delete
     }
 
     lua_pushnumber(L, toDelete.size());
@@ -1555,15 +1574,15 @@ int L_DeleteTemporaryTriggers(lua_State* L)
     QStringList toDelete;
 
     // Find all temporary triggers
-    for (const auto& [name, triggerPtr] : pDoc->m_TriggerMap) {
-        if (triggerPtr->bTemporary) {
+    for (const auto& [name, triggerPtr] : pDoc->m_automationRegistry->m_TriggerMap) {
+        if (triggerPtr->temporary) {
             toDelete.append(name);
         }
     }
 
     // Delete them
     for (const QString& name : toDelete) {
-        pDoc->deleteTrigger(name);
+        (void)pDoc->deleteTrigger(name); // intentional: bulk group/temporary delete
     }
 
     lua_pushnumber(L, toDelete.size());

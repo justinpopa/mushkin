@@ -139,7 +139,7 @@ void MapDialog::loadSettings()
 
     // Failure detection settings
     m_failurePatternEdit->setText(m_doc->m_strMappingFailure);
-    m_failureRegexpCheck->setChecked(m_doc->m_bMapFailureRegexp != 0);
+    m_failureRegexpCheck->setChecked(m_doc->m_bMapFailureRegexp);
 }
 
 void MapDialog::saveSettings()
@@ -156,7 +156,7 @@ void MapDialog::saveSettings()
 
     // Failure detection settings
     m_doc->m_strMappingFailure = m_failurePatternEdit->text();
-    m_doc->m_bMapFailureRegexp = m_failureRegexpCheck->isChecked() ? 1 : 0;
+    m_doc->m_bMapFailureRegexp = m_failureRegexpCheck->isChecked();
 
     // Pack the flags back into m_iFlags1
     m_doc->packFlags();
@@ -202,9 +202,6 @@ void MapDialog::onRemoveAllClicked()
         m_doc->m_strSpecialForwards.clear();
         m_doc->m_strSpecialBackwards.clear();
 
-        // TODO: Clear m_strMapList when implemented
-        // m_doc->m_strMapList->clear();
-
         updateDirectionDisplays();
 
         QMessageBox::information(this, "Mapper", "All mapper data has been removed.");
@@ -217,10 +214,9 @@ void MapDialog::onRemoveLastClicked()
         return;
 
     // TODO: Implement removing last mapper entry
-    // This would require access to m_strMapList to remove the last entry
     QMessageBox::information(this, "Remove Last",
                              "This feature will remove the last mapper entry.\n\n"
-                             "Implementation requires m_strMapList to be available.");
+                             "Mapper list is not yet implemented.");
 }
 
 void MapDialog::onSpecialMoveClicked()

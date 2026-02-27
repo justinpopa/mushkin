@@ -43,15 +43,15 @@ TEST_F(TriggersAliasesTest, TriggerDefaults)
 {
     Trigger* trigger = new Trigger();
 
-    EXPECT_TRUE(trigger->bEnabled) << "bEnabled should default to true";
-    EXPECT_EQ(trigger->iSequence, 100) << "iSequence should default to 100";
+    EXPECT_TRUE(trigger->enabled) << "enabled should default to true";
+    EXPECT_EQ(trigger->sequence, 100) << "sequence should default to 100";
     EXPECT_EQ(trigger->wildcards.size(), MAX_WILDCARDS)
         << "Wildcard vector should be allocated with MAX_WILDCARDS";
     EXPECT_EQ(trigger->regexp, nullptr) << "regexp pointer should be nullptr";
-    EXPECT_EQ(trigger->iSendTo, 0) << "iSendTo should default to eSendToWorld (0)";
+    EXPECT_EQ(trigger->send_to, 0) << "send_to should default to eSendToWorld (0)";
     EXPECT_EQ(trigger->dispid, -1) << "dispid should default to DISPID_UNKNOWN (-1)";
-    EXPECT_EQ(trigger->nMatched, 0) << "nMatched should be initialized to 0";
-    EXPECT_EQ(trigger->nInvocationCount, 0) << "nInvocationCount should be initialized to 0";
+    EXPECT_EQ(trigger->matched, 0) << "matched should be initialized to 0";
+    EXPECT_EQ(trigger->invocation_count, 0) << "invocation_count should be initialized to 0";
 
     delete trigger;
 }
@@ -61,8 +61,8 @@ TEST_F(TriggersAliasesTest, AliasDefaults)
 {
     auto alias = std::make_unique<Alias>();
 
-    EXPECT_TRUE(alias->bEnabled) << "bEnabled should default to true";
-    EXPECT_EQ(alias->iSequence, 100) << "iSequence should default to 100";
+    EXPECT_TRUE(alias->enabled) << "enabled should default to true";
+    EXPECT_EQ(alias->sequence, 100) << "sequence should default to 100";
     EXPECT_EQ(alias->wildcards.size(), MAX_WILDCARDS)
         << "Wildcard vector should be allocated with MAX_WILDCARDS";
     EXPECT_EQ(alias->regexp, nullptr) << "regexp pointer should be nullptr";
@@ -74,23 +74,23 @@ TEST_F(TriggersAliasesTest, AddTrigger)
 {
     Trigger* t1 = new Trigger();
     t1->trigger = "You have * hit points";
-    t1->strLabel = "hp_trigger";
-    t1->iSequence = 100;
+    t1->label = "hp_trigger";
+    t1->sequence = 100;
 
-    bool addResult = doc->addTrigger("hp_trigger", std::unique_ptr<Trigger>(t1));
+    auto addResult = doc->addTrigger("hp_trigger", std::unique_ptr<Trigger>(t1));
 
-    EXPECT_TRUE(addResult) << "addTrigger() should return true";
-    EXPECT_TRUE(doc->m_TriggerMap.find("hp_trigger") != doc->m_TriggerMap.end())
+    EXPECT_TRUE(addResult.has_value()) << "addTrigger() should succeed";
+    EXPECT_TRUE(doc->m_automationRegistry->m_TriggerMap.find("hp_trigger") != doc->m_automationRegistry->m_TriggerMap.end())
         << "Trigger should be in m_TriggerMap";
-    EXPECT_TRUE(doc->m_TriggerArray.contains(t1)) << "Trigger should be in m_TriggerArray";
-    EXPECT_EQ(t1->strInternalName, "hp_trigger") << "strInternalName should be set";
+    EXPECT_TRUE(doc->m_automationRegistry->m_TriggerArray.contains(t1)) << "Trigger should be in m_TriggerArray";
+    EXPECT_EQ(t1->internal_name, "hp_trigger") << "internal_name should be set";
 }
 
 // Test 4: Get trigger by name
 TEST_F(TriggersAliasesTest, GetTrigger)
 {
     Trigger* t1 = new Trigger();
-    t1->strLabel = "test_trigger";
+    t1->label = "test_trigger";
     doc->addTrigger("test_trigger", std::unique_ptr<Trigger>(t1));
 
     Trigger* retrieved = doc->getTrigger("test_trigger");
@@ -104,14 +104,15 @@ TEST_F(TriggersAliasesTest, GetTrigger)
 TEST_F(TriggersAliasesTest, DuplicateTriggerPrevention)
 {
     Trigger* t1 = new Trigger();
-    t1->strLabel = "duplicate_trigger";
+    t1->label = "duplicate_trigger";
     doc->addTrigger("duplicate_trigger", std::unique_ptr<Trigger>(t1));
 
     Trigger* duplicate = new Trigger();
-    bool duplicateResult =
+    auto duplicateResult =
         doc->addTrigger("duplicate_trigger", std::unique_ptr<Trigger>(duplicate));
 
-    EXPECT_FALSE(duplicateResult) << "addTrigger() should reject duplicate names";
+    EXPECT_FALSE(duplicateResult.has_value()) << "addTrigger() should reject duplicate names";
+    EXPECT_EQ(duplicateResult.error().type, WorldErrorType::AlreadyExists);
     // duplicate is automatically deleted by unique_ptr if not added
 }
 
@@ -119,48 +120,50 @@ TEST_F(TriggersAliasesTest, DuplicateTriggerPrevention)
 TEST_F(TriggersAliasesTest, TriggerSequenceSorting)
 {
     Trigger* t1 = new Trigger();
-    t1->strLabel = "hp_trigger";
-    t1->iSequence = 100;
+    t1->label = "hp_trigger";
+    t1->sequence = 100;
     doc->addTrigger("hp_trigger", std::unique_ptr<Trigger>(t1));
 
     Trigger* t2 = new Trigger();
-    t2->strLabel = "hunger_trigger";
-    t2->iSequence = 50; // Lower sequence = earlier
+    t2->label = "hunger_trigger";
+    t2->sequence = 50; // Lower sequence = earlier
     doc->addTrigger("hunger_trigger", std::unique_ptr<Trigger>(t2));
 
     Trigger* t3 = new Trigger();
-    t3->strLabel = "thirst_trigger";
-    t3->iSequence = 200; // Higher sequence = later
+    t3->label = "thirst_trigger";
+    t3->sequence = 200; // Higher sequence = later
     doc->addTrigger("thirst_trigger", std::unique_ptr<Trigger>(t3));
 
-    ASSERT_EQ(doc->m_TriggerArray.size(), 3) << "All 3 triggers should be in array";
+    ASSERT_EQ(doc->m_automationRegistry->m_TriggerArray.size(), 3) << "All 3 triggers should be in array";
 
     // Triggers use lazy sorting, so rebuild array before checking order
     doc->rebuildTriggerArray();
 
     // Array should be sorted: t2 (50), t1 (100), t3 (200)
-    EXPECT_EQ(doc->m_TriggerArray[0], t2) << "First trigger should have lowest sequence";
-    EXPECT_EQ(doc->m_TriggerArray[1], t1) << "Second trigger should have middle sequence";
-    EXPECT_EQ(doc->m_TriggerArray[2], t3) << "Third trigger should have highest sequence";
+    EXPECT_EQ(doc->m_automationRegistry->m_TriggerArray[0], t2) << "First trigger should have lowest sequence";
+    EXPECT_EQ(doc->m_automationRegistry->m_TriggerArray[1], t1) << "Second trigger should have middle sequence";
+    EXPECT_EQ(doc->m_automationRegistry->m_TriggerArray[2], t3) << "Third trigger should have highest sequence";
 }
 
 // Test 7: Delete trigger
 TEST_F(TriggersAliasesTest, DeleteTrigger)
 {
     Trigger* t1 = new Trigger();
-    t1->strLabel = "temp_trigger";
+    t1->label = "temp_trigger";
     doc->addTrigger("temp_trigger", std::unique_ptr<Trigger>(t1));
 
-    bool deleteResult = doc->deleteTrigger("temp_trigger");
+    auto deleteResult = doc->deleteTrigger("temp_trigger");
 
-    EXPECT_TRUE(deleteResult) << "deleteTrigger() should return true";
-    EXPECT_FALSE(doc->m_TriggerMap.find("temp_trigger") != doc->m_TriggerMap.end())
+    EXPECT_TRUE(deleteResult.has_value()) << "deleteTrigger() should succeed";
+    EXPECT_FALSE(doc->m_automationRegistry->m_TriggerMap.find("temp_trigger") != doc->m_automationRegistry->m_TriggerMap.end())
         << "Trigger should be removed from m_TriggerMap";
     // Note: Can't check m_TriggerArray.contains(t1) after delete - t1 is now deleted
 
     // Verify we can't delete it again
-    bool deleteAgain = doc->deleteTrigger("temp_trigger");
-    EXPECT_FALSE(deleteAgain) << "deleteTrigger() should return false for already-deleted trigger";
+    auto deleteAgain = doc->deleteTrigger("temp_trigger");
+    EXPECT_FALSE(deleteAgain.has_value())
+        << "deleteTrigger() should fail for already-deleted trigger";
+    EXPECT_EQ(deleteAgain.error().type, WorldErrorType::NotFound);
 }
 
 // Test 8: Add alias to WorldDocument
@@ -169,25 +172,25 @@ TEST_F(TriggersAliasesTest, AddAlias)
     auto a1 = std::make_unique<Alias>();
     a1->name = "^n$";
     a1->contents = "north";
-    a1->strLabel = "north_alias";
-    a1->iSequence = 100;
-    a1->bRegexp = true;
+    a1->label = "north_alias";
+    a1->sequence = 100;
+    a1->use_regexp = true;
 
     Alias* a1Ptr = a1.get();
-    bool aliasAddResult = doc->addAlias("north_alias", std::move(a1));
+    auto aliasAddResult = doc->addAlias("north_alias", std::move(a1));
 
-    EXPECT_TRUE(aliasAddResult) << "addAlias() should return true";
-    EXPECT_NE(doc->m_AliasMap.find("north_alias"), doc->m_AliasMap.end())
+    EXPECT_TRUE(aliasAddResult.has_value()) << "addAlias() should succeed";
+    EXPECT_NE(doc->m_automationRegistry->m_AliasMap.find("north_alias"), doc->m_automationRegistry->m_AliasMap.end())
         << "Alias should be in m_AliasMap";
-    EXPECT_TRUE(doc->m_AliasArray.contains(a1Ptr)) << "Alias should be in m_AliasArray";
-    EXPECT_EQ(a1Ptr->strInternalName, "north_alias") << "strInternalName should be set";
+    EXPECT_TRUE(doc->m_automationRegistry->m_AliasArray.contains(a1Ptr)) << "Alias should be in m_AliasArray";
+    EXPECT_EQ(a1Ptr->internal_name, "north_alias") << "internal_name should be set";
 }
 
 // Test 9: Get alias by name
 TEST_F(TriggersAliasesTest, GetAlias)
 {
     auto a1 = std::make_unique<Alias>();
-    a1->strLabel = "test_alias";
+    a1->label = "test_alias";
     Alias* a1Ptr = a1.get();
     doc->addAlias("test_alias", std::move(a1));
 
@@ -203,16 +206,16 @@ TEST_F(TriggersAliasesTest, GetAlias)
 TEST_F(TriggersAliasesTest, DeleteAlias)
 {
     auto a1 = std::make_unique<Alias>();
-    a1->strLabel = "temp_alias";
+    a1->label = "temp_alias";
     Alias* a1Ptr = a1.get();
     doc->addAlias("temp_alias", std::move(a1));
 
-    bool aliasDeleteResult = doc->deleteAlias("temp_alias");
+    auto aliasDeleteResult = doc->deleteAlias("temp_alias");
 
-    EXPECT_TRUE(aliasDeleteResult) << "deleteAlias() should return true";
-    EXPECT_EQ(doc->m_AliasMap.find("temp_alias"), doc->m_AliasMap.end())
+    EXPECT_TRUE(aliasDeleteResult.has_value()) << "deleteAlias() should succeed";
+    EXPECT_EQ(doc->m_automationRegistry->m_AliasMap.find("temp_alias"), doc->m_automationRegistry->m_AliasMap.end())
         << "Alias should be removed from m_AliasMap";
-    EXPECT_FALSE(doc->m_AliasArray.contains(a1Ptr)) << "Alias should be removed from m_AliasArray";
+    EXPECT_FALSE(doc->m_automationRegistry->m_AliasArray.contains(a1Ptr)) << "Alias should be removed from m_AliasArray";
 }
 
 // Test 11: Trigger equality operator
@@ -221,18 +224,18 @@ TEST_F(TriggersAliasesTest, TriggerEquality)
     Trigger* eq1 = new Trigger();
     eq1->trigger = "test pattern";
     eq1->contents = "test contents";
-    eq1->iSequence = 50;
-    eq1->bEnabled = true;
+    eq1->sequence = 50;
+    eq1->enabled = true;
 
     Trigger* eq2 = new Trigger();
     eq2->trigger = "test pattern";
     eq2->contents = "test contents";
-    eq2->iSequence = 50;
-    eq2->bEnabled = true;
+    eq2->sequence = 50;
+    eq2->enabled = true;
 
     EXPECT_TRUE(*eq1 == *eq2) << "Identical triggers should be equal";
 
-    eq2->iSequence = 100; // Change one field
+    eq2->sequence = 100; // Change one field
     EXPECT_FALSE(*eq1 == *eq2) << "Different triggers should not be equal";
 
     delete eq1;
@@ -245,12 +248,12 @@ TEST_F(TriggersAliasesTest, AliasEquality)
     auto aeq1 = std::make_unique<Alias>();
     aeq1->name = "test";
     aeq1->contents = "test command";
-    aeq1->iSequence = 50;
+    aeq1->sequence = 50;
 
     auto aeq2 = std::make_unique<Alias>();
     aeq2->name = "test";
     aeq2->contents = "test command";
-    aeq2->iSequence = 50;
+    aeq2->sequence = 50;
 
     EXPECT_TRUE(*aeq1 == *aeq2) << "Identical aliases should be equal";
 
@@ -264,17 +267,17 @@ TEST_F(TriggersAliasesTest, AliasSequenceSorting)
     auto south = std::make_unique<Alias>();
     south->name = "s";
     south->contents = "south";
-    south->iSequence = 200;
+    south->sequence = 200;
 
     auto west = std::make_unique<Alias>();
     west->name = "w";
     west->contents = "west";
-    west->iSequence = 50;
+    west->sequence = 50;
 
     auto east = std::make_unique<Alias>();
     east->name = "e";
     east->contents = "east";
-    east->iSequence = 100;
+    east->sequence = 100;
 
     Alias* southPtr = south.get();
     Alias* westPtr = west.get();
@@ -287,12 +290,12 @@ TEST_F(TriggersAliasesTest, AliasSequenceSorting)
     // Force rebuild of alias array (lazy sorting)
     doc->rebuildAliasArray();
 
-    ASSERT_EQ(doc->m_AliasArray.size(), 3) << "All 3 aliases should be in array";
+    ASSERT_EQ(doc->m_automationRegistry->m_AliasArray.size(), 3) << "All 3 aliases should be in array";
 
     // Should be sorted: west(50), east(100), south(200)
-    EXPECT_EQ(doc->m_AliasArray[0], westPtr) << "First alias should have lowest sequence";
-    EXPECT_EQ(doc->m_AliasArray[1], eastPtr) << "Second alias should have middle sequence";
-    EXPECT_EQ(doc->m_AliasArray[2], southPtr) << "Third alias should have highest sequence";
+    EXPECT_EQ(doc->m_automationRegistry->m_AliasArray[0], westPtr) << "First alias should have lowest sequence";
+    EXPECT_EQ(doc->m_automationRegistry->m_AliasArray[1], eastPtr) << "Second alias should have middle sequence";
+    EXPECT_EQ(doc->m_automationRegistry->m_AliasArray[2], southPtr) << "Third alias should have highest sequence";
 }
 
 // Test 14: Field value preservation
@@ -301,17 +304,17 @@ TEST_F(TriggersAliasesTest, TriggerFieldPreservation)
     Trigger* detailed = new Trigger();
     detailed->trigger = "You have (*) gold";
     detailed->contents = "say I have %1 gold!";
-    detailed->strLabel = "gold_trigger";
-    detailed->strProcedure = "on_gold_change";
-    detailed->iSequence = 75;
-    detailed->bEnabled = false;
-    detailed->bRegexp = true;
-    detailed->bKeepEvaluating = true;
-    detailed->bOmitFromOutput = true;
+    detailed->label = "gold_trigger";
+    detailed->procedure = "on_gold_change";
+    detailed->sequence = 75;
+    detailed->enabled = false;
+    detailed->use_regexp = true;
+    detailed->keep_evaluating = true;
+    detailed->omit_from_output = true;
     detailed->colour = 5;
-    detailed->iSendTo = 12; // eSendToScript
-    detailed->strGroup = "Currency";
-    detailed->iUserOption = 42;
+    detailed->send_to = 12; // eSendToScript
+    detailed->group = "Currency";
+    detailed->user_option = 42;
 
     doc->addTrigger("gold_trigger", std::unique_ptr<Trigger>(detailed));
 
@@ -319,17 +322,17 @@ TEST_F(TriggersAliasesTest, TriggerFieldPreservation)
 
     EXPECT_EQ(verified->trigger, "You have (*) gold") << "trigger field should be preserved";
     EXPECT_EQ(verified->contents, "say I have %1 gold!") << "contents field should be preserved";
-    EXPECT_EQ(verified->strLabel, "gold_trigger") << "strLabel field should be preserved";
-    EXPECT_EQ(verified->strProcedure, "on_gold_change") << "strProcedure field should be preserved";
-    EXPECT_EQ(verified->iSequence, 75) << "iSequence field should be preserved";
-    EXPECT_FALSE(verified->bEnabled) << "bEnabled field should be preserved";
-    EXPECT_TRUE(verified->bRegexp) << "bRegexp field should be preserved";
-    EXPECT_TRUE(verified->bKeepEvaluating) << "bKeepEvaluating field should be preserved";
-    EXPECT_TRUE(verified->bOmitFromOutput) << "bOmitFromOutput field should be preserved";
+    EXPECT_EQ(verified->label, "gold_trigger") << "label field should be preserved";
+    EXPECT_EQ(verified->procedure, "on_gold_change") << "procedure field should be preserved";
+    EXPECT_EQ(verified->sequence, 75) << "sequence field should be preserved";
+    EXPECT_FALSE(verified->enabled) << "enabled field should be preserved";
+    EXPECT_TRUE(verified->use_regexp) << "use_regexp field should be preserved";
+    EXPECT_TRUE(verified->keep_evaluating) << "keep_evaluating field should be preserved";
+    EXPECT_TRUE(verified->omit_from_output) << "omit_from_output field should be preserved";
     EXPECT_EQ(verified->colour, 5) << "colour field should be preserved";
-    EXPECT_EQ(verified->iSendTo, 12) << "iSendTo field should be preserved";
-    EXPECT_EQ(verified->strGroup, "Currency") << "strGroup field should be preserved";
-    EXPECT_EQ(verified->iUserOption, 42) << "iUserOption field should be preserved";
+    EXPECT_EQ(verified->send_to, 12) << "send_to field should be preserved";
+    EXPECT_EQ(verified->group, "Currency") << "group field should be preserved";
+    EXPECT_EQ(verified->user_option, 42) << "user_option field should be preserved";
 }
 
 // GoogleTest main function

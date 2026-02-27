@@ -5,6 +5,8 @@
 #include <QList>
 #include <QMap>
 #include <QString>
+#include <memory>
+#include <vector>
 
 // Forward declarations
 class WorldDocument;
@@ -117,26 +119,24 @@ struct MXPArgument {
     }
 };
 
-typedef QList<MXPArgument*> MXPArgumentList;
+typedef std::vector<std::unique_ptr<MXPArgument>> MXPArgumentList;
 
 // ========== ELEMENT ITEM STRUCTURE ==========
 // Based on OtherTypes.h from original MUSHclient
 // One atomic element reference in a custom element's expansion
 
 struct ElementItem {
-    AtomicElement* pAtomicElement; // Points to built-in element
-    MXPArgumentList argumentList;  // Arguments for this element
+    AtomicElement*
+        pAtomicElement; // Points to built-in element (non-owning, owned by m_atomicElementMap)
+    MXPArgumentList argumentList; // Arguments for this element
 
     ElementItem() : pAtomicElement(nullptr)
     {
     }
-    ~ElementItem()
-    {
-        qDeleteAll(argumentList);
-    }
+    // unique_ptr elements in argumentList are destroyed automatically
 };
 
-typedef QList<ElementItem*> ElementItemList;
+typedef std::vector<std::unique_ptr<ElementItem>> ElementItemList;
 
 // ========== CUSTOM ELEMENT STRUCTURE ==========
 // Based on OtherTypes.h from original MUSHclient
@@ -155,11 +155,7 @@ struct CustomElement {
     {
     }
 
-    ~CustomElement()
-    {
-        qDeleteAll(elementItemList);
-        qDeleteAll(attributeList);
-    }
+    // unique_ptr elements in elementItemList and attributeList are destroyed automatically
 };
 
 // ========== ENTITY STRUCTURE ==========

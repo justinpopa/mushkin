@@ -214,14 +214,14 @@ static void luaError(lua_State* L, const QString& event, const QString& procedur
  * @param szReason Description (e.g., "world connect")
  * @param nparams List of number parameters to pass to function
  * @param sparams List of string parameters to pass to function
- * @param nInvocationCount IN/OUT: Invocation counter (incremented on success)
+ * @param invocation_count IN/OUT: Invocation counter (incremented on success)
  * @param result OUT: Boolean result from function (optional)
  * @return true on error, false on success
  */
 bool ScriptEngine::executeLua(qint32& dispid, const QString& szProcedure, unsigned short iReason,
                               const QString& szType, const QString& szReason,
                               QList<double>& nparams, QList<QString>& sparams,
-                              long& nInvocationCount, bool* result)
+                              long& invocation_count, bool* result)
 {
     // Safety check
     if (!L) {
@@ -291,7 +291,7 @@ bool ScriptEngine::executeLua(qint32& dispid, const QString& szProcedure, unsign
         return true; // Error
     }
 
-    nInvocationCount++; // Count successful calls
+    invocation_count++; // Count successful calls
 
     // Update timing statistics
     if (m_doc) {

@@ -4,21 +4,20 @@
 #include "dialogs/trigger_edit_dialog.h"
 #include "world/world_document.h"
 
-TriggersPage::TriggersPage(WorldDocument* doc, QWidget* parent)
-    : ItemListPageBase(doc, parent)
+TriggersPage::TriggersPage(WorldDocument* doc, QWidget* parent) : ItemListPageBase(doc, parent)
 {
     setupUi();
 }
 
 int TriggersPage::itemCount() const
 {
-    return static_cast<int>(m_doc->m_TriggerMap.size());
+    return static_cast<int>(m_doc->m_automationRegistry->m_TriggerMap.size());
 }
 
 QStringList TriggersPage::itemNames() const
 {
     QStringList names;
-    for (const auto& [name, triggerPtr] : m_doc->m_TriggerMap) {
+    for (const auto& [name, triggerPtr] : m_doc->m_automationRegistry->m_TriggerMap) {
         names.append(name);
     }
     return names;
@@ -31,26 +30,26 @@ bool TriggersPage::itemExists(const QString& name) const
 
 void TriggersPage::deleteItem(const QString& name)
 {
-    m_doc->deleteTrigger(name);
+    (void)m_doc->deleteTrigger(name); // UI: item selected for deletion; not-found is a no-op
 }
 
 QString TriggersPage::getItemGroup(const QString& name) const
 {
     Trigger* trigger = m_doc->getTrigger(name);
-    return trigger ? trigger->strGroup : QString();
+    return trigger ? trigger->group : QString();
 }
 
 bool TriggersPage::getItemEnabled(const QString& name) const
 {
     Trigger* trigger = m_doc->getTrigger(name);
-    return trigger ? trigger->bEnabled : false;
+    return trigger ? trigger->enabled : false;
 }
 
 void TriggersPage::setItemEnabled(const QString& name, bool enabled)
 {
     Trigger* trigger = m_doc->getTrigger(name);
     if (trigger) {
-        trigger->bEnabled = enabled;
+        trigger->enabled = enabled;
     }
 }
 
@@ -60,14 +59,14 @@ void TriggersPage::populateRow(int row, const QString& name)
     if (!trigger)
         return;
 
-    setCheckboxItem(row, COL_ENABLED, trigger->bEnabled, name);
-    setReadOnlyItem(row, COL_LABEL, trigger->strLabel);
+    setCheckboxItem(row, COL_ENABLED, trigger->enabled, name);
+    setReadOnlyItem(row, COL_LABEL, trigger->label);
     setReadOnlyItem(row, COL_PATTERN, trigger->trigger);
-    setReadOnlyItem(row, COL_GROUP, trigger->strGroup);
-    setReadOnlyItemWithData(row, COL_SEQUENCE, QString::number(trigger->iSequence),
-                            trigger->iSequence);
-    setReadOnlyItem(row, COL_SENDTO, sendToDisplayName(trigger->iSendTo));
-    setReadOnlyItemWithData(row, COL_MATCHED, QString::number(trigger->nMatched), trigger->nMatched);
+    setReadOnlyItem(row, COL_GROUP, trigger->group);
+    setReadOnlyItemWithData(row, COL_SEQUENCE, QString::number(trigger->sequence),
+                            trigger->sequence);
+    setReadOnlyItem(row, COL_SENDTO, sendToDisplayName(trigger->send_to));
+    setReadOnlyItemWithData(row, COL_MATCHED, QString::number(trigger->matched), trigger->matched);
 }
 
 bool TriggersPage::openEditDialog(const QString& name)
@@ -83,6 +82,6 @@ bool TriggersPage::openEditDialog(const QString& name)
 
 QStringList TriggersPage::columnHeaders() const
 {
-    return {tr("Enabled"), tr("Label"), tr("Pattern"), tr("Group"),
+    return {tr("Enabled"), tr("Label"),   tr("Pattern"), tr("Group"),
             tr("Seq"),     tr("Send To"), tr("Matched")};
 }

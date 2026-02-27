@@ -5,6 +5,21 @@
 #include "lua_common.h"
 #include <sqlite3.h>
 
+// ========== LuaDatabase destructor ==========
+// Defined here because the full sqlite3 type is required for finalize/close,
+// and world_document.h only forward-declares struct sqlite3.
+LuaDatabase::~LuaDatabase()
+{
+    if (pStmt) {
+        sqlite3_finalize(pStmt);
+        pStmt = nullptr;
+    }
+    if (db) {
+        sqlite3_close(db);
+        db = nullptr;
+    }
+}
+
 /**
  * world.DatabaseOpen(Name, Filename, Flags)
  *
@@ -13,7 +28,8 @@
  *
  * @param Name (string) Logical name for this database connection
  * @param Filename (string) Path to database file, or ":memory:" for in-memory database
- * @param Flags (number) SQLite open flags (optional, default: SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE)
+ * @param Flags (number) SQLite open flags (optional, default: SQLITE_OPEN_READWRITE |
+ * SQLITE_OPEN_CREATE)
  *
  * @return (number) Error code:
  *   - SQLITE_OK (0): Success

@@ -13,15 +13,15 @@
 #include <QKeyEvent>
 #include <QLabel>
 #include <QMessageBox>
-#include <QSplitter>
 #include <QPainter>
+#include <QSplitter>
 #include <QStyleOption>
 #include <QVBoxLayout>
 #ifdef Q_OS_MACOS
-#include <QHBoxLayout>
-#include <QMdiSubWindow>
-#include <QMouseEvent>
-#include <QToolButton>
+#    include <QHBoxLayout>
+#    include <QMdiSubWindow>
+#    include <QMouseEvent>
+#    include <QToolButton>
 #endif
 
 /**
@@ -94,7 +94,8 @@ void WorldWidget::setupUi()
     // Create custom title bar for macOS (replaces QMdiSubWindow's native title bar)
     m_titleBar = new QWidget(this);
     m_titleBar->setFixedHeight(22);
-    m_titleBar->setStyleSheet("background-color: #383838; border: none; border-bottom: 1px solid #555;");
+    m_titleBar->setStyleSheet(
+        "background-color: #383838; border: none; border-bottom: 1px solid #555;");
 
     QHBoxLayout* titleLayout = new QHBoxLayout(m_titleBar);
     titleLayout->setContentsMargins(8, 0, 4, 0);
@@ -110,7 +111,9 @@ void WorldWidget::setupUi()
     QToolButton* minBtn = new QToolButton(m_titleBar);
     minBtn->setFixedSize(16, 16);
     minBtn->setText("−");
-    minBtn->setStyleSheet("QToolButton { border: 1px solid #555; border-radius: 2px; background: transparent; color: #888; font-size: 14px; } QToolButton:hover { background: #444; }");
+    minBtn->setStyleSheet(
+        "QToolButton { border: 1px solid #555; border-radius: 2px; background: transparent; color: "
+        "#888; font-size: 14px; } QToolButton:hover { background: #444; }");
     connect(minBtn, &QToolButton::clicked, this, [this]() {
         if (QMdiSubWindow* mdi = qobject_cast<QMdiSubWindow*>(parentWidget()))
             mdi->showMinimized();
@@ -121,7 +124,9 @@ void WorldWidget::setupUi()
     QToolButton* maxBtn = new QToolButton(m_titleBar);
     maxBtn->setFixedSize(16, 16);
     maxBtn->setText("□");
-    maxBtn->setStyleSheet("QToolButton { border: 1px solid #555; border-radius: 2px; background: transparent; color: #888; font-size: 11px; } QToolButton:hover { background: #444; }");
+    maxBtn->setStyleSheet(
+        "QToolButton { border: 1px solid #555; border-radius: 2px; background: transparent; color: "
+        "#888; font-size: 11px; } QToolButton:hover { background: #444; }");
     connect(maxBtn, &QToolButton::clicked, this, [this]() {
         if (QMdiSubWindow* mdi = qobject_cast<QMdiSubWindow*>(parentWidget())) {
             if (mdi->isMaximized())
@@ -136,7 +141,9 @@ void WorldWidget::setupUi()
     QToolButton* closeBtn = new QToolButton(m_titleBar);
     closeBtn->setFixedSize(16, 16);
     closeBtn->setText("×");
-    closeBtn->setStyleSheet("QToolButton { border: 1px solid #555; border-radius: 2px; background: transparent; color: #888; font-size: 14px; } QToolButton:hover { background: #633; color: #faa; }");
+    closeBtn->setStyleSheet(
+        "QToolButton { border: 1px solid #555; border-radius: 2px; background: transparent; color: "
+        "#888; font-size: 14px; } QToolButton:hover { background: #633; color: #faa; }");
     connect(closeBtn, &QToolButton::clicked, this, [this]() {
         if (QMdiSubWindow* mdi = qobject_cast<QMdiSubWindow*>(parentWidget()))
             mdi->close();
@@ -329,7 +336,8 @@ void WorldWidget::updateWindowTitle()
 void WorldWidget::updateFrameForWindowState(Qt::WindowStates state)
 {
     QVBoxLayout* layout = qobject_cast<QVBoxLayout*>(this->layout());
-    if (!layout) return;
+    if (!layout)
+        return;
 
     if (state & Qt::WindowMaximized) {
         // No border/margin when maximized
@@ -403,15 +411,15 @@ void WorldWidget::updateInfoBar()
  *
  * Uses XML serialization from
  */
-bool WorldWidget::loadFromFile(const QString& filename)
+std::expected<void, QString> WorldWidget::loadFromFile(const QString& filename)
 {
     if (!m_document) {
-        return false;
+        return std::unexpected(QString("No world document available"));
     }
 
     // Load XML
     if (!XmlSerialization::LoadWorldXML(m_document, filename)) {
-        return false;
+        return std::unexpected(QString("Failed to parse world file: %1").arg(filename));
     }
 
     // Store filename (both in widget and document for Lua API access)
@@ -443,7 +451,7 @@ bool WorldWidget::loadFromFile(const QString& filename)
     // Note: Welcome messages will be shown when OutputView is connected to document
     // Text will appear when StartNewLine() is called from network data
 
-    return true;
+    return {};
 }
 
 /**
@@ -451,15 +459,15 @@ bool WorldWidget::loadFromFile(const QString& filename)
  *
  * Uses XML serialization from
  */
-bool WorldWidget::saveToFile(const QString& filename)
+std::expected<void, QString> WorldWidget::saveToFile(const QString& filename)
 {
     if (!m_document) {
-        return false;
+        return std::unexpected(QString("No world document available"));
     }
 
     // Save XML
     if (!XmlSerialization::SaveWorldXML(m_document, filename)) {
-        return false;
+        return std::unexpected(QString("Failed to write world file: %1").arg(filename));
     }
 
     // Store filename (both in widget and document for Lua API access)
@@ -470,7 +478,7 @@ bool WorldWidget::saveToFile(const QString& filename)
     // Update UI
     updateWindowTitle();
 
-    return true;
+    return {};
 }
 
 /**
@@ -549,7 +557,7 @@ void WorldWidget::sendCommand()
     if (bAutoSay) {
         // Check connection if not re-evaluating (original sendvw.cpp)
         if (!m_document->m_bReEvaluateAutoSay &&
-            m_document->m_iConnectPhase != eConnectConnectedToMud) {
+            m_document->m_connectionManager->m_iConnectPhase != eConnectConnectedToMud) {
             return; // Don't send if not connected
         }
 
@@ -587,7 +595,7 @@ void WorldWidget::sendCommand()
 
         // Early return - don't execute the normal command path
         // Clear input and return
-        if (m_document->m_bAutoRepeat && !m_document->m_bNoEcho) {
+        if (m_document->m_bAutoRepeat && !m_document->m_telnetParser->m_bNoEcho) {
             m_inputView->selectAll();
         } else {
             m_inputView->clear();
@@ -606,7 +614,7 @@ void WorldWidget::sendCommand()
     // Clear input after sending (configurable)
     // m_bAutoRepeat allows command to stay in field for easy repetition
     // Based on CSendView::SendCommand() from sendvw.cpp
-    if (m_document->m_bAutoRepeat && !m_document->m_bNoEcho) {
+    if (m_document->m_bAutoRepeat && !m_document->m_telnetParser->m_bNoEcho) {
         // Keep command and select all (so typing replaces it)
         m_inputView->selectAll();
     } else {

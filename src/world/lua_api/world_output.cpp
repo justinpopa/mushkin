@@ -5,8 +5,8 @@
  * colored text, hyperlinks, ANSI processing, and info bar management.
  */
 
-#include "lua_common.h"
 #include "../color_utils.h"
+#include "lua_common.h"
 
 /**
  * world.Note(text, ...)
@@ -312,7 +312,8 @@ int L_AnsiNote(lua_State* L)
  * @param hint (string) Tooltip text on hover (optional, defaults to action)
  * @param forecolour (string|number) Text color (optional, defaults to hyperlink color)
  * @param backcolour (string|number) Background color (optional, defaults to note background)
- * @param url (boolean) If true, opens in browser instead of sending to MUD (optional, defaults to false)
+ * @param url (boolean) If true, opens in browser instead of sending to MUD (optional, defaults to
+ * false)
  *
  * @return Nothing
  *
@@ -488,13 +489,13 @@ int L_GetLineInfo(lua_State* L)
     int infoType = luaL_checkinteger(L, 2);
 
     // Check line exists (1-based index)
-    if (lineNumber <= 0 || lineNumber > pDoc->m_lineList.size()) {
+    if (lineNumber <= 0 || lineNumber > static_cast<int>(pDoc->m_lineList.size())) {
         lua_pushnil(L);
         return 1;
     }
 
     // Get the line (convert to 0-based index)
-    Line* line = pDoc->m_lineList.at(lineNumber - 1);
+    Line* line = pDoc->m_lineList.at(lineNumber - 1).get();
     if (!line) {
         lua_pushnil(L);
         return 1;
@@ -502,7 +503,7 @@ int L_GetLineInfo(lua_State* L)
 
     switch (infoType) {
         case 1: // text of line
-            lua_pushlstring(L, line->text(), line->len());
+            lua_pushlstring(L, line->text().data(), line->text().size());
             break;
         case 2: // length of text
             lua_pushinteger(L, line->len());
@@ -592,12 +593,12 @@ int L_GetStyleInfo(lua_State* L)
     int infoType = luaL_checkinteger(L, 3);
 
     // Check line exists (1-based index)
-    if (lineNumber <= 0 || lineNumber > pDoc->m_lineList.size()) {
+    if (lineNumber <= 0 || lineNumber > static_cast<int>(pDoc->m_lineList.size())) {
         lua_pushnil(L);
         return 1;
     }
 
-    Line* line = pDoc->m_lineList.at(lineNumber - 1);
+    Line* line = pDoc->m_lineList.at(lineNumber - 1).get();
     if (!line) {
         lua_pushnil(L);
         return 1;
@@ -627,7 +628,7 @@ int L_GetStyleInfo(lua_State* L)
             int offset = startCol - 1;
             int length = style->iLength;
             if (offset >= 0 && offset + length <= line->len()) {
-                lua_pushlstring(L, line->text() + offset, length);
+                lua_pushlstring(L, line->text().data() + offset, length);
             } else {
                 lua_pushstring(L, "");
             }

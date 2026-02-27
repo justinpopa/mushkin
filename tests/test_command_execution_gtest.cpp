@@ -61,10 +61,10 @@ TEST_F(CommandExecutionTest, SendMsgMultilineSplitting)
     doc->SendMsg(multiline, true, true, false);
 
     // Should have 3 items in queue
-    ASSERT_EQ(doc->m_CommandQueue.count(), 3) << "Should have 3 commands in queue";
-    EXPECT_TRUE(doc->m_CommandQueue[0].endsWith("north")) << "First command should be 'north'";
-    EXPECT_TRUE(doc->m_CommandQueue[1].endsWith("south")) << "Second command should be 'south'";
-    EXPECT_TRUE(doc->m_CommandQueue[2].endsWith("east")) << "Third command should be 'east'";
+    ASSERT_EQ(doc->m_connectionManager->m_CommandQueue.count(), 3) << "Should have 3 commands in queue";
+    EXPECT_TRUE(doc->m_connectionManager->m_CommandQueue[0].endsWith("north")) << "First command should be 'north'";
+    EXPECT_TRUE(doc->m_connectionManager->m_CommandQueue[1].endsWith("south")) << "Second command should be 'south'";
+    EXPECT_TRUE(doc->m_connectionManager->m_CommandQueue[2].endsWith("east")) << "Third command should be 'east'";
 }
 
 /**
@@ -84,36 +84,36 @@ TEST_F(CommandExecutionTest, CommandQueueEncoding)
     doc->m_iSpeedWalkDelay = 100; // Enable queueing
 
     // Test 1: Queue with echo and log
-    doc->m_CommandQueue.clear();
+    doc->m_connectionManager->m_CommandQueue.clear();
     doc->SendMsg("test1", true, true, true);
-    ASSERT_EQ(doc->m_CommandQueue.count(), 1);
-    EXPECT_TRUE(doc->m_CommandQueue[0].startsWith("Q"))
+    ASSERT_EQ(doc->m_connectionManager->m_CommandQueue.count(), 1);
+    EXPECT_TRUE(doc->m_connectionManager->m_CommandQueue[0].startsWith("Q"))
         << "Should have uppercase Q prefix (echo + log)";
-    EXPECT_EQ(doc->m_CommandQueue[0], "Qtest1");
+    EXPECT_EQ(doc->m_connectionManager->m_CommandQueue[0], "Qtest1");
 
     // Test 2: Queue without echo, with log
-    doc->m_CommandQueue.clear();
+    doc->m_connectionManager->m_CommandQueue.clear();
     doc->SendMsg("test2", false, true, true);
-    ASSERT_EQ(doc->m_CommandQueue.count(), 1);
-    EXPECT_TRUE(doc->m_CommandQueue[0].startsWith("q"))
+    ASSERT_EQ(doc->m_connectionManager->m_CommandQueue.count(), 1);
+    EXPECT_TRUE(doc->m_connectionManager->m_CommandQueue[0].startsWith("q"))
         << "Should have lowercase q prefix (no-echo + log)";
-    EXPECT_EQ(doc->m_CommandQueue[0], "qtest2");
+    EXPECT_EQ(doc->m_connectionManager->m_CommandQueue[0], "qtest2");
 
     // Test 3: Queue with echo, without log
-    doc->m_CommandQueue.clear();
+    doc->m_connectionManager->m_CommandQueue.clear();
     doc->SendMsg("test3", true, true, false);
-    ASSERT_EQ(doc->m_CommandQueue.count(), 1);
-    EXPECT_TRUE(doc->m_CommandQueue[0].startsWith("q")) << "Should have lowercase prefix (no log)";
-    EXPECT_EQ(doc->m_CommandQueue[0], "qtest3");
+    ASSERT_EQ(doc->m_connectionManager->m_CommandQueue.count(), 1);
+    EXPECT_TRUE(doc->m_connectionManager->m_CommandQueue[0].startsWith("q")) << "Should have lowercase prefix (no log)";
+    EXPECT_EQ(doc->m_connectionManager->m_CommandQueue[0], "qtest3");
 
     // Test 4: Immediate with echo and log (forced to queue because queue not empty)
-    doc->m_CommandQueue.clear();
+    doc->m_connectionManager->m_CommandQueue.clear();
     doc->SendMsg("test4", true, true, true);  // First one goes to queue
     doc->SendMsg("test5", true, false, true); // Second one is "immediate" but queue not empty
-    ASSERT_EQ(doc->m_CommandQueue.count(), 2);
-    EXPECT_TRUE(doc->m_CommandQueue[1].startsWith("I"))
+    ASSERT_EQ(doc->m_connectionManager->m_CommandQueue.count(), 2);
+    EXPECT_TRUE(doc->m_connectionManager->m_CommandQueue[1].startsWith("I"))
         << "Should have uppercase I prefix (immediate + echo + log)";
-    EXPECT_EQ(doc->m_CommandQueue[1], "Itest5");
+    EXPECT_EQ(doc->m_connectionManager->m_CommandQueue[1], "Itest5");
 }
 
 /**
@@ -162,23 +162,23 @@ TEST_F(CommandExecutionTest, CommandStripping)
     doc->m_iSpeedWalkDelay = 100; // Force queueing to inspect result
 
     // Test trailing \r\n
-    doc->m_CommandQueue.clear();
+    doc->m_connectionManager->m_CommandQueue.clear();
     doc->SendMsg("test1\r\n", true, true, false);
-    ASSERT_EQ(doc->m_CommandQueue.count(), 1);
-    EXPECT_FALSE(doc->m_CommandQueue[0].contains("\r")) << "Should not contain \\r";
-    EXPECT_FALSE(doc->m_CommandQueue[0].contains("\n")) << "Should not contain \\n";
+    ASSERT_EQ(doc->m_connectionManager->m_CommandQueue.count(), 1);
+    EXPECT_FALSE(doc->m_connectionManager->m_CommandQueue[0].contains("\r")) << "Should not contain \\r";
+    EXPECT_FALSE(doc->m_connectionManager->m_CommandQueue[0].contains("\n")) << "Should not contain \\n";
 
     // Test trailing \n
-    doc->m_CommandQueue.clear();
+    doc->m_connectionManager->m_CommandQueue.clear();
     doc->SendMsg("test2\n", true, true, false);
-    ASSERT_EQ(doc->m_CommandQueue.count(), 1);
-    EXPECT_FALSE(doc->m_CommandQueue[0].contains("\n")) << "Should not contain \\n";
+    ASSERT_EQ(doc->m_connectionManager->m_CommandQueue.count(), 1);
+    EXPECT_FALSE(doc->m_connectionManager->m_CommandQueue[0].contains("\n")) << "Should not contain \\n";
 
     // Test no trailing newline
-    doc->m_CommandQueue.clear();
+    doc->m_connectionManager->m_CommandQueue.clear();
     doc->SendMsg("test3", true, true, false);
-    ASSERT_EQ(doc->m_CommandQueue.count(), 1);
-    EXPECT_TRUE(doc->m_CommandQueue[0].endsWith("test3")) << "Should end with 'test3'";
+    ASSERT_EQ(doc->m_connectionManager->m_CommandQueue.count(), 1);
+    EXPECT_TRUE(doc->m_connectionManager->m_CommandQueue[0].endsWith("test3")) << "Should end with 'test3'";
 }
 
 /**
@@ -191,10 +191,10 @@ TEST_F(CommandExecutionTest, EmptyCommandHandling)
     doc->m_iSpeedWalkDelay = 100;
 
     // Send empty string
-    doc->m_CommandQueue.clear();
+    doc->m_connectionManager->m_CommandQueue.clear();
     doc->SendMsg("", true, true, false);
     // Empty string should create one empty item
-    EXPECT_EQ(doc->m_CommandQueue.count(), 1) << "Empty command should create one queue item";
+    EXPECT_EQ(doc->m_connectionManager->m_CommandQueue.count(), 1) << "Empty command should create one queue item";
 }
 
 /**
@@ -205,8 +205,8 @@ TEST_F(CommandExecutionTest, EmptyCommandHandling)
 TEST_F(CommandExecutionTest, QueueInitialState)
 {
     // Queue should be empty initially
-    EXPECT_TRUE(doc->m_CommandQueue.isEmpty()) << "Queue should be empty initially";
-    EXPECT_EQ(doc->m_CommandQueue.count(), 0) << "Queue count should be 0 initially";
+    EXPECT_TRUE(doc->m_connectionManager->m_CommandQueue.isEmpty()) << "Queue should be empty initially";
+    EXPECT_EQ(doc->m_connectionManager->m_CommandQueue.count(), 0) << "Queue count should be 0 initially";
 }
 
 /**
@@ -220,14 +220,14 @@ TEST_F(CommandExecutionTest, ImmediateSending)
     doc->m_iSpeedWalkDelay = 0;
 
     // Queue should remain empty (commands sent immediately)
-    doc->m_CommandQueue.clear();
+    doc->m_connectionManager->m_CommandQueue.clear();
 
     // Note: We can't actually test sending without a socket,
     // but we can verify the queue remains empty
     // In real implementation, this would call DoSendMsg() directly
 
     // For now, just verify queue is empty
-    EXPECT_TRUE(doc->m_CommandQueue.isEmpty())
+    EXPECT_TRUE(doc->m_connectionManager->m_CommandQueue.isEmpty())
         << "Queue should remain empty with no speedwalk delay";
 }
 

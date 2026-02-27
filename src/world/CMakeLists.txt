@@ -2,6 +2,10 @@
 # Includes Lua API (previously separate scripting module - merged to eliminate circular dependency)
 add_library(world STATIC
     color_utils.h
+    connection_manager.h   # ConnectionManager companion object (owns connection state)
+    connection_manager.cpp # ConnectionManager implementation
+    telnet_parser.h
+    telnet_parser.cpp
     world_document.cpp
     world_document.h
     world_triggers.cpp
@@ -15,11 +19,17 @@ add_library(world STATIC
     world_variables.cpp
     world_serialization.cpp
     world_document_plugins.cpp
-    world_sound.cpp          # Sound system
+    automation_registry.h    # AutomationRegistry companion object (trigger/alias/timer state + evaluation)
+    automation_registry.cpp  # AutomationRegistry implementation
+    sound_manager.h          # SoundManager companion object (spatial audio state)
+    sound_manager.cpp        # SoundManager implementation
+    world_sound.cpp          # WorldDocument forwarding wrappers → SoundManager
     world_notepad.cpp        # Notepad window tracking
     world_recall.cpp         # Recall/buffer search
-    world_mxp.cpp            # MXP (MUD eXtension Protocol)
+    world_mxp.cpp            # MXP stub (implementation moved to mxp_engine.cpp)
     mxp_types.h              # MXP data structures
+    mxp_engine.h             # MXPEngine companion object (runtime MXP state + logic)
+    mxp_engine.cpp           # MXPEngine implementation
     accelerator_manager.h    # Keyboard accelerator management
     accelerator_manager.cpp
     macro_keypad_compat.h    # Macro/keypad compatibility with original MUSHclient

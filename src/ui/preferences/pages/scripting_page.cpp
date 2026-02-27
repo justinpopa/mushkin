@@ -2,9 +2,9 @@
 #include "world/world_document.h"
 
 #include <QCheckBox>
-#include <QFileInfo>
 #include <QComboBox>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QFormLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -13,8 +13,7 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 
-ScriptingPage::ScriptingPage(WorldDocument* doc, QWidget* parent)
-    : PreferencesPageBase(doc, parent)
+ScriptingPage::ScriptingPage(WorldDocument* doc, QWidget* parent) : PreferencesPageBase(doc, parent)
 {
     setupUi();
 }
@@ -75,10 +74,10 @@ void ScriptingPage::setupUi()
     mainLayout->addWidget(optionsGroup);
 
     // Help text
-    QLabel* helpLabel = new QLabel(
-        tr("The script file is loaded when the world opens. It can define functions "
-           "called by triggers, aliases, and timers."),
-        this);
+    QLabel* helpLabel =
+        new QLabel(tr("The script file is loaded when the world opens. It can define functions "
+                      "called by triggers, aliases, and timers."),
+                   this);
     helpLabel->setWordWrap(true);
     helpLabel->setStyleSheet("color: gray; font-style: italic;");
     mainLayout->addWidget(helpLabel);
@@ -98,7 +97,7 @@ void ScriptingPage::loadSettings()
     m_autoReloadCheck->blockSignals(true);
     m_warnIfNoHandlerCheck->blockSignals(true);
 
-    m_enableScriptCheck->setChecked(m_doc->m_bEnableScripts != 0);
+    m_enableScriptCheck->setChecked(m_doc->m_bEnableScripts);
     m_scriptFileEdit->setText(m_doc->m_strScriptFilename);
 
     // Determine language from file extension
@@ -134,7 +133,7 @@ void ScriptingPage::saveSettings()
     if (!m_doc)
         return;
 
-    m_doc->m_bEnableScripts = m_enableScriptCheck->isChecked() ? 1 : 0;
+    m_doc->m_bEnableScripts = m_enableScriptCheck->isChecked();
     m_doc->m_strScriptFilename = m_scriptFileEdit->text();
     // Script language is determined by file extension, not stored separately
     m_doc->m_nReloadOption = m_autoReloadCheck->isChecked() ? 1 : 0; // 1 = OnFileChange
@@ -172,8 +171,8 @@ void ScriptingPage::onBrowseClicked()
         filter = tr("Script Files (*.lua *.yue *.moon *.tl *.fnl);;All Files (*)");
     }
 
-    QString fileName = QFileDialog::getOpenFileName(
-        this, tr("Choose Script File"), m_scriptFileEdit->text(), filter);
+    QString fileName = QFileDialog::getOpenFileName(this, tr("Choose Script File"),
+                                                    m_scriptFileEdit->text(), filter);
 
     if (!fileName.isEmpty()) {
         m_scriptFileEdit->setText(fileName);

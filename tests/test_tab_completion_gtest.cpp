@@ -46,23 +46,23 @@ class TabCompletionTest : public ::testing::Test {
     void addLineToOutputBuffer(const QString& text)
     {
         // Create line with simple defaults
-        Line* line = new Line(doc->m_lineList.count(), // lineNumber
-                              80,                      // wrapColumn
-                              0,                       // lineFlags
-                              qRgb(255, 255, 255),     // foreColour (white)
-                              qRgb(0, 0, 0),           // backColour (black)
-                              false                    // isUnicode
+        auto line = std::make_unique<Line>(static_cast<int>(doc->m_lineList.size()), // lineNumber
+                                           80,                                       // wrapColumn
+                                           0,                                        // lineFlags
+                                           qRgb(255, 255, 255), // foreColour (white)
+                                           qRgb(0, 0, 0),       // backColour (black)
+                                           false                // isUnicode
         );
 
         // Copy text into line's buffer
         QByteArray textBytes = text.toUtf8();
         int len = textBytes.length();
         line->textBuffer.resize(len);
-        memcpy(line->text(), textBytes.constData(), len);
+        memcpy(line->textBuffer.data(), textBytes.constData(), len);
         line->textBuffer.push_back('\0');
 
-        // Add to output buffer
-        doc->m_lineList.append(line);
+        // Add to output buffer (ownership transferred)
+        doc->m_lineList.push_back(std::move(line));
     }
 
     WorldDocument* doc = nullptr;

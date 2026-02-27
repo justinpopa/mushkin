@@ -295,20 +295,20 @@ void TriggerEditDialog::loadTriggerData()
     }
 
     // General tab
-    m_labelEdit->setText(trigger->strLabel);
+    m_labelEdit->setText(trigger->label);
     m_patternEdit->setText(trigger->trigger);
-    m_enabledCheck->setChecked(trigger->bEnabled);
-    m_regexpCheck->setChecked(trigger->bRegexp);
-    m_multiLineCheck->setChecked(trigger->bMultiLine);
-    m_linesToMatchSpin->setValue(trigger->iLinesToMatch > 0 ? trigger->iLinesToMatch : 2);
-    m_linesToMatchSpin->setEnabled(trigger->bMultiLine);
-    m_sequenceSpin->setValue(trigger->iSequence);
-    m_groupEdit->setText(trigger->strGroup);
+    m_enabledCheck->setChecked(trigger->enabled);
+    m_regexpCheck->setChecked(trigger->use_regexp);
+    m_multiLineCheck->setChecked(trigger->multi_line);
+    m_linesToMatchSpin->setValue(trigger->lines_to_match > 0 ? trigger->lines_to_match : 2);
+    m_linesToMatchSpin->setEnabled(trigger->multi_line);
+    m_sequenceSpin->setValue(trigger->sequence);
+    m_groupEdit->setText(trigger->group);
 
     // Response tab
     m_sendTextEdit->setPlainText(trigger->contents);
-    m_scriptEdit->setText(trigger->strProcedure);
-    int index = m_sendToCombo->findData(trigger->iSendTo);
+    m_scriptEdit->setText(trigger->procedure);
+    int index = m_sendToCombo->findData(trigger->send_to);
     if (index >= 0) {
         m_sendToCombo->setCurrentIndex(index);
     }
@@ -318,30 +318,30 @@ void TriggerEditDialog::loadTriggerData()
     }
 
     // Options tab
-    m_keepEvaluatingCheck->setChecked(trigger->bKeepEvaluating);
-    m_expandVariablesCheck->setChecked(trigger->bExpandVariables);
-    m_omitFromOutputCheck->setChecked(trigger->bOmitFromOutput);
+    m_keepEvaluatingCheck->setChecked(trigger->keep_evaluating);
+    m_expandVariablesCheck->setChecked(trigger->expand_variables);
+    m_omitFromOutputCheck->setChecked(trigger->omit_from_output);
     m_omitFromLogCheck->setChecked(trigger->omit_from_log);
-    m_oneShotCheck->setChecked(trigger->bOneShot);
-    m_repeatCheck->setChecked(trigger->bRepeat);
-    m_soundIfInactiveCheck->setChecked(trigger->bSoundIfInactive);
-    m_lowercaseWildcardCheck->setChecked(trigger->bLowercaseWildcard);
-    m_clipboardArgSpin->setValue(trigger->iClipboardArg);
+    m_oneShotCheck->setChecked(trigger->one_shot);
+    m_repeatCheck->setChecked(trigger->repeat);
+    m_soundIfInactiveCheck->setChecked(trigger->sound_if_inactive);
+    m_lowercaseWildcardCheck->setChecked(trigger->lowercase_wildcard);
+    m_clipboardArgSpin->setValue(trigger->clipboard_arg);
 
     // Appearance tab
-    bool hasColorChange = (trigger->iOtherForeground != 0 || trigger->iOtherBackground != 0);
+    bool hasColorChange = (trigger->other_foreground != 0 || trigger->other_background != 0);
     m_changeColorsCheck->setChecked(hasColorChange);
     m_colorChangeTypeCombo->setEnabled(hasColorChange);
     m_foregroundColorButton->setEnabled(hasColorChange);
     m_backgroundColorButton->setEnabled(hasColorChange);
 
-    int colorIndex = m_colorChangeTypeCombo->findData(trigger->iColourChangeType);
+    int colorIndex = m_colorChangeTypeCombo->findData(trigger->colour_change_type);
     if (colorIndex >= 0) {
         m_colorChangeTypeCombo->setCurrentIndex(colorIndex);
     }
 
-    m_foregroundColor = trigger->iOtherForeground;
-    m_backgroundColor = trigger->iOtherBackground;
+    m_foregroundColor = trigger->other_foreground;
+    m_backgroundColor = trigger->other_background;
     updateColorButton(m_foregroundColorButton, m_foregroundColor);
     updateColorButton(m_backgroundColorButton, m_backgroundColor);
 }
@@ -373,18 +373,64 @@ bool TriggerEditDialog::validateForm()
 
 bool TriggerEditDialog::saveTrigger()
 {
-    Trigger* trigger = nullptr;
-
     if (m_isEditMode) {
         // Edit existing trigger
-        trigger = m_doc->getTrigger(m_triggerName);
+        Trigger* trigger = m_doc->getTrigger(m_triggerName);
         if (!trigger) {
             QMessageBox::warning(this, "Error", "Trigger not found: " + m_triggerName);
             return false;
         }
+
+        // General tab
+        trigger->label = m_labelEdit->text().trimmed();
+        trigger->trigger = m_patternEdit->text();
+        trigger->enabled = m_enabledCheck->isChecked();
+        trigger->use_regexp = m_regexpCheck->isChecked();
+        trigger->multi_line = m_multiLineCheck->isChecked();
+        trigger->lines_to_match = m_multiLineCheck->isChecked() ? m_linesToMatchSpin->value() : 0;
+        trigger->sequence = m_sequenceSpin->value();
+        trigger->group = m_groupEdit->text().trimmed();
+
+        // Response tab
+        trigger->contents = m_sendTextEdit->toPlainText();
+        trigger->procedure = m_scriptEdit->text().trimmed();
+        trigger->send_to = m_sendToCombo->currentData().toInt();
+        trigger->scriptLanguage =
+            static_cast<ScriptLanguage>(m_scriptLanguageCombo->currentData().toInt());
+
+        // Options tab
+        trigger->keep_evaluating = m_keepEvaluatingCheck->isChecked();
+        trigger->expand_variables = m_expandVariablesCheck->isChecked();
+        trigger->omit_from_output = m_omitFromOutputCheck->isChecked();
+        trigger->omit_from_log = m_omitFromLogCheck->isChecked();
+        trigger->one_shot = m_oneShotCheck->isChecked();
+        trigger->repeat = m_repeatCheck->isChecked();
+        trigger->sound_if_inactive = m_soundIfInactiveCheck->isChecked();
+        trigger->lowercase_wildcard = m_lowercaseWildcardCheck->isChecked();
+        trigger->clipboard_arg = m_clipboardArgSpin->value();
+
+        // Appearance tab
+        if (m_changeColorsCheck->isChecked()) {
+            trigger->colour_change_type = m_colorChangeTypeCombo->currentData().toInt();
+            trigger->other_foreground = m_foregroundColor;
+            trigger->other_background = m_backgroundColor;
+        } else {
+            trigger->colour_change_type = 0;
+            trigger->other_foreground = 0;
+            trigger->other_background = 0;
+        }
+
+        // Compile regexp if needed
+        if (trigger->use_regexp) {
+            if (auto res = trigger->compileRegexp(); !res) {
+                QMessageBox::warning(this, tr("Regexp Error"),
+                                     tr("Pattern failed to compile:\n%1").arg(res.error()));
+                return false;
+            }
+        }
     } else {
         // Create new trigger
-        trigger = new Trigger();
+        auto triggerPtr = std::make_unique<Trigger>();
 
         // Generate internal name
         QString label = m_labelEdit->text().trimmed();
@@ -394,66 +440,66 @@ bool TriggerEditDialog::saveTrigger()
             if (pattern.length() > 50) {
                 pattern = pattern.left(50) + "...";
             }
-            trigger->strInternalName = QString("trigger_%1_%2")
-                                           .arg(QDateTime::currentMSecsSinceEpoch())
-                                           .arg(qHash(pattern));
+            triggerPtr->internal_name = QString("trigger_%1_%2")
+                                              .arg(QDateTime::currentMSecsSinceEpoch())
+                                              .arg(qHash(pattern));
         } else {
-            trigger->strInternalName = label;
+            triggerPtr->internal_name = label;
         }
-    }
 
-    // General tab
-    trigger->strLabel = m_labelEdit->text().trimmed();
-    trigger->trigger = m_patternEdit->text();
-    trigger->bEnabled = m_enabledCheck->isChecked();
-    trigger->bRegexp = m_regexpCheck->isChecked();
-    trigger->bMultiLine = m_multiLineCheck->isChecked();
-    trigger->iLinesToMatch = m_multiLineCheck->isChecked() ? m_linesToMatchSpin->value() : 0;
-    trigger->iSequence = m_sequenceSpin->value();
-    trigger->strGroup = m_groupEdit->text().trimmed();
+        // General tab
+        triggerPtr->label = m_labelEdit->text().trimmed();
+        triggerPtr->trigger = m_patternEdit->text();
+        triggerPtr->enabled = m_enabledCheck->isChecked();
+        triggerPtr->use_regexp = m_regexpCheck->isChecked();
+        triggerPtr->multi_line = m_multiLineCheck->isChecked();
+        triggerPtr->lines_to_match = m_multiLineCheck->isChecked() ? m_linesToMatchSpin->value() : 0;
+        triggerPtr->sequence = m_sequenceSpin->value();
+        triggerPtr->group = m_groupEdit->text().trimmed();
 
-    // Response tab
-    trigger->contents = m_sendTextEdit->toPlainText();
-    trigger->strProcedure = m_scriptEdit->text().trimmed();
-    trigger->iSendTo = m_sendToCombo->currentData().toInt();
-    trigger->scriptLanguage =
-        static_cast<ScriptLanguage>(m_scriptLanguageCombo->currentData().toInt());
+        // Response tab
+        triggerPtr->contents = m_sendTextEdit->toPlainText();
+        triggerPtr->procedure = m_scriptEdit->text().trimmed();
+        triggerPtr->send_to = m_sendToCombo->currentData().toInt();
+        triggerPtr->scriptLanguage =
+            static_cast<ScriptLanguage>(m_scriptLanguageCombo->currentData().toInt());
 
-    // Options tab
-    trigger->bKeepEvaluating = m_keepEvaluatingCheck->isChecked();
-    trigger->bExpandVariables = m_expandVariablesCheck->isChecked();
-    trigger->bOmitFromOutput = m_omitFromOutputCheck->isChecked();
-    trigger->omit_from_log = m_omitFromLogCheck->isChecked();
-    trigger->bOneShot = m_oneShotCheck->isChecked();
-    trigger->bRepeat = m_repeatCheck->isChecked();
-    trigger->bSoundIfInactive = m_soundIfInactiveCheck->isChecked();
-    trigger->bLowercaseWildcard = m_lowercaseWildcardCheck->isChecked();
-    trigger->iClipboardArg = m_clipboardArgSpin->value();
+        // Options tab
+        triggerPtr->keep_evaluating = m_keepEvaluatingCheck->isChecked();
+        triggerPtr->expand_variables = m_expandVariablesCheck->isChecked();
+        triggerPtr->omit_from_output = m_omitFromOutputCheck->isChecked();
+        triggerPtr->omit_from_log = m_omitFromLogCheck->isChecked();
+        triggerPtr->one_shot = m_oneShotCheck->isChecked();
+        triggerPtr->repeat = m_repeatCheck->isChecked();
+        triggerPtr->sound_if_inactive = m_soundIfInactiveCheck->isChecked();
+        triggerPtr->lowercase_wildcard = m_lowercaseWildcardCheck->isChecked();
+        triggerPtr->clipboard_arg = m_clipboardArgSpin->value();
 
-    // Appearance tab
-    if (m_changeColorsCheck->isChecked()) {
-        trigger->iColourChangeType = m_colorChangeTypeCombo->currentData().toInt();
-        trigger->iOtherForeground = m_foregroundColor;
-        trigger->iOtherBackground = m_backgroundColor;
-    } else {
-        trigger->iColourChangeType = 0;
-        trigger->iOtherForeground = 0;
-        trigger->iOtherBackground = 0;
-    }
+        // Appearance tab
+        if (m_changeColorsCheck->isChecked()) {
+            triggerPtr->colour_change_type = m_colorChangeTypeCombo->currentData().toInt();
+            triggerPtr->other_foreground = m_foregroundColor;
+            triggerPtr->other_background = m_backgroundColor;
+        } else {
+            triggerPtr->colour_change_type = 0;
+            triggerPtr->other_foreground = 0;
+            triggerPtr->other_background = 0;
+        }
 
-    // Compile regexp if needed
-    if (trigger->bRegexp) {
-        trigger->compileRegexp();
-    }
+        // Compile regexp if needed
+        if (triggerPtr->use_regexp) {
+            if (auto res = triggerPtr->compileRegexp(); !res) {
+                QMessageBox::warning(this, tr("Regexp Error"),
+                                     tr("Pattern failed to compile:\n%1").arg(res.error()));
+                return false;
+            }
+        }
 
-    // Add to document if new
-    if (!m_isEditMode) {
-        auto triggerPtr = std::unique_ptr<Trigger>(trigger);
-        if (!m_doc->addTrigger(triggerPtr->strInternalName, std::move(triggerPtr))) {
-            QMessageBox::warning(
-                this, "Error",
-                "Failed to add trigger. A trigger with this name may already exist.");
-            // triggerPtr will automatically delete on scope exit
+        // Add to document
+        QString internalName = triggerPtr->internal_name;
+        if (auto res = m_doc->addTrigger(internalName, std::move(triggerPtr)); !res.has_value()) {
+            QMessageBox::warning(this, "Error",
+                                 QString("Failed to add trigger: %1").arg(res.error().message));
             return false;
         }
     }

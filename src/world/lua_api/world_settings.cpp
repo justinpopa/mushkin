@@ -713,7 +713,7 @@ int L_GetInfo(lua_State* L)
 
         case 61: // IP address from socket connection
         {
-            // TODO: Extract IP from m_sockAddr or connection socket
+            // TODO: Extract IP from the active connection socket
             lua_pushstring(L, "");
         } break;
 
@@ -816,8 +816,8 @@ int L_GetInfo(lua_State* L)
 
         case 75: // IAC subnegotiation data
         {
-            lua_pushlstring(L, pDoc->m_IAC_subnegotiation_data.constData(),
-                            pDoc->m_IAC_subnegotiation_data.size());
+            lua_pushlstring(L, pDoc->m_telnetParser->m_IAC_subnegotiation_data.constData(),
+                            pDoc->m_telnetParser->m_IAC_subnegotiation_data.size());
         } break;
 
         case 76: // Special font (first one)
@@ -906,7 +906,7 @@ int L_GetInfo(lua_State* L)
 
         // Boolean flags (101-125)
         case 101: // No echo (IAC WILL ECHO received)
-            lua_pushboolean(L, pDoc->m_bNoEcho);
+            lua_pushboolean(L, pDoc->m_telnetParser->m_bNoEcho);
             break;
 
         case 102: // Debug incoming packets
@@ -914,24 +914,26 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 103: // Compress (MCCP active)
-            lua_pushboolean(L, pDoc->m_bCompress);
+            lua_pushboolean(L, pDoc->m_telnetParser->m_bCompress);
             break;
 
         case 104: // MXP active
-            lua_pushboolean(L, pDoc->m_bMXP);
+            lua_pushboolean(L, pDoc->m_mxpEngine->m_bMXP);
             break;
 
         case 105: // Pueblo active
-            lua_pushboolean(L, pDoc->m_bPuebloActive);
+            lua_pushboolean(L, pDoc->m_mxpEngine->m_bPuebloActive);
             break;
 
         case 106: // Not connected
-            lua_pushboolean(L, pDoc->m_iConnectPhase != eConnectConnectedToMud);
+            lua_pushboolean(L,
+                            pDoc->m_connectionManager->m_iConnectPhase != eConnectConnectedToMud);
             break;
 
         case 107: // Connecting (not disconnected and not connected)
-            lua_pushboolean(L, pDoc->m_iConnectPhase != eConnectNotConnected &&
-                                   pDoc->m_iConnectPhase != eConnectConnectedToMud);
+            lua_pushboolean(L, pDoc->m_connectionManager->m_iConnectPhase != eConnectNotConnected &&
+                                   pDoc->m_connectionManager->m_iConnectPhase !=
+                                       eConnectConnectedToMud);
             break;
 
         case 108: // Disconnect OK
@@ -1020,39 +1022,39 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 203: // Total lines sent
-            lua_pushinteger(L, pDoc->m_nTotalLinesSent);
+            lua_pushinteger(L, pDoc->m_connectionManager->m_nTotalLinesSent);
             break;
 
         case 204: // Input packet count
-            lua_pushinteger(L, pDoc->m_iInputPacketCount);
+            lua_pushinteger(L, pDoc->m_connectionManager->m_iInputPacketCount);
             break;
 
         case 205: // Output packet count
-            lua_pushinteger(L, pDoc->m_iOutputPacketCount);
+            lua_pushinteger(L, pDoc->m_connectionManager->m_iOutputPacketCount);
             break;
 
         case 206: // Total uncompressed bytes (MCCP)
-            lua_pushinteger(L, pDoc->m_nTotalUncompressed);
+            lua_pushinteger(L, pDoc->m_telnetParser->m_nTotalUncompressed);
             break;
 
         case 207: // Total compressed bytes (MCCP)
-            lua_pushinteger(L, pDoc->m_nTotalCompressed);
+            lua_pushinteger(L, pDoc->m_telnetParser->m_nTotalCompressed);
             break;
 
         case 208: // MCCP type (0=none, 1=v1, 2=v2)
-            lua_pushinteger(L, pDoc->m_iMCCP_type);
+            lua_pushinteger(L, pDoc->m_telnetParser->m_iMCCP_type);
             break;
 
         case 209: // MXP errors
-            lua_pushinteger(L, pDoc->m_iMXPerrors);
+            lua_pushinteger(L, pDoc->m_mxpEngine->m_iMXPerrors);
             break;
 
         case 210: // MXP tags processed
-            lua_pushinteger(L, pDoc->m_iMXPtags);
+            lua_pushinteger(L, pDoc->m_mxpEngine->m_iMXPtags);
             break;
 
         case 211: // MXP entities processed
-            lua_pushinteger(L, pDoc->m_iMXPentities);
+            lua_pushinteger(L, pDoc->m_mxpEngine->m_iMXPentities);
             break;
 
         case 212: // Output font height
@@ -1074,11 +1076,11 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 216: // Bytes received
-            lua_pushinteger(L, pDoc->m_nBytesIn);
+            lua_pushinteger(L, pDoc->m_connectionManager->m_nBytesIn);
             break;
 
         case 217: // Bytes sent
-            lua_pushinteger(L, pDoc->m_nBytesOut);
+            lua_pushinteger(L, pDoc->m_connectionManager->m_nBytesOut);
             break;
 
         case 218: // Count of variables
@@ -1086,15 +1088,15 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 219: // Count of triggers
-            lua_pushinteger(L, pDoc->m_TriggerMap.size());
+            lua_pushinteger(L, pDoc->m_automationRegistry->m_TriggerMap.size());
             break;
 
         case 220: // Count of timers
-            lua_pushinteger(L, pDoc->m_TimerMap.size());
+            lua_pushinteger(L, pDoc->m_automationRegistry->m_TimerMap.size());
             break;
 
         case 221: // Count of aliases
-            lua_pushinteger(L, pDoc->m_AliasMap.size());
+            lua_pushinteger(L, pDoc->m_automationRegistry->m_AliasMap.size());
             break;
 
         case 222: // Count of queued commands
@@ -1103,13 +1105,13 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 223: // Count of mapper items
-            // TODO: Add mapper support (m_strMapList)
+            // TODO: Add mapper support (mapper list not yet implemented)
             lua_pushinteger(L, 0);
             break;
 
         case 224: // Count of lines in output window
             // Based on: methods_info.cpp
-            lua_pushinteger(L, pDoc->m_lineList.count());
+            lua_pushinteger(L, static_cast<lua_Integer>(pDoc->m_lineList.size()));
             break;
 
         case 225: // Count of custom MXP elements
@@ -1123,7 +1125,7 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 227: // Connection phase
-            lua_pushinteger(L, pDoc->m_iConnectPhase);
+            lua_pushinteger(L, pDoc->m_connectionManager->m_iConnectPhase);
             break;
 
         case 228: // IP address (as integer)
@@ -1200,23 +1202,23 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 244: // Triggers evaluated count
-            lua_pushinteger(L, pDoc->m_iTriggersEvaluatedCount);
+            lua_pushinteger(L, pDoc->m_automationRegistry->m_iTriggersEvaluatedCount);
             break;
 
         case 245: // Triggers matched count
-            lua_pushinteger(L, pDoc->m_iTriggersMatchedCount);
+            lua_pushinteger(L, pDoc->m_automationRegistry->m_iTriggersMatchedCount);
             break;
 
         case 246: // Aliases evaluated count
-            lua_pushinteger(L, pDoc->m_iAliasesEvaluatedCount);
+            lua_pushinteger(L, pDoc->m_automationRegistry->m_iAliasesEvaluatedCount);
             break;
 
         case 247: // Aliases matched count
-            lua_pushinteger(L, pDoc->m_iAliasesMatchedCount);
+            lua_pushinteger(L, pDoc->m_automationRegistry->m_iAliasesMatchedCount);
             break;
 
         case 248: // Timers fired count
-            lua_pushinteger(L, pDoc->m_iTimersFiredCount);
+            lua_pushinteger(L, pDoc->m_automationRegistry->m_iTimersFiredCount);
             break;
 
         case 249: // Main window client height
@@ -1420,15 +1422,15 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 286: // Triggers matched this session
-            lua_pushinteger(L, pDoc->m_iTriggersMatchedThisSessionCount);
+            lua_pushinteger(L, pDoc->m_automationRegistry->m_iTriggersMatchedThisSessionCount);
             break;
 
         case 287: // Aliases matched this session
-            lua_pushinteger(L, pDoc->m_iAliasesMatchedThisSessionCount);
+            lua_pushinteger(L, pDoc->m_automationRegistry->m_iAliasesMatchedThisSessionCount);
             break;
 
         case 288: // Timers fired this session
-            lua_pushinteger(L, pDoc->m_iTimersFiredThisSessionCount);
+            lua_pushinteger(L, pDoc->m_automationRegistry->m_iTimersFiredThisSessionCount);
             break;
 
         case 289: // Last line with IAC GA
@@ -1501,7 +1503,7 @@ int L_GetInfo(lua_State* L)
 
         case 301: // Number of sent packets
             // TODO: Distinguish between sent packets and sent lines
-            lua_pushinteger(L, pDoc->m_nTotalLinesSent);
+            lua_pushinteger(L, pDoc->m_connectionManager->m_nTotalLinesSent);
             break;
 
         case 302: // Connect time (seconds since connected)
@@ -1621,7 +1623,12 @@ int L_SetOption(lua_State* L)
     // Write value based on field length
     switch (opt.iLength) {
         case 1:
-            *reinterpret_cast<qint8*>(fieldPtr) = static_cast<qint8>(value);
+            // Boolean (bool is 1 byte): write 0 or 1 via bool* to avoid UB
+            if (opt.iMaximum == 0.0 && opt.iMinimum == 0.0) {
+                *reinterpret_cast<bool*>(fieldPtr) = (value != 0.0);
+            } else {
+                *reinterpret_cast<qint8*>(fieldPtr) = static_cast<qint8>(value);
+            }
             break;
         case 2:
             *reinterpret_cast<qint16*>(fieldPtr) = static_cast<qint16>(value);

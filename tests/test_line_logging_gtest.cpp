@@ -54,7 +54,7 @@ class LineLoggingTest : public ::testing::Test {
         Line* line = new Line(1, 80, flags, 0xFFFFFF, 0x000000, false);
         int len = strlen(text);
         line->textBuffer.resize(len);
-        memcpy(line->text(), text, len);
+        memcpy(line->textBuffer.data(), text, len);
         line->textBuffer.push_back('\0');
         line->hard_return = true;
         line->m_theTime = QDateTime::currentDateTime();

@@ -60,12 +60,30 @@ static const QRgb DEFAULT_BOLD_COLORS[8] = {
 
 WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
 {
-    // Create the network socket
+    // Create AutomationRegistry companion FIRST — other companions may call into it.
+    m_automationRegistry = std::make_unique<AutomationRegistry>(*this);
+
+    // Create TelnetParser companion FIRST — many other init sites below delegate to it.
+    m_telnetParser = std::make_unique<TelnetParser>(*this);
+
+    // Create MXPEngine companion — depends on TelnetParser existing (accesses
+    // m_telnetParser->m_phase).
+    m_mxpEngine = std::make_unique<MXPEngine>(*this);
+
+    // Create SoundManager companion — audio engine is lazy-loaded on first playSound() call.
+    m_soundManager = std::make_unique<SoundManager>(*this);
+
+    // Create ConnectionManager companion — owns connection state, statistics, timing, queue.
+    m_connectionManager = std::make_unique<ConnectionManager>(*this);
+
+    // Create the network socket.
     // WorldSocket calls our methods directly via m_pDoc pointer:
-    // - onReadyRead() calls ReceiveMsg()
-    // - onConnected() calls OnConnect(0)
-    // - onError() calls OnConnect(errorCode)
-    m_pSocket = new WorldSocket(this, this);
+    // - onReadyRead()  → ReceiveMsg()
+    // - onConnected()  → OnConnect(0) → m_connectionManager->onConnect(0)
+    // - onError()      → OnConnect(errorCode) → m_connectionManager->onConnect(errorCode)
+    // - onDisconnected() → OnConnectionDisconnect() → m_connectionManager->onConnectionDisconnect()
+    // The socket is stored in m_connectionManager->m_pSocket (non-owning; Qt parent-child).
+    m_connectionManager->m_pSocket = new WorldSocket(this, this);
 
     // ========== Initialize connection settings ==========
     m_server = QString();
@@ -73,16 +91,16 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_name = QString();
     m_password = QString();
     m_port = 4000; // Default MUD port
-    m_connect_now = eNoAutoConnect;
+    m_connect_now = false;
 
     // ========== Initialize display settings ==========
     m_font_name = "Courier New";
     m_font_height = 12;  // matches original MUSHclient default
     m_font_weight = 400; // FW_NORMAL
     m_font_charset = 0;  // DEFAULT_CHARSET
-    m_wrap = 1;          // true = wrap enabled (matches original MUSHclient default)
-    m_timestamps = 0;
-    m_match_width = 30;
+    m_wrap = true;       // wrap enabled (matches original MUSHclient default)
+    m_timestamps = false;
+    m_match_width = false;
 
     // ========== Initialize colors ==========
     initializeColors();
@@ -103,23 +121,20 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_nWrapColumn = 80;
 
     // ========== Initialize triggers, aliases, timers - Enable Flags ==========
-    m_enable_aliases = 1;
-    m_enable_triggers = 1;
-    m_bEnableTimers = 1;
+    m_enable_aliases = true;
+    m_enable_triggers = true;
+    m_bEnableTimers = true;
 
     // ========== Initialize Trigger/Alias/Timer Collections ==========
-    // m_AliasMap and m_TriggerMap are QMap/QVector (auto-initialized)
-    // m_AliasArray and m_TriggerArray are QVector (auto-initialized)
-    // m_TimerMap and m_TimerRevMap are QMap (auto-initialized)
-    m_triggersNeedSorting = false; // No triggers yet, no sort needed
-    m_aliasesNeedSorting = false;  // No aliases yet, no sort needed
+    // All collections are owned by m_automationRegistry (auto-initialized by its constructor).
+    // m_triggersNeedSorting and m_aliasesNeedSorting default to false in AutomationRegistry.
 
     // ========== Initialize input handling ==========
-    m_display_my_input = 1;
+    m_display_my_input = true;
     m_echo_colour = 65535; // SAMECOLOUR
-    m_bEscapeDeletesInput = 0;
-    m_bArrowsChangeHistory = 1;
-    m_bConfirmOnPaste = 1; // Default: true (like original)
+    m_bEscapeDeletesInput = false;
+    m_bArrowsChangeHistory = true;
+    m_bConfirmOnPaste = true; // Default: true (like original)
 
     // ========== Initialize command history ==========
     m_commandHistory.clear();
@@ -130,32 +145,28 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_iHistoryStatus = eAtBottom; // Start at bottom (ready for new commands)
 
     // ========== Initialize sound ==========
-    m_enable_beeps = 1;
-    m_enable_trigger_sounds = 1;
+    m_enable_beeps = true;
+    m_enable_trigger_sounds = true;
     m_new_activity_sound = QString();
     m_strBeepSound = QString();
 
     // ========== Initialize macros ==========
-    for (int i = 0; i < MACRO_COUNT; i++) {
-        m_macros[i] = QString();
-        m_macro_type[i] = 0; // SEND_NOW
-        m_macro_name[i] = QString();
-    }
+    m_macros.fill(QString());
+    m_macro_type.fill(0); // SEND_NOW
+    m_macro_name.fill(QString());
 
     // ========== Initialize keypad ==========
-    for (int i = 0; i < KEYPAD_MAX_ITEMS; i++) {
-        m_keypad[i] = QString();
-    }
-    m_keypad_enable = 0;
+    m_keypad.fill(QString());
+    m_keypad_enable = false;
 
     // ========== Initialize speed walking ==========
-    m_enable_speed_walk = 0;
+    m_enable_speed_walk = false;
     m_speed_walk_prefix = QString();
     m_strSpeedWalkFiller = QString();
     m_iSpeedWalkDelay = 0;
 
     // ========== Initialize command stack ==========
-    m_enable_command_stack = 0;
+    m_enable_command_stack = false;
     m_strCommandStackCharacter = ";";
 
     // ========== Initialize connection text ==========
@@ -179,7 +190,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
 
     // ========== Initialize scripting ==========
     m_strLanguage = "Lua";
-    m_bEnableScripts = 1;
+    m_bEnableScripts = true;
     m_strScriptFilename = QString();
     m_strScriptPrefix = "/";
     m_strScriptEditor = QString();
@@ -208,51 +219,49 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_iHyperlinkColour = BGR(255, 128, 0); // Light blue - RGB(0, 128, 255) like original
 
     // ========== Initialize misc flags ==========
-    m_indent_paras = 1; // Default: true (like original)
-    m_bSaveWorldAutomatically = 0;
-    m_bLineInformation = 1; // Default: true (like original)
-    m_bStartPaused = 0;
+    m_indent_paras = true; // Default: true (like original)
+    m_bSaveWorldAutomatically = false;
+    m_bLineInformation = true; // Default: true (like original)
+    m_bStartPaused = false;
     m_iNoteTextColour = 4; // Default: 4 (cyan) like original
-    m_bKeepCommandsOnSameLine = 0;
+    m_bKeepCommandsOnSameLine = false;
 
     // ========== Initialize auto-say ==========
     m_strAutoSayString = "say "; // Default: "say " (like original)
-    m_bEnableAutoSay = 0;
-    m_bExcludeMacros = 0;
-    m_bExcludeNonAlpha = 0;
-    m_strOverridePrefix = "-";           // Default: "-" (like original)
-    m_bConfirmBeforeReplacingTyping = 1; // Default: true (like original)
-    m_bReEvaluateAutoSay = 0;
+    m_bEnableAutoSay = false;
+    m_bExcludeMacros = false;
+    m_bExcludeNonAlpha = false;
+    m_strOverridePrefix = "-";              // Default: "-" (like original)
+    m_bConfirmBeforeReplacingTyping = true; // Default: true (like original)
+    m_bReEvaluateAutoSay = false;
 
     // ========== Initialize Script Variables Collection ==========
     // m_VariableMap is automatically initialized as empty QMap
 
     // ========== Initialize print styles ==========
-    for (int i = 0; i < 8; i++) {
-        m_nNormalPrintStyle[i] = 0;
-        m_nBoldPrintStyle[i] = 0;
-    }
+    m_nNormalPrintStyle.fill(0);
+    m_nBoldPrintStyle.fill(0);
 
     // ========== Initialize display options (version 9+) ==========
-    m_bShowBold = 0; // Default: false (like original)
-    m_bShowItalic = 1;
-    m_bShowUnderline = 1;
-    m_bAltArrowRecallsPartial = 0;
-    m_iPixelOffset = 1; // Default: 1 (like original)
-    m_bAutoFreeze = 1;  // Default: true (like original) - auto_pause
-    m_bKeepFreezeAtBottom = 0;
-    m_bAutoRepeat = 0;
-    m_bDisableCompression = 0;
-    m_bLowerCaseTabCompletion = 0;
-    m_bDoubleClickInserts = 0;
-    m_bDoubleClickSends = 0;
-    m_bConfirmOnSend = 1; // Default: true (like original)
-    m_bTranslateGerman = 0;
+    m_bShowBold = false; // Default: false (like original)
+    m_bShowItalic = true;
+    m_bShowUnderline = true;
+    m_bAltArrowRecallsPartial = false;
+    m_iPixelOffset = 1;   // Default: 1 (like original)
+    m_bAutoFreeze = true; // Default: true (like original) - auto_pause
+    m_bKeepFreezeAtBottom = false;
+    m_bAutoRepeat = false;
+    m_bDisableCompression = false;
+    m_bLowerCaseTabCompletion = false;
+    m_bDoubleClickInserts = false;
+    m_bDoubleClickSends = false;
+    m_bConfirmOnSend = true; // Default: true (like original)
+    m_bTranslateGerman = false;
 
     // ========== Initialize tab completion ==========
     m_strTabCompletionDefaults = QString();
     m_iTabCompletionLines = 200;
-    m_bTabCompletionSpace = 0;                                 // Default: false (like original)
+    m_bTabCompletionSpace = false;                             // Default: false (like original)
     m_strWordDelimiters = "-._~!@#$%^&*()+=[]{}\\|;:'\",<>?/"; // Word delimiters
     m_bTabCompleteFunctions = true; // Show Lua functions in Shift+Tab menu by default
     // m_ExtraShiftTabCompleteItems initialized empty by default
@@ -283,11 +292,11 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_strRecallLinePreamble = QString();
 
     // ========== Initialize paste/file options ==========
-    m_bPasteCommentedSoftcode = 0;
-    m_bFileCommentedSoftcode = 0;
-    m_bFlashIcon = 0; // Off by default (like original MUSHclient)
-    m_bArrowKeysWrap = 0;
-    m_bSpellCheckOnSend = 0;
+    m_bPasteCommentedSoftcode = false;
+    m_bFileCommentedSoftcode = false;
+    m_bFlashIcon = false; // Off by default (like original MUSHclient)
+    m_bArrowKeysWrap = false;
+    m_bSpellCheckOnSend = false;
     m_nPasteDelay = 0;
     m_nFileDelay = 0;
     m_nPasteDelayPerLines = 1;
@@ -302,24 +311,24 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_bWarnIfScriptingInactive = 1; // Default: true (like original)
 
     // ========== Initialize sending options ==========
-    m_bWriteWorldNameToLog = 1; // Default: true (like original)
-    m_bSendEcho = 0;
-    m_bPasteEcho = 0;
+    m_bWriteWorldNameToLog = true; // Default: true (like original)
+    m_bSendEcho = false;
+    m_bPasteEcho = false;
 
     // ========== Initialize default options ==========
-    m_bUseDefaultColours = 0;
-    m_bUseDefaultTriggers = 0;
-    m_bUseDefaultAliases = 0;
-    m_bUseDefaultMacros = 0;
-    m_bUseDefaultTimers = 0;
-    m_bUseDefaultInputFont = 0;
+    m_bUseDefaultColours = false;
+    m_bUseDefaultTriggers = false;
+    m_bUseDefaultAliases = false;
+    m_bUseDefaultMacros = false;
+    m_bUseDefaultTimers = false;
+    m_bUseDefaultInputFont = false;
 
     // ========== Initialize terminal settings ==========
     m_strTerminalIdentification = "mushkin"; // Identify as Mushkin
 
     // ========== Initialize mapping ==========
     m_strMappingFailure = "Alas, you cannot go that way."; // Default like original
-    m_bMapFailureRegexp = 0;
+    m_bMapFailureRegexp = false;
 
     // ========== Initialize flag containers ==========
     m_iFlags1 = 0;
@@ -329,23 +338,23 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_strWorldID = QString(); // Will be generated on save
 
     // ========== Initialize more options (version 15+) ==========
-    m_bAlwaysRecordCommandHistory = 0;
-    m_bCopySelectionToClipboard = 0;
-    m_bCarriageReturnClearsLine = 0;
-    m_bSendMXP_AFK_Response = 1;
-    m_bMudCanChangeOptions = 1;
-    m_bEnableSpamPrevention = 0;
+    m_bAlwaysRecordCommandHistory = false;
+    m_bCopySelectionToClipboard = false;
+    m_bCarriageReturnClearsLine = false;
+    m_bSendMXP_AFK_Response = true;
+    m_bMudCanChangeOptions = true;
+    m_bEnableSpamPrevention = false;
     m_iSpamLineCount = 20;
     m_strSpamMessage = "look";
 
-    m_bDoNotShowOutstandingLines = 0;
-    m_bDoNotTranslateIACtoIACIAC = 0;
+    m_bDoNotShowOutstandingLines = false;
+    m_bDoNotTranslateIACtoIACIAC = false;
 
     // ========== Initialize clipboard and display ==========
-    m_bAutoCopyInHTML = 0;
+    m_bAutoCopyInHTML = false;
     m_iLineSpacing = 0;
-    m_bUTF_8 = 0;
-    m_bConvertGAtoNewline = 0;
+    m_bUTF_8 = false;
+    m_bConvertGAtoNewline = false;
     m_iCurrentActionSource = 0; // eUnknownActionSource
 
     // ========== Initialize filters ==========
@@ -355,73 +364,73 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_strVariablesFilter = QString();
 
     // ========== Initialize script errors ==========
-    m_bScriptErrorsToOutputWindow = 0;
-    m_bLogScriptErrors = 0;
+    m_bScriptErrorsToOutputWindow = false;
+    m_bLogScriptErrors = false;
 
     // ========== Initialize command window auto-resize ==========
-    m_bAutoResizeCommandWindow = 0;
+    m_bAutoResizeCommandWindow = false;
     m_strEditorWindowName = QString();
     m_iAutoResizeMinimumLines = 1;
     m_iAutoResizeMaximumLines = 20;
-    m_bDoNotAddMacrosToCommandHistory = 0;
-    m_bSendKeepAlives = 0;
+    m_bDoNotAddMacrosToCommandHistory = false;
+    m_bSendKeepAlives = false;
 
     // ========== Initialize default trigger settings ==========
     m_iDefaultTriggerSendTo = 0;
     m_iDefaultTriggerSequence = 100;
-    m_bDefaultTriggerRegexp = 0;
-    m_bDefaultTriggerExpandVariables = 0;
-    m_bDefaultTriggerKeepEvaluating = 0;
-    m_bDefaultTriggerIgnoreCase = 0;
+    m_bDefaultTriggerRegexp = false;
+    m_bDefaultTriggerExpandVariables = false;
+    m_bDefaultTriggerKeepEvaluating = false;
+    m_bDefaultTriggerIgnoreCase = false;
 
     // ========== Initialize default alias settings ==========
     m_iDefaultAliasSendTo = 0;
     m_iDefaultAliasSequence = 100;
-    m_bDefaultAliasRegexp = 0;
-    m_bDefaultAliasExpandVariables = 0;
-    m_bDefaultAliasKeepEvaluating = 0;
-    m_bDefaultAliasIgnoreCase = 0;
+    m_bDefaultAliasRegexp = false;
+    m_bDefaultAliasExpandVariables = false;
+    m_bDefaultAliasKeepEvaluating = false;
+    m_bDefaultAliasIgnoreCase = false;
 
     // ========== Initialize default timer settings ==========
     m_iDefaultTimerSendTo = 0;
 
     // ========== Initialize sound ==========
-    m_bPlaySoundsInBackground = 0;
+    m_bPlaySoundsInBackground = false;
 
     // ========== Initialize HTML logging ==========
-    m_bLogHTML = 0;
-    m_bUnpauseOnSend = 0;
+    m_bLogHTML = false;
+    m_bUnpauseOnSend = false;
 
     // ========== Initialize logging options ==========
-    m_log_input = 0;
-    m_bLogOutput = 1; // Log output by default
-    m_bLogNotes = 0;
-    m_bLogInColour = 0;
-    m_bLogRaw = 0;
+    m_log_input = false;
+    m_bLogOutput = true; // Log output by default
+    m_bLogNotes = false;
+    m_bLogInColour = false;
+    m_bLogRaw = false;
 
     // ========== Initialize tree views ==========
-    m_bTreeviewTriggers = 1;
-    m_bTreeviewAliases = 1;
-    m_bTreeviewTimers = 1;
+    m_bTreeviewTriggers = true;
+    m_bTreeviewAliases = true;
+    m_bTreeviewTimers = true;
 
     // ========== Initialize input wrapping ==========
-    m_bAutoWrapInput = 0;
+    m_bAutoWrapInput = false;
 
     // ========== Initialize tooltips ==========
     m_iToolTipVisibleTime = 30000; // 30 seconds
     m_iToolTipStartTime = 500;     // 0.5 seconds
 
     // ========== Initialize save file options ==========
-    m_bOmitSavedDateFromSaveFiles = 0;
+    m_bOmitSavedDateFromSaveFiles = false;
 
     // ========== Initialize output buffer fading ==========
     m_iFadeOutputBufferAfterSeconds = 0;
     m_FadeOutputOpacityPercent = 20;
     m_FadeOutputSeconds = 8;
-    m_bCtrlBackspaceDeletesLastWord = 0;
+    m_bCtrlBackspaceDeletesLastWord = false;
 
     // ========== Initialize remote access server settings ==========
-    m_bEnableRemoteAccess = 0;
+    m_bEnableRemoteAccess = false;
     m_iRemotePort = 0;
     m_strRemotePassword = QString();
     m_iRemoteScrollbackLines = 100;
@@ -437,49 +446,37 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_whisper_colour = 0;
     m_mail_colour = 0;
     m_game_colour = 0;
-    m_remove_channels1 = 0;
-    m_remove_channels2 = 0;
-    m_remove_pages = 0;
-    m_remove_whispers = 0;
-    m_remove_set = 0;
-    m_remove_mail = 0;
-    m_remove_game = 0;
+    m_remove_channels1 = false;
+    m_remove_channels2 = false;
+    m_remove_pages = false;
+    m_remove_whispers = false;
+    m_remove_set = false;
+    m_remove_mail = false;
+    m_remove_game = false;
 
     // ========== Runtime State Flags ==========
-    m_bNAWS_wanted = false;
-    m_bCHARSET_wanted = false;
+    // m_bNAWS_wanted, m_bCHARSET_wanted, m_bNoEcho moved to TelnetParser.
     m_bLoaded = false;
     m_bSelected = false;
     m_bVariablesChanged = false;
     m_bModified = false;
-    m_bNoEcho = false;
     m_bDebugIncomingPackets = false;
 
     // ========== Statistics Counters ==========
-    m_iInputPacketCount = 0;
-    m_iOutputPacketCount = 0;
+    // m_iInputPacketCount, m_iOutputPacketCount: zero-initialized by ConnectionManager ctor.
     m_iUTF8ErrorCount = 0;
     m_iOutputWindowRedrawCount = 0;
 
     // ========== UTF-8 Processing State ==========
-    for (int i = 0; i < 8; i++) {
-        m_UTF8Sequence[i] = 0;
-    }
+    m_UTF8Sequence.fill(0);
     m_iUTF8BytesLeft = 0;
 
-    // ========== Trigger/Alias/Timer Statistics ==========
-    m_iTriggersEvaluatedCount = 0;
-    m_iTriggersMatchedCount = 0;
-    m_iAliasesEvaluatedCount = 0;
-    m_iAliasesMatchedCount = 0;
-    m_iTimersFiredCount = 0;
-    m_iTriggersMatchedThisSessionCount = 0;
-    m_iAliasesMatchedThisSessionCount = 0;
-    m_iTimersFiredThisSessionCount = 0;
+    // Trigger/Alias/Timer statistics are zero-initialized by AutomationRegistry member
+    // initializers.
 
     // ========== UI State ==========
     m_last_prefs_page = 0;
-    m_bConfigEnableTimers = 0;
+    m_bConfigEnableTimers = false;
     m_strLastSelectedTrigger = QString();
     m_strLastSelectedAlias = QString();
     m_strLastSelectedTimer = QString();
@@ -497,111 +494,41 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_selectionEndChar = -1;
 
     // ========== Line Buffer ==========
-    // m_lineList initializes to empty QList automatically
-    m_currentLine = nullptr;
+    // m_lineList initializes to empty std::vector automatically
+    // m_currentLine is a std::unique_ptr, initializes to nullptr automatically
     m_strCurrentLine = QString();
 
-    // ========== Actions List ==========
-    m_ActionList = nullptr;
-
     // ========== Line Position Tracking ==========
-    m_pLinePositions = nullptr;
     m_total_lines = 0;
     m_new_lines = 0;
     m_newlines_received = 0;
-    m_nTotalLinesSent = 0;
-    m_nTotalLinesReceived = 0;
+    // m_nTotalLinesSent, m_nTotalLinesReceived: zero-initialized by ConnectionManager ctor.
     m_last_line_with_IAC_GA = 0;
 
     // ========== Timing Variables ==========
-    m_tConnectTime = QDateTime();
+    // m_tConnectTime, m_tsConnectDuration, m_whenWorldStarted,
+    // m_whenWorldStartedHighPrecision: zero-initialized by ConnectionManager ctor.
     m_tLastPlayerInput = QDateTime();
-    m_tsConnectDuration = 0;
-    m_whenWorldStarted = QDateTime();
-    m_whenWorldStartedHighPrecision = 0;
     m_tStatusTime = QDateTime();
     m_lastMousePosition = QPoint(0, 0);
     m_view_number = 0;
 
     // ========== Telnet Negotiation Phase ==========
-    m_phase = NONE; // Start in normal text mode
-    m_ttype_sequence = 0;
+    // Fields moved to TelnetParser; TelnetParser constructor zero-initializes them.
+    // m_telnetParser already created above.
 
-    // ========== MCCP Compression ==========
-    memset(&m_zCompress, 0, sizeof(m_zCompress)); // Zero-initialize z_stream
-    m_bCompress = false;
-    m_bCompressInitOK = false;
-    m_CompressInput = nullptr;
-    m_CompressOutput = nullptr;
-    m_nTotalUncompressed = 0;
-    m_nTotalCompressed = 0;
-    m_iCompressionTimeTaken = 0;
-    m_nCompressionOutputBufferSize = COMPRESS_BUFFER_LENGTH; // Default 20000
-    m_iMCCP_type = 0;
-    m_bSupports_MCCP_2 = false;
-
-    // ========== Telnet Subnegotiation ==========
-    m_subnegotiation_type = 0;
-    m_IAC_subnegotiation_data = QByteArray();
-
-    // ========== Telnet Negotiation Arrays ==========
-    for (int i = 0; i < 256; i++) {
-        m_bClient_sent_IAC_DO[i] = false;
-        m_bClient_sent_IAC_DONT[i] = false;
-        m_bClient_sent_IAC_WILL[i] = false;
-        m_bClient_sent_IAC_WONT[i] = false;
-        m_bClient_got_IAC_DO[i] = false;
-        m_bClient_got_IAC_DONT[i] = false;
-        m_bClient_got_IAC_WILL[i] = false;
-        m_bClient_got_IAC_WONT[i] = false;
-    }
-
-    // ========== MSP (MUD Sound Protocol) ==========
-    m_bMSP = false;
-
-    // ========== ZMP (Zenith MUD Protocol) ==========
-    m_bZMP = false;
+    // ========== MSP / ZMP / ATCP ==========
+    // m_bMSP, m_bZMP, m_bATCP moved to TelnetParser.
     m_strZMPpackage.clear();
-
-    // ========== ATCP (Achaea Telnet Client Protocol) ==========
-    m_bATCP = false;
 
     // ========== GMCP (Generic Mud Communication Protocol) ==========
 
     // ========== MXP/Pueblo Runtime State ==========
-    m_bMXP = false;
-    m_bPuebloActive = false;
-    m_iPuebloLevel = QString();
-    m_bPreMode = false;
-    m_iMXP_mode = 0;
-    m_iMXP_defaultMode = 0;
-    m_iMXP_previousMode = 0;
-    m_bInParagraph = false;
-    m_bMXP_script = false;
-    m_bSuppressNewline = false;
-    m_bMXP_nobr = false;
-    m_bMXP_preformatted = false;
-    m_bMXP_centered = false;
-    m_strMXP_link.clear();
-    m_strMXP_hint.clear();
-    m_bMXP_link_prompt = false;
-    m_iMXP_list_depth = 0;
-    m_iMXP_list_counter = 0;
-    m_iListMode = 0;
-    m_iListCount = 0;
-    m_strMXPstring = QString();
-    m_strMXPtagcontents = QString();
-    m_cMXPquoteTerminator = 0;
-    // MXP maps and lists are auto-initialized to empty
+    // All MXP runtime fields moved to MXPEngine (m_mxpEngine).
+    // MXPEngine constructor zero-initializes them.
     m_cLastChar = 0;
     m_lastSpace = -1; // No space position yet
     m_iLastOutstandingTagCount = 0;
-    m_strPuebloMD5 = QString();
-
-    // ========== MXP Statistics ==========
-    m_iMXPerrors = 0;
-    m_iMXPtags = 0;
-    m_iMXPentities = 0;
 
     // ========== ANSI State ==========
     m_code = 0;
@@ -617,29 +544,20 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_iNoteStyle = 0;
 
     // ========== Logging ==========
-    m_logfile = nullptr;
+    m_logfile.reset(); // ensure closed/null (default-constructed is already null)
     m_logfile_name = QString();
     m_LastFlushTime = QDateTime();
 
     // ========== Fonts ==========
-    for (int i = 0; i < 16; i++) {
-        m_font[i] = nullptr;
-    }
     m_FontHeight = 0;
     m_FontWidth = 0;
-    m_input_font = nullptr;
     m_InputFontHeight = 0;
     m_InputFontWidth = 0;
 
     // ========== Byte Counters ==========
-    m_nBytesIn = 0;
-    m_nBytesOut = 0;
+    // m_nBytesIn, m_nBytesOut: zero-initialized by ConnectionManager ctor.
 
-    // ========== Sockets ==========
-    m_sockAddr = nullptr;
-    m_hNameLookup = nullptr;
-    m_pGetHostStruct = nullptr;
-    m_iConnectPhase = 0;
+    // m_iConnectPhase: zero-initialized by ConnectionManager ctor (= CONNECT_NOT_CONNECTED).
 
     // ========== Scripting Engine ==========
     // Create script engine and initialize Lua
@@ -657,8 +575,6 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     // m_bTabCompleteFunctions and m_ExtraShiftTabCompleteItems initialized in Tab Completion
     // section
     m_strLastImmediateExpression = QString();
-    m_pThread = nullptr;
-    m_eventScriptFileChanged = nullptr;
     m_bInScriptFileChanged = false;
     m_timeScriptFileMod = QDateTime();
     m_scriptFileWatcher = nullptr; // Created when script file is set
@@ -674,12 +590,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_dispidWorldDisconnect = 0;
     m_dispidWorldGetFocus = 0;
     m_dispidWorldLoseFocus = 0;
-    m_dispidOnMXP_Start = 0;
-    m_dispidOnMXP_Stop = 0;
-    m_dispidOnMXP_OpenTag = 0;
-    m_dispidOnMXP_CloseTag = 0;
-    m_dispidOnMXP_SetVariable = 0;
-    m_dispidOnMXP_Error = 0;
+    // MXP DISPID fields moved to MXPEngine (m_mxpEngine).
 
     // ========== Plugin State ==========
     m_bPluginProcessesOpenTag = false;
@@ -688,15 +599,6 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_bPluginProcessesSetEntity = false;
     m_bPluginProcessesError = false;
 
-    // ========== Find Info Structures ==========
-    m_DisplayFindInfo = nullptr;
-    m_RecallFindInfo = nullptr;
-    m_TriggersFindInfo = nullptr;
-    m_AliasesFindInfo = nullptr;
-    m_MacrosFindInfo = nullptr;
-    m_TimersFindInfo = nullptr;
-    m_VariablesFindInfo = nullptr;
-    m_NotesFindInfo = nullptr;
     m_bRecallCommands = false;
     m_bRecallOutput = false;
     m_bRecallNotes = false;
@@ -705,19 +607,10 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_iUniqueDocumentNumber = 0;
 
     // ========== Mapping ==========
-    m_strMapList = nullptr;
-    m_MapFailureRegexp = nullptr;
     m_strSpecialForwards = QString();
     m_strSpecialBackwards = QString();
-    m_pTimerWnd = nullptr;
-    // m_CommandQueue initializes empty
+    // m_CommandQueue moved to ConnectionManager; initialized empty by ConnectionManager ctor.
     m_bShowingMapperStatus = false;
-    m_strIncludeFileList = nullptr;
-    m_strCurrentIncludeFileList = nullptr;
-
-    // ========== Configuration Arrays ==========
-    m_NumericConfiguration = nullptr;
-    m_AlphaConfiguration = nullptr;
 
     // ========== Plugins ==========
     m_PluginList.clear(); // QList, not pointer
@@ -733,25 +626,17 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     // ========== Arrays for scripting ==========
     // m_Arrays is a std::map and is default-initialized to empty
 
-    // ========== Special Fonts ==========
-    m_strSpecialFontName = nullptr;
-
     // ========== Background Image ==========
     m_strBackgroundImageName = QString();
-    m_BackgroundBitmap = nullptr;
     m_iBackgroundMode = 0;
     m_iBackgroundColour = qRgb(0, 0, 0);
 
     // ========== Foreground Image ==========
     m_strForegroundImageName = QString();
-    m_ForegroundBitmap = nullptr;
     m_iForegroundMode = 0;
 
     // ========== MiniWindows ==========
     // m_MiniWindowMap and m_MiniWindowsOrder are initialized by their default constructors
-
-    // ========== Databases ==========
-    m_Databases = nullptr;
 
     // ========== Text Rectangle ==========
     m_TextRectangle = QRect(0, 0, 0, 0);
@@ -762,7 +647,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_TextRectangleOutsideFillStyle = 0;
 
     // ========== Sound System ==========
-    // Sound buffers initialized in InitializeSoundSystem()
+    // m_soundManager created above; audio engine lazy-loaded on first playSound() call.
 
     // ========== Info Bar ==========
     m_infoBarText = QString();
@@ -776,11 +661,6 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     // ========== Accelerators ==========
     m_acceleratorManager = new AcceleratorManager(this, this);
 
-    // ========== Color Translation ==========
-    m_ColourTranslationMap = nullptr;
-
-    // ========== Outstanding Lines ==========
-    m_OutstandingLines = nullptr;
     m_bNotesNotWantedNow = false;
     m_bDoingSimulate = false;
     m_bLineOmittedFromOutput = false;
@@ -788,11 +668,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_bScrollBarWanted = false;
 
     // ========== IAC Counters ==========
-    m_nCount_IAC_DO = 0;
-    m_nCount_IAC_DONT = 0;
-    m_nCount_IAC_WILL = 0;
-    m_nCount_IAC_WONT = 0;
-    m_nCount_IAC_SB = 0;
+    // Moved to TelnetParser; initialized to 0 by TelnetParser constructor.
 
     // ========== UI State Strings ==========
     m_strWordUnderMenu = QString();
@@ -838,8 +714,9 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_timerCheckTimer->start(1000); // Fire every 1000ms (1 second)
 
     // ========== Sound System ==========
-    // Audio system is lazy-loaded on first use (in PlaySound)
-    // This avoids creating audio objects in tests and headless environments
+    // Audio system is lazy-loaded on first use (in m_soundManager->playSound())
+    // This avoids creating audio objects in tests and headless environments.
+    // m_soundManager itself is already created above.
 }
 
 WorldDocument::~WorldDocument()
@@ -864,18 +741,20 @@ WorldDocument::~WorldDocument()
     }
 
     // ========== Sound System Cleanup ==========
-    CleanupSoundSystem();
+    if (m_soundManager)
+        m_soundManager->cleanup();
 
-    if (m_pSocket) {
-        // Socket cleanup handled by network layer
-        m_pSocket = nullptr;
+    // Socket is Qt parent-child owned (parent = this); Qt deletes it when WorldDocument dies.
+    // m_connectionManager->m_pSocket is non-owning — just null it before ConnectionManager dtor.
+    if (m_connectionManager) {
+        m_connectionManager->m_pSocket = nullptr;
     }
 
     // ========== Save and Clean Up Plugins ==========
     // Save plugin state for all plugins before cleanup
     for (const auto& plugin : m_PluginList) {
         if (plugin) {
-            plugin->SaveState();
+            (void)plugin->SaveState();
         }
     }
 
@@ -907,33 +786,18 @@ WorldDocument::~WorldDocument()
     }
 
     // ========== MCCP Compression Cleanup ==========
-    // Clean up zlib decompression stream
-    if (m_bCompressInitOK) {
-        inflateEnd(&m_zCompress);
-        m_bCompressInitOK = false;
-    }
-
-    // Free compression buffers
-    if (m_CompressOutput) {
-        free(m_CompressOutput);
-        m_CompressOutput = nullptr;
-    }
-
-    if (m_CompressInput) {
-        free(m_CompressInput);
-        m_CompressInput = nullptr;
-    }
+    // Handled by TelnetParser destructor (cleanupZlib()).
+    // m_telnetParser (unique_ptr) is destroyed automatically after this destructor body.
 
     // ========== Line Buffer Cleanup ==========
-    // Delete all lines in buffer
-    qDeleteAll(m_lineList);
+    // m_lineList (std::vector<std::unique_ptr<Line>>) cleans up automatically
+    // m_currentLine (std::unique_ptr<Line>) cleans up automatically
     m_lineList.clear();
+    m_currentLine.reset();
 
-    // Delete current line if it exists
-    if (m_currentLine) {
-        delete m_currentLine;
-        m_currentLine = nullptr;
-    }
+    // ========== MXP Cleanup ==========
+    // MXPEngine destructor calls CleanupMXP() automatically.
+    // m_mxpEngine (unique_ptr) is destroyed automatically after this destructor body.
 
     // ========== MiniWindow Cleanup ==========
     // Clear all miniwindows (unique_ptr handles deletion automatically)
@@ -1043,14 +907,14 @@ void WorldDocument::packFlags()
  */
 void WorldDocument::ReceiveMsg()
 {
-    if (!m_pSocket) {
+    if (!m_connectionManager->m_pSocket) {
         qCDebug(lcWorld) << "ReceiveMsg: No socket";
         return;
     }
 
     // Read all available data
     std::array<char, 8192> buffer{};
-    auto result = m_pSocket->receive(buffer);
+    auto result = m_connectionManager->m_pSocket->receive(buffer);
     if (!result) {
         qCDebug(lcWorld) << "ReceiveMsg: Socket read error:" << result.error();
         return;
@@ -1061,8 +925,8 @@ void WorldDocument::ReceiveMsg()
     }
 
     // Update statistics
-    m_nBytesIn += nRead;
-    m_iInputPacketCount++;
+    m_connectionManager->m_nBytesIn += nRead;
+    m_connectionManager->m_iInputPacketCount++;
 
     // Notify plugins of raw packet received (for protocol debugging)
     // Note: Original MUSHclient uses SendToAllPluginCallbacksRtn which can modify the data
@@ -1071,90 +935,81 @@ void WorldDocument::ReceiveMsg()
     SendToAllPluginCallbacks(ON_PLUGIN_PACKET_RECEIVED, packetData, false);
 
     // Check if we need to decompress the data
-    if (m_bCompress) {
+    auto& tp = *m_telnetParser;
+    if (tp.m_bCompress) {
         // MCCP decompression with staging buffer
         // Check if we have space in the input buffer for the new data
-        if ((COMPRESS_BUFFER_LENGTH - m_zCompress.avail_in) < (unsigned int)nRead) {
+        if ((TELNET_COMPRESS_BUFFER_LENGTH - tp.m_zCompress.avail_in) < static_cast<uInt>(nRead)) {
             qCDebug(lcWorld) << "Insufficient space in compression input buffer";
             OnConnectionDisconnect();
             return;
         }
 
-        // Shuffle any remaining unconsumed data to the start of the buffer
-        if (m_zCompress.avail_in > 0) {
-            memmove(m_CompressInput, m_zCompress.next_in, m_zCompress.avail_in);
+        // Shuffle any remaining unconsumed data to the start of the vector
+        if (tp.m_zCompress.avail_in > 0) {
+            memmove(tp.m_CompressInput.data(), tp.m_zCompress.next_in, tp.m_zCompress.avail_in);
         }
-        m_zCompress.next_in = m_CompressInput;
+        tp.m_zCompress.next_in = tp.m_CompressInput.data();
 
         // Append new compressed data to the staging buffer
-        memcpy(&m_zCompress.next_in[m_zCompress.avail_in], buffer.data(), nRead);
-        m_zCompress.avail_in += nRead;
-        m_nTotalCompressed += nRead;
+        memcpy(tp.m_CompressInput.data() + tp.m_zCompress.avail_in, buffer.data(), nRead);
+        tp.m_zCompress.avail_in += static_cast<uInt>(nRead);
+        tp.m_nTotalCompressed += nRead;
 
         // Keep decompressing until all input is consumed
         do {
-            // Set up output buffer
-            m_zCompress.next_out = m_CompressOutput;
-            m_zCompress.avail_out = m_nCompressionOutputBufferSize;
+            // Set up output buffer — z_stream.next_out points into the vector's storage
+            tp.m_zCompress.next_out = tp.m_CompressOutput.data();
+            tp.m_zCompress.avail_out = static_cast<uInt>(tp.m_CompressOutput.size());
 
             // Decompress
             QElapsedTimer timer;
             timer.start();
-            int izError = inflate(&m_zCompress, Z_SYNC_FLUSH);
-            m_iCompressionTimeTaken += timer.elapsed();
+            int izError = inflate(&tp.m_zCompress, Z_SYNC_FLUSH);
+            tp.m_iCompressionTimeTaken += timer.elapsed();
 
             // Handle Z_BUF_ERROR by growing the output buffer
             if (izError == Z_BUF_ERROR) {
-                // Output buffer is too small - double it and try again
-                qint32 newSize = m_nCompressionOutputBufferSize * 2;
-                Bytef* newBuffer = (Bytef*)realloc(m_CompressOutput, newSize);
-                if (!newBuffer) {
-                    qCDebug(lcWorld) << "Failed to grow compression output buffer";
-                    m_bCompress = false;
-                    OnConnectionDisconnect();
-                    return;
-                }
-                m_CompressOutput = newBuffer;
-                m_nCompressionOutputBufferSize = newSize;
+                const std::size_t newSize = tp.m_CompressOutput.size() * 2;
+                tp.m_CompressOutput.resize(newSize);
                 qCDebug(lcWorld) << "Grew compression output buffer to" << newSize << "bytes";
 
-                // Reset output buffer pointers and try again
-                m_zCompress.next_out = m_CompressOutput;
-                m_zCompress.avail_out = m_nCompressionOutputBufferSize;
+                tp.m_zCompress.next_out = tp.m_CompressOutput.data();
+                tp.m_zCompress.avail_out = static_cast<uInt>(newSize);
 
                 timer.start();
-                izError = inflate(&m_zCompress, Z_SYNC_FLUSH);
-                m_iCompressionTimeTaken += timer.elapsed();
+                izError = inflate(&tp.m_zCompress, Z_SYNC_FLUSH);
+                tp.m_iCompressionTimeTaken += timer.elapsed();
             }
 
             if (izError != Z_OK && izError != Z_STREAM_END) {
                 qCDebug(lcWorld) << "MCCP decompression error:" << izError;
-                if (m_zCompress.msg) {
-                    qCDebug(lcWorld) << "  zlib message:" << m_zCompress.msg;
+                if (tp.m_zCompress.msg) {
+                    qCDebug(lcWorld) << "  zlib message:" << tp.m_zCompress.msg;
                 }
-                // Stop compression on error
-                m_bCompress = false;
+                tp.m_bCompress = false;
                 OnConnectionDisconnect();
                 return;
             }
 
             // Calculate how many bytes were decompressed
-            qint64 nDecompressed = m_nCompressionOutputBufferSize - m_zCompress.avail_out;
-            m_nTotalUncompressed += nDecompressed;
+            const qint64 nDecompressed =
+                static_cast<qint64>(tp.m_CompressOutput.size()) - tp.m_zCompress.avail_out;
+            tp.m_nTotalUncompressed += nDecompressed;
 
             // Process each decompressed byte through the telnet state machine
             for (qint64 i = 0; i < nDecompressed; i++) {
-                ProcessIncomingByte(m_CompressOutput[i]);
+                ProcessIncomingByte(tp.m_CompressOutput[static_cast<std::size_t>(i)]);
             }
 
             // If we hit stream end, compression is done
             if (izError == Z_STREAM_END) {
                 qCDebug(lcWorld) << "MCCP stream ended";
-                m_bCompress = false;
+                tp.m_bCompress = false;
                 break;
             }
 
-        } while (m_zCompress.avail_in > 0);
+        } while (tp.m_zCompress.avail_in > 0);
     } else {
         // No compression - process each byte directly through the telnet state machine
         for (qint64 i = 0; i < nRead; i++) {
@@ -1169,156 +1024,11 @@ void WorldDocument::ReceiveMsg()
     }
 }
 
-/**
- * OnConnect - Called when connection succeeds or fails
- *
- * This is called from WorldSocket::onConnected() (errorCode=0)
- * or WorldSocket::onError() (errorCode=socket error).
- *
- * Will be fully implemented in .
- *
- * Port from: doc.cpp (search for "OnConnect")
- */
-void WorldDocument::OnConnect(int errorCode)
-{
-    if (errorCode == 0) {
-        // Connection succeeded!
-        qCDebug(lcWorld) << "WorldDocument::OnConnect() - connected successfully to" << m_server
-                         << ":" << m_port;
-        m_iConnectPhase = eConnectConnectedToMud;
-        m_tConnectTime = QDateTime::currentDateTime();
-
-        // Initialize parser state
-        m_phase = NONE;
-        m_bCompress = false;
-        m_code = 0;
-        memset(m_UTF8Sequence, 0, sizeof(m_UTF8Sequence));
-        m_iUTF8BytesLeft = 0;
-        memset(m_bClient_sent_IAC_DO, 0, sizeof(m_bClient_sent_IAC_DO));
-        memset(m_bClient_sent_IAC_DONT, 0, sizeof(m_bClient_sent_IAC_DONT));
-        memset(m_bClient_sent_IAC_WILL, 0, sizeof(m_bClient_sent_IAC_WILL));
-        memset(m_bClient_sent_IAC_WONT, 0, sizeof(m_bClient_sent_IAC_WONT));
-        memset(m_bClient_got_IAC_DO, 0, sizeof(m_bClient_got_IAC_DO));
-        memset(m_bClient_got_IAC_DONT, 0, sizeof(m_bClient_got_IAC_DONT));
-        memset(m_bClient_got_IAC_WILL, 0, sizeof(m_bClient_got_IAC_WILL));
-        memset(m_bClient_got_IAC_WONT, 0, sizeof(m_bClient_got_IAC_WONT));
-
-        // Create initial line if needed
-        if (!m_currentLine) {
-            m_currentLine = new Line(1,             // Line number
-                                     m_nWrapColumn, // Wrap column
-                                     m_iFlags,      // Style flags
-                                     m_iForeColour, // Foreground
-                                     m_iBackColour, // Background
-                                     m_bUTF_8       // UTF-8 mode
-            );
-
-            // Create initial style
-            auto initialStyle = std::make_unique<Style>();
-            initialStyle->iLength = 0;
-            initialStyle->iFlags = m_iFlags;
-            initialStyle->iForeColour = m_iForeColour;
-            initialStyle->iBackColour = m_iBackColour;
-            initialStyle->pAction = nullptr;
-            m_currentLine->styleList.push_back(std::move(initialStyle));
-        }
-
-        // Call Lua callback for world connect
-        onWorldConnect();
-
-        // Notify plugins of connection
-        SendToAllPluginCallbacks(ON_PLUGIN_CONNECT);
-
-        // Start remote access server if configured
-        qCDebug(lcWorld) << "Remote access check: enabled=" << m_bEnableRemoteAccess
-                         << "port=" << m_iRemotePort
-                         << "password_set=" << !m_strRemotePassword.isEmpty();
-        if (m_bEnableRemoteAccess && m_iRemotePort > 0 && !m_strRemotePassword.isEmpty()) {
-            if (!m_pRemoteServer) {
-                m_pRemoteServer = std::make_unique<RemoteAccessServer>(this);
-            }
-            m_pRemoteServer->setPassword(m_strRemotePassword);
-            m_pRemoteServer->setScrollbackLines(m_iRemoteScrollbackLines);
-            m_pRemoteServer->setMaxClients(m_iRemoteMaxClients);
-            if (auto result = m_pRemoteServer->start(m_iRemotePort); result) {
-                qCDebug(lcWorld) << "Remote access server started on port" << m_iRemotePort;
-            } else {
-                qCWarning(lcWorld)
-                    << "Remote access server FAILED to start on port" << m_iRemotePort;
-            }
-        } else {
-            qCDebug(lcWorld) << "Remote access server not starting (conditions not met)";
-        }
-
-        // TODO: Implement additional connect handling:
-        // - Send connect text (m_connect_text)
-        // - Execute connect script (m_strWorldConnect)
-        // - Send plugin callbacks
-        // - Start timers
-
-        emit connectionStateChanged(true);
-    } else {
-        // Connection failed
-        qCDebug(lcWorld) << "WorldDocument::OnConnect() - connection failed with error:"
-                         << errorCode;
-        m_iConnectPhase = eConnectNotConnected;
-
-        // TODO: Implement error handling:
-        // - Display error message
-        // - Execute error script
-        // - Attempt reconnect if configured
-
-        emit connectionStateChanged(false);
-    }
-}
-
-/**
- * connectToMud - Initiate connection to the MUD server
- *
- * Called by user action (Game → Connect) or auto-connect on world open.
- */
-void WorldDocument::connectToMud()
-{
-    if (!m_pSocket) {
-        qCDebug(lcWorld) << "connectToMud: No socket available!";
-        return;
-    }
-
-    if (m_pSocket->isConnected()) {
-        qCDebug(lcWorld) << "connectToMud: Already connected";
-        return;
-    }
-
-    if (m_server.isEmpty()) {
-        qCDebug(lcWorld) << "connectToMud: No server specified";
-        return;
-    }
-
-    qCDebug(lcWorld) << "connectToMud: Connecting to" << m_server << ":" << m_port;
-    m_iConnectPhase = eConnectConnectingToMud;
-    m_pSocket->connectToHost(m_server, m_port);
-}
-
-/**
- * disconnectFromMud - Disconnect from the MUD server
- *
- * Called by user action (Game → Disconnect) or on world close.
- */
-void WorldDocument::disconnectFromMud()
-{
-    if (!m_pSocket) {
-        return;
-    }
-
-    if (!m_pSocket->isConnected()) {
-        qCDebug(lcWorld) << "disconnectFromMud: Not connected";
-        return;
-    }
-
-    qCDebug(lcWorld) << "disconnectFromMud: Disconnecting from" << m_server;
-    m_iConnectPhase = eConnectDisconnecting;
-    m_pSocket->disconnectFromHost();
-}
+// NOTE: OnConnect(), connectToMud(), disconnectFromMud(), connectedTime(),
+//       resetConnectedTime() implementation moved to ConnectionManager.
+//       WorldDocument::OnConnect() / connectToMud() / disconnectFromMud() /
+//       connectedTime() / resetConnectedTime() are now inline forwarding wrappers
+//       in world_document.h that delegate to m_connectionManager.
 
 /**
  * sendToMud - Send text to the MUD
@@ -1331,7 +1041,8 @@ void WorldDocument::disconnectFromMud()
  */
 void WorldDocument::sendToMud(const QString& text)
 {
-    if (!m_pSocket || !m_pSocket->isConnected()) {
+    auto& cm = *m_connectionManager;
+    if (!cm.m_pSocket || !cm.m_pSocket->isConnected()) {
         qCDebug(lcWorld) << "sendToMud: Not connected";
         return;
     }
@@ -1348,32 +1059,9 @@ void WorldDocument::sendToMud(const QString& text)
                 static_cast<std::size_t>(data.length())});
 
     // Increment statistics
-    m_nTotalLinesSent++;
+    cm.m_nTotalLinesSent++;
 
     qCDebug(lcWorld) << "sendToMud:" << text;
-}
-
-/**
- * connectedTime - Get the duration of the current connection
- *
- * @return Seconds connected, or -1 if not connected
- */
-qint64 WorldDocument::connectedTime() const
-{
-    if (!m_tConnectTime.isValid()) {
-        return -1;
-    }
-    return m_tConnectTime.secsTo(QDateTime::currentDateTime());
-}
-
-/**
- * resetConnectedTime - Reset the connection timer to now
- *
- * Called when user double-clicks the time indicator in the status bar.
- */
-void WorldDocument::resetConnectedTime()
-{
-    m_tConnectTime = QDateTime::currentDateTime();
 }
 
 // ========== Command Execution Pipeline ==========
@@ -1417,9 +1105,11 @@ void WorldDocument::SendMsg(const QString& text, bool bEcho, bool bQueue, bool b
         lines.append(strText);
     }
 
+    auto& commandQueue = m_connectionManager->m_CommandQueue;
+
     for (const QString& line : lines) {
         // Queue if speedwalk delay active OR already items in queue
-        if (m_iSpeedWalkDelay > 0 && (bQueue || !m_CommandQueue.isEmpty())) {
+        if (m_iSpeedWalkDelay > 0 && (bQueue || !commandQueue.isEmpty())) {
             // Encode echo/log flags in prefix character
             // Original uses: Q = queue+echo, q = queue+no-echo,
             //                I = immediate+echo, i = immediate+no-echo
@@ -1438,7 +1128,7 @@ void WorldDocument::SendMsg(const QString& text, bool bEcho, bool bQueue, bool b
             }
 
             // Queue it
-            m_CommandQueue.append(prefix + line);
+            commandQueue.append(prefix + line);
         } else {
             // Send immediately
             DoSendMsg(line, bEcho, bLog);
@@ -1470,7 +1160,7 @@ bool WorldDocument::sendTextToMud(const QString& text, const QString& preamble,
     int totalLines = lines.size();
 
     // Use actual logging setting
-    bool bLog = (m_log_input != 0);
+    bool bLog = m_log_input;
 
     // Track state for commented softcode mode
     bool hashCommenting = false;
@@ -1641,7 +1331,7 @@ void WorldDocument::DoSendMsg(const QString& text, bool bEcho, bool bLog)
     // ========== Input Echoing ==========
     // Echo sent text to output window if requested
     // Don't echo if m_bNoEcho is set (MUD requested echo suppression for password entry)
-    if (bEcho && m_display_my_input && !m_bNoEcho) {
+    if (bEcho && m_display_my_input && !m_telnetParser->m_bNoEcho) {
         // Display as colored note with input colors
         QRgb inputFore = m_normalcolour[m_echo_colour % 8]; // Ensure valid index 0-7
         QRgb inputBack = m_normalcolour[0];                 // Black background (index 0)
@@ -1679,7 +1369,7 @@ void WorldDocument::DoSendMsg(const QString& text, bool bEcho, bool bLog)
     }
 
     // Update statistics
-    m_nTotalLinesSent++;
+    m_connectionManager->m_nTotalLinesSent++;
     m_tLastPlayerInput = QDateTime::currentDateTime();
 
     // Notify plugins that send completed
@@ -1898,67 +1588,13 @@ void WorldDocument::Execute(const QString& command)
             addToCommandHistory(processedCommand);
         }
         // Note: If alias handled, the alias execution already added to history (if
-        // !bOmitFromCommandHistory)
+        // !omit_from_command_history)
     }
 }
 
-// ========== Command Queue ==========
-
-/**
- * GetCommandQueue - Get list of queued commands
- *
- * Returns a copy of the current command queue.
- *
- * @return QStringList of queued commands
- */
-QStringList WorldDocument::GetCommandQueue() const
-{
-    return m_CommandQueue;
-}
-
-/**
- * Queue - Add command to command queue
- *
- * Queues a command to be sent to the MUD. The command will be sent
- * according to the speedwalk delay setting.
- *
- * Based on methods_speedwalks.cpp
- *
- * @param message Command to queue
- * @param echo Whether to echo the command when sent
- * @return Error code (0=success, 30002=not connected, 30063=plugin processing)
- */
-qint32 WorldDocument::Queue(const QString& message, bool echo)
-{
-    if (m_iConnectPhase != eConnectConnectedToMud) {
-        return 30002; // eWorldClosed
-    }
-
-    if (m_bPluginProcessingSent) {
-        return 30063; // eItemInUse
-    }
-
-    // Add to queue via SendMsg with queue=true
-    SendMsg(message, echo, true, false);
-    return 0; // eOK
-}
-
-/**
- * DiscardQueue - Clear the command queue
- *
- * Clears all queued commands and returns the count of discarded items.
- *
- * Based on methods_speedwalks.cpp
- *
- * @return Number of commands that were discarded
- */
-qint32 WorldDocument::DiscardQueue()
-{
-    qint32 count = m_CommandQueue.size();
-    m_CommandQueue.clear();
-    // TODO: Update status line to show queue is empty
-    return count;
-}
+// NOTE: GetCommandQueue(), Queue(), DiscardQueue() implementation moved to ConnectionManager.
+// WorldDocument::GetCommandQueue() / Queue() / DiscardQueue() are now inline forwarding wrappers
+// in world_document.h that delegate to m_connectionManager.
 
 // ========== Command Input Window ==========
 
@@ -2640,7 +2276,7 @@ QString WorldDocument::RemoveBacktracks(const QString& speedWalkString)
 Style* WorldDocument::AddStyle(quint16 iFlags, QRgb iForeColour, QRgb iBackColour, quint16 iLength,
                                const std::shared_ptr<Action>& pAction)
 {
-    Line* pLine = m_currentLine;
+    Line* pLine = m_currentLine.get();
 
     // Can't add style without a line
     if (!pLine)
@@ -2698,19 +2334,18 @@ Style* WorldDocument::AddStyle(quint16 iFlags, QRgb iForeColour, QRgb iBackColou
  *
  * @param line The completed Line object to add (ownership transferred to buffer)
  */
-void WorldDocument::AddLineToBuffer(Line* line)
+void WorldDocument::AddLineToBuffer(std::unique_ptr<Line> line)
 {
     if (!line) {
         return; // Null check
     }
 
-    // Add line to buffer
-    m_lineList.append(line);
+    // Add line to buffer (ownership transferred)
+    m_lineList.push_back(std::move(line));
 
     // Trim buffer if too large
-    while (m_lineList.count() > m_maxlines) {
-        Line* oldLine = m_lineList.takeFirst();
-        delete oldLine;
+    while (static_cast<qint32>(m_lineList.size()) > m_maxlines) {
+        m_lineList.erase(m_lineList.begin()); // oldest line is deleted automatically
     }
 }
 
@@ -2799,7 +2434,7 @@ void WorldDocument::AddToLine(const char* sText, int iLength)
     m_currentLine->textBuffer.resize(currentLen + iLength);
 
     // Copy text to buffer
-    memcpy(m_currentLine->text() + currentLen, sText, iLength);
+    memcpy(m_currentLine->textBuffer.data() + currentLen, sText, iLength);
 
     // Add null terminator for C-string compatibility
     m_currentLine->textBuffer.push_back('\0');
@@ -2848,8 +2483,8 @@ void WorldDocument::AddToLine(unsigned char c)
  *
  * This is called when the current line length exceeds m_nWrapColumn.
  * Behavior depends on m_wrap setting:
- * - m_wrap = 0: Hard break at column boundary
- * - m_wrap = 1: Word-wrap at last space (if found within reasonable distance)
+ * - m_wrap = false: Hard break at column boundary
+ * - m_wrap = true: Word-wrap at last space (if found within reasonable distance)
  *
  * Word-wrap logic:
  * 1. If m_wrap is enabled and we have a valid last space position
@@ -2869,7 +2504,7 @@ void WorldDocument::handleLineWrap()
     int breakPoint = -1;
 
     // If word-wrap is enabled and we have a valid space position
-    if (m_wrap != 0 && m_lastSpace >= 0) {
+    if (m_wrap && m_lastSpace >= 0) {
         // Check that the text after the space isn't too long
         // (if remaining text is >= wrap column, we'd have to break again immediately)
         qint32 remainingLen = lineLen - m_lastSpace;
@@ -2890,7 +2525,7 @@ void WorldDocument::handleLineWrap()
 
         QByteArray carryOver;
         if (carryOverLen > 0) {
-            carryOver = QByteArray(m_currentLine->text() + carryOverStart, carryOverLen);
+            carryOver = QByteArray(m_currentLine->text().data() + carryOverStart, carryOverLen);
         }
 
         // Truncate current line AFTER the space (include the space in this line)
@@ -2931,7 +2566,7 @@ void WorldDocument::handleLineWrap()
 
         QByteArray carryOver;
         if (carryOverLen > 0) {
-            carryOver = QByteArray(m_currentLine->text() + splitPoint, carryOverLen);
+            carryOver = QByteArray(m_currentLine->text().data() + splitPoint, carryOverLen);
         }
 
         // Truncate current line at the split point
@@ -3003,120 +2638,13 @@ void WorldDocument::adjustStylesForTruncation(qint32 newLength)
 
 // ========== Lua Function Callbacks ==========
 
-/**
- * onWorldConnect - Called when connection to MUD succeeds
- *
- * Lua Function Callbacks
- * Based on CMUSHclientDoc::OnWorldConnect() from doc.cpp
- *
- * Calls the Lua function "OnWorldConnect" if it exists.
- * Scripts can use this to perform initialization when connecting.
- */
-void WorldDocument::onWorldConnect()
-{
-    // Check if we have a script engine
-    if (!m_ScriptEngine) {
-        return;
-    }
-
-    // Get DISPID if we haven't already
-    if (m_dispidWorldConnect == 0) {
-        m_dispidWorldConnect = m_ScriptEngine->getLuaDispid("OnWorldConnect");
-    }
-
-    // Skip if function doesn't exist
-    if (m_dispidWorldConnect == DISPID_UNKNOWN) {
-        return;
-    }
-
-    // Prepare empty parameter lists (this callback takes no parameters)
-    QList<double> nparams;
-    QList<QString> sparams;
-    long nInvocationCount = 0;
-    bool result = false;
-
-    // Call the Lua function
-    bool error =
-        m_ScriptEngine->executeLua(m_dispidWorldConnect, "OnWorldConnect", eWorldAction, "world",
-                                   "world connect", nparams, sparams, nInvocationCount, &result);
-
-    if (error) {
-        qCDebug(lcWorld) << "Error calling OnWorldConnect callback";
-    } else {
-        qCDebug(lcWorld) << "OnWorldConnect callback executed successfully";
-    }
-}
-
-/**
- * onWorldDisconnect - Called when connection to MUD closes
- *
- * Lua Function Callbacks
- * Based on CMUSHclientDoc::OnWorldDisconnect() from doc.cpp
- *
- * Calls the Lua function "OnWorldDisconnect" if it exists.
- * Scripts can use this to clean up when disconnecting.
- */
-void WorldDocument::onWorldDisconnect()
-{
-    // Check if we have a script engine
-    if (!m_ScriptEngine) {
-        return;
-    }
-
-    // Get DISPID if we haven't already
-    if (m_dispidWorldDisconnect == 0) {
-        m_dispidWorldDisconnect = m_ScriptEngine->getLuaDispid("OnWorldDisconnect");
-    }
-
-    // Skip if function doesn't exist
-    if (m_dispidWorldDisconnect == DISPID_UNKNOWN) {
-        return;
-    }
-
-    // Prepare empty parameter lists (this callback takes no parameters)
-    QList<double> nparams;
-    QList<QString> sparams;
-    long nInvocationCount = 0;
-    bool result = false;
-
-    // Call the Lua function
-    bool error = m_ScriptEngine->executeLua(m_dispidWorldDisconnect, "OnWorldDisconnect",
-                                            eWorldAction, "world", "world disconnect", nparams,
-                                            sparams, nInvocationCount, &result);
-
-    if (error) {
-        qCDebug(lcWorld) << "Error calling OnWorldDisconnect callback";
-    } else {
-        qCDebug(lcWorld) << "OnWorldDisconnect callback executed successfully";
-    }
-}
+// NOTE: onWorldConnect(), onWorldDisconnect(), OnConnectionDisconnect() implementation
+// moved to ConnectionManager. They are called from ConnectionManager::onConnect() and
+// ConnectionManager::onConnectionDisconnect().
+// WorldDocument::OnConnectionDisconnect() is now an inline forwarding wrapper in
+// world_document.h that calls m_connectionManager->onConnectionDisconnect().
 
 // ========== Stub Methods (Future Implementation) ==========
-
-void WorldDocument::OnConnectionDisconnect()
-{
-    qCDebug(lcWorld) << "OnConnectionDisconnect - disconnect detected";
-
-    // Stop remote access server if running
-    if (m_pRemoteServer && m_pRemoteServer->isRunning()) {
-        qCDebug(lcWorld) << "Stopping remote access server";
-        m_pRemoteServer->stop();
-    }
-
-    // Call Lua callback for world disconnect
-    onWorldDisconnect();
-
-    // Notify plugins of disconnection
-    SendToAllPluginCallbacks(ON_PLUGIN_DISCONNECT);
-
-    // Update connection state
-    m_iConnectPhase = eConnectNotConnected;
-    emit connectionStateChanged(false);
-
-    // TODO: Additional cleanup:
-    // - Stop timers
-    // - Clean up telnet state
-}
 
 /**
  * StartNewLine - Complete current line and start a new one
@@ -3161,7 +2689,8 @@ void WorldDocument::StartNewLine(bool bNewLine, unsigned char iFlags)
         // This allows plugins to process prompts and other unterminated lines
         // Based on original MUSHclient's SendLineToPlugin()
         if (!(iFlags & NOTE_OR_COMMAND)) {
-            QString partialLine = QString::fromUtf8(m_currentLine->text(), m_currentLine->len());
+            QString partialLine =
+                QString::fromUtf8(m_currentLine->text().data(), m_currentLine->text().size());
             SendToAllPluginCallbacks(ON_PLUGIN_PARTIAL_LINE, partialLine, false);
         }
 
@@ -3170,7 +2699,8 @@ void WorldDocument::StartNewLine(bool bNewLine, unsigned char iFlags)
         if (bNewLine && !(iFlags & NOTE_OR_COMMAND)) {
             // Add line text to recent lines buffer for multi-line trigger matching
             // Based on ProcessPreviousLine.cpp in original MUSHclient
-            QString lineText = QString::fromUtf8(m_currentLine->text(), m_currentLine->len());
+            QString lineText =
+                QString::fromUtf8(m_currentLine->text().data(), m_currentLine->text().size());
             m_recentLines.push_back(lineText);
             m_newlines_received++;
 
@@ -3179,23 +2709,24 @@ void WorldDocument::StartNewLine(bool bNewLine, unsigned char iFlags)
                 m_recentLines.pop_front();
             }
 
-            evaluateTriggers(m_currentLine);
+            evaluateTriggers(m_currentLine.get());
         }
 
         // Line-level logging integration
         // Log completed lines based on line type and logging flags
         if (bNewLine) {
-            logCompletedLine(m_currentLine);
+            logCompletedLine(m_currentLine.get());
         }
 
         // Detect and linkify URLs in the completed line
-        DetectAndLinkifyURLs(m_currentLine);
+        DetectAndLinkifyURLs(m_currentLine.get());
 
         // Notify plugins about the line being displayed (for accessibility/screen readers)
-        // iType: 0 = MUD output, 1 = COMMENT (note), 2 = USER_INPUT (command)
+        // type: 0 = MUD output, 1 = COMMENT (note), 2 = USER_INPUT (command)
         // iLog: whether line should be logged based on type
         if (bNewLine) {
-            QString lineText = QString::fromUtf8(m_currentLine->text(), m_currentLine->len());
+            QString lineText =
+                QString::fromUtf8(m_currentLine->text().data(), m_currentLine->text().size());
             unsigned char lineFlags = m_currentLine->flags;
             if (lineFlags & COMMENT) {
                 Screendraw(COMMENT, m_bLogNotes, lineText);
@@ -3208,8 +2739,8 @@ void WorldDocument::StartNewLine(bool bNewLine, unsigned char iFlags)
             }
         }
 
-        // Add completed line to buffer (this also handles buffer size limiting)
-        AddLineToBuffer(m_currentLine);
+        // Add completed line to buffer (ownership transferred via move)
+        AddLineToBuffer(std::move(m_currentLine));
     }
 
     // Create new line
@@ -3233,12 +2764,12 @@ void WorldDocument::StartNewLine(bool bNewLine, unsigned char iFlags)
     }
 
     // Create new Line object
-    m_currentLine = new Line(m_total_lines, // line number
-                             m_nWrapColumn, // wrap column
-                             iFlags,        // line flags
-                             initialFore,   // foreground color
-                             initialBack,   // background color
-                             m_bUTF_8);     // UTF-8 mode
+    m_currentLine = std::make_unique<Line>(m_total_lines, // line number
+                                           m_nWrapColumn, // wrap column
+                                           iFlags,        // line flags
+                                           initialFore,   // foreground color
+                                           initialBack,   // background color
+                                           m_bUTF_8);     // UTF-8 mode
 
     // Reset word-wrap tracking for new line
     m_lastSpace = -1;
@@ -3279,7 +2810,7 @@ void WorldDocument::DetectAndLinkifyURLs(Line* line)
     }
 
     // Convert line text to QString for regex matching
-    QString lineText = QString::fromUtf8(line->text(), line->len());
+    QString lineText = QString::fromUtf8(line->text().data(), line->text().size());
 
     // URL regex pattern - matches http://, https://, ftp://, mailto:
     // Excludes common punctuation that shouldn't be part of URLs
@@ -3438,7 +2969,7 @@ void WorldDocument::addToCommandHistory(const QString& command)
 
     // Don't record if server requested no echo (password entry) unless overridden
     // Based on sendvw.cpp: !(pDoc->m_bNoEcho && !pDoc->m_bAlwaysRecordCommandHistory)
-    if (m_bNoEcho && !m_bAlwaysRecordCommandHistory) {
+    if (m_telnetParser->m_bNoEcho && !m_bAlwaysRecordCommandHistory) {
         qCDebug(lcWorld) << "Command history: skipping due to echo suppression";
         return;
     }

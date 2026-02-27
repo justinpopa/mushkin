@@ -111,19 +111,19 @@ void CommandOptionsDialog::loadSettings()
         return;
 
     // Double-click behavior
-    m_doubleClickInserts->setChecked(m_doc->m_bDoubleClickInserts != 0);
-    m_doubleClickSends->setChecked(m_doc->m_bDoubleClickSends != 0);
+    m_doubleClickInserts->setChecked(m_doc->m_bDoubleClickInserts);
+    m_doubleClickSends->setChecked(m_doc->m_bDoubleClickSends);
 
     // Arrow key behavior
-    m_arrowKeysWrap->setChecked(m_doc->m_bArrowKeysWrap != 0);
-    m_arrowsChangeHistory->setChecked(m_doc->m_bArrowsChangeHistory != 0);
+    m_arrowKeysWrap->setChecked(m_doc->m_bArrowKeysWrap);
+    m_arrowsChangeHistory->setChecked(m_doc->m_bArrowsChangeHistory);
     m_arrowRecallsPartial->setChecked(m_doc->m_bArrowRecallsPartial);
-    m_altArrowRecallsPartial->setChecked(m_doc->m_bAltArrowRecallsPartial != 0);
+    m_altArrowRecallsPartial->setChecked(m_doc->m_bAltArrowRecallsPartial);
 
     // Input options
-    m_escapeDeletesInput->setChecked(m_doc->m_bEscapeDeletesInput != 0);
-    m_saveDeletedCommand->setChecked(m_doc->m_bSaveDeletedCommand != 0);
-    m_confirmBeforeReplacingTyping->setChecked(m_doc->m_bConfirmBeforeReplacingTyping != 0);
+    m_escapeDeletesInput->setChecked(m_doc->m_bEscapeDeletesInput);
+    m_saveDeletedCommand->setChecked(m_doc->m_bSaveDeletedCommand);
+    m_confirmBeforeReplacingTyping->setChecked(m_doc->m_bConfirmBeforeReplacingTyping);
 
     // Keyboard shortcuts
     m_ctrlZGoesToEndOfBuffer->setChecked(m_doc->m_bCtrlZGoesToEndOfBuffer);
@@ -137,19 +137,19 @@ void CommandOptionsDialog::saveSettings()
         return;
 
     // Double-click behavior
-    m_doc->m_bDoubleClickInserts = m_doubleClickInserts->isChecked() ? 1 : 0;
-    m_doc->m_bDoubleClickSends = m_doubleClickSends->isChecked() ? 1 : 0;
+    m_doc->m_bDoubleClickInserts = m_doubleClickInserts->isChecked();
+    m_doc->m_bDoubleClickSends = m_doubleClickSends->isChecked();
 
     // Arrow key behavior
-    m_doc->m_bArrowKeysWrap = m_arrowKeysWrap->isChecked() ? 1 : 0;
-    m_doc->m_bArrowsChangeHistory = m_arrowsChangeHistory->isChecked() ? 1 : 0;
+    m_doc->m_bArrowKeysWrap = m_arrowKeysWrap->isChecked();
+    m_doc->m_bArrowsChangeHistory = m_arrowsChangeHistory->isChecked();
     m_doc->m_bArrowRecallsPartial = m_arrowRecallsPartial->isChecked();
-    m_doc->m_bAltArrowRecallsPartial = m_altArrowRecallsPartial->isChecked() ? 1 : 0;
+    m_doc->m_bAltArrowRecallsPartial = m_altArrowRecallsPartial->isChecked();
 
     // Input options
-    m_doc->m_bEscapeDeletesInput = m_escapeDeletesInput->isChecked() ? 1 : 0;
-    m_doc->m_bSaveDeletedCommand = m_saveDeletedCommand->isChecked() ? 1 : 0;
-    m_doc->m_bConfirmBeforeReplacingTyping = m_confirmBeforeReplacingTyping->isChecked() ? 1 : 0;
+    m_doc->m_bEscapeDeletesInput = m_escapeDeletesInput->isChecked();
+    m_doc->m_bSaveDeletedCommand = m_saveDeletedCommand->isChecked();
+    m_doc->m_bConfirmBeforeReplacingTyping = m_confirmBeforeReplacingTyping->isChecked();
 
     // Keyboard shortcuts
     m_doc->m_bCtrlZGoesToEndOfBuffer = m_ctrlZGoesToEndOfBuffer->isChecked();

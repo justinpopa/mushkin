@@ -8,6 +8,8 @@
 ## Core Commands
 - **Build:** cmake --build build -j$(nproc)
 - **Test:** export QT_QPA_PLATFORM=offscreen && ctest --test-dir build --output-on-failure
+- **Lint:** clang-tidy -p build --checks='modernize-*,performance-*'
+- **Format:** clang-format --dry-run -Werror src/
 - **Fix:** clang-tidy -p build --fix --checks='modernize-*,performance-*'
 - **Visual Check:** ./build/bin/mushkin (Requires manual UI verification)
 
@@ -42,14 +44,20 @@ When spawning a Sonnet subagent, include the appropriate persona in the task pro
 **Reasoning tasks** (UB, concurrency, correctness):
 > You are a reasoning specialist for a C++26 codebase. Focus: (1) Identify UB from pointer aliasing, lifetime issues, signed overflow, sequence points. (2) Analyze lock-free algorithms, memory ordering, data races. (3) Provide step-by-step correctness proofs. (4) Cite specific C++ standard clauses when flagging UB.
 
-### Escape Hatch
-Use `/openrouter` to run a specialist model (via opencode) when a task genuinely benefits from it.
+### Escape Hatches
+- **Codex CLI** — direct access to OpenAI reasoning models (o3, etc.). Preferred for UB analysis, concurrency proofs, and correctness verification.
+- **`/openrouter`** — run any specialist model via opencode. Use when Codex CLI doesn't cover the needed model.
 
-**Escalation:** When Sonnet's analysis on UB, lifetime, or concurrency is uncertain or contradictory, escalate to a reasoning model via `/openrouter openai/o4-mini` (or `gpt-5-pro` for the hardest cases). This is a judgment call by the Overseer, not a routine step.
+**Escalation:** When Sonnet's analysis on UB, lifetime, or concurrency is uncertain or contradictory, escalate to a reasoning model via Codex CLI (o3) or `/openrouter` (o4-mini, gpt-5-pro). This is a judgment call by the Overseer, not a routine step.
 
 **Opus handles ONLY:** orchestration, cross-agent coordination, judgment calls, and user communication. When in doubt, delegate down — Haiku is nearly free, Opus is not.
 
 See AGENTS.md for full council details.
+
+## Code Style
+- Struct fields: snake_case (no Hungarian prefixes).
+- When editing a function, rename Hungarian-prefixed local variables to modern style
+  (e.g., nCount → count, pTrigger → trigger, iRow → row). No dedicated cleanup passes.
 
 ## Migration Tracking
 - See @docs/migration_status.md for per-module progress.

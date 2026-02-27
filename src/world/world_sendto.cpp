@@ -39,15 +39,15 @@
  *
  * @param iWhere Where to send (eSendToWorld, eSendToOutput, etc.)
  * @param strSendText Text to send
- * @param bOmitFromOutput If true, omit from output buffer
- * @param bOmitFromLog If true, omit from log file
+ * @param omit_from_output If true, omit from output buffer
+ * @param omit_from_log If true, omit from log file
  * @param strDescription Description for notepad/script (e.g., "trigger blah")
- * @param strVariable Variable name (for eSendToVariable)
+ * @param variable Variable name (for eSendToVariable)
  * @param strOutput [OUT] Accumulated output text (for eSendToOutput)
  */
-void WorldDocument::sendTo(quint16 iWhere, const QString& strSendText, bool bOmitFromOutput,
-                           bool bOmitFromLog, const QString& strDescription,
-                           const QString& strVariable, QString& strOutput,
+void WorldDocument::sendTo(quint16 iWhere, const QString& strSendText, bool omit_from_output,
+                           bool omit_from_log, const QString& strDescription,
+                           const QString& variable, QString& strOutput,
                            ScriptLanguage scriptLang)
 {
     // Empty send text does nothing for most destinations
@@ -64,7 +64,7 @@ void WorldDocument::sendTo(quint16 iWhere, const QString& strSendText, bool bOmi
         // Original: doc.cpp
         case eSendToWorld:
             if (!strSendText.isEmpty()) {
-                // TODO: Handle bOmitFromOutput and bOmitFromLog flags
+                // TODO: Handle omit_from_output and omit_from_log flags
                 // Original calls SendMsg() with these flags
                 // For now, just send directly
                 sendToMud(strSendText);
@@ -151,9 +151,9 @@ void WorldDocument::sendTo(quint16 iWhere, const QString& strSendText, bool bOmi
         // Original: doc.cpp
         case eSendToVariable:
             // Set variable using the variable system
-            // strVariable contains the variable name, strSendText contains the value
-            if (!strVariable.isEmpty()) {
-                setVariable(strVariable, strSendText);
+            // variable contains the variable name, strSendText contains the value
+            if (!variable.isEmpty()) {
+                setVariable(variable, strSendText);
             }
             break;
 
@@ -164,7 +164,7 @@ void WorldDocument::sendTo(quint16 iWhere, const QString& strSendText, bool bOmi
             // - Alias matching and expansion
             // - Command stacking (multiple commands separated by delimiter)
             // - Speedwalk expansion
-            // Note: bOmitFromLog flag not currently honored by Execute()
+            // Note: omit_from_log flag not currently honored by Execute()
             Execute(strSendText);
             break;
 

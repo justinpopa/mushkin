@@ -8,9 +8,11 @@
 #include "lua_api/lua_common.h"
 #include "notepad_widget.h"
 #include "world_document.h"
+#include "world_error.h"
 #include <QColor>
 #include <QMdiSubWindow>
 #include <QString>
+#include <expected>
 
 /**
  * RegisterNotepad - Register a notepad window with this world
@@ -85,10 +87,12 @@ NotepadWidget* WorldDocument::FindNotepad(const QString& title)
  */
 NotepadWidget* WorldDocument::CreateNotepadWindow(const QString& title, const QString& contents)
 {
-    // Create notepad widget
-    // Note: The widget's parent is set to nullptr here - the MDI subwindow will
-    // be the actual parent after the UI layer wraps it
+    // Create notepad widget.
+    // Parent is nullptr here — QMdiSubWindow takes ownership when the UI layer
+    // calls addSubWindow(). WA_DeleteOnClose ensures the widget is destroyed
+    // when closed even if no MDI subwindow is ever assigned (e.g. headless tests).
     NotepadWidget* notepad = new NotepadWidget(this, title, contents, nullptr);
+    notepad->setAttribute(Qt::WA_DeleteOnClose);
 
     // Emit signal so UI layer can wrap in MDI subwindow
     emit notepadCreated(notepad);
@@ -105,9 +109,10 @@ NotepadWidget* WorldDocument::CreateNotepadWindow(const QString& title, const QS
  *
  * @param title Notepad window title
  * @param contents New text content
- * @return true on success
+ * @return std::expected<void, WorldError> — always succeeds (creates notepad if needed)
  */
-bool WorldDocument::SendToNotepad(const QString& title, const QString& contents)
+std::expected<void, WorldError> WorldDocument::SendToNotepad(const QString& title,
+                                                             const QString& contents)
 {
     NotepadWidget* notepad = FindNotepad(title);
 
@@ -119,7 +124,11 @@ bool WorldDocument::SendToNotepad(const QString& title, const QString& contents)
         notepad = CreateNotepadWindow(title, contents);
     }
 
-    return (notepad != nullptr);
+    if (!notepad) {
+        return std::unexpected(WorldError{WorldErrorType::NotepadNotFound,
+                                          QString("Failed to create notepad: %1").arg(title)});
+    }
+    return {};
 }
 
 /**
@@ -129,9 +138,10 @@ bool WorldDocument::SendToNotepad(const QString& title, const QString& contents)
  *
  * @param title Notepad window title
  * @param contents Text to append
- * @return true on success
+ * @return std::expected<void, WorldError> — always succeeds (creates notepad if needed)
  */
-bool WorldDocument::AppendToNotepad(const QString& title, const QString& contents)
+std::expected<void, WorldError> WorldDocument::AppendToNotepad(const QString& title,
+                                                               const QString& contents)
 {
     NotepadWidget* notepad = FindNotepad(title);
 
@@ -143,7 +153,11 @@ bool WorldDocument::AppendToNotepad(const QString& title, const QString& content
         notepad = CreateNotepadWindow(title, contents);
     }
 
-    return (notepad != nullptr);
+    if (!notepad) {
+        return std::unexpected(WorldError{WorldErrorType::NotepadNotFound,
+                                          QString("Failed to create notepad: %1").arg(title)});
+    }
+    return {};
 }
 
 /**
@@ -153,39 +167,42 @@ bool WorldDocument::AppendToNotepad(const QString& title, const QString& content
  *
  * @param title Notepad window title
  * @param contents New text content
- * @return true if notepad found and replaced
+ * @return std::expected<void, WorldError> — error if notepad not found
  */
-bool WorldDocument::ReplaceNotepad(const QString& title, const QString& contents)
+std::expected<void, WorldError> WorldDocument::ReplaceNotepad(const QString& title,
+                                                              const QString& contents)
 {
     NotepadWidget* notepad = FindNotepad(title);
 
     if (!notepad) {
-        return false;
+        return std::unexpected(WorldError{WorldErrorType::NotepadNotFound,
+                                          QString("Notepad not found: %1").arg(title)});
     }
 
     notepad->ReplaceText(contents);
-    return true;
+    return {};
 }
 
 /**
  * ActivateNotepad - Bring notepad window to front
  *
  * @param title Notepad window title
- * @return true if notepad found
+ * @return std::expected<void, WorldError> — error if notepad not found
  */
-bool WorldDocument::ActivateNotepad(const QString& title)
+std::expected<void, WorldError> WorldDocument::ActivateNotepad(const QString& title)
 {
     NotepadWidget* notepad = FindNotepad(title);
 
     if (!notepad || !notepad->m_pMdiSubWindow) {
-        return false;
+        return std::unexpected(WorldError{WorldErrorType::NotepadNotFound,
+                                          QString("Notepad not found: %1").arg(title)});
     }
 
     // Activate the MDI subwindow
     notepad->m_pMdiSubWindow->raise();
     notepad->m_pMdiSubWindow->setFocus();
 
-    return true;
+    return {};
 }
 
 /**
@@ -206,7 +223,14 @@ qint32 WorldDocument::CloseNotepad(const QString& title, bool querySave)
     // For now, just close without save prompt
     // TODO: Implement save prompt if querySave is true and content modified
     if (notepad->m_pMdiSubWindow) {
+        // Close the MDI wrapper; WA_DeleteOnClose on the subwindow destroys it,
+        // which destroys the NotepadWidget child and triggers UnregisterNotepad.
         notepad->m_pMdiSubWindow->close();
+    } else {
+        // No MDI subwindow (e.g. headless / test environment).
+        // WA_DeleteOnClose is set on the widget itself — calling close() is
+        // sufficient to trigger deletion and UnregisterNotepad via ~NotepadWidget.
+        notepad->close();
     }
 
     return eOK;
@@ -352,21 +376,23 @@ qint32 WorldDocument::NotepadSaveMethod(const QString& title, qint32 method)
  * @param top Top position
  * @param width Width
  * @param height Height
- * @return true if notepad found and moved
+ * @return std::expected<void, WorldError> — error if notepad not found
  */
-bool WorldDocument::MoveNotepadWindow(const QString& title, qint32 left, qint32 top, qint32 width,
-                                      qint32 height)
+std::expected<void, WorldError> WorldDocument::MoveNotepadWindow(const QString& title, qint32 left,
+                                                                 qint32 top, qint32 width,
+                                                                 qint32 height)
 {
     NotepadWidget* notepad = FindNotepad(title);
 
     if (!notepad || !notepad->m_pMdiSubWindow) {
-        return false;
+        return std::unexpected(WorldError{WorldErrorType::NotepadNotFound,
+                                          QString("Notepad not found: %1").arg(title)});
     }
 
     // Set MDI window geometry
     notepad->m_pMdiSubWindow->setGeometry(left, top, width, height);
 
-    return true;
+    return {};
 }
 
 /**

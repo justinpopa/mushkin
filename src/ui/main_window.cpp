@@ -74,6 +74,7 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 #include <functional>
+#include <memory>
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent), m_mdiArea(nullptr), m_mainToolBar(nullptr), m_gameToolBar(nullptr),
@@ -1569,7 +1570,11 @@ void MainWindow::closeEvent(QCloseEvent* event)
                 if (worldWidget && worldWidget->isModified()) {
                     QString filename = worldWidget->filename();
                     if (!filename.isEmpty()) {
-                        worldWidget->saveToFile(filename);
+                        if (auto result = worldWidget->saveToFile(filename); !result) {
+                            QMessageBox::critical(
+                                this, "Error",
+                                QString("Failed to save world file:\n%1").arg(result.error()));
+                        }
                     }
                     // New worlds without a filename will be discarded
                     // (user would need to use Save As explicitly)
@@ -1813,7 +1818,7 @@ void MainWindow::updateMenus()
         if (worldWidget) {
             isConnected = worldWidget->isConnected();
             isLogOpen = worldWidget->document()->IsLogOpen();
-            isAutoSayEnabled = worldWidget->document()->m_bEnableAutoSay != 0;
+            isAutoSayEnabled = worldWidget->document()->m_bEnableAutoSay;
         }
     }
     m_connectAction->setEnabled(hasActiveWorld && !isConnected);
@@ -1836,7 +1841,7 @@ void MainWindow::updateMenus()
     if (hasActiveWorld) {
         WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
         if (worldWidget && worldWidget->document()) {
-            m_wrapOutputAction->setChecked(worldWidget->document()->m_wrap != 0);
+            m_wrapOutputAction->setChecked(worldWidget->document()->m_wrap);
         }
     }
 
@@ -2100,13 +2105,13 @@ void MainWindow::openWorld(const QString& filename)
     statusBar()->showMessage(QString("Opening %1...").arg(filename));
 
     // Create world widget
-    WorldWidget* worldWidget = new WorldWidget();
+    auto worldWidgetOwner = std::make_unique<WorldWidget>();
 
     // Load world file
-    if (!worldWidget->loadFromFile(filename)) {
-        delete worldWidget;
+    if (auto result = worldWidgetOwner->loadFromFile(filename); !result) {
+        // worldWidgetOwner destroyed automatically
         QMessageBox::critical(this, "Error",
-                              QString("Failed to load world file:\n%1").arg(filename));
+                              QString("Failed to load world file:\n%1").arg(result.error()));
         statusBar()->showMessage("Failed to load world file", 3000);
         return;
     }
@@ -2114,8 +2119,9 @@ void MainWindow::openWorld(const QString& filename)
     // Add to recent files
     addRecentFile(filename);
 
-    // Wrap in MDI subwindow
-    QMdiSubWindow* subWindow = m_mdiArea->addSubWindow(worldWidget);
+    // Transfer ownership to MDI area (Qt parent-child from here on)
+    WorldWidget* worldWidget = worldWidgetOwner.get();
+    QMdiSubWindow* subWindow = m_mdiArea->addSubWindow(worldWidgetOwner.release());
     subWindow->setAttribute(Qt::WA_DeleteOnClose);
     subWindow->setWindowTitle(worldWidget->worldName());
 
@@ -2238,12 +2244,12 @@ void MainWindow::saveWorld()
     }
 
     // Save to file
-    if (worldWidget->saveToFile(filename)) {
+    if (auto result = worldWidget->saveToFile(filename); result) {
         addRecentFile(filename);
         statusBar()->showMessage(QString("Saved %1").arg(worldWidget->worldName()), 3000);
     } else {
         QMessageBox::critical(this, "Error",
-                              QString("Failed to save world file:\n%1").arg(filename));
+                              QString("Failed to save world file:\n%1").arg(result.error()));
         statusBar()->showMessage("Failed to save world file", 3000);
     }
 }
@@ -2269,14 +2275,14 @@ void MainWindow::saveWorldAs()
         return;
     }
 
-    if (worldWidget->saveToFile(filename)) {
+    if (auto result = worldWidget->saveToFile(filename); result) {
         addRecentFile(filename);
         activeSubWindow->setWindowTitle(worldWidget->worldName());
         statusBar()->showMessage(
             QString("Saved %1 as %2").arg(worldWidget->worldName()).arg(filename), 3000);
     } else {
         QMessageBox::critical(this, "Error",
-                              QString("Failed to save world file:\n%1").arg(filename));
+                              QString("Failed to save world file:\n%1").arg(result.error()));
         statusBar()->showMessage("Failed to save world file", 3000);
     }
 }
@@ -2497,10 +2503,10 @@ void MainWindow::pasteToWorld()
     QString postamble = doc->m_paste_postamble;
     QString linePreamble = doc->m_pasteline_preamble;
     QString linePostamble = doc->m_pasteline_postamble;
-    bool commentedSoftcode = doc->m_bPasteCommentedSoftcode != 0;
+    bool commentedSoftcode = doc->m_bPasteCommentedSoftcode;
     int lineDelay = doc->m_nPasteDelay;
     int lineDelayPerLines = doc->m_nPasteDelayPerLines;
-    bool echo = doc->m_bPasteEcho != 0;
+    bool echo = doc->m_bPasteEcho;
     int lineCount = text.count('\n') + 1;
 
     // Check if confirmation is needed
@@ -3069,7 +3075,7 @@ void MainWindow::toggleAutoSay()
 
     // Toggle Auto-Say setting
     bool newValue = m_autoSayAction->isChecked();
-    doc->m_bEnableAutoSay = newValue ? 1 : 0;
+    doc->m_bEnableAutoSay = newValue;
 }
 
 void MainWindow::toggleWrapOutput()
@@ -3090,9 +3096,9 @@ void MainWindow::toggleWrapOutput()
     }
 
     // Toggle m_wrap (word-wrap at spaces enabled/disabled)
-    // m_wrap is a boolean (0=off, non-zero=on), separate from m_nWrapColumn (the wrap column width)
+    // m_wrap is separate from m_nWrapColumn (the wrap column width)
     // This matches original MUSHclient behavior from doc.cpp OnGameWraplines()
-    doc->m_wrap = m_wrapOutputAction->isChecked() ? 1 : 0;
+    doc->m_wrap = m_wrapOutputAction->isChecked();
 }
 
 void MainWindow::minimizeToTray()
@@ -3126,7 +3132,7 @@ void MainWindow::toggleTrace()
 
     // Toggle trace mode
     bool traceEnabled = m_traceAction->isChecked();
-    doc->m_bTrace = traceEnabled ? 1 : 0;
+    doc->m_bTrace = traceEnabled;
 }
 
 void MainWindow::testTrigger()
@@ -4115,14 +4121,11 @@ void MainWindow::clearOutput()
         QMessageBox::Yes | QMessageBox::No);
 
     if (reply == QMessageBox::Yes) {
-        // Clear the line list
+        // Clear the line list (unique_ptr destructors free each Line)
         doc->m_lineList.clear();
 
         // Clear current incomplete line if any
-        if (doc->m_currentLine) {
-            delete doc->m_currentLine;
-            doc->m_currentLine = nullptr;
-        }
+        doc->m_currentLine.reset();
 
         // Trigger redraw
         OutputView* outputView = worldWidget->outputView();
@@ -4168,8 +4171,9 @@ void MainWindow::recallText()
 
     // Create notepad window with results
     QString title = QString("Recall: %1").arg(dialog.searchText());
-    doc->SendToNotepad(title, result);
-    doc->ActivateNotepad(title);
+    // Errors here are non-fatal; the notepad system will log internally
+    (void)doc->SendToNotepad(title, result);
+    (void)doc->ActivateNotepad(title);
 }
 
 void MainWindow::stopSound()
@@ -4207,7 +4211,7 @@ void MainWindow::toggleCommandEcho()
 
     // Toggle the echo command flag
     bool newValue = m_commandEchoAction->isChecked();
-    doc->m_display_my_input = newValue ? 1 : 0;
+    doc->m_display_my_input = newValue;
 }
 
 void MainWindow::toggleFreezeOutput()
@@ -4239,7 +4243,7 @@ void MainWindow::goToLine()
     }
 
     // Get total lines from the world document's line list
-    int totalLines = worldWidget->document()->m_lineList.count();
+    int totalLines = static_cast<int>(worldWidget->document()->m_lineList.size());
     if (totalLines == 0) {
         return;
     }
@@ -4326,14 +4330,15 @@ void MainWindow::bookmarkSelection()
     int lineIndex = worldWidget->outputView()->getSelectionStartLine();
     if (lineIndex < 0) {
         // No selection - use last visible line
-        lineIndex = worldWidget->document()->m_lineList.count() - 1;
+        lineIndex = static_cast<int>(worldWidget->document()->m_lineList.size()) - 1;
     }
 
-    if (lineIndex < 0 || lineIndex >= worldWidget->document()->m_lineList.count()) {
+    if (lineIndex < 0 ||
+        lineIndex >= static_cast<int>(worldWidget->document()->m_lineList.size())) {
         return;
     }
 
-    Line* pLine = worldWidget->document()->m_lineList[lineIndex];
+    Line* pLine = worldWidget->document()->m_lineList[lineIndex].get();
     pLine->flags ^= BOOKMARK; // Toggle bookmark
     worldWidget->outputView()->update();
 }
@@ -4350,8 +4355,8 @@ void MainWindow::goToBookmark()
         return;
     }
 
-    QList<Line*>& lines = worldWidget->document()->m_lineList;
-    if (lines.isEmpty()) {
+    auto& lines = worldWidget->document()->m_lineList;
+    if (lines.empty()) {
         return;
     }
 
@@ -4361,14 +4366,15 @@ void MainWindow::goToBookmark()
         startLine = 0;
 
     // Search for next bookmark (wrap around)
-    int searchStart = (startLine + 1) % lines.count();
+    int lineCount = static_cast<int>(lines.size());
+    int searchStart = (startLine + 1) % lineCount;
     int current = searchStart;
     do {
         if (lines[current]->flags & BOOKMARK) {
             worldWidget->outputView()->scrollToLine(current);
             return;
         }
-        current = (current + 1) % lines.count();
+        current = (current + 1) % lineCount;
     } while (current != searchStart);
 }
 
@@ -4694,7 +4700,7 @@ bool MainWindow::performSearch()
         return false;
     }
 
-    if (doc->m_lineList.isEmpty()) {
+    if (doc->m_lineList.empty()) {
         return false;
     }
 
@@ -4705,12 +4711,12 @@ bool MainWindow::performSearch()
     int startChar = (m_lastFoundChar >= 0) ? m_lastFoundChar + 1 : 0;
 
     // Search forward from current position
-    for (int i = startLine; i < doc->m_lineList.count(); i++) {
-        Line* pLine = doc->m_lineList[i];
+    for (int i = startLine; i < static_cast<int>(doc->m_lineList.size()); i++) {
+        Line* pLine = doc->m_lineList[i].get();
         if (!pLine || pLine->len() == 0)
             continue;
 
-        QString lineText = QString::fromUtf8(pLine->text(), pLine->len());
+        QString lineText = QString::fromUtf8(pLine->text().data(), pLine->text().size());
 
         int index = -1;
         if (m_lastSearchUseRegex) {
@@ -4742,11 +4748,11 @@ bool MainWindow::performSearch()
 
     // Not found - wrap around to beginning
     for (int i = 0; i < startLine; i++) {
-        Line* pLine = doc->m_lineList[i];
+        Line* pLine = doc->m_lineList[i].get();
         if (!pLine || pLine->len() == 0)
             continue;
 
-        QString lineText = QString::fromUtf8(pLine->text(), pLine->len());
+        QString lineText = QString::fromUtf8(pLine->text().data(), pLine->text().size());
 
         int index = -1;
         if (m_lastSearchUseRegex) {
@@ -4796,23 +4802,24 @@ bool MainWindow::performSearchBackward()
         return false;
     }
 
-    if (doc->m_lineList.isEmpty()) {
+    if (doc->m_lineList.empty()) {
         return false;
     }
 
     Qt::CaseSensitivity cs = m_lastSearchMatchCase ? Qt::CaseSensitive : Qt::CaseInsensitive;
 
     // Start from position before last find
-    int startLine = (m_lastFoundLine >= 0) ? m_lastFoundLine : doc->m_lineList.count() - 1;
+    int startLine =
+        (m_lastFoundLine >= 0) ? m_lastFoundLine : static_cast<int>(doc->m_lineList.size()) - 1;
     int startChar = (m_lastFoundChar > 0) ? m_lastFoundChar - 1 : -1;
 
     // Search backward from current position
     for (int i = startLine; i >= 0; i--) {
-        Line* pLine = doc->m_lineList[i];
+        Line* pLine = doc->m_lineList[i].get();
         if (!pLine || pLine->len() == 0)
             continue;
 
-        QString lineText = QString::fromUtf8(pLine->text(), pLine->len());
+        QString lineText = QString::fromUtf8(pLine->text().data(), pLine->text().size());
 
         int searchTo = (i == startLine && startChar >= 0) ? startChar : lineText.length();
         int index = -1;
@@ -4852,12 +4859,12 @@ bool MainWindow::performSearchBackward()
     }
 
     // Not found - wrap around to end
-    for (int i = doc->m_lineList.count() - 1; i > startLine; i--) {
-        Line* pLine = doc->m_lineList[i];
+    for (int i = static_cast<int>(doc->m_lineList.size()) - 1; i > startLine; i--) {
+        Line* pLine = doc->m_lineList[i].get();
         if (!pLine || pLine->len() == 0)
             continue;
 
-        QString lineText = QString::fromUtf8(pLine->text(), pLine->len());
+        QString lineText = QString::fromUtf8(pLine->text().data(), pLine->text().size());
 
         int index = -1;
         if (m_lastSearchUseRegex) {
@@ -5198,10 +5205,10 @@ void MainWindow::sendFile()
     QString postamble = doc->m_file_postamble;
     QString linePreamble = doc->m_line_preamble;
     QString linePostamble = doc->m_line_postamble;
-    bool commentedSoftcode = doc->m_bFileCommentedSoftcode != 0;
+    bool commentedSoftcode = doc->m_bFileCommentedSoftcode;
     int lineDelay = doc->m_nFileDelay;
     int lineDelayPerLines = doc->m_nFileDelayPerLines;
-    bool echo = doc->m_bSendEcho != 0;
+    bool echo = doc->m_bSendEcho;
     int lineCount = text.count('\n') + 1;
     QString shortFileName = QFileInfo(fileName).fileName();
 
@@ -5363,7 +5370,7 @@ void MainWindow::updateStatusIndicators()
 
     // Lines indicator
     if (WorldDocument* doc = worldWidget->document()) {
-        int lineCount = doc->m_lineList.count();
+        int lineCount = static_cast<int>(doc->m_lineList.size());
         m_linesIndicator->setText(QString("%1 lines").arg(lineCount));
     } else {
         m_linesIndicator->setText("");

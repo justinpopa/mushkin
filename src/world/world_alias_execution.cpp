@@ -1,13 +1,11 @@
 /**
- * world_alias_execution.cpp - Alias Matching and Execution
+ * world_alias_execution.cpp - Alias Execution
  *
- * Implements what happens when user types a command:
- * - Check aliases in sequence order
- * - Match against wildcards or regex patterns
- * - Capture wildcards (%1, %2, etc.)
- * - Execute actions (send to world, call script, etc.)
- * - Echo command if requested
- * - Add to command history
+ * Alias matching/evaluation pipeline (evaluateAliases, rebuildAliasArray) has moved
+ * to AutomationRegistry (automation_registry.cpp).
+ *
+ * This file retains executeAlias() and executeAliasScript() which remain on WorldDocument
+ * because they are tightly coupled to its output/script/sendTo infrastructure.
  */
 
 #include "../automation/alias.h"
@@ -27,185 +25,18 @@ extern "C" {
 }
 
 /**
- * evaluateOneAliasSequence - Helper to evaluate one alias sequence
- *
- * Plugin Evaluation Order
- * Helper function that evaluates a single alias array (world or plugin).
- *
- * @param aliasArray Array of aliases to evaluate
- * @param command The user's command
- * @param doc The world document
- * @param anyMatched Output: set to true if any alias matched
- * @return true if evaluation should stop (alias matched and !bKeepEvaluating)
- */
-static bool evaluateOneAliasSequence(const QVector<Alias*>& aliasArray, const QString& command,
-                                     WorldDocument* doc, bool& anyMatched)
-{
-    // Check each alias in sequence order
-    for (Alias* alias : aliasArray) {
-        // Skip disabled aliases
-        if (!alias->bEnabled) {
-            continue;
-        }
-
-        // Try to match alias pattern
-        bool matched = alias->match(command);
-
-        if (matched) {
-            qDebug() << "Alias MATCHED:" << alias->strLabel << "pattern:" << alias->name
-                     << "script:" << alias->strProcedure;
-
-            // Track that at least one alias matched
-            anyMatched = true;
-
-            // Execute the alias
-            doc->executeAlias(alias, command);
-
-            // If alias doesn't want to keep evaluating, we're done
-            if (!alias->bKeepEvaluating) {
-                return true; // Stop evaluation
-            }
-        }
-    }
-
-    return false; // Continue evaluation
-}
-
-/**
- * evaluateAliases - Check command against all aliases
- *
- * Alias matching and execution
- * Plugin evaluation order (negative → world → positive)
- *
- * Called when user presses Enter in command window. Checks all enabled
- * aliases in sequence order. If an alias matches, executes it and optionally
- * stops evaluation (if bKeepEvaluating is false).
- *
- * Based on evaluate.cpp in original MUSHclient.
- * Evaluation order (suggested by Fiendish, added in v4.97):
- * 1. Plugins with negative sequence (< 0)
- * 2. World aliases
- * 3. Plugins with zero/positive sequence (>= 0)
- *
- * @param command User's typed command
- * @return true if alias handled the command, false if should send to MUD
- */
-bool WorldDocument::evaluateAliases(const QString& command)
-{
-    // Empty command - nothing to do
-    if (command.isEmpty()) {
-        return false;
-    }
-
-    // Debug: show what command we're evaluating
-    qDebug() << "evaluateAliases: command =" << command;
-
-    // Rebuild alias array if needed
-    if (m_aliasesNeedSorting) {
-        rebuildAliasArray();
-    }
-
-    // Save current plugin context
-    Plugin* savedPlugin = m_CurrentPlugin;
-    m_CurrentPlugin = nullptr;
-
-    bool stopEvaluation = false;
-    bool anyMatched = false; // Track if ANY alias matched (regardless of bKeepEvaluating)
-
-    // ========== Phase 1: Evaluate plugins with NEGATIVE sequence ==========
-    // These plugins get to see the command BEFORE the world aliases
-    for (const auto& plugin : m_PluginList) {
-        if (plugin->m_iSequence >= 0) {
-            // Stop when we hit non-negative sequence
-            break;
-        }
-
-        if (!plugin->m_bEnabled) {
-            continue;
-        }
-
-        // Rebuild plugin's alias array if needed
-        if (plugin->m_aliasesNeedSorting) {
-            plugin->rebuildAliasArray();
-        }
-
-        // Set current plugin context
-        m_CurrentPlugin = plugin.get();
-
-        // Evaluate this plugin's aliases
-        stopEvaluation = evaluateOneAliasSequence(plugin->m_AliasArray, command, this, anyMatched);
-
-        if (stopEvaluation) {
-            m_CurrentPlugin = savedPlugin;
-            return true; // Alias handled it and wants to stop
-        }
-    }
-
-    // ========== Phase 2: Evaluate WORLD aliases ==========
-    m_CurrentPlugin = nullptr;
-
-    stopEvaluation = evaluateOneAliasSequence(m_AliasArray, command, this, anyMatched);
-
-    if (stopEvaluation) {
-        m_CurrentPlugin = savedPlugin;
-        return true; // Alias handled it and wants to stop
-    }
-
-    // ========== Phase 3: Evaluate plugins with ZERO/POSITIVE sequence ==========
-    // These plugins get to see the command AFTER the world aliases
-    for (const auto& plugin : m_PluginList) {
-        if (plugin->m_iSequence < 0) {
-            // Skip negative sequence (already processed)
-            continue;
-        }
-
-        if (!plugin->m_bEnabled) {
-            continue;
-        }
-
-        // Rebuild plugin's alias array if needed
-        if (plugin->m_aliasesNeedSorting) {
-            plugin->rebuildAliasArray();
-        }
-
-        // Set current plugin context
-        m_CurrentPlugin = plugin.get();
-
-        // Evaluate this plugin's aliases
-        stopEvaluation = evaluateOneAliasSequence(plugin->m_AliasArray, command, this, anyMatched);
-
-        if (stopEvaluation) {
-            m_CurrentPlugin = savedPlugin;
-            return true; // Alias handled it and wants to stop
-        }
-    }
-
-    // Restore plugin context
-    m_CurrentPlugin = savedPlugin;
-
-    // Return true if any alias matched, even if they all had bKeepEvaluating=true
-    if (anyMatched) {
-        qDebug() << "evaluateAliases: Alias(es) matched and handled command:" << command;
-        return true;
-    }
-
-    qDebug() << "evaluateAliases: No alias matched, sending to MUD:" << command;
-    return false; // No alias handled it, send to MUD
-}
-
-/**
  * executeAlias - Execute an alias's action
  *
  * Called when an alias matches. Performs all alias actions:
  * - Echoes command if requested
  * - Replaces wildcards in contents
- * - Expands variables (if bExpandVariables)
- * - Executes action based on iSendTo
- * - Calls Lua script (if strProcedure set)
- * - Deletes alias (if bOneShot)
- * - Adds to command history (if !bOmitFromCommandHistory)
+ * - Expands variables (if expand_variables)
+ * - Executes action based on send_to
+ * - Calls Lua script (if procedure set)
+ * - Deletes alias (if one_shot)
+ * - Adds to command history (if !omit_from_command_history)
  *
- * Note: Statistics (nMatched, tWhenMatched) are already updated by Alias::match()
+ * Note: Statistics (matched, when_matched) are already updated by Alias::match()
  *
  * @param alias The alias that matched
  * @param command The user's command
@@ -213,7 +44,7 @@ bool WorldDocument::evaluateAliases(const QString& command)
 void WorldDocument::executeAlias(Alias* alias, const QString& command)
 {
     // Echo the alias/command?
-    if (alias->bEchoAlias) {
+    if (alias->echo_alias) {
         // Display the command in output
         note(command);
     }
@@ -225,7 +56,7 @@ void WorldDocument::executeAlias(Alias* alias, const QString& command)
     contents = replaceWildcards(contents, alias->wildcards);
 
     // Expand variables (@variablename → value)
-    if (alias->bExpandVariables) {
+    if (alias->expand_variables) {
         contents = expandVariables(contents);
     }
 
@@ -233,11 +64,10 @@ void WorldDocument::executeAlias(Alias* alias, const QString& command)
     // Refactored to use sendTo() instead of inline switch statement
     QString strExtraOutput; // Accumulates eSendToOutput text
     QString aliasDescription =
-        QString("Alias: %1")
-            .arg(alias->strLabel.isEmpty() ? alias->strInternalName : alias->strLabel);
+        QString("Alias: %1").arg(alias->label.isEmpty() ? alias->internal_name : alias->label);
 
-    sendTo(alias->iSendTo, contents, alias->bOmitFromOutput, alias->bOmitFromLog, aliasDescription,
-           alias->strVariable, strExtraOutput, alias->scriptLanguage);
+    sendTo(alias->send_to, contents, alias->omit_from_output, alias->omit_from_log,
+           aliasDescription, alias->variable, strExtraOutput, alias->scriptLanguage);
 
     // Display any output that was accumulated
     if (!strExtraOutput.isEmpty()) {
@@ -245,14 +75,14 @@ void WorldDocument::executeAlias(Alias* alias, const QString& command)
     }
 
     // Call Lua script if procedure is defined
-    // Original MUSHclient calls the script function if strProcedure is set,
-    // regardless of iSendTo value
-    if (!alias->strProcedure.isEmpty()) {
+    // Original MUSHclient calls the script function if procedure is set,
+    // regardless of send_to value
+    if (!alias->procedure.isEmpty()) {
         executeAliasScript(alias, command);
     }
 
     // Add to command history (unless omitted)
-    if (!alias->bOmitFromCommandHistory) {
+    if (!alias->omit_from_command_history) {
         // addToCommandHistory() handles duplicate filtering
         // Note: We're passing the original command, not the alias contents
         // This matches original MUSHclient behavior
@@ -260,12 +90,12 @@ void WorldDocument::executeAlias(Alias* alias, const QString& command)
     }
 
     // One-shot: delete alias after firing
-    if (alias->bOneShot) {
-        qCDebug(lcWorld) << "Deleting one-shot alias:" << alias->strLabel;
-        deleteAlias(alias->strInternalName);
+    if (alias->one_shot) {
+        qCDebug(lcWorld) << "Deleting one-shot alias:" << alias->label;
+        (void)deleteAlias(alias->internal_name); // intentional: one-shot, fired and done
     }
 
-    qCDebug(lcWorld) << "Alias executed:" << alias->strLabel << "matched:" << alias->nMatched
+    qCDebug(lcWorld) << "Alias executed:" << alias->label << "matched:" << alias->matched
                      << "times";
 }
 
@@ -275,7 +105,7 @@ void WorldDocument::executeAlias(Alias* alias, const QString& command)
  * Alias Script Execution
  * Based on CMUSHclientDoc::ExecuteAliasScript()
  *
- * Calls the Lua function specified in alias->strProcedure with parameters:
+ * Calls the Lua function specified in alias->procedure with parameters:
  * 1. Alias name (string)
  * 2. Matched command (string)
  * 3. Wildcards (table) - indexed 0..N where 0 is full match, 1+ are capture groups
@@ -286,7 +116,7 @@ void WorldDocument::executeAlias(Alias* alias, const QString& command)
 void WorldDocument::executeAliasScript(Alias* alias, const QString& command)
 {
     // Safety check - need a procedure name
-    if (alias->strProcedure.isEmpty()) {
+    if (alias->procedure.isEmpty()) {
         return;
     }
 
@@ -301,7 +131,7 @@ void WorldDocument::executeAliasScript(Alias* alias, const QString& command)
     }
 
     if (!scriptEngine || !scriptEngine->isLua()) {
-        qDebug() << "executeAliasScript: No script engine for alias" << alias->strProcedure;
+        qDebug() << "executeAliasScript: No script engine for alias" << alias->procedure;
         return;
     }
 
@@ -309,10 +139,10 @@ void WorldDocument::executeAliasScript(Alias* alias, const QString& command)
     // dispid caching: DISPID_UNKNOWN = check needed, 1 = exists (cached)
     // We re-check each time it's DISPID_UNKNOWN (allows function to be defined later)
     if (alias->dispid == DISPID_UNKNOWN) {
-        alias->dispid = scriptEngine->getLuaDispid(alias->strProcedure);
+        alias->dispid = scriptEngine->getLuaDispid(alias->procedure);
 
         if (alias->dispid == DISPID_UNKNOWN) {
-            qDebug() << "executeAliasScript: Function not found:" << alias->strProcedure;
+            qDebug() << "executeAliasScript: Function not found:" << alias->procedure;
             return; // Function doesn't exist, skip it
         }
     }
@@ -324,20 +154,20 @@ void WorldDocument::executeAliasScript(Alias* alias, const QString& command)
     }
 
     // Parameter 1: Alias name (use label if set, otherwise internal name)
-    QString aliasName = alias->strLabel.isEmpty() ? alias->strInternalName : alias->strLabel;
+    QString aliasName = alias->label.isEmpty() ? alias->internal_name : alias->label;
 
     // Prevent deletion during script execution
-    alias->bExecutingScript = true;
+    alias->executing_script = true;
 
     // Clear stack
     lua_settop(L, 0);
 
     // Find the function
-    lua_getglobal(L, alias->strProcedure.toUtf8().constData());
+    lua_getglobal(L, alias->procedure.toUtf8().constData());
     if (!lua_isfunction(L, -1)) {
-        qDebug() << "executeAliasScript: Function not found:" << alias->strProcedure;
+        qDebug() << "executeAliasScript: Function not found:" << alias->procedure;
         lua_pop(L, 1);
-        alias->bExecutingScript = false;
+        alias->executing_script = false;
         alias->dispid = DISPID_UNKNOWN;
         return;
     }
@@ -403,41 +233,21 @@ void WorldDocument::executeAliasScript(Alias* alias, const QString& command)
 
     if (error) {
         QString errorMsg = QString::fromUtf8(lua_tostring(L, -1));
-        qWarning() << "Alias script error in" << alias->strProcedure << ":" << errorMsg;
+        qWarning() << "Alias script error in" << alias->procedure << ":" << errorMsg;
         lua_pop(L, 1);
         alias->dispid = DISPID_UNKNOWN;
     } else {
-        alias->nInvocationCount++;
+        alias->invocation_count++;
     }
 
     lua_settop(L, 0); // Clear stack
 
     // Allow deletion again
-    alias->bExecutingScript = false;
+    alias->executing_script = false;
 
-    qCDebug(lcWorld) << "Alias script executed:" << alias->strProcedure
-                     << "invocations:" << alias->nInvocationCount;
+    qCDebug(lcWorld) << "Alias script executed:" << alias->procedure
+                     << "invocations:" << alias->invocation_count;
 }
 
-/**
- * rebuildAliasArray - Rebuild alias array sorted by sequence
- *
- * Plugin Evaluation Order
- * Called when aliases are added/deleted or sequence numbers change.
- * Rebuilds m_AliasArray from m_AliasMap, sorted by iSequence.
- */
-void WorldDocument::rebuildAliasArray()
-{
-    m_AliasArray.clear();
-
-    // Add all aliases from map to array
-    for (const auto& [name, aliasPtr] : m_AliasMap) {
-        m_AliasArray.append(aliasPtr.get());
-    }
-
-    // Sort by sequence (lower = earlier)
-    std::sort(m_AliasArray.begin(), m_AliasArray.end(),
-              [](const Alias* a, const Alias* b) { return a->iSequence < b->iSequence; });
-
-    m_aliasesNeedSorting = false;
-}
+// rebuildAliasArray moved to AutomationRegistry::rebuildAliasArray().
+// WorldDocument::rebuildAliasArray() is an inline forwarding wrapper in world_document.h.

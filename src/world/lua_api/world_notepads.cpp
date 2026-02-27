@@ -29,9 +29,9 @@ int L_SendToNotepad(lua_State* L)
     const char* title = luaL_checkstring(L, 1);
     const char* contents = luaL_checkstring(L, 2);
 
-    bool result = pDoc->SendToNotepad(QString::fromUtf8(title), QString::fromUtf8(contents));
+    auto result = pDoc->SendToNotepad(QString::fromUtf8(title), QString::fromUtf8(contents));
 
-    lua_pushboolean(L, result);
+    lua_pushboolean(L, result.has_value() ? 1 : 0);
     return 1;
 }
 
@@ -50,9 +50,9 @@ int L_AppendToNotepad(lua_State* L)
     const char* title = luaL_checkstring(L, 1);
     const char* contents = luaL_checkstring(L, 2);
 
-    bool result = pDoc->AppendToNotepad(QString::fromUtf8(title), QString::fromUtf8(contents));
+    auto result = pDoc->AppendToNotepad(QString::fromUtf8(title), QString::fromUtf8(contents));
 
-    lua_pushboolean(L, result);
+    lua_pushboolean(L, result.has_value() ? 1 : 0);
     return 1;
 }
 
@@ -71,9 +71,9 @@ int L_ReplaceNotepad(lua_State* L)
     const char* title = luaL_checkstring(L, 1);
     const char* contents = luaL_checkstring(L, 2);
 
-    bool result = pDoc->ReplaceNotepad(QString::fromUtf8(title), QString::fromUtf8(contents));
+    auto result = pDoc->ReplaceNotepad(QString::fromUtf8(title), QString::fromUtf8(contents));
 
-    lua_pushboolean(L, result);
+    lua_pushboolean(L, result.has_value() ? 1 : 0);
     return 1;
 }
 
@@ -90,9 +90,9 @@ int L_ActivateNotepad(lua_State* L)
     WorldDocument* pDoc = doc(L);
     const char* title = luaL_checkstring(L, 1);
 
-    bool result = pDoc->ActivateNotepad(QString::fromUtf8(title));
+    auto result = pDoc->ActivateNotepad(QString::fromUtf8(title));
 
-    lua_pushboolean(L, result);
+    lua_pushboolean(L, result.has_value() ? 1 : 0);
     return 1;
 }
 
@@ -331,9 +331,9 @@ int L_MoveNotepadWindow(lua_State* L)
     qint32 width = luaL_checknumber(L, 4);
     qint32 height = luaL_checknumber(L, 5);
 
-    bool result = pDoc->MoveNotepadWindow(QString::fromUtf8(title), left, top, width, height);
+    auto result = pDoc->MoveNotepadWindow(QString::fromUtf8(title), left, top, width, height);
 
-    lua_pushboolean(L, result);
+    lua_pushboolean(L, result.has_value() ? 1 : 0);
     return 1;
 }
 

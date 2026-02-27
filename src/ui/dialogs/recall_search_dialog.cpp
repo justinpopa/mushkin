@@ -23,7 +23,7 @@ RecallSearchDialog::RecallSearchDialog(WorldDocument* doc, QWidget* parent)
 
     // Set line count to total lines in buffer
     if (m_doc) {
-        m_lineCountSpin->setValue(m_doc->m_lineList.count());
+        m_lineCountSpin->setValue(static_cast<int>(m_doc->m_lineList.size()));
     }
 }
 

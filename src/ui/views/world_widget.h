@@ -1,7 +1,9 @@
 #ifndef WORLD_WIDGET_H
 #define WORLD_WIDGET_H
 
+#include <QString>
 #include <QWidget>
+#include <expected>
 
 // Forward declarations
 class WorldDocument;
@@ -68,8 +70,8 @@ class WorldWidget : public QWidget {
     void setModified(bool modified);
 
     // File operations
-    bool loadFromFile(const QString& filename);
-    bool saveToFile(const QString& filename);
+    [[nodiscard]] std::expected<void, QString> loadFromFile(const QString& filename);
+    [[nodiscard]] std::expected<void, QString> saveToFile(const QString& filename);
 
     // Connection state
     bool isConnected() const
@@ -136,8 +138,8 @@ class WorldWidget : public QWidget {
     InputView* m_inputView;    // Custom input widget with history
     QLabel* m_infoBar;         // Script-controllable info bar
 #ifdef Q_OS_MACOS
-    QWidget* m_titleBar;       // Custom title bar for macOS MDI
-    QLabel* m_titleLabel;      // Title label in custom title bar
+    QWidget* m_titleBar;  // Custom title bar for macOS MDI
+    QLabel* m_titleLabel; // Title label in custom title bar
 #endif
 
     // State

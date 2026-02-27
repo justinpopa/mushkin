@@ -12,8 +12,7 @@
 #include <QSpinBox>
 #include <QVBoxLayout>
 
-OutputPage::OutputPage(WorldDocument* doc, QWidget* parent)
-    : PreferencesPageBase(doc, parent)
+OutputPage::OutputPage(WorldDocument* doc, QWidget* parent) : PreferencesPageBase(doc, parent)
 {
     setupUi();
 }
@@ -82,10 +81,11 @@ void OutputPage::setupUi()
     QGroupBox* colorGroup = new QGroupBox(tr("ANSI Color Palette"), this);
     QGridLayout* colorGrid = new QGridLayout(colorGroup);
 
-    const char* colorNames[16] = {"Black",       "Red",          "Green",         "Yellow",
-                                  "Blue",        "Magenta",      "Cyan",          "White",
-                                  "Bright Black","Bright Red",   "Bright Green",  "Bright Yellow",
-                                  "Bright Blue", "Bright Magenta","Bright Cyan",  "Bright White"};
+    static constexpr std::array<const char*, 16> colorNames = {
+        "Black",        "Red",           "Green",       "Yellow",         "Blue",
+        "Magenta",      "Cyan",          "White",       "Bright Black",   "Bright Red",
+        "Bright Green", "Bright Yellow", "Bright Blue", "Bright Magenta", "Bright Cyan",
+        "Bright White"};
 
     // Create 16 color buttons in 2 columns (8 rows x 2 cols)
     for (int i = 0; i < 16; i++) {
@@ -98,8 +98,7 @@ void OutputPage::setupUi()
         m_colorButtons[i] = new QPushButton(this);
         m_colorButtons[i]->setFixedSize(70, 24);
         m_colorButtons[i]->setProperty("colorIndex", i);
-        connect(m_colorButtons[i], &QPushButton::clicked, this,
-                &OutputPage::onColorButtonClicked);
+        connect(m_colorButtons[i], &QPushButton::clicked, this, &OutputPage::onColorButtonClicked);
         colorRow->addWidget(m_colorButtons[i]);
         colorRow->addStretch();
 
@@ -145,13 +144,13 @@ void OutputPage::loadSettings()
         QString("%1, %2pt").arg(m_outputFont.family()).arg(m_outputFont.pointSize()));
 
     // Load wrap settings
-    m_wordWrapCheck->setChecked(m_doc->m_wrap != 0);
+    m_wordWrapCheck->setChecked(m_doc->m_wrap);
     m_wrapColumnSpin->setValue(m_doc->m_nWrapColumn);
 
     // Load text style options
-    m_showBoldCheck->setChecked(m_doc->m_bShowBold != 0);
-    m_showItalicCheck->setChecked(m_doc->m_bShowItalic != 0);
-    m_showUnderlineCheck->setChecked(m_doc->m_bShowUnderline != 0);
+    m_showBoldCheck->setChecked(m_doc->m_bShowBold);
+    m_showItalicCheck->setChecked(m_doc->m_bShowItalic);
+    m_showUnderlineCheck->setChecked(m_doc->m_bShowUnderline);
 
     // Load ANSI colors from document
     for (int i = 0; i < 8; i++) {
@@ -162,7 +161,7 @@ void OutputPage::loadSettings()
     }
 
     // Load activity settings
-    m_flashIconCheck->setChecked(m_doc->m_bFlashIcon != 0);
+    m_flashIconCheck->setChecked(m_doc->m_bFlashIcon);
 
     // Unblock signals
     m_wordWrapCheck->blockSignals(false);
@@ -186,13 +185,13 @@ void OutputPage::saveSettings()
     m_doc->m_font_weight = m_outputFont.weight();
 
     // Save wrap settings
-    m_doc->m_wrap = m_wordWrapCheck->isChecked() ? 1 : 0;
+    m_doc->m_wrap = m_wordWrapCheck->isChecked();
     m_doc->m_nWrapColumn = m_wrapColumnSpin->value();
 
     // Save text style options
-    m_doc->m_bShowBold = m_showBoldCheck->isChecked() ? 1 : 0;
-    m_doc->m_bShowItalic = m_showItalicCheck->isChecked() ? 1 : 0;
-    m_doc->m_bShowUnderline = m_showUnderlineCheck->isChecked() ? 1 : 0;
+    m_doc->m_bShowBold = m_showBoldCheck->isChecked();
+    m_doc->m_bShowItalic = m_showItalicCheck->isChecked();
+    m_doc->m_bShowUnderline = m_showUnderlineCheck->isChecked();
 
     // Save ANSI colors
     for (int i = 0; i < 8; i++) {
@@ -201,7 +200,7 @@ void OutputPage::saveSettings()
     }
 
     // Save activity settings
-    m_doc->m_bFlashIcon = m_flashIconCheck->isChecked() ? 1 : 0;
+    m_doc->m_bFlashIcon = m_flashIconCheck->isChecked();
 
     m_doc->setModified(true);
     emit m_doc->outputSettingsChanged();
@@ -221,8 +220,7 @@ void OutputPage::onOutputFontButtonClicked()
 
     if (ok) {
         m_outputFont = font;
-        m_outputFontLabel->setText(
-            QString("%1, %2pt").arg(font.family()).arg(font.pointSize()));
+        m_outputFontLabel->setText(QString("%1, %2pt").arg(font.family()).arg(font.pointSize()));
         markChanged();
     }
 }
@@ -235,8 +233,9 @@ void OutputPage::onColorButtonClicked()
 
     int index = btn->property("colorIndex").toInt();
 
-    QColor color = QColorDialog::getColor(QColor(m_ansiColors[index]), this,
-                                          tr("Choose color for %1").arg(index < 8 ? "normal" : "bright"));
+    QColor color =
+        QColorDialog::getColor(QColor(m_ansiColors[index]), this,
+                               tr("Choose color for %1").arg(index < 8 ? "normal" : "bright"));
 
     if (color.isValid()) {
         m_ansiColors[index] = color.rgb();

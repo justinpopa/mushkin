@@ -3,7 +3,7 @@
  * Plugin State Saving Test
  *
  * Tests plugin state persistence including:
- * - Variable saving/loading (strLabel, strContents)
+ * - Variable saving/loading (label, contents)
  * - Array saving/loading (nested map structure)
  * - OnPluginSaveState callback execution
  * - m_bSaveState flag behavior
@@ -132,25 +132,25 @@ TEST_F(PluginStateTest, SaveStateWithVariables)
 {
     // Create variables
     auto var1 = std::make_unique<Variable>();
-    var1->strLabel = "player_name";
-    var1->strContents = "Gandalf";
+    var1->label = "player_name";
+    var1->contents = "Gandalf";
     plugin->m_VariableMap["player_name"] = std::move(var1);
 
     auto var2 = std::make_unique<Variable>();
-    var2->strLabel = "player_hp";
-    var2->strContents = "250";
+    var2->label = "player_hp";
+    var2->contents = "250";
     plugin->m_VariableMap["player_hp"] = std::move(var2);
 
     auto var3 = std::make_unique<Variable>();
-    var3->strLabel = "guild";
-    var3->strContents = "Wizards";
+    var3->label = "guild";
+    var3->contents = "Wizards";
     plugin->m_VariableMap["guild"] = std::move(var3);
 
     EXPECT_EQ(plugin->m_VariableMap.size(), 3) << "Should have 3 variables";
 
     // Save state
-    bool saveResult = plugin->SaveState();
-    EXPECT_TRUE(saveResult) << "SaveState() should return true";
+    auto saveResult = plugin->SaveState();
+    EXPECT_TRUE(saveResult.has_value()) << "SaveState() should return true";
 
     // Verify state file was created
     EXPECT_TRUE(QFile::exists(stateFilePath)) << "State file should be created";
@@ -177,8 +177,8 @@ TEST_F(PluginStateTest, SaveStateWithArrays)
     EXPECT_EQ(plugin->m_Arrays["stats"].size(), 3) << "stats should have 3 items";
 
     // Save state
-    bool saveResult = plugin->SaveState();
-    EXPECT_TRUE(saveResult) << "SaveState() should return true";
+    auto saveResult = plugin->SaveState();
+    EXPECT_TRUE(saveResult.has_value()) << "SaveState() should return true";
 
     // Verify state file was created
     EXPECT_TRUE(QFile::exists(stateFilePath)) << "State file should be created";
@@ -204,18 +204,18 @@ TEST_F(PluginStateTest, VerifyXMLStructure)
 {
     // Create variables
     auto var1 = std::make_unique<Variable>();
-    var1->strLabel = "test_var1";
-    var1->strContents = "value1";
+    var1->label = "test_var1";
+    var1->contents = "value1";
     plugin->m_VariableMap["test_var1"] = std::move(var1);
 
     auto var2 = std::make_unique<Variable>();
-    var2->strLabel = "test_var2";
-    var2->strContents = "value2";
+    var2->label = "test_var2";
+    var2->contents = "value2";
     plugin->m_VariableMap["test_var2"] = std::move(var2);
 
     auto var3 = std::make_unique<Variable>();
-    var3->strLabel = "test_var3";
-    var3->strContents = "value3";
+    var3->label = "test_var3";
+    var3->contents = "value3";
     plugin->m_VariableMap["test_var3"] = std::move(var3);
 
     // Create arrays
@@ -277,18 +277,18 @@ TEST_F(PluginStateTest, LoadStateRestoresVariables)
 {
     // Create and save variables
     auto var1 = std::make_unique<Variable>();
-    var1->strLabel = "player_name";
-    var1->strContents = "Gandalf";
+    var1->label = "player_name";
+    var1->contents = "Gandalf";
     plugin->m_VariableMap["player_name"] = std::move(var1);
 
     auto var2 = std::make_unique<Variable>();
-    var2->strLabel = "player_hp";
-    var2->strContents = "250";
+    var2->label = "player_hp";
+    var2->contents = "250";
     plugin->m_VariableMap["player_hp"] = std::move(var2);
 
     auto var3 = std::make_unique<Variable>();
-    var3->strLabel = "guild";
-    var3->strContents = "Wizards";
+    var3->label = "guild";
+    var3->contents = "Wizards";
     plugin->m_VariableMap["guild"] = std::move(var3);
 
     plugin->SaveState();
@@ -298,8 +298,8 @@ TEST_F(PluginStateTest, LoadStateRestoresVariables)
     EXPECT_EQ(plugin->m_VariableMap.size(), 0) << "Variables should be cleared";
 
     // Load state
-    bool loadResult = plugin->LoadState();
-    EXPECT_TRUE(loadResult) << "LoadState() should return true";
+    auto loadResult = plugin->LoadState();
+    EXPECT_TRUE(loadResult.has_value()) << "LoadState() should return true";
 
     // Verify variables were restored
     EXPECT_EQ(plugin->m_VariableMap.size(), 3) << "Should have 3 variables after loading";
@@ -310,11 +310,11 @@ TEST_F(PluginStateTest, LoadStateRestoresVariables)
     EXPECT_TRUE(plugin->m_VariableMap.find("guild") != plugin->m_VariableMap.end())
         << "Should have guild";
 
-    EXPECT_EQ(plugin->m_VariableMap["player_name"]->strContents, QString("Gandalf"))
+    EXPECT_EQ(plugin->m_VariableMap["player_name"]->contents, QString("Gandalf"))
         << "player_name value should be correct";
-    EXPECT_EQ(plugin->m_VariableMap["player_hp"]->strContents, QString("250"))
+    EXPECT_EQ(plugin->m_VariableMap["player_hp"]->contents, QString("250"))
         << "player_hp value should be correct";
-    EXPECT_EQ(plugin->m_VariableMap["guild"]->strContents, QString("Wizards"))
+    EXPECT_EQ(plugin->m_VariableMap["guild"]->contents, QString("Wizards"))
         << "guild value should be correct";
 }
 
@@ -341,8 +341,8 @@ TEST_F(PluginStateTest, LoadStateRestoresArrays)
     EXPECT_EQ(plugin->m_Arrays.size(), 0) << "Arrays should be cleared";
 
     // Load state
-    bool loadResult = plugin->LoadState();
-    EXPECT_TRUE(loadResult) << "LoadState() should return true";
+    auto loadResult = plugin->LoadState();
+    EXPECT_TRUE(loadResult.has_value()) << "LoadState() should return true";
 
     // Verify arrays were restored
     EXPECT_EQ(plugin->m_Arrays.size(), 2) << "Should have 2 arrays after loading";
@@ -371,16 +371,17 @@ TEST_F(PluginStateTest, SaveStateFalsePreventsFileCreation)
 
     // Create a variable
     auto var = std::make_unique<Variable>();
-    var->strLabel = "test_var";
-    var->strContents = "test_value";
+    var->label = "test_var";
+    var->contents = "test_value";
     plugin->m_VariableMap["test_var"] = std::move(var);
 
     // Remove state file if it exists
     QFile::remove(stateFilePath);
 
     // Save state
-    bool saveResult = plugin->SaveState();
-    EXPECT_TRUE(saveResult) << "SaveState() should return true even when save_state=false";
+    auto saveResult = plugin->SaveState();
+    EXPECT_TRUE(saveResult.has_value())
+        << "SaveState() should return true even when save_state=false";
 
     // Verify state file was NOT created
     EXPECT_FALSE(QFile::exists(stateFilePath))
@@ -395,8 +396,8 @@ TEST_F(PluginStateTest, EmptyStateSaved)
     plugin->m_Arrays.clear();
 
     // Save state
-    bool saveResult = plugin->SaveState();
-    EXPECT_TRUE(saveResult) << "SaveState() should succeed for empty state";
+    auto saveResult = plugin->SaveState();
+    EXPECT_TRUE(saveResult.has_value()) << "SaveState() should succeed for empty state";
 
     // Verify file was created
     EXPECT_TRUE(QFile::exists(stateFilePath))
@@ -410,8 +411,8 @@ TEST_F(PluginStateTest, LoadStateNonExistentFile)
     QFile::remove(stateFilePath);
 
     // Load state
-    bool loadResult = plugin->LoadState();
-    EXPECT_TRUE(loadResult) << "LoadState() should return true when file doesn't exist";
+    auto loadResult = plugin->LoadState();
+    EXPECT_TRUE(loadResult.has_value()) << "LoadState() should return true when file doesn't exist";
 }
 
 // Test 11: Multiple save/load cycles preserve latest data
@@ -419,15 +420,15 @@ TEST_F(PluginStateTest, MultipleSaveLoadCycles)
 {
     // Create initial data
     auto var = std::make_unique<Variable>();
-    var->strLabel = "cycle_test";
-    var->strContents = "iteration 1";
+    var->label = "cycle_test";
+    var->contents = "iteration 1";
     plugin->m_VariableMap["cycle_test"] = std::move(var);
 
     // First save
     plugin->SaveState();
 
     // Modify
-    plugin->m_VariableMap["cycle_test"]->strContents = "iteration 2";
+    plugin->m_VariableMap["cycle_test"]->contents = "iteration 2";
 
     // Second save
     plugin->SaveState();
@@ -439,7 +440,7 @@ TEST_F(PluginStateTest, MultipleSaveLoadCycles)
     // Verify latest value
     ASSERT_TRUE(plugin->m_VariableMap.find("cycle_test") != plugin->m_VariableMap.end())
         << "Variable should exist after reload";
-    EXPECT_EQ(plugin->m_VariableMap["cycle_test"]->strContents, QString("iteration 2"))
+    EXPECT_EQ(plugin->m_VariableMap["cycle_test"]->contents, QString("iteration 2"))
         << "Multiple saves should overwrite, keeping latest value";
 }
 
@@ -448,13 +449,13 @@ TEST_F(PluginStateTest, ComplexStateSaveLoad)
 {
     // Create complex state
     auto var1 = std::make_unique<Variable>();
-    var1->strLabel = "var1";
-    var1->strContents = "value1";
+    var1->label = "var1";
+    var1->contents = "value1";
     plugin->m_VariableMap["var1"] = std::move(var1);
 
     auto var2 = std::make_unique<Variable>();
-    var2->strLabel = "var2";
-    var2->strContents = "value2";
+    var2->label = "var2";
+    var2->contents = "value2";
     plugin->m_VariableMap["var2"] = std::move(var2);
 
     QMap<QString, QString> array1;
@@ -481,9 +482,9 @@ TEST_F(PluginStateTest, ComplexStateSaveLoad)
     EXPECT_EQ(plugin->m_VariableMap.size(), 2) << "Should have 2 variables";
     EXPECT_EQ(plugin->m_Arrays.size(), 2) << "Should have 2 arrays";
 
-    EXPECT_EQ(plugin->m_VariableMap["var1"]->strContents, QString("value1"))
+    EXPECT_EQ(plugin->m_VariableMap["var1"]->contents, QString("value1"))
         << "var1 should be correct";
-    EXPECT_EQ(plugin->m_VariableMap["var2"]->strContents, QString("value2"))
+    EXPECT_EQ(plugin->m_VariableMap["var2"]->contents, QString("value2"))
         << "var2 should be correct";
 
     EXPECT_EQ(plugin->m_Arrays["array1"]["a"], QString("1")) << "array1.a should be correct";

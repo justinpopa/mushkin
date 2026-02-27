@@ -5,6 +5,7 @@
 #include <QMdiArea>
 #include <QMdiSubWindow>
 #include <QMenu>
+#include <QMessageBox>
 #include <QVBoxLayout>
 
 #include "../../storage/database.h"
@@ -132,22 +133,22 @@ void ActivityWindow::refresh()
 
         // Total lines
         QTableWidgetItem* linesItem = new QTableWidgetItem();
-        linesItem->setData(Qt::DisplayRole, static_cast<int>(doc->m_lineList.count()));
+        linesItem->setData(Qt::DisplayRole, static_cast<int>(doc->m_lineList.size()));
         linesItem->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
         m_table->setItem(row, ColLines, linesItem);
 
         // Status
         QString status;
-        if (doc->m_iConnectPhase == eConnectConnectedToMud)
+        if (doc->m_connectionManager->m_iConnectPhase == eConnectConnectedToMud)
             status = tr("Connected");
-        else if (doc->m_iConnectPhase == eConnectNotConnected)
+        else if (doc->m_connectionManager->m_iConnectPhase == eConnectNotConnected)
             status = tr("Disconnected");
         else
             status = tr("Connecting...");
         QTableWidgetItem* statusItem = new QTableWidgetItem(status);
-        if (doc->m_iConnectPhase == eConnectConnectedToMud) {
+        if (doc->m_connectionManager->m_iConnectPhase == eConnectConnectedToMud) {
             statusItem->setForeground(QColor(0, 128, 0)); // Green
-        } else if (doc->m_iConnectPhase == eConnectNotConnected) {
+        } else if (doc->m_connectionManager->m_iConnectPhase == eConnectNotConnected) {
             statusItem->setForeground(Qt::gray);
         } else {
             statusItem->setForeground(QColor(255, 165, 0)); // Orange
@@ -156,17 +157,20 @@ void ActivityWindow::refresh()
 
         // Since (connection start time)
         QString sinceStr;
-        if (doc->m_iConnectPhase == eConnectConnectedToMud && doc->m_tConnectTime.isValid()) {
-            sinceStr = formatTime(doc->m_tConnectTime);
+        if (doc->m_connectionManager->m_iConnectPhase == eConnectConnectedToMud &&
+            doc->m_connectionManager->m_tConnectTime.isValid()) {
+            sinceStr = formatTime(doc->m_connectionManager->m_tConnectTime);
         }
         QTableWidgetItem* sinceItem = new QTableWidgetItem(sinceStr);
         m_table->setItem(row, ColSince, sinceItem);
 
         // Duration - includes previous connections plus current session
         // m_tsConnectDuration is in milliseconds
-        qint64 totalSecs = doc->m_tsConnectDuration / 1000;
-        if (doc->m_iConnectPhase == eConnectConnectedToMud && doc->m_tConnectTime.isValid()) {
-            totalSecs += doc->m_tConnectTime.secsTo(QDateTime::currentDateTime());
+        qint64 totalSecs = doc->m_connectionManager->m_tsConnectDuration / 1000;
+        if (doc->m_connectionManager->m_iConnectPhase == eConnectConnectedToMud &&
+            doc->m_connectionManager->m_tConnectTime.isValid()) {
+            totalSecs +=
+                doc->m_connectionManager->m_tConnectTime.secsTo(QDateTime::currentDateTime());
         }
         QString durationStr = (totalSecs > 0) ? formatDuration(totalSecs) : QString();
         QTableWidgetItem* durationItem = new QTableWidgetItem(durationStr);
@@ -237,12 +241,14 @@ void ActivityWindow::onContextMenu(const QPoint& pos)
 
     QAction* connectAction = menu.addAction(tr("C&onnect"));
     connectAction->setEnabled(ww && ww->document() &&
-                              ww->document()->m_iConnectPhase == eConnectNotConnected);
+                              ww->document()->m_connectionManager->m_iConnectPhase ==
+                                  eConnectNotConnected);
     connect(connectAction, &QAction::triggered, this, &ActivityWindow::connectWorld);
 
     QAction* disconnectAction = menu.addAction(tr("&Disconnect"));
     disconnectAction->setEnabled(ww && ww->document() &&
-                                 ww->document()->m_iConnectPhase == eConnectConnectedToMud);
+                                 ww->document()->m_connectionManager->m_iConnectPhase ==
+                                     eConnectConnectedToMud);
     connect(disconnectAction, &QAction::triggered, this, &ActivityWindow::disconnectWorld);
 
     menu.addSeparator();
@@ -333,7 +339,10 @@ void ActivityWindow::saveWorld()
 
     QString filename = ww->filename();
     if (!filename.isEmpty()) {
-        ww->saveToFile(filename);
+        if (auto result = ww->saveToFile(filename); !result) {
+            QMessageBox::critical(this, tr("Error"),
+                                  tr("Failed to save world file:\n%1").arg(result.error()));
+        }
     } else {
         // No filename - use Save As
         saveWorldAs();
@@ -352,7 +361,10 @@ void ActivityWindow::saveWorldAs()
         this, tr("Save World As"), startDir, tr("MUSHclient World Files (*.mcl);;All Files (*)"));
 
     if (!filename.isEmpty()) {
-        ww->saveToFile(filename);
+        if (auto result = ww->saveToFile(filename); !result) {
+            QMessageBox::critical(this, tr("Error"),
+                                  tr("Failed to save world file:\n%1").arg(result.error()));
+        }
     }
 }
 
