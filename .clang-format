@@ -1,5 +1,5 @@
-# MUSHclient-Qt Code Formatting Configuration
-# Based on MFC/Hungarian style with modern C++20 conventions
+# Mushkin Code Formatting Configuration
+# Based on MFC/Hungarian style with modern C++26 conventions
 ---
 Language: Cpp
 BasedOnStyle: LLVM
@@ -66,5 +66,5 @@ KeepEmptyLinesAtTheStartOfBlocks: false
 MaxEmptyLinesToKeep: 2
 NamespaceIndentation: None
 
-# C++20
-Standard: c++20
+# C++26
+Standard: Latest

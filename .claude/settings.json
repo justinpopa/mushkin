@@ -1,0 +1,53 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cmake *)",
+      "Bash(ctest *)",
+      "Bash(ninja)",
+      "Bash(ninja *)",
+      "Bash(clang-format *)",
+      "Bash(clang-tidy *)",
+      "Bash(clang++ *)",
+      "Bash(/usr/bin/clang++ *)",
+      "Bash(/opt/homebrew/opt/llvm/bin/clang++ *)",
+      "Bash(opencode *)",
+      "Bash(gemini *)",
+      "Bash(brew *)",
+      "Bash(xcodebuild *)",
+      "Bash(xcrun *)",
+      "Bash(which *)",
+      "Bash(ls *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(cat *)",
+      "Bash(echo *)",
+      "Bash(sed *)",
+      "Bash(grep *)",
+      "Bash(python3 *)",
+      "Bash(rm -f /tmp/or_response*)",
+      "Bash(export *)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(git branch*)",
+      "Bash(git stash list*)",
+      "Bash(mkdir *)",
+      "Bash(sysctl *)",
+      "Bash(jq *)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "FILE_PATH=$(cat | jq -r '.tool_input.file_path // empty'); if [[ \"$FILE_PATH\" =~ \\.(cpp|h|hpp|cc|cxx)$ ]]; then /opt/homebrew/opt/llvm/bin/clang-format -i \"$FILE_PATH\" 2>/dev/null; fi"
+          }
+        ]
+      }
+    ]
+  }
+}
