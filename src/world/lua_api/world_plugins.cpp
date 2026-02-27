@@ -960,7 +960,7 @@ int L_SendPkt(lua_State* L)
     const char* text = luaL_checklstring(L, 1, &textLength);
 
     // Send raw packet
-    pDoc->SendPacket((const unsigned char*)text, textLength);
+    pDoc->SendPacket({reinterpret_cast<const unsigned char*>(text), textLength});
 
     lua_pushnumber(L, 0); // eOK
     return 1;

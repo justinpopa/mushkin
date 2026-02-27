@@ -9,9 +9,9 @@
 #include "../text/line.h"
 #include "../text/style.h"
 #include "accelerator_manager.h"
-#include "view_interfaces.h"
 #include "logging.h"
 #include "script_engine.h"
+#include "view_interfaces.h"
 #include "world_socket.h"
 #include <QClipboard>
 #include <QColor>
@@ -28,6 +28,7 @@
 #include <QThread>
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
+#include <array>   // for std::array
 #include <cstring> // for memcpy, strlen
 
 #include "color_utils.h"
@@ -76,10 +77,10 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
 
     // ========== Initialize display settings ==========
     m_font_name = "Courier New";
-    m_font_height = 12; // matches original MUSHclient default
+    m_font_height = 12;  // matches original MUSHclient default
     m_font_weight = 400; // FW_NORMAL
     m_font_charset = 0;  // DEFAULT_CHARSET
-    m_wrap = 1; // true = wrap enabled (matches original MUSHclient default)
+    m_wrap = 1;          // true = wrap enabled (matches original MUSHclient default)
     m_timestamps = 0;
     m_match_width = 30;
 
@@ -88,8 +89,8 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
 
     // ========== Initialize input colors and font ==========
     // Colors are stored in BGR format (Windows COLORREF: 0x00BBGGRR)
-    m_input_text_colour = BGR(0, 0, 0);              // Black text
-    m_input_background_colour = BGR(255, 255, 255);  // White background
+    m_input_text_colour = BGR(0, 0, 0);             // Black text
+    m_input_background_colour = BGR(255, 255, 255); // White background
     m_input_font_height = 12;
     m_input_font_name = "Courier New";
     m_input_font_italic = 0;
@@ -118,7 +119,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_echo_colour = 65535; // SAMECOLOUR
     m_bEscapeDeletesInput = 0;
     m_bArrowsChangeHistory = 1;
-    m_bConfirmOnPaste = 1;              // Default: true (like original)
+    m_bConfirmOnPaste = 1; // Default: true (like original)
 
     // ========== Initialize command history ==========
     m_commandHistory.clear();
@@ -207,19 +208,19 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_iHyperlinkColour = BGR(255, 128, 0); // Light blue - RGB(0, 128, 255) like original
 
     // ========== Initialize misc flags ==========
-    m_indent_paras = 1;                 // Default: true (like original)
+    m_indent_paras = 1; // Default: true (like original)
     m_bSaveWorldAutomatically = 0;
-    m_bLineInformation = 1;             // Default: true (like original)
+    m_bLineInformation = 1; // Default: true (like original)
     m_bStartPaused = 0;
-    m_iNoteTextColour = 4;              // Default: 4 (cyan) like original
+    m_iNoteTextColour = 4; // Default: 4 (cyan) like original
     m_bKeepCommandsOnSameLine = 0;
 
     // ========== Initialize auto-say ==========
-    m_strAutoSayString = "say ";        // Default: "say " (like original)
+    m_strAutoSayString = "say "; // Default: "say " (like original)
     m_bEnableAutoSay = 0;
     m_bExcludeMacros = 0;
     m_bExcludeNonAlpha = 0;
-    m_strOverridePrefix = "-";          // Default: "-" (like original)
+    m_strOverridePrefix = "-";           // Default: "-" (like original)
     m_bConfirmBeforeReplacingTyping = 1; // Default: true (like original)
     m_bReEvaluateAutoSay = 0;
 
@@ -233,25 +234,25 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     }
 
     // ========== Initialize display options (version 9+) ==========
-    m_bShowBold = 0;                    // Default: false (like original)
+    m_bShowBold = 0; // Default: false (like original)
     m_bShowItalic = 1;
     m_bShowUnderline = 1;
     m_bAltArrowRecallsPartial = 0;
-    m_iPixelOffset = 1;                 // Default: 1 (like original)
-    m_bAutoFreeze = 1;                  // Default: true (like original) - auto_pause
+    m_iPixelOffset = 1; // Default: 1 (like original)
+    m_bAutoFreeze = 1;  // Default: true (like original) - auto_pause
     m_bKeepFreezeAtBottom = 0;
     m_bAutoRepeat = 0;
     m_bDisableCompression = 0;
     m_bLowerCaseTabCompletion = 0;
     m_bDoubleClickInserts = 0;
     m_bDoubleClickSends = 0;
-    m_bConfirmOnSend = 1;               // Default: true (like original)
+    m_bConfirmOnSend = 1; // Default: true (like original)
     m_bTranslateGerman = 0;
 
     // ========== Initialize tab completion ==========
     m_strTabCompletionDefaults = QString();
     m_iTabCompletionLines = 200;
-    m_bTabCompletionSpace = 0;          // Default: false (like original)
+    m_bTabCompletionSpace = 0;                                 // Default: false (like original)
     m_strWordDelimiters = "-._~!@#$%^&*()+=[]{}\\|;:'\",<>?/"; // Word delimiters
     m_bTabCompleteFunctions = true; // Show Lua functions in Shift+Tab menu by default
     // m_ExtraShiftTabCompleteItems initialized empty by default
@@ -273,10 +274,10 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_strOutputLinePreambleNotes = QString();
     m_OutputLinePreambleOutputTextColour = BGR(255, 255, 255); // White (like original)
     m_OutputLinePreambleOutputBackColour = BGR(0, 0, 0);       // Black
-    m_OutputLinePreambleInputTextColour = BGR(0, 0, 128);      // Dark red RGB(128,0,0) (like original)
-    m_OutputLinePreambleInputBackColour = BGR(0, 0, 0);        // Black
-    m_OutputLinePreambleNotesTextColour = BGR(255, 0, 0);      // Blue RGB(0,0,255) (like original)
-    m_OutputLinePreambleNotesBackColour = BGR(0, 0, 0);        // Black
+    m_OutputLinePreambleInputTextColour = BGR(0, 0, 128); // Dark red RGB(128,0,0) (like original)
+    m_OutputLinePreambleInputBackColour = BGR(0, 0, 0);   // Black
+    m_OutputLinePreambleNotesTextColour = BGR(255, 0, 0); // Blue RGB(0,0,255) (like original)
+    m_OutputLinePreambleNotesBackColour = BGR(0, 0, 0);   // Black
 
     // ========== Initialize recall window ==========
     m_strRecallLinePreamble = QString();
@@ -297,11 +298,11 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_bUseDefaultOutputFont = 0;
     m_bSaveDeletedCommand = 0;
     m_bTranslateBackslashSequences = 0;
-    m_bEditScriptWithNotepad = 1;       // Default: true (like original)
-    m_bWarnIfScriptingInactive = 1;     // Default: true (like original)
+    m_bEditScriptWithNotepad = 1;   // Default: true (like original)
+    m_bWarnIfScriptingInactive = 1; // Default: true (like original)
 
     // ========== Initialize sending options ==========
-    m_bWriteWorldNameToLog = 1;         // Default: true (like original)
+    m_bWriteWorldNameToLog = 1; // Default: true (like original)
     m_bSendEcho = 0;
     m_bPasteEcho = 0;
 
@@ -1048,13 +1049,14 @@ void WorldDocument::ReceiveMsg()
     }
 
     // Read all available data
-    char buffer[8192];
-    qint64 nRead = m_pSocket->receive(buffer, sizeof(buffer));
-
-    if (nRead <= 0) {
-        if (nRead < 0) {
-            qCDebug(lcWorld) << "ReceiveMsg: Socket read error";
-        }
+    std::array<char, 8192> buffer{};
+    auto result = m_pSocket->receive(buffer);
+    if (!result) {
+        qCDebug(lcWorld) << "ReceiveMsg: Socket read error:" << result.error();
+        return;
+    }
+    qint64 nRead = *result;
+    if (nRead == 0) {
         return;
     }
 
@@ -1065,7 +1067,7 @@ void WorldDocument::ReceiveMsg()
     // Notify plugins of raw packet received (for protocol debugging)
     // Note: Original MUSHclient uses SendToAllPluginCallbacksRtn which can modify the data
     // For now, we just notify without modification capability
-    QString packetData = QString::fromLatin1(buffer, nRead);
+    QString packetData = QString::fromLatin1(buffer.data(), nRead);
     SendToAllPluginCallbacks(ON_PLUGIN_PACKET_RECEIVED, packetData, false);
 
     // Check if we need to decompress the data
@@ -1085,7 +1087,7 @@ void WorldDocument::ReceiveMsg()
         m_zCompress.next_in = m_CompressInput;
 
         // Append new compressed data to the staging buffer
-        memcpy(&m_zCompress.next_in[m_zCompress.avail_in], buffer, nRead);
+        memcpy(&m_zCompress.next_in[m_zCompress.avail_in], buffer.data(), nRead);
         m_zCompress.avail_in += nRead;
         m_nTotalCompressed += nRead;
 
@@ -1238,7 +1240,7 @@ void WorldDocument::OnConnect(int errorCode)
             m_pRemoteServer->setPassword(m_strRemotePassword);
             m_pRemoteServer->setScrollbackLines(m_iRemoteScrollbackLines);
             m_pRemoteServer->setMaxClients(m_iRemoteMaxClients);
-            if (m_pRemoteServer->start(m_iRemotePort)) {
+            if (auto result = m_pRemoteServer->start(m_iRemotePort); result) {
                 qCDebug(lcWorld) << "Remote access server started on port" << m_iRemotePort;
             } else {
                 qCWarning(lcWorld)
@@ -1342,7 +1344,8 @@ void WorldDocument::sendToMud(const QString& text)
     data.append('\n');
 
     // Send through socket
-    SendPacket((const unsigned char*)data.constData(), data.length());
+    SendPacket({reinterpret_cast<const unsigned char*>(data.constData()),
+                static_cast<std::size_t>(data.length())});
 
     // Increment statistics
     m_nTotalLinesSent++;
@@ -1668,7 +1671,8 @@ void WorldDocument::DoSendMsg(const QString& text, bool bEcho, bool bLog)
 
         // Send the doubled data + newline
         doubled.append('\n');
-        SendPacket((const unsigned char*)doubled.constData(), doubled.length());
+        SendPacket({reinterpret_cast<const unsigned char*>(doubled.constData()),
+                    static_cast<std::size_t>(doubled.length())});
     } else {
         // Just send normally (use existing sendToMud)
         sendToMud(str);
@@ -2881,7 +2885,7 @@ void WorldDocument::handleLineWrap()
         // This ensures soft-wrapped lines display correctly when joined
 
         // Save the text AFTER the space to carry over to the next line
-        int carryOverStart = breakPoint + 1;  // Text starts after the space
+        int carryOverStart = breakPoint + 1; // Text starts after the space
         int carryOverLen = lineLen - carryOverStart;
 
         QByteArray carryOver;
@@ -2891,7 +2895,7 @@ void WorldDocument::handleLineWrap()
 
         // Truncate current line AFTER the space (include the space in this line)
         // This matches original MUSHclient when m_indent_paras is false
-        int truncateAt = breakPoint + 1;  // Keep up to and including the space
+        int truncateAt = breakPoint + 1; // Keep up to and including the space
         m_currentLine->textBuffer.resize(truncateAt);
         m_currentLine->textBuffer.push_back('\0');
 

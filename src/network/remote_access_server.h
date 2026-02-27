@@ -10,6 +10,12 @@
 #include <QHostAddress>
 #include <QList>
 #include <QObject>
+#include <expected>
+
+enum class StartError {
+    NoPassword,
+    BindFailed,
+};
 
 class QTcpServer;
 class WorldDocument;
@@ -26,7 +32,8 @@ class RemoteAccessServer : public QObject {
 
     // Start the server. By default binds to localhost only for security.
     // Pass QHostAddress::Any to allow connections from other machines.
-    bool start(quint16 port, const QHostAddress& bindAddress = QHostAddress::LocalHost);
+    std::expected<void, StartError>
+    start(quint16 port, const QHostAddress& bindAddress = QHostAddress::LocalHost);
     void stop();
     bool isRunning() const;
     quint16 port() const;
@@ -55,11 +62,13 @@ class RemoteAccessServer : public QObject {
     void onIncompleteLine();
 
   private:
-    void broadcastLine(Line* line);
-    void broadcastIncompleteLine(Line* line);
+    void broadcastLine(const Line* line);
+    void broadcastIncompleteLine(const Line* line);
 
     WorldDocument* m_pDoc;
-    QTcpServer* m_pServer;
+    // Owned via Qt parent-child (parent = this). nullptr when stopped.
+    QTcpServer* m_pServer = nullptr;
+    // Each RemoteClient is Qt-parented to this. Removed from list before deleteLater().
     QList<RemoteClient*> m_clients;
     QString m_password;
     int m_scrollbackLines;

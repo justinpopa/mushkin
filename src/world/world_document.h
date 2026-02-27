@@ -19,15 +19,16 @@
 #include <deque>      // For m_recentLines (multi-line triggers)
 #include <functional> // For std::function (progress callback)
 #include <memory>     // For std::unique_ptr
+#include <span>       // For std::span (buffer parameters)
 
 #include "../automation/script_language.h" // ScriptLanguage enum
 #include "../automation/variable.h"        // ArraysMap type
 #include "miniwindow.h"                    // MiniWindow (off-screen drawing surface)
-#include "mxp_types.h"              // MXP data structures
-#include <QJsonArray>               // GMCP JSON parsing
-#include <QJsonObject>              // GMCP JSON parsing
-#include <QJsonValue>               // GMCP JSON parsing
-#include <zlib.h>                   // For MCCP compression
+#include "mxp_types.h"                     // MXP data structures
+#include <QJsonArray>                      // GMCP JSON parsing
+#include <QJsonObject>                     // GMCP JSON parsing
+#include <QJsonValue>                      // GMCP JSON parsing
+#include <zlib.h>                          // For MCCP compression
 
 // Forward declarations
 class QAudioEngine;   // Spatial audio engine
@@ -843,7 +844,7 @@ class WorldDocument : public QObject {
     QString m_strLastSelectedVariable;
 
     // ========== View Pointers (will be replaced with Qt equivalents) ==========
-    IInputView* m_pActiveInputView;  // Active input view (interface pointer)
+    IInputView* m_pActiveInputView;   // Active input view (interface pointer)
     IOutputView* m_pActiveOutputView; // Active output view (interface pointer)
 
     // ========== Text Selection State ==========
@@ -972,8 +973,8 @@ class WorldDocument : public QObject {
     ActiveTagList m_activeTagList;       // Stack of unclosed tags
     MXPGaugeMap m_gaugeMap;              // Track gauges and stats by entity name
 
-    char m_cLastChar;      // last incoming character
-    qint32 m_lastSpace;    // position of last space in current line (for word-wrap), -1 if none
+    char m_cLastChar;   // last incoming character
+    qint32 m_lastSpace; // position of last space in current line (for word-wrap), -1 if none
     qint32 m_iLastOutstandingTagCount;
     QString m_strPuebloMD5; // Pueblo hash string
 
@@ -1257,11 +1258,14 @@ class WorldDocument : public QObject {
     void sendToMud(const QString& text); // Send text to MUD
 
     // Connection time methods (for status bar)
-    qint64 connectedTime() const;  // Returns seconds connected, or -1 if not connected
-    void resetConnectedTime();     // Reset connection timer to now
+    qint64 connectedTime() const; // Returns seconds connected, or -1 if not connected
+    void resetConnectedTime();    // Reset connection timer to now
 
     // Logging status (for status bar)
-    bool isLogging() const { return m_logfile != nullptr; }
+    bool isLogging() const
+    {
+        return m_logfile != nullptr;
+    }
 
     // ========== Telnet State Machine ==========
 
@@ -1303,7 +1307,7 @@ class WorldDocument : public QObject {
     void Handle_TELOPT_MSP();           // MSP (MUD Sound Protocol)
 
     // Support methods
-    void SendPacket(const unsigned char* data, qint64 len);        // Send raw bytes
+    void SendPacket(std::span<const unsigned char> data);          // Send raw bytes
     bool Handle_Telnet_Request(int iNumber, const QString& sType); // Query plugins
     void Handle_IAC_GA();                                          // Handle Go Ahead
     void OutputBadUTF8characters();                                // Fallback for invalid UTF-8
@@ -1369,10 +1373,10 @@ class WorldDocument : public QObject {
     void SendWindowSizes(int width); // NAWS
 
     // ========== Line Buffer Management ==========
-    void AddLineToBuffer(Line* line);              // Add line to buffer with size limiting
-    void AddToLine(const char* str, int len = -1); // Add text to current line
-    void AddToLine(unsigned char c);               // Add single character to current line
-    void handleLineWrap();                         // Handle line wrapping when column exceeded
+    void AddLineToBuffer(Line* line);                 // Add line to buffer with size limiting
+    void AddToLine(const char* str, int len = -1);    // Add text to current line
+    void AddToLine(unsigned char c);                  // Add single character to current line
+    void handleLineWrap();                            // Handle line wrapping when column exceeded
     void adjustStylesForTruncation(qint32 newLength); // Adjust styles when truncating line
     void StartNewLine(bool bNewLine,
                       unsigned char iFlags); // Complete current line and start new one
@@ -1386,8 +1390,14 @@ class WorldDocument : public QObject {
     // ========== Command Window Helpers ==========
     void setActiveInputView(IInputView* inputView);
     void setActiveOutputView(IOutputView* outputView);
-    IInputView* activeInputView() const { return m_pActiveInputView; }
-    IOutputView* activeOutputView() const { return m_pActiveOutputView; }
+    IInputView* activeInputView() const
+    {
+        return m_pActiveInputView;
+    }
+    IOutputView* activeOutputView() const
+    {
+        return m_pActiveOutputView;
+    }
 
     QString GetCommand() const;
     qint32 SetCommand(const QString& text);

@@ -402,7 +402,7 @@ void WorldDocument::Send_IAC_DO(unsigned char c)
     }
 
     unsigned char do_do_it[3] = {IAC, DO, c};
-    SendPacket(do_do_it, sizeof(do_do_it));
+    SendPacket(do_do_it);
     m_bClient_sent_IAC_DO[c] = true;
     m_bClient_sent_IAC_DONT[c] = false;
 }
@@ -419,7 +419,7 @@ void WorldDocument::Send_IAC_DONT(unsigned char c)
     }
 
     unsigned char dont_do_it[3] = {IAC, DONT, c};
-    SendPacket(dont_do_it, sizeof(dont_do_it));
+    SendPacket(dont_do_it);
     m_bClient_sent_IAC_DONT[c] = true;
     m_bClient_sent_IAC_DO[c] = false;
 }
@@ -436,7 +436,7 @@ void WorldDocument::Send_IAC_WILL(unsigned char c)
     }
 
     unsigned char will_do_it[3] = {IAC, WILL, c};
-    SendPacket(will_do_it, sizeof(will_do_it));
+    SendPacket(will_do_it);
     m_bClient_sent_IAC_WILL[c] = true;
     m_bClient_sent_IAC_WONT[c] = false;
 }
@@ -453,7 +453,7 @@ void WorldDocument::Send_IAC_WONT(unsigned char c)
     }
 
     unsigned char wont_do_it[3] = {IAC, WONT, c};
-    SendPacket(wont_do_it, sizeof(wont_do_it));
+    SendPacket(wont_do_it);
     m_bClient_sent_IAC_WONT[c] = true;
     m_bClient_sent_IAC_WILL[c] = false;
 }
@@ -926,14 +926,15 @@ void WorldDocument::Phase_COMPRESS_WILL(unsigned char c)
  *
  * Port from: doc.cpp (various locations)
  */
-void WorldDocument::SendPacket(const unsigned char* data, qint64 len)
+void WorldDocument::SendPacket(std::span<const unsigned char> data)
 {
     if (!m_pSocket) {
         qCDebug(lcWorld) << "SendPacket: No socket available";
         return;
     }
 
-    m_pSocket->send((const char*)data, len);
+    // Ignore send errors — callers don't check return value for protocol packets
+    (void)m_pSocket->send({reinterpret_cast<const char*>(data.data()), data.size()});
 }
 
 /**
@@ -1112,11 +1113,11 @@ void WorldDocument::Handle_TELOPT_CHARSET()
         memcpy(&sResponse[iLength], p2, sizeof(p2));
         iLength += sizeof(p2);
 
-        SendPacket(sResponse, iLength);
+        SendPacket({sResponse, static_cast<std::size_t>(iLength)});
     } else {
         // Build: IAC SB CHARSET REJECTED IAC SE
         unsigned char p[] = {IAC, SB, TELOPT_CHARSET, 3, IAC, SE}; // 3 = REJECTED
-        SendPacket(p, sizeof(p));
+        SendPacket(p);
     }
 }
 
@@ -1172,7 +1173,7 @@ void WorldDocument::Handle_TELOPT_TERMINAL_TYPE()
     memcpy(&sResponse[iLength], p2, 2);
     iLength += 2;
 
-    SendPacket(sResponse, iLength);
+    SendPacket({sResponse, static_cast<std::size_t>(iLength)});
 }
 
 /**
@@ -1228,7 +1229,8 @@ void WorldDocument::Handle_TELOPT_ZMP()
         response.append('\0');
         response.append(static_cast<char>(IAC));
         response.append(static_cast<char>(SE));
-        SendPacket(reinterpret_cast<const unsigned char*>(response.constData()), response.size());
+        SendPacket({reinterpret_cast<const unsigned char*>(response.constData()),
+                    static_cast<std::size_t>(response.size())});
     } else if (command == "zmp.check") {
         // Server asking if we support a package
         // For now, we only support core zmp.* commands
@@ -1245,8 +1247,8 @@ void WorldDocument::Handle_TELOPT_ZMP()
             response.append('\0');
             response.append(static_cast<char>(IAC));
             response.append(static_cast<char>(SE));
-            SendPacket(reinterpret_cast<const unsigned char*>(response.constData()),
-                       response.size());
+            SendPacket({reinterpret_cast<const unsigned char*>(response.constData()),
+                        static_cast<std::size_t>(response.size())});
         }
     } else if (command == "zmp.ident") {
         // Server asking for client identification
@@ -1264,7 +1266,8 @@ void WorldDocument::Handle_TELOPT_ZMP()
         response.append('\0');
         response.append(static_cast<char>(IAC));
         response.append(static_cast<char>(SE));
-        SendPacket(reinterpret_cast<const unsigned char*>(response.constData()), response.size());
+        SendPacket({reinterpret_cast<const unsigned char*>(response.constData()),
+                    static_cast<std::size_t>(response.size())});
     }
 
     // Send to Lua callback for custom handling
@@ -1317,7 +1320,8 @@ void WorldDocument::Handle_TELOPT_ATCP()
         response.append("hello Mushkin 1.0");
         response.append(static_cast<char>(IAC));
         response.append(static_cast<char>(SE));
-        SendPacket(reinterpret_cast<const unsigned char*>(response.constData()), response.size());
+        SendPacket({reinterpret_cast<const unsigned char*>(response.constData()),
+                    static_cast<std::size_t>(response.size())});
     }
 
     // Send to Lua callback for custom handling
@@ -2320,7 +2324,7 @@ void WorldDocument::SendWindowSizes(int width)
     packet[length++] = IAC;
     packet[length++] = SE;
 
-    SendPacket(packet, length);
+    SendPacket({packet, static_cast<std::size_t>(length)});
     qCDebug(lcWorld) << "Sent NAWS:" << width << "x" << height;
 }
 

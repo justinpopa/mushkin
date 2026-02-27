@@ -30,8 +30,8 @@ class RemoteClient : public QObject {
     bool isAuthenticated() const;
     QString address() const;
     QDateTime connectedAt() const;
-    void sendLine(Line* line);
-    void sendIncompleteLine(Line* line);
+    void sendLine(const Line* line);
+    void sendIncompleteLine(const Line* line);
     void sendRawText(const QString& text, bool includeNewline = true);
     void disconnect();
 

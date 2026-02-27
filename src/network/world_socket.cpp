@@ -25,18 +25,23 @@ void WorldSocket::disconnectFromHost()
     m_socket->disconnectFromHost();
 }
 
-qint64 WorldSocket::send(const char* data, qint64 len)
+std::expected<qint64, QString> WorldSocket::send(std::span<const char> data)
 {
-    qint64 written = m_socket->write(data, len);
+    qint64 written = m_socket->write(data.data(), static_cast<qint64>(data.size()));
     if (written < 0) {
         qCDebug(lcNetwork) << "WorldSocket::send() error:" << m_socket->errorString();
+        return std::unexpected(m_socket->errorString());
     }
     return written;
 }
 
-qint64 WorldSocket::receive(char* buffer, qint64 maxLen)
+std::expected<qint64, QString> WorldSocket::receive(std::span<char> buffer)
 {
-    return m_socket->read(buffer, maxLen);
+    qint64 nRead = m_socket->read(buffer.data(), static_cast<qint64>(buffer.size()));
+    if (nRead < 0) {
+        return std::unexpected(m_socket->errorString());
+    }
+    return nRead;
 }
 
 bool WorldSocket::isConnected() const

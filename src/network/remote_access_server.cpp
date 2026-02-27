@@ -21,15 +21,16 @@ RemoteAccessServer::~RemoteAccessServer()
     stop();
 }
 
-bool RemoteAccessServer::start(quint16 port, const QHostAddress& bindAddress)
+std::expected<void, StartError> RemoteAccessServer::start(quint16 port,
+                                                          const QHostAddress& bindAddress)
 {
     if (m_pServer) {
-        return m_pServer->isListening();
+        return {};
     }
 
     if (m_password.isEmpty()) {
         emit error("Cannot start server: password not set");
-        return false;
+        return std::unexpected(StartError::NoPassword);
     }
 
     m_pServer = new QTcpServer(this);
@@ -40,7 +41,7 @@ bool RemoteAccessServer::start(quint16 port, const QHostAddress& bindAddress)
         emit error(QString("Failed to start server: %1").arg(m_pServer->errorString()));
         delete m_pServer;
         m_pServer = nullptr;
-        return false;
+        return std::unexpected(StartError::BindFailed);
     }
 
     // Connect to WorldDocument signals for output streaming
@@ -54,7 +55,7 @@ bool RemoteAccessServer::start(quint16 port, const QHostAddress& bindAddress)
     }
 
     emit serverStarted(m_pServer->serverPort());
-    return true;
+    return {};
 }
 
 void RemoteAccessServer::stop()
@@ -225,7 +226,7 @@ void RemoteAccessServer::onIncompleteLine()
     broadcastIncompleteLine(m_pDoc->m_currentLine);
 }
 
-void RemoteAccessServer::broadcastLine(Line* line)
+void RemoteAccessServer::broadcastLine(const Line* line)
 {
     for (RemoteClient* client : m_clients) {
         if (client->isAuthenticated()) {
@@ -234,7 +235,7 @@ void RemoteAccessServer::broadcastLine(Line* line)
     }
 }
 
-void RemoteAccessServer::broadcastIncompleteLine(Line* line)
+void RemoteAccessServer::broadcastIncompleteLine(const Line* line)
 {
     for (RemoteClient* client : m_clients) {
         if (client->isAuthenticated()) {

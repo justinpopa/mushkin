@@ -22,7 +22,7 @@ RemoteClient::RemoteClient(QTcpSocket* socket, WorldDocument* doc, const QString
       m_scrollbackLines(scrollbackLines), m_state(State::Negotiating), m_failedAttempts(0),
       m_maxFailedAttempts(kMaxPasswordAttempts), m_connectedAt(QDateTime::currentDateTime())
 {
-    // Take ownership of socket
+    // Takes ownership of socket via Qt parent-child (setParent below).
     m_pSocket->setParent(this);
 
     // Connect socket signals
@@ -63,7 +63,7 @@ QDateTime RemoteClient::connectedAt() const
     return m_connectedAt;
 }
 
-void RemoteClient::sendLine(Line* line)
+void RemoteClient::sendLine(const Line* line)
 {
     if (m_state != State::Authenticated || !line) {
         return;
@@ -73,7 +73,7 @@ void RemoteClient::sendLine(Line* line)
     sendBytes(formatted);
 }
 
-void RemoteClient::sendIncompleteLine(Line* line)
+void RemoteClient::sendIncompleteLine(const Line* line)
 {
     if (m_state != State::Authenticated || !line) {
         return;
