@@ -42,8 +42,9 @@
 #include <QSpatialSound>
 #include <QUrl>
 #include <QVector3D>
-#include <cmath>  // for pow()
-#include <memory> // for std::weak_ptr
+#include <algorithm> // for std::clamp
+#include <cmath>     // for pow()
+#include <memory>    // for std::weak_ptr
 
 // ---------------------------------------------------------------------------
 // Construction / destruction
@@ -237,12 +238,10 @@ qint32 SoundManager::playSound(qint16 buffer, const QString& filename, bool loop
     releaseInactiveSoundBuffers();
 
     // Clamp volume to valid range (-100 to 0)
-    if (volume > 0 || volume < -100.0)
-        volume = 0.0;
+    volume = std::clamp(volume, -100.0, 0.0);
 
     // Clamp pan to valid range (-100 to +100)
-    if (pan > 100.0 || pan < -100.0)
-        pan = 0.0;
+    pan = std::clamp(pan, -100.0, 100.0);
 
     // Buffer 0 = auto-select free buffer (matches original MUSHclient behavior)
     if (buffer == 0) {

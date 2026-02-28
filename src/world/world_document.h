@@ -909,10 +909,14 @@ class WorldDocument : public QObject {
     bool m_bWorldClosing; // world is closing?
 
     // Current style (from MUD)
-    quint16 m_iFlags;                        // style flags
-    QRgb m_iForeColour;                      // foreground color
-    QRgb m_iBackColour;                      // background color
-    std::shared_ptr<Action> m_currentAction; // current hyperlink action (nullptr if no action)
+    quint16 m_iFlags;   // style flags
+    QRgb m_iForeColour; // foreground color
+    QRgb m_iBackColour; // background color
+    // shared_ptr is intentional: m_currentAction is copied into each Style created while the
+    // hyperlink is active. All resulting Style objects co-own the same Action; none is the unique
+    // owner. unique_ptr would require transferring ownership on every AddToLine() call and would
+    // leave m_currentAction empty — breaking multi-style hyperlink runs.
+    std::shared_ptr<Action> m_currentAction; // current hyperlink action (nullptr if none)
 
     // Notes style
     bool m_bNotesInRGB; // notes in RGB mode?

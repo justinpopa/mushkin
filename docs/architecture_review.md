@@ -238,9 +238,9 @@ Note: Lua API boundary functions intentionally return integers (Lua convention).
 **Risk:** Suspicious — should likely be `unique_ptr`. Multiple styles share the same action, so shared ownership may be intentional.
 
 **Targets:**
-- [ ] Audit `std::shared_ptr<Action>` usage to confirm shared ownership is required
+- [x] Audited `std::shared_ptr<Action>` — shared ownership is genuine (multiple Styles share one Action per hyperlink span; documented in style.h and world_document.h)
 
-**Acceptance:** Either document why shared ownership is needed, or convert to `unique_ptr`.
+**Acceptance:** Documented why shared ownership is needed.
 
 ---
 
@@ -250,7 +250,7 @@ Note: Lua API boundary functions intentionally return integers (Lua convention).
 **Risk:** `sound_manager.cpp:245-251` collapses any out-of-range volume to 0 (full blast) instead of clamping to nearest valid value. Passing `-200` (should be muted) plays at full volume.
 
 **Targets:**
-- [ ] `src/world/sound_manager.cpp` — fix clamping to saturate at bounds instead of resetting to 0
+- [x] `src/world/sound_manager.cpp` — fixed clamping with `std::clamp` (volume: -100..0, pan: -100..100)
 
 **Acceptance:** Invalid volume/pan values clamp to nearest legal value. Build + test pass.
 

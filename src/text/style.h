@@ -104,11 +104,17 @@ class Style {
     ~Style();
 
     // Public members (same as original for direct access)
-    quint16 iLength;                 // How many bytes (characters) this style affects
-    quint16 iFlags;                  // Style bits (see defines above)
-    QRgb iForeColour;                // Foreground color (interpretation depends on COLOURTYPE bits)
-    QRgb iBackColour;                // Background color (interpretation depends on COLOURTYPE bits)
-    std::shared_ptr<Action> pAction; // Action/hyperlink pointer (or nullptr)
+    quint16 iLength;  // How many bytes (characters) this style affects
+    quint16 iFlags;   // Style bits (see defines above)
+    QRgb iForeColour; // Foreground color (interpretation depends on COLOURTYPE bits)
+    QRgb iBackColour; // Background color (interpretation depends on COLOURTYPE bits)
+    // shared_ptr is intentional: a single Action object is shared across multiple Style runs.
+    // When MXP/auto-detected hyperlinks span several style changes (e.g., color mid-link),
+    // AddToLine() copies m_currentAction into each new Style. All those Style objects own the
+    // same Action via shared reference counting. OutputView event handlers also take a temporary
+    // copy by value to extend lifetime during click/hover processing. unique_ptr cannot model
+    // this because there is no single owner at the point of creation.
+    std::shared_ptr<Action> pAction; // shared Action/hyperlink (nullptr = no action)
 };
 
 #endif // STYLE_H
