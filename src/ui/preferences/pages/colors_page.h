@@ -21,7 +21,7 @@ class ColorsPage : public PreferencesPageBase {
 
     QString pageName() const override
     {
-        return tr("Colors");
+        return tr("Custom Colors");
     }
     QString pageDescription() const override
     {

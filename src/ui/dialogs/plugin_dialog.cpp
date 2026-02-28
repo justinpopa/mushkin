@@ -60,17 +60,22 @@ void PluginDialog::setupUi()
     m_pluginTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_pluginTable->setSortingEnabled(false); // We do manual sorting
     m_pluginTable->setContextMenuPolicy(Qt::CustomContextMenu);
-    m_pluginTable->horizontalHeader()->setStretchLastSection(false);
     m_pluginTable->verticalHeader()->setVisible(false);
 
-    // Set column widths
-    m_pluginTable->setColumnWidth(COL_NAME, 100);
-    m_pluginTable->setColumnWidth(COL_PURPOSE, 200);
-    m_pluginTable->setColumnWidth(COL_AUTHOR, 100);
-    m_pluginTable->setColumnWidth(COL_LANGUAGE, 70);
-    m_pluginTable->setColumnWidth(COL_FILE, 200);
-    m_pluginTable->setColumnWidth(COL_ENABLED, 60);
-    m_pluginTable->setColumnWidth(COL_VERSION, 50);
+    // Auto-size columns: stretch Purpose to fill, others fit content
+    m_pluginTable->horizontalHeader()->setSectionResizeMode(COL_NAME,
+                                                            QHeaderView::ResizeToContents);
+    m_pluginTable->horizontalHeader()->setSectionResizeMode(COL_PURPOSE, QHeaderView::Stretch);
+    m_pluginTable->horizontalHeader()->setSectionResizeMode(COL_AUTHOR,
+                                                            QHeaderView::ResizeToContents);
+    m_pluginTable->horizontalHeader()->setSectionResizeMode(COL_LANGUAGE,
+                                                            QHeaderView::ResizeToContents);
+    m_pluginTable->horizontalHeader()->setSectionResizeMode(COL_FILE,
+                                                            QHeaderView::ResizeToContents);
+    m_pluginTable->horizontalHeader()->setSectionResizeMode(COL_ENABLED,
+                                                            QHeaderView::ResizeToContents);
+    m_pluginTable->horizontalHeader()->setSectionResizeMode(COL_VERSION,
+                                                            QHeaderView::ResizeToContents);
 
     mainLayout->addWidget(m_pluginTable);
 

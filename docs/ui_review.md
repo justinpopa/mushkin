@@ -41,7 +41,7 @@
 **Description:** The rightmost column header is truncated to "F..." (likely "File" or "Filename"). Dialog needs a wider minimum width or better column sizing.
 
 **Targets:**
-- [ ] `src/ui/plugin_dialog.cpp` — Set reasonable minimum column widths or dialog minimum size
+- [x] `src/ui/dialogs/plugin_dialog.cpp` — Columns use `ResizeToContents` with Purpose column stretching to fill
 
 **Acceptance:** All column headers fully visible without horizontal scrolling at 1280x720.
 
@@ -134,12 +134,12 @@
 
 ### D3 — No "About Mushkin" dialog
 
-**Severity:** Low
+**Severity:** Low (Already Fixed)
 **Location:** App menu (mushkin menu, left of File)
 **Description:** macOS apps conventionally have an "About" dialog in the application menu showing version, credits, license. Mushkin is missing this.
 
 **Targets:**
-- [ ] Add an About dialog with app name, version, build info, and credits
+- [x] `src/ui/main_window.cpp:4037-4051` — About dialog already exists with version, description, and MUSHclient credits
 
 **Acceptance:** mushkin > About Mushkin opens a dialog with version info.
 
@@ -152,8 +152,8 @@
 **Description:** The "Colors" page only shows 16 custom color slots. The actual ANSI color palette (the 16 standard terminal colors) lives on the "Output" page. Users looking for ANSI colors will naturally go to "Colors" first and be confused.
 
 **Targets:**
-- [ ] Consider moving ANSI palette to the Colors page, or adding a note/link on the Colors page directing users to Output for ANSI colors
-- [ ] Alternatively, rename "Colors" to "Custom Colors" to clarify scope
+- [x] Renamed "Colors" to "Custom Colors" in tree and page header to clarify scope
+- [ ] Consider moving ANSI palette to the Custom Colors page, or adding a note directing users to Output for ANSI colors
 
 **Acceptance:** User can find ANSI color settings without confusion.
 
@@ -174,12 +174,12 @@
 
 ### D6 — Trigger Appearance tab: no color preview on buttons
 
-**Severity:** Low
+**Severity:** Low (Already Fixed)
 **Location:** Add/Edit Trigger dialog > Appearance tab
 **Description:** The Foreground/Background buttons show only text labels with no color swatch preview. Users can't see the currently selected color at a glance.
 
 **Targets:**
-- [ ] `src/ui/dialogs/trigger_edit_dialog.cpp` — Add color swatch preview (icon or background color) to Foreground/Background buttons
+- [x] `src/ui/dialogs/trigger_edit_dialog.cpp:530-537` — `updateColorButton()` sets background-color stylesheet on buttons; called during setup and after color selection
 
 **Acceptance:** Buttons show the currently selected color visually.
 
@@ -230,12 +230,12 @@
 
 ### R2 — Keypad page tight at low resolution
 
-**Severity:** Low
+**Severity:** Low (Already Fixed)
 **Location:** World Properties > Input > Keypad
 **Description:** The Ctrl+Keypad section gets tight at low resolution. Content may need scrolling on smaller screens.
 
 **Targets:**
-- [ ] `src/ui/preferences/pages/keypad_page.cpp` — Wrap the keypad grid in a scroll area for small screens
+- [x] `src/ui/preferences/pages/keypad_page.cpp:37-39,162-163` — Already wrapped in `QScrollArea` with `setWidgetResizable(true)`
 
 **Acceptance:** All keypad sections accessible at 1280x720.
 
@@ -248,7 +248,7 @@
 **Description:** Column widths don't adapt to content. Horizontal scrollbar appears unnecessarily while there's unused space.
 
 **Targets:**
-- [ ] `src/ui/plugin_dialog.cpp` — Use `QHeaderView::Stretch` or `ResizeToContents` for the table columns
+- [x] `src/ui/dialogs/plugin_dialog.cpp` — Same fix as B3: `ResizeToContents` + `Stretch` on Purpose column
 
 **Acceptance:** All columns visible without scrolling when dialog has sufficient width.
 

@@ -129,7 +129,7 @@ void UnifiedPreferencesDialog::setupTree()
     appearanceGroup->setFlags(appearanceGroup->flags() & ~Qt::ItemIsSelectable);
     appearanceGroup->setExpanded(true);
     addPageItem(appearanceGroup, Page::Output, tr("Output"));
-    addPageItem(appearanceGroup, Page::Colors, tr("Colors"));
+    addPageItem(appearanceGroup, Page::Colors, tr("Custom Colors"));
     addPageItem(appearanceGroup, Page::MXP, tr("MXP / Pueblo"));
 
     // Automation group
