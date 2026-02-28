@@ -796,6 +796,23 @@ gtest_discover_tests(test-bit-library-gtest
     DISCOVERY_TIMEOUT 30
 )
 
+# LuaFileSystem (lfs) integration test (GoogleTest version)
+add_executable(test-lfs-gtest
+    test_lfs_gtest.cpp
+)
+
+target_link_libraries(test-lfs-gtest PRIVATE
+    GTest::gtest
+    Qt6::Core
+    Qt6::Gui
+    Qt6::Widgets
+    ui          # Transitively brings: world (with Lua API), text, storage, automation, utils, network
+)
+
+gtest_discover_tests(test-lfs-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
 # Progress library compatibility test (GoogleTest version)
 add_executable(test-progress-library-gtest
     test_progress_library_gtest.cpp

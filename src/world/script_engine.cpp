@@ -24,6 +24,7 @@ int luaopen_bit(lua_State* L);      // Bit manipulation library (LuaJIT)
 int luaopen_progress(lua_State* L); // Progress dialog library
 int luaopen_lpeg(lua_State* L);     // LPeg pattern matching library
 int luaopen_yue(lua_State* L);      // YueScript transpiler (statically linked)
+int luaopen_lfs(lua_State* L);      // LuaFileSystem (directory/file operations)
 
 // ========== FFI Shims for Cross-Platform Compatibility ==========
 
@@ -409,6 +410,17 @@ void ScriptEngine::openLua()
     lua_call(L, 0, 1);            // Call with 0 args, expect 1 result (the progress table)
     lua_setglobal(L, "progress"); // Register as global "progress"
 
+    // Load LuaFileSystem (directory/file operations for plugins)
+    lua_pushcfunction(L, luaopen_lfs);
+    lua_call(L, 0, 1);
+    lua_pushvalue(L, -1);
+    lua_setglobal(L, "lfs");
+    lua_getglobal(L, "package");
+    lua_getfield(L, -1, "loaded");
+    lua_pushvalue(L, -3);
+    lua_setfield(L, -2, "lfs");
+    lua_pop(L, 3);
+
     // Load lpeg library (Parsing Expression Grammars for Lua)
     lua_pushcfunction(L, luaopen_lpeg);
     lua_call(L, 0, 1); // Call with 0 args, expect 1 result (the lpeg table)
@@ -663,14 +675,14 @@ return re
     // YueScript is statically linked into the application to avoid
     // Windows DLL loading issues with Lua C modules
     lua_pushcfunction(L, luaopen_yue);
-    lua_call(L, 0, 1);            // Call luaopen_yue(), returns yue table
-    lua_pushvalue(L, -1);         // duplicate yue table
-    lua_setglobal(L, "yue");      // global "yue" = yue table
+    lua_call(L, 0, 1);       // Call luaopen_yue(), returns yue table
+    lua_pushvalue(L, -1);    // duplicate yue table
+    lua_setglobal(L, "yue"); // global "yue" = yue table
     lua_getglobal(L, "package");
     lua_getfield(L, -1, "loaded");
-    lua_pushvalue(L, -3);         // push yue table again
-    lua_setfield(L, -2, "yue");   // package.loaded["yue"] = yue
-    lua_pop(L, 3);                // pop loaded, package, and yue
+    lua_pushvalue(L, -3);       // push yue table again
+    lua_setfield(L, -2, "yue"); // package.loaded["yue"] = yue
+    lua_pop(L, 3);              // pop loaded, package, and yue
     qDebug() << "YueScript module loaded successfully (statically linked)";
 
     // Load Teal module for typed Lua transpilation support
@@ -1047,8 +1059,7 @@ static void luaError(lua_State* L, const QString& event, const QString& name, Wo
     // Display in output window
     if (doc) {
         // Orange error text on black background (BGR format for MUSHclient compatibility)
-        doc->colourNote(BGR(255, 140, 0), BGR(0, 0, 0),
-                        QString("=== %1: %2 ===").arg(event, name));
+        doc->colourNote(BGR(255, 140, 0), BGR(0, 0, 0), QString("=== %1: %2 ===").arg(event, name));
         doc->colourNote(BGR(255, 140, 0), BGR(0, 0, 0), errorMsg);
 
         // Show error lines (if we have a line number and script file)
