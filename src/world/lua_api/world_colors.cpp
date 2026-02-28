@@ -5,8 +5,8 @@
  * Colors use BGR format (0x00BBGGRR) for MUSHclient compatibility.
  */
 
-#include "lua_common.h"
 #include "../color_utils.h"
+#include "lua_common.h"
 #include <QColorDialog>
 
 /**
@@ -691,6 +691,89 @@ int L_AdjustColour(lua_State* L)
             lua_pushinteger(L, bgr);
             return 1;
     }
+}
+
+// ========== Bare-name compatibility aliases (dual get/set dispatch) ==========
+
+/**
+ * world.NormalColour(whichColour [, newValue])
+ *
+ * Compatibility alias for the MUSHclient COM property NormalColour.
+ * With one argument acts as a getter (returns the current color value).
+ * With two arguments acts as a setter (sets the color and returns nothing).
+ *
+ * @param whichColour (number) Color index 1-8
+ * @param newValue (number, optional) BGR color value to set
+ *
+ * @return (number|nothing) Current BGR value when getting; nothing when setting
+ *
+ * @see GetNormalColour, SetNormalColour
+ */
+int L_NormalColour(lua_State* L)
+{
+    if (lua_gettop(L) >= 2)
+        return L_SetNormalColour(L);
+    return L_GetNormalColour(L);
+}
+
+/**
+ * world.BoldColour(whichColour [, newValue])
+ *
+ * Compatibility alias for the MUSHclient COM property BoldColour.
+ * With one argument acts as a getter; with two acts as a setter.
+ *
+ * @param whichColour (number) Color index 1-8
+ * @param newValue (number, optional) BGR color value to set
+ *
+ * @return (number|nothing) Current BGR value when getting; nothing when setting
+ *
+ * @see GetBoldColour, SetBoldColour
+ */
+int L_BoldColour(lua_State* L)
+{
+    if (lua_gettop(L) >= 2)
+        return L_SetBoldColour(L);
+    return L_GetBoldColour(L);
+}
+
+/**
+ * world.CustomColourText(whichColour [, newValue])
+ *
+ * Compatibility alias for the MUSHclient COM property CustomColourText.
+ * With one argument acts as a getter; with two acts as a setter.
+ *
+ * @param whichColour (number) Custom color index 1-16
+ * @param newValue (number, optional) BGR color value to set
+ *
+ * @return (number|nothing) Current BGR value when getting; nothing when setting
+ *
+ * @see GetCustomColourText, SetCustomColourText
+ */
+int L_CustomColourText(lua_State* L)
+{
+    if (lua_gettop(L) >= 2)
+        return L_SetCustomColourText(L);
+    return L_GetCustomColourText(L);
+}
+
+/**
+ * world.CustomColourBackground(whichColour [, newValue])
+ *
+ * Compatibility alias for the MUSHclient COM property CustomColourBackground.
+ * With one argument acts as a getter; with two acts as a setter.
+ *
+ * @param whichColour (number) Custom color index 1-16
+ * @param newValue (number, optional) BGR color value to set
+ *
+ * @return (number|nothing) Current BGR value when getting; nothing when setting
+ *
+ * @see GetCustomColourBackground, SetCustomColourBackground
+ */
+int L_CustomColourBackground(lua_State* L)
+{
+    if (lua_gettop(L) >= 2)
+        return L_SetCustomColourBackground(L);
+    return L_GetCustomColourBackground(L);
 }
 
 // ========== Registration ==========

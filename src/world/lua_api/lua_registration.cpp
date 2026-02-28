@@ -50,6 +50,9 @@ extern int L_ShowInfoBar(lua_State* L);
 // Network functions
 extern int L_Send(lua_State* L);
 extern int L_SendNoEcho(lua_State* L);
+extern int L_SendImmediate(lua_State* L);
+extern int L_SendPush(lua_State* L);
+extern int L_SendSpecial(lua_State* L);
 extern int L_Connect(lua_State* L);
 extern int L_Disconnect(lua_State* L);
 extern int L_IsConnected(lua_State* L);
@@ -120,6 +123,11 @@ extern int L_PickColour(lua_State* L);
 extern int L_AdjustColour(lua_State* L);
 extern int L_ColourNameToRGB(lua_State* L);
 extern int L_RGBColourToName(lua_State* L);
+// Bare-name compatibility aliases (dual get/set dispatch)
+extern int L_NormalColour(lua_State* L);
+extern int L_BoldColour(lua_State* L);
+extern int L_CustomColourText(lua_State* L);
+extern int L_CustomColourBackground(lua_State* L);
 
 // Trace/Echo/Speedwalk functions
 extern int L_GetTrace(lua_State* L);
@@ -131,6 +139,9 @@ extern int L_SetSpeedWalkDelay(lua_State* L);
 extern int L_EvaluateSpeedwalk(lua_State* L);
 extern int L_ReverseSpeedwalk(lua_State* L);
 extern int L_RemoveBacktracks(lua_State* L);
+// Bare-name compatibility aliases
+extern int L_EchoInput(lua_State* L);
+extern int L_SpeedWalkDelay(lua_State* L);
 
 // Trigger functions
 extern int L_AddTrigger(lua_State* L);
@@ -279,6 +290,10 @@ extern int L_SetLogNotes(lua_State* L);
 extern int L_GetLogOutput(lua_State* L);
 extern int L_SetLogOutput(lua_State* L);
 extern int L_LogSend(lua_State* L);
+// Bare-name compatibility aliases
+extern int L_LogInput(lua_State* L);
+extern int L_LogNotes(lua_State* L);
+extern int L_LogOutput(lua_State* L);
 
 // Random number functions
 extern int L_MtRand(lua_State* L);
@@ -438,6 +453,11 @@ extern int L_WindowMenu(lua_State* L);
 extern int L_WindowHotspotInfo(lua_State* L);
 extern int L_WindowMoveHotspot(lua_State* L);
 extern int L_WindowScrollwheelHandler(lua_State* L);
+extern int L_WindowList(lua_State* L);
+extern int L_WindowHotspotList(lua_State* L);
+extern int L_WindowCreateImage(lua_State* L);
+extern int L_WindowImageOp(lua_State* L);
+extern int L_WindowLoadImageMemory(lua_State* L);
 
 // Pixel manipulation functions (standalone helpers)
 extern int L_BlendPixel(lua_State* L);
@@ -488,6 +508,9 @@ int RegisterLuaRoutines(lua_State* L)
         // Network functions
         {"Send", L_Send},
         {"SendNoEcho", L_SendNoEcho},
+        {"SendImmediate", L_SendImmediate},
+        {"SendPush", L_SendPush},
+        {"SendSpecial", L_SendSpecial},
         {"Connect", L_Connect},
         {"Disconnect", L_Disconnect},
         {"IsConnected", L_IsConnected},
@@ -554,6 +577,11 @@ int RegisterLuaRoutines(lua_State* L)
         {"SetCustomColourName", L_SetCustomColourName},
         {"PickColour", L_PickColour},
         {"AdjustColour", L_AdjustColour},
+        // Bare-name compatibility aliases (dual get/set dispatch)
+        {"NormalColour", L_NormalColour},
+        {"BoldColour", L_BoldColour},
+        {"CustomColourText", L_CustomColourText},
+        {"CustomColourBackground", L_CustomColourBackground},
 
         // Trace/Echo/Speedwalk functions
         {"GetTrace", L_GetTrace},
@@ -562,6 +590,9 @@ int RegisterLuaRoutines(lua_State* L)
         {"SetEchoInput", L_SetEchoInput},
         {"GetSpeedWalkDelay", L_GetSpeedWalkDelay},
         {"SetSpeedWalkDelay", L_SetSpeedWalkDelay},
+        // Bare-name compatibility aliases
+        {"EchoInput", L_EchoInput},
+        {"SpeedWalkDelay", L_SpeedWalkDelay},
         {"EvaluateSpeedwalk", L_EvaluateSpeedwalk},
         {"ReverseSpeedwalk", L_ReverseSpeedwalk},
         {"RemoveBacktracks", L_RemoveBacktracks},
@@ -717,6 +748,10 @@ int RegisterLuaRoutines(lua_State* L)
         {"SetLogNotes", L_SetLogNotes},
         {"GetLogOutput", L_GetLogOutput},
         {"SetLogOutput", L_SetLogOutput},
+        // Bare-name compatibility aliases
+        {"LogInput", L_LogInput},
+        {"LogNotes", L_LogNotes},
+        {"LogOutput", L_LogOutput},
         {"LogSend", L_LogSend},
 
         // Random number functions
@@ -856,6 +891,11 @@ int RegisterLuaRoutines(lua_State* L)
         {"WindowHotspotInfo", L_WindowHotspotInfo},
         {"WindowMoveHotspot", L_WindowMoveHotspot},
         {"WindowScrollwheelHandler", L_WindowScrollwheelHandler},
+        {"WindowList", L_WindowList},
+        {"WindowHotspotList", L_WindowHotspotList},
+        {"WindowCreateImage", L_WindowCreateImage},
+        {"WindowImageOp", L_WindowImageOp},
+        {"WindowLoadImageMemory", L_WindowLoadImageMemory},
 
         // Sound functions
         {"PlaySound", L_PlaySound},

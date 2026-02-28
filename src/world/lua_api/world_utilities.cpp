@@ -3061,6 +3061,105 @@ int L_SetLogOutput(lua_State* L)
     return 0;
 }
 
+// ========== Bare-name compatibility aliases (dual get/set dispatch) ==========
+
+/**
+ * world.EchoInput([enable])
+ *
+ * Compatibility alias for the MUSHclient COM property EchoInput.
+ * With no arguments acts as a getter (returns current echo state).
+ * With one argument acts as a setter.
+ *
+ * @param enable (boolean, optional) true to enable, false to disable
+ *
+ * @return (boolean|nothing) Current echo state when getting; nothing when setting
+ *
+ * @see GetEchoInput, SetEchoInput
+ */
+int L_EchoInput(lua_State* L)
+{
+    if (lua_gettop(L) >= 1)
+        return L_SetEchoInput(L);
+    return L_GetEchoInput(L);
+}
+
+/**
+ * world.SpeedWalkDelay([delay])
+ *
+ * Compatibility alias for the MUSHclient COM property SpeedWalkDelay.
+ * With no arguments acts as a getter (returns current delay in ms).
+ * With one argument acts as a setter.
+ *
+ * @param delay (number, optional) Delay in milliseconds between speedwalk commands
+ *
+ * @return (number|nothing) Current delay when getting; nothing when setting
+ *
+ * @see GetSpeedWalkDelay, SetSpeedWalkDelay
+ */
+int L_SpeedWalkDelay(lua_State* L)
+{
+    if (lua_gettop(L) >= 1)
+        return L_SetSpeedWalkDelay(L);
+    return L_GetSpeedWalkDelay(L);
+}
+
+/**
+ * world.LogInput([enable])
+ *
+ * Compatibility alias for the MUSHclient COM property LogInput.
+ * With no arguments acts as a getter; with one argument acts as a setter.
+ *
+ * @param enable (boolean, optional) true to enable, false to disable
+ *
+ * @return (boolean|nothing) Current state when getting; nothing when setting
+ *
+ * @see GetLogInput, SetLogInput
+ */
+int L_LogInput(lua_State* L)
+{
+    if (lua_gettop(L) >= 1)
+        return L_SetLogInput(L);
+    return L_GetLogInput(L);
+}
+
+/**
+ * world.LogNotes([enable])
+ *
+ * Compatibility alias for the MUSHclient COM property LogNotes.
+ * With no arguments acts as a getter; with one argument acts as a setter.
+ *
+ * @param enable (boolean, optional) true to enable, false to disable
+ *
+ * @return (boolean|nothing) Current state when getting; nothing when setting
+ *
+ * @see GetLogNotes, SetLogNotes
+ */
+int L_LogNotes(lua_State* L)
+{
+    if (lua_gettop(L) >= 1)
+        return L_SetLogNotes(L);
+    return L_GetLogNotes(L);
+}
+
+/**
+ * world.LogOutput([enable])
+ *
+ * Compatibility alias for the MUSHclient COM property LogOutput.
+ * With no arguments acts as a getter; with one argument acts as a setter.
+ *
+ * @param enable (boolean, optional) true to enable, false to disable
+ *
+ * @return (boolean|nothing) Current state when getting; nothing when setting
+ *
+ * @see GetLogOutput, SetLogOutput
+ */
+int L_LogOutput(lua_State* L)
+{
+    if (lua_gettop(L) >= 1)
+        return L_SetLogOutput(L);
+    return L_GetLogOutput(L);
+}
+
 /**
  * world.LogSend(message, ...)
  *
