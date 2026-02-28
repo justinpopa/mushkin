@@ -13,6 +13,7 @@
 // - IsLogOpen() - Check if log is open
 // - FormatTime(dt, pattern, forHTML) - Expand time codes in strings
 
+#include "../storage/global_options.h"
 #include "../text/line.h"  // For Line and LOG_LINE flag
 #include "../text/style.h" // For Style
 #include "../utils/app_paths.h"
@@ -104,16 +105,20 @@ QString WorldDocument::FormatTime(const QDateTime& dt, const QString& pattern, b
     result.replace("%P", playerName.replace("%", escapedPercent));
 
     // %F becomes default world files directory
-    // TODO: Get from application settings when implemented
-    QString worldFilesDir = AppPaths::getAppDirectory() + "/worlds";
+    QString worldFilesDir = GlobalOptions::instance().defaultWorldFileDirectory();
+    if (worldFilesDir.isEmpty()) {
+        worldFilesDir = AppPaths::getAppDirectory() + "/worlds";
+    }
     if (forHTML) {
         worldFilesDir = FixHTMLString(worldFilesDir);
     }
     result.replace("%F", worldFilesDir.replace("%", escapedPercent));
 
     // %L becomes default log files directory
-    // TODO: Get from application settings when implemented
-    QString logFilesDir = AppPaths::getAppDirectory() + "/logs";
+    QString logFilesDir = GlobalOptions::instance().defaultLogFileDirectory();
+    if (logFilesDir.isEmpty()) {
+        logFilesDir = AppPaths::getAppDirectory() + "/logs";
+    }
     if (forHTML) {
         logFilesDir = FixHTMLString(logFilesDir);
     }

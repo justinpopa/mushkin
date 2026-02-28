@@ -1192,7 +1192,7 @@ void MainWindow::createActivityToolBar()
     QLabel* activityLabel = new QLabel(" Worlds: ", this);
     m_activityToolBar->addWidget(activityLabel);
 
-    // TODO: Add dynamic world buttons when worlds connect/disconnect
+    // TODO(ui): Add dynamic world buttons to activity toolbar on connect/disconnect.
 
     // Connect visibility toggle
     connect(m_activityToolBarAction, &QAction::toggled, m_activityToolBar, &QToolBar::setVisible);
@@ -2205,7 +2205,7 @@ void MainWindow::openWorld(const QString& filename)
 void MainWindow::openStartupList()
 {
     // Open all worlds in the startup list
-    // TODO: Implement startup list functionality
+    // TODO(feature): Show startup world list dialog (worlds auto-opened on launch).
     QMessageBox::information(this, "Open Startup List",
                              "Opening worlds from startup list is not yet implemented.");
 }
@@ -2635,22 +2635,23 @@ void MainWindow::selectAll()
 
 void MainWindow::spellCheck()
 {
-    // TODO: Implement spell check functionality
+    // Not implemented: Spell check requires platform-specific or third-party library (e.g.,
+    // Hunspell).
 }
 
 void MainWindow::reloadNamesFile()
 {
-    // TODO: Implement reload names file functionality
+    // Not applicable: Name generator uses built-in algorithm — no external names file to reload.
 }
 
 void MainWindow::openNotepad()
 {
-    // TODO: Implement open notepad functionality
+    // TODO(feature): Prompt for notepad title and create new NotepadWidget via WorldDocument.
 }
 
 void MainWindow::flipToNotepad()
 {
-    // TODO: Implement flip to notepad functionality
+    // TODO(feature): Cycle focus between open notepad windows (Ctrl+Tab equivalent for notepads).
 }
 
 void MainWindow::colourPicker()
@@ -2669,7 +2670,7 @@ void MainWindow::colourPicker()
 
 void MainWindow::debugPackets()
 {
-    // TODO: Implement debug packets window
+    // TODO(feature): Show packet debug window (raw telnet data inspector).
 }
 
 void MainWindow::find()
@@ -2744,8 +2745,7 @@ void MainWindow::findBackward()
 
 void MainWindow::recallLastWord()
 {
-    // Recall last word from input - essentially undo last word deletion
-    // TODO: Implement recall last word functionality
+    // TODO(feature): Recall last word from command history for auto-completion.
 }
 
 void MainWindow::generateCharacterName()
@@ -3350,7 +3350,7 @@ void MainWindow::addMapperComment()
     if (dialog.exec() == QDialog::Accepted) {
         QString comment = dialog.comment();
         if (!comment.isEmpty()) {
-            // TODO: Add comment to current mapper location when mapper is fully implemented
+            doc->m_mapList.append(QChar('{') + comment + QChar('}'));
         }
     }
 }
@@ -4018,6 +4018,20 @@ int MainWindow::setToolBarPosition(int which, bool floating, int side, int top, 
 
 int MainWindow::getToolBarInfo(int which, int infoType)
 {
+    // Handle main window client area (which=0)
+    if (which == 0) {
+        QWidget* central = centralWidget();
+        if (!central) {
+            return 0;
+        }
+        if (infoType == 0) {
+            return central->height();
+        } else if (infoType == 1) {
+            return central->width();
+        }
+        return 0;
+    }
+
     // Handle InfoBar (which=4) separately since it's a QDockWidget
     if (which == 4) {
         if (!m_infoBarDock || !m_infoBarDock->isVisible()) {
@@ -4999,7 +5013,8 @@ void MainWindow::quickConnect()
 {
     QuickConnectDialog dlg(this);
     if (dlg.exec() == QDialog::Accepted) {
-        // TODO: Create temporary world and connect with the provided settings
+        // TODO(feature): Create temporary world document from Quick Connect dialog settings and
+        // connect.
     }
 }
 
@@ -5033,7 +5048,8 @@ void MainWindow::highlightPhrase()
         if (activeSubWindow) {
             WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
             if (worldWidget && worldWidget->document()) {
-                // TODO: Apply highlight settings to the world document
+                // TODO(feature): Apply custom highlight color settings to the active world
+                // document.
             }
         }
     }

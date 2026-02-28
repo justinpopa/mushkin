@@ -672,9 +672,8 @@ return re
     lua_setfield(L, -2, "luacom"); // package.loaded["luacom"] = stub table
     lua_pop(L, 2);                 // pop loaded, package
 
-    // TODO: Register additional libraries
-    //    luaopen_rex(L);    // PCRE regex
-    //    etc.
+    // Not applicable: PCRE regex (rex) and other optional MUSHclient C extensions are not ported.
+    // YueScript and Teal are registered below. LuaSocket and lfs are not bundled.
 
     // Load YueScript module for YueScript transpilation support
     // YueScript is statically linked into the application to avoid

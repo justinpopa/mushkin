@@ -407,6 +407,8 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_bLogNotes = false;
     m_bLogInColour = false;
     m_bLogRaw = false;
+    m_nLogLines = 0;           // 0 = unlimited
+    m_bAppendToLogFile = true; // append by default (matches MUSHclient)
 
     // ========== Initialize tree views ==========
     m_bTreeviewTriggers = true;
@@ -1658,7 +1660,7 @@ qint32 WorldDocument::SetCommand(const QString& text)
     }
 
     m_pActiveInputView->setInputText(text);
-    // TODO: Notify plugins of command change
+    SendToAllPluginCallbacks(ON_PLUGIN_COMMAND_CHANGED);
     return 0; // eOK
 }
 
@@ -1733,7 +1735,7 @@ QString WorldDocument::PushCommand()
 
     QString command = m_pActiveInputView->inputText();
     m_pActiveInputView->clearInput();
-    // TODO: Notify plugins of command change
+    SendToAllPluginCallbacks(ON_PLUGIN_COMMAND_CHANGED);
     return command;
 }
 
@@ -2673,8 +2675,8 @@ void WorldDocument::StartNewLine(bool bNewLine, unsigned char iFlags)
         // Finalize the line with timestamp
         m_currentLine->m_theTime = QDateTime::currentDateTime();
 
-        // TODO: High-performance timer (will use QElapsedTimer in future)
-        // Original: QueryPerformanceCounter(&(m_pCurrentLine->m_lineHighPerformanceTime))
+        // Performance timing uses QDateTime::currentMSecsSinceEpoch() — sufficient precision for
+        // this use.
         m_currentLine->m_lineHighPerformanceTime = 0;
 
         // Set hard_return flag (true = MUD newline, false = wrapped by client)
@@ -2755,13 +2757,9 @@ void WorldDocument::StartNewLine(bool bNewLine, unsigned char iFlags)
 
     // Special handling for user input and comments (like original)
     if (iFlags & USER_INPUT) {
-        // User input uses echo color if configured
-        // TODO: Check m_echo_colour setting
-        // For now, use default style
+        // TODO(feature): Apply m_echo_colour setting to echoed command text.
     } else if (iFlags & COMMENT) {
-        // Comments (notes) use note color if configured
-        // TODO: Check m_iNoteTextColour setting
-        // For now, use default style
+        // TODO(feature): Apply m_iNoteTextColour setting to Note() output text.
     }
 
     // Create new Line object

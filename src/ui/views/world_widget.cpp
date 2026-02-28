@@ -546,7 +546,7 @@ void WorldWidget::sendCommand()
         // Check if command starts with any configured macro
         // Note: Macros are stored in m_macros array, checked in original sendvw.cpp
         // For now, we don't have macro support implemented, so this is a placeholder
-        // TODO: Implement macro exclusion when macro system is added
+        // TODO(feature): Exclude macro keys from forwarding when macro system is fully implemented.
     }
 
     // 4. Exclude if command already starts with auto-say string (prevent "say say Hello!")

@@ -76,14 +76,12 @@ void LogDialog::loadSettings()
     if (!m_doc)
         return;
 
-    // TODO: Load lines to log setting when field is added to WorldDocument
-    // m_lines->setValue(m_doc->???);
+    m_lines->setValue(m_doc->m_nLogLines);
 
     // Load log file preamble
     m_preamble->setText(m_doc->m_strLogFilePreamble);
 
-    // TODO: Load append to log file setting when field is added to WorldDocument
-    // m_appendToLogFile->setChecked(m_doc->???);
+    m_appendToLogFile->setChecked(m_doc->m_bAppendToLogFile);
 
     // Load write world name
     m_writeWorldName->setChecked(m_doc->m_bWriteWorldNameToLog);
@@ -99,14 +97,12 @@ void LogDialog::saveSettings()
     if (!m_doc)
         return;
 
-    // TODO: Save lines to log setting when field is added to WorldDocument
-    // m_doc->??? = m_lines->value();
+    m_doc->m_nLogLines = m_lines->value();
 
     // Save log file preamble
     m_doc->m_strLogFilePreamble = m_preamble->text();
 
-    // TODO: Save append to log file setting when field is added to WorldDocument
-    // m_doc->??? = m_appendToLogFile->isChecked();
+    m_doc->m_bAppendToLogFile = m_appendToLogFile->isChecked();
 
     // Save write world name
     m_doc->m_bWriteWorldNameToLog = m_writeWorldName->isChecked();

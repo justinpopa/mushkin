@@ -45,24 +45,53 @@ class InputView : public QPlainTextEdit, public IInputView {
     ~InputView() override;
 
     // ========== IInputView Interface Implementation ==========
-    QString inputText() const override { return toPlainText(); }
-    void setInputText(const QString& text) override { setPlainText(text); }
-    int cursorPosition() const override { return textCursor().position(); }
+    QString inputText() const override
+    {
+        return toPlainText();
+    }
+    void setInputText(const QString& text) override
+    {
+        setPlainText(text);
+    }
+    int cursorPosition() const override
+    {
+        return textCursor().position();
+    }
     void setCursorPosition(int pos) override;
     void setSelection(int start, int length) override;
-    void selectAll() override { QPlainTextEdit::selectAll(); }
-    void clearInput() override { clear(); }
+    void selectAll() override
+    {
+        QPlainTextEdit::selectAll();
+    }
+    int selectionStart() const override
+    {
+        return textCursor().selectionStart();
+    }
+    int selectionEnd() const override
+    {
+        return textCursor().selectionEnd();
+    }
+    void clearInput() override
+    {
+        clear();
+    }
 
     // ========== QLineEdit Compatibility Methods ==========
     /**
      * text - Get the current text (compatibility with QLineEdit API)
      */
-    QString text() const { return toPlainText(); }
+    QString text() const
+    {
+        return toPlainText();
+    }
 
     /**
      * setText - Set the current text (compatibility with QLineEdit API)
      */
-    void setText(const QString& text) { setPlainText(text); }
+    void setText(const QString& text)
+    {
+        setPlainText(text);
+    }
 
     /**
      * hasSelectedText - Check if text is selected (compatibility with QLineEdit API)

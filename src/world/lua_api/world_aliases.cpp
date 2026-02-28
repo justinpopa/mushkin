@@ -1061,7 +1061,7 @@ int L_SetAliasOption(lua_State* L)
             alias->send_to = static_cast<SendTo>(value);
         } else if (qOption == "sequence") {
             alias->sequence = value;
-            // TODO: Re-sort aliases
+            pDoc->m_automationRegistry->m_aliasesNeedSorting = true;
         } else if (qOption == "user") {
             alias->user_option = value;
         }
@@ -1117,7 +1117,7 @@ int L_SetAliasOption(lua_State* L)
             (void)alias->compileRegexp(); // Recompile with new pattern
         } else if (qOption == "script") {
             alias->procedure = qValue;
-            // TODO: Update dispid
+            // Not applicable: Windows COM dispatch ID (IDispatch). Not used in Qt port.
         } else if (qOption == "send") {
             alias->contents = qValue;
         } else if (qOption == "variable") {

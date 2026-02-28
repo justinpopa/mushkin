@@ -4,7 +4,7 @@
 **Method:** Lua API diff (428 original vs 509 Mushkin) + Gemini Pro 3.1 codebase comparison
 **Source:** `../mushclient-original` (stripped), `../mushclient_resources`
 
-**Coverage:** 416/428 Lua API functions ported (~97.2%). Remaining: 8 GetInfo stubs (B1) + 4 non-API gaps (N1/N2).
+**Coverage:** 424/428 Lua API functions ported (~99.1%). Remaining: 4 non-API gaps (N1/N2).
 
 ---
 
@@ -201,10 +201,10 @@ Cases 294–306 were assigned invented meanings that conflict with the original 
 - [x] Case 228: IP address as integer via `QHostAddress::toIPv4Address()`
 
 **Remaining stubs (need new infrastructure):**
-- [ ] Cases 57–58: Default world/log directories (need `GlobalOptions` wiring)
-- [ ] Cases 233–234: Trigger/alias regex timing (needs perf counter in regexp matching)
-- [ ] Cases 236–237: Input selection start/end column (needs `QLineEdit` hook)
-- [ ] Cases 249–250: Main window client height/width (needs `MainWindow` reference)
+- [x] Cases 57–58: Default world/log directories via `GlobalOptions` singleton
+- [x] Cases 233–234: Trigger/alias regex timing via `std::chrono::high_resolution_clock` accumulators
+- [x] Cases 236–237: Input selection start/end via `IInputView::selectionStart()/selectionEnd()`
+- [x] Cases 249–250: Main window client height/width via `getToolBarInfo(which=0)`
 
 **Required changes outside L_GetInfo (done):**
 - [x] `connection_manager.cpp`: Assign `m_whenWorldStarted` in `onConnect()`
@@ -250,13 +250,25 @@ These aren't Lua API functions but are architectural/feature gaps.
 - [x] Bundle `lfs` v1.8.0 library (statically linked in third-party)
 - [x] Register in Lua state (`lfs` global + `require("lfs")` support)
 
+### N5 — Logging Settings Infrastructure
+
+**Impact:** Low–Medium — log dialog fields are non-functional without these
+**Effort:** Small
+
+- [x] Add `m_nLogLines` (int) to WorldDocument — max output lines to include in log
+- [x] Add `m_bAppendToLogFile` (bool) to WorldDocument — append vs overwrite on log open
+- [x] Add log format combo wiring (reuses existing `m_bLogHTML`/`m_bLogRaw` flags — Text/HTML/Raw)
+- [x] Wire log dialog load/save to these fields (`log_dialog.cpp:79,85,102,108`)
+- [x] Wire log format combo in world properties (`world_properties_dialog.cpp:534`)
+- [x] Implement `%D` delta time in output preamble (`output_view.cpp:673`) — track previous line timestamp through paint loop
+
 ---
 
 ## Summary
 
 | Group | Functions | Impact | Effort | Status |
 |:---|:---:|:---|:---|:---|
-| **B1 GetInfo Collision** | **22 cases** | **Critical** | **Small** | 20/22 done (4 stubs remain) |
+| **B1 GetInfo Collision** | **22 cases** | **Critical** | **Small** | Done (22/22) |
 | G1 Mapper | 14 | High | Large | Done (cd0e135, cc06aad) |
 | G2 Speedwalk | 5 | Medium | N/A | Done (flag constants, already implemented) |
 | G3 World Management | 4 | Medium | Medium | Done (Open stubbed) |
@@ -273,4 +285,5 @@ These aren't Lua API functions but are architectural/feature gaps.
 | N2 Chat | — | Low–Med | Large | Not started |
 | N3 DoCommand API | — | Medium | Medium | Done (252 commands) |
 | N4 LuaFileSystem | — | Medium | Small | Done |
-| **Total** | **47 + 4 + B1** | | | |
+| N5 Logging Settings | 6 | Low–Med | Small | Done |
+| **Total** | **47 + 4** | | | |

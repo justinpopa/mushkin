@@ -230,7 +230,7 @@ QWidget* GlobalPreferencesDialog::createWorldsPage()
     m_addCurrentWorld = new QPushButton("Add Current World");
     m_addCurrentWorld->setMinimumWidth(120);
     connect(m_addCurrentWorld, &QPushButton::clicked, [this]() {
-        // TODO: Add logic to get current world file path from main window
+        // TODO(ui): Query active WorldDocument file path from MainWindow for display.
         qWarning() << "Add Current World not yet implemented";
     });
     buttonLayout->addWidget(m_addCurrentWorld);

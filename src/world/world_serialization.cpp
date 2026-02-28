@@ -968,7 +968,7 @@ void WorldDocument::Save_One_Trigger_XML(QTextStream& out, Trigger* trigger)
     if (trigger->match_type & BLINK)
         out << "   italic=\"y\"\n";
 
-    // TODO: Add TRIGGER_MATCH_* flag definitions if needed
+    // TRIGGER_MATCH_* constants are defined in trigger.h (HILITE, INVERSE, BLINK, etc.).
 
     out << "  >\n";
 

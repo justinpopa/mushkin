@@ -98,8 +98,8 @@ void LoggingPage::loadSettings()
         m_logFormatCombo->setCurrentIndex(2);
     else
         m_logFormatCombo->setCurrentIndex(0);
-    m_appendLogCheck->setChecked(false); // Not stored in WorldDocument
-    m_logInputCheck->setChecked(false);  // Not stored in WorldDocument
+    m_appendLogCheck->setChecked(m_doc->m_bAppendToLogFile);
+    m_logInputCheck->setChecked(m_doc->m_log_input);
     m_logNotesCheck->setChecked(m_doc->m_bLogNotes);
 
     // Unblock signals
@@ -123,7 +123,8 @@ void LoggingPage::saveSettings()
     // Save format as flags
     m_doc->m_bLogHTML = (m_logFormatCombo->currentIndex() == 1);
     m_doc->m_bLogRaw = (m_logFormatCombo->currentIndex() == 2);
-    // m_appendLogCheck and m_logInputCheck not stored in WorldDocument
+    m_doc->m_bAppendToLogFile = m_appendLogCheck->isChecked();
+    m_doc->m_log_input = m_logInputCheck->isChecked();
     m_doc->m_bLogNotes = m_logNotesCheck->isChecked();
 
     m_doc->setModified(true);

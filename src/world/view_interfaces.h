@@ -22,9 +22,8 @@ class QWidget;
  * Provides methods that the world module needs to interact with
  * the output display without knowing about the concrete OutputView class.
  */
-class IOutputView
-{
-public:
+class IOutputView {
+  public:
     virtual ~IOutputView() = default;
 
     // ========== Dimensions ==========
@@ -69,9 +68,8 @@ public:
  * Provides methods that the world module needs to interact with
  * the command input without knowing about the concrete InputView class.
  */
-class IInputView
-{
-public:
+class IInputView {
+  public:
     virtual ~IInputView() = default;
 
     // ========== Text Access ==========
@@ -90,6 +88,11 @@ public:
 
     // Used by SelectCommand()
     virtual void selectAll() = 0;
+
+    // ========== Selection Position ==========
+    // Used by GetInfo(236), GetInfo(237) - command selection position
+    virtual int selectionStart() const = 0;
+    virtual int selectionEnd() const = 0;
 
     // ========== Clear ==========
     // Used by Execute() when clearing input after send

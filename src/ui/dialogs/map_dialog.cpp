@@ -130,12 +130,8 @@ void MapDialog::loadSettings()
         return;
 
     // Load mapper settings from WorldDocument
-    // Note: m_bEnable is not currently in WorldDocument - this is a placeholder
-    // In the original MFC code, this would be m_bEnable
-    m_enableMapperCheck->setChecked(false); // TODO: Add m_bEnable to WorldDocument
-
-    // Note: m_bRemoveMapReverses is not currently in WorldDocument - this is a placeholder
-    m_removeMapReversesCheck->setChecked(false); // TODO: Add m_bRemoveMapReverses to WorldDocument
+    m_enableMapperCheck->setChecked(m_doc->m_bMapping);
+    m_removeMapReversesCheck->setChecked(m_doc->m_bRemoveMapReverses);
 
     // Failure detection settings
     m_failurePatternEdit->setText(m_doc->m_strMappingFailure);
@@ -148,11 +144,8 @@ void MapDialog::saveSettings()
         return;
 
     // Save mapper settings to WorldDocument
-    // TODO: Add m_bEnable to WorldDocument
-    // m_doc->m_bEnable = m_enableMapperCheck->isChecked() ? 1 : 0;
-
-    // TODO: Add m_bRemoveMapReverses to WorldDocument
-    // m_doc->m_bRemoveMapReverses = m_removeMapReversesCheck->isChecked() ? 1 : 0;
+    m_doc->m_bMapping = m_enableMapperCheck->isChecked();
+    m_doc->m_bRemoveMapReverses = m_removeMapReversesCheck->isChecked();
 
     // Failure detection settings
     m_doc->m_strMappingFailure = m_failurePatternEdit->text();
@@ -213,16 +206,17 @@ void MapDialog::onRemoveLastClicked()
     if (!m_doc)
         return;
 
-    // TODO: Implement removing last mapper entry
-    QMessageBox::information(this, "Remove Last",
-                             "This feature will remove the last mapper entry.\n\n"
-                             "Mapper list is not yet implemented.");
+    if (m_doc->m_mapList.isEmpty()) {
+        QMessageBox::information(this, "Remove Last", "No mapper entries to remove.");
+        return;
+    }
+    m_doc->m_mapList.removeLast();
+    QMessageBox::information(this, "Remove Last", "Last mapper entry removed.");
 }
 
 void MapDialog::onSpecialMoveClicked()
 {
-    // TODO: Implement special move dialog
-    // This would open a dialog to add custom movement commands
+    // Not implemented: Special move dialog for non-standard exit directions (e.g., "climb tree").
     QMessageBox::information(this, "Special Move",
                              "This feature will allow you to add special move commands.\n\n"
                              "Implementation pending.");
@@ -230,8 +224,7 @@ void MapDialog::onSpecialMoveClicked()
 
 void MapDialog::onEditClicked()
 {
-    // TODO: Implement mapper editor dialog
-    // This would open a more advanced mapper editing interface
+    // Not implemented: Mapper room/exit editor dialog — most users manage maps via Lua plugins.
     QMessageBox::information(this, "Edit Mapper",
                              "This feature will open the mapper editor.\n\n"
                              "Implementation pending.");
@@ -239,8 +232,7 @@ void MapDialog::onEditClicked()
 
 void MapDialog::onConvertToRegexpClicked()
 {
-    // TODO: Implement conversion of text pattern to regex
-    // This would help users convert simple text patterns to regex format
+    // TODO(feature): Convert plain text trigger pattern to equivalent QRegularExpression.
     QString currentPattern = m_failurePatternEdit->text();
 
     if (currentPattern.isEmpty()) {

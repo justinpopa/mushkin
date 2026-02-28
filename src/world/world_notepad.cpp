@@ -220,8 +220,7 @@ qint32 WorldDocument::CloseNotepad(const QString& title, bool querySave)
         return eNoSuchNotepad;
     }
 
-    // For now, just close without save prompt
-    // TODO: Implement save prompt if querySave is true and content modified
+    // TODO(feature): Prompt to save modified notepad content when querySave=true.
     if (notepad->m_pMdiSubWindow) {
         // Close the MDI wrapper; WA_DeleteOnClose on the subwindow destroys it,
         // which destroys the NotepadWidget child and triggers UnregisterNotepad.
@@ -267,8 +266,7 @@ QStringList WorldDocument::GetNotepadList(bool includeAllWorlds)
 {
     QStringList titles;
 
-    // For now, only return this world's notepads
-    // TODO: If includeAllWorlds is true, get notepads from all worlds
+    // TODO(multi-world): Enumerate notepads from all open worlds when includeAllWorlds=true.
     for (NotepadWidget* notepad : m_notepadList) {
         if (notepad) {
             titles.append(notepad->m_strTitle);

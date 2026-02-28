@@ -172,7 +172,7 @@ bool Trigger::match(const QString& text, QRgb foreColor, QRgb backColor, quint16
         return false;
     }
 
-    // TODO: Implement color/style matching (match_type, style)
+    // TODO(feature): Match triggers by text color/style attributes (match_type bitmask fields).
     Q_UNUSED(foreColor);
     Q_UNUSED(backColor);
     Q_UNUSED(style);

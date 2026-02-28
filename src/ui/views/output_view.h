@@ -2,6 +2,7 @@
 #define OUTPUT_VIEW_H
 
 #include <QColor>
+#include <QDateTime>
 #include <QElapsedTimer>
 #include <QFont>
 #include <QPixmap>
@@ -45,16 +46,40 @@ class OutputView : public QWidget, public IOutputView {
     ~OutputView() override;
 
     // ========== IOutputView Interface Implementation ==========
-    int viewHeight() const override { return height(); }
-    int viewWidth() const override { return width(); }
-    int getScrollPositionPixels() const override { return m_scrollPos * m_lineHeight; }
-    QPoint mapToGlobal(const QPoint& pos) const override { return QWidget::mapToGlobal(pos); }
-    void setViewCursor(const QCursor& cursor) override { setCursor(cursor); }
-    void requestUpdate() override { update(); }
-    QWidget* parentWindow() const override { return window(); }
+    int viewHeight() const override
+    {
+        return height();
+    }
+    int viewWidth() const override
+    {
+        return width();
+    }
+    int getScrollPositionPixels() const override
+    {
+        return m_scrollPos * m_lineHeight;
+    }
+    QPoint mapToGlobal(const QPoint& pos) const override
+    {
+        return QWidget::mapToGlobal(pos);
+    }
+    void setViewCursor(const QCursor& cursor) override
+    {
+        setCursor(cursor);
+    }
+    void requestUpdate() override
+    {
+        update();
+    }
+    QWidget* parentWindow() const override
+    {
+        return window();
+    }
     void reloadBackgroundImage() override;
     void reloadForegroundImage() override;
-    bool isFrozen() const override { return m_freeze; }
+    bool isFrozen() const override
+    {
+        return m_freeze;
+    }
     void setFrozen(bool frozen) override;
 
   public slots:
@@ -463,10 +488,11 @@ class OutputView : public QWidget, public IOutputView {
     int m_frozenLineCount; // Lines received while frozen
 
     // Widget shown state (for auto-wrap timing)
-    bool m_hasBeenShown;   // True after first showEvent (window fully sized)
+    bool m_hasBeenShown; // True after first showEvent (window fully sized)
 
     // Alert throttling (like original MUSHclient - max once per second)
-    qint64 m_lastAlertTime; // Last time we flashed the icon (ms since epoch)
+    qint64 m_lastAlertTime;       // Last time we flashed the icon (ms since epoch)
+    QDateTime m_lastPreambleTime; // Previous line's timestamp for %D delta time
 
     /**
      * drawImage - Draw an image with specified mode

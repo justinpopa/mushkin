@@ -48,7 +48,7 @@ OutputView::OutputView(WorldDocument* doc, QWidget* parent)
       m_visibleLines(0), m_selectionActive(false), m_selectionStartLine(-1),
       m_selectionStartChar(-1), m_selectionEndLine(-1), m_selectionEndChar(-1),
       m_mouseDownButton(Qt::NoButton), m_freeze(false), m_frozenLineCount(0), m_hasBeenShown(false),
-      m_lastAlertTime(0)
+      m_lastAlertTime(0), m_lastPreambleTime()
 {
     // Set up fixed-width font for MUD display
     // Read font from WorldDocument if available, otherwise use default
@@ -670,8 +670,14 @@ void OutputView::drawLine(QPainter& painter, int y, Line* line, int lineIndex)
         strPreamble.replace("%e", strElapsedTime);
 
         // Calculate delta time from previous line (%D)
-        // TODO: Track previous line time for %D support
-        strPreamble.replace("%D", "0.000000");
+        double deltaTime = 0.0;
+        if (m_lastPreambleTime.isValid()) {
+            deltaTime = m_lastPreambleTime.msecsTo(line->m_theTime) / 1000.0;
+            if (deltaTime < 0.0)
+                deltaTime = 0.0;
+        }
+        m_lastPreambleTime = line->m_theTime;
+        strPreamble.replace("%D", QString::asprintf("%.6f", deltaTime));
 
         // Expand remaining time codes
         strPreamble = m_doc->FormatTime(line->m_theTime, strPreamble, false);

@@ -2425,7 +2425,7 @@ static int L_utils_appendtonotepad(lua_State* L)
  */
 static int L_utils_setbackgroundcolour(lua_State* L)
 {
-    // TODO: Implement main frame background color setting
+    // TODO(ui): Set main window background color via UI callback.
     // In original: Frame.m_backgroundColour = luaL_optnumber (L, 1, 0);
     //              Frame.InvalidateRect(NULL);
 

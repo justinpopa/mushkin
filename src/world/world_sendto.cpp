@@ -25,7 +25,9 @@
 #include "../automation/script_language.h" // For ScriptLanguage enum
 #include "../automation/sendto.h"
 #include "logging.h"
+#include "notepad_widget.h"
 #include "script_engine.h"
+#include "view_interfaces.h"
 #include "world_document.h"
 #include <QDebug>
 
@@ -63,9 +65,7 @@ void WorldDocument::sendTo(SendTo iWhere, const QString& strSendText, bool omit_
         // Original: doc.cpp
         case eSendToWorld:
             if (!strSendText.isEmpty()) {
-                // TODO: Handle omit_from_output and omit_from_log flags
-                // Original calls SendMsg() with these flags
-                // For now, just send directly
+                // TODO(feature): Honor omit_from_output and omit_from_log flags from trigger/alias.
                 sendToMud(strSendText);
             }
             break;
@@ -73,60 +73,54 @@ void WorldDocument::sendTo(SendTo iWhere, const QString& strSendText, bool omit_
         // ========== eSendToCommand: Put in command input field ==========
         // Original: doc.cpp
         case eSendToCommand:
-            // TODO: Set command input field text
-            // Original finds CSendView and calls GetEditCtrl().ReplaceSel()
-            // We need to emit signal or call InputWidget method
-            qCDebug(lcWorld) << "SendTo: eSendToCommand:" << strSendText;
-            qCDebug(lcWorld) << "  TODO: Set command input field";
+            if (m_pActiveInputView) {
+                m_pActiveInputView->setInputText(strSendText);
+            }
             break;
 
         // ========== eSendToCommandQueue: Add to command queue ==========
         // Original: doc.cpp
         case eSendToCommandQueue:
-            // TODO: Command queue system
-            // Original calls SendMsg() with queue=true flag
+            // TODO(feature): Command queue not yet implemented — eSendToCommandQueue is a no-op.
             qCDebug(lcWorld) << "SendTo: eSendToCommandQueue:" << strSendText;
-            qCDebug(lcWorld) << "  TODO: Implement command queue";
             break;
 
         // ========== eSendToStatus: Set status line message ==========
         // Original: doc.cpp
         case eSendToStatus:
-            // TODO: Status line system
-            // Original sets m_strStatusMessage and calls ShowStatusLine()
-            qCDebug(lcWorld) << "SendTo: eSendToStatus:" << strSendText;
-            qCDebug(lcWorld) << "  TODO: Implement status line";
+            m_strStatusMessage = strSendText;
+            m_tStatusDisplayed = QDateTime::currentDateTime();
             break;
 
         // ========== eSendToNotepad: Create new notepad window ==========
         // Original: doc.cpp
         case eSendToNotepad:
-            // TODO: Notepad system
-            // Original calls CreateTextWindow() with fonts, colors, etc.
-            qCDebug(lcWorld) << "SendTo: eSendToNotepad:" << strDescription;
-            qCDebug(lcWorld) << "  Content:" << strSendText;
-            qCDebug(lcWorld) << "  TODO: Implement notepad windows";
+            CreateNotepadWindow(strDescription, strSendText);
             break;
 
         // ========== eAppendToNotepad: Append to existing notepad ==========
         // Original: doc.cpp
-        case eAppendToNotepad:
-            // TODO: Notepad system
-            // Original calls AppendToTheNotepad() with append mode
-            qCDebug(lcWorld) << "SendTo: eAppendToNotepad:" << strDescription;
-            qCDebug(lcWorld) << "  Content:" << strSendText;
-            qCDebug(lcWorld) << "  TODO: Implement notepad append";
+        case eAppendToNotepad: {
+            NotepadWidget* notepad = FindNotepad(strDescription);
+            if (notepad) {
+                notepad->AppendText(strSendText);
+            } else {
+                CreateNotepadWindow(strDescription, strSendText);
+            }
             break;
+        }
 
         // ========== eReplaceNotepad: Replace notepad contents ==========
         // Original: doc.cpp
-        case eReplaceNotepad:
-            // TODO: Notepad system
-            // Original calls AppendToTheNotepad() with replace mode
-            qCDebug(lcWorld) << "SendTo: eReplaceNotepad:" << strDescription;
-            qCDebug(lcWorld) << "  Content:" << strSendText;
-            qCDebug(lcWorld) << "  TODO: Implement notepad replace";
+        case eReplaceNotepad: {
+            NotepadWidget* notepad = FindNotepad(strDescription);
+            if (notepad) {
+                notepad->ReplaceText(strSendText);
+            } else {
+                CreateNotepadWindow(strDescription, strSendText);
+            }
             break;
+        }
 
         // ========== eSendToOutput: Display in output window ==========
         // Original: doc.cpp
@@ -169,12 +163,13 @@ void WorldDocument::sendTo(SendTo iWhere, const QString& strSendText, bool omit_
 
         // ========== eSendToSpeedwalk: Expand speedwalk and send to MUD ==========
         // Original: doc.cpp
-        case eSendToSpeedwalk:
-            // TODO: Speedwalk system
-            // Original calls DoEvaluateSpeedwalk() then SendMsg() with queue
-            qCDebug(lcWorld) << "SendTo: eSendToSpeedwalk:" << strSendText;
-            qCDebug(lcWorld) << "  TODO: Implement speedwalk expansion";
+        case eSendToSpeedwalk: {
+            QString expanded = DoEvaluateSpeedwalk(strSendText);
+            if (!expanded.isEmpty()) {
+                sendToMud(expanded);
+            }
             break;
+        }
 
         // ========== eSendToScript: Execute as script ==========
         // Original: doc.cpp
@@ -199,8 +194,7 @@ void WorldDocument::sendTo(SendTo iWhere, const QString& strSendText, bool omit_
         // ========== eSendImmediate: Send immediately (bypass queue) ==========
         // Original: doc.cpp
         case eSendImmediate:
-            // TODO: When queue system exists, this should bypass it
-            // For now, just send directly (same as eSendToWorld)
+            // Sends immediately, bypassing any future command queue — same as eSendToWorld for now.
             if (!strSendText.isEmpty()) {
                 sendToMud(strSendText);
             }

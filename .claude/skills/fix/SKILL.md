@@ -1,73 +1,88 @@
 ---
 name: fix
-description: Parse architecture_review.md and fix issues by priority.
+description: Parse docs/*.md gap/review files and fix issues by target.
 ---
 # /fix [target]
 
-Parses `docs/architecture_review.md` and fixes architectural issues systematically.
+Scans all `docs/*.md` files for open checklist items (`- [ ]`) and fixes them systematically.
+
+## Sources
+- `docs/architecture_review.md` — architectural issues (p2f, p3g, p4a)
+- `docs/feature_gaps.md` — missing features and API gaps (n1, n2, n5)
+- `docs/ui_review.md` — UI issues (ui-mxp)
 
 ## Arguments
-- `<target>` — one of: `p0`, `p1`, `p2a`, `p2b`, `p3a`, `p3b`, `p4a`, or a specific issue keyword (e.g., `quint16`, `void-star`, `defines`, `socket`, `tests`, `db-errors`)
+- `<target>` — one of the targets below, or a keyword alias
 
-If no target is given, display the current status of all issues (checked vs unchecked boxes from the doc).
+| Target | Source | Description |
+|:---|:---|:---|
+| `p2f` | architecture_review.md | Interface decoupling (IWorldContext) |
+| `p3g` | architecture_review.md | Audit qint32 → std::int32_t |
+| `p4a` | architecture_review.md | God class decomposition (config structs, long-term split) |
+| `n1` | feature_gaps.md | SOCKS/HTTP proxy support |
+| `n2` | feature_gaps.md | Chat system (peer-to-peer) |
+| `n5` | feature_gaps.md | Logging settings infrastructure |
+| `ui-mxp` | ui_review.md | MXP/Pueblo settings page |
+
+If no target is given, display the current status of ALL open items across all docs.
 
 ## Pipeline
 
 ### Step 0: Parse Status
-Read `docs/architecture_review.md`. Extract the target priority section. Show the user which sub-items are done (`[x]`) and which remain (`[ ]`).
+Read all three docs. Grep for `- [ ]` and `- [x]` lines. Show the user a summary table of open vs done items per source file and per target.
 
 ### Step 1: Plan (per target)
 
-**p0 / quint16:**
-Spawn a **Sonnet subagent** (Task tool, `model: sonnet`) with the code generation persona:
-> Read `src/automation/trigger.h`, `src/automation/alias.h`, and identify all `quint16` fields that have boolean semantics (fields named like: enabled, ignore_case, use_regexp, repeat, multi_line, keep_evaluating, expand_variables, sound_if_inactive, omit_from_output, omit_from_log, echo_alias, omit_from_command_history, menu, etc.). Change their type from `quint16` to `bool`. Then grep for all files that assign integer literals (0, 1) to these fields and update to `false`/`true`. Also update any comparisons like `!= 0` to direct bool usage.
-
-For `world_document.h` — the same pattern but for all `m_b*` prefixed `quint16` fields. This is a LARGE file; split into batches if needed.
-
-**p1 / decompose:**
-This is architectural work. Spawn a **Sonnet subagent** to extract ONE subsystem at a time:
-1. Read `src/world/world_document.h` and identify all members/methods related to the target subsystem
-2. Create a new header/source file for the extracted class
-3. Update WorldDocument to hold the new class as a member and delegate
-4. Run `/build` and `/test` after each extraction
-
-Order: TelnetParser → MXPEngine → SoundManager → AutomationRegistry → ConnectionManager. Do ONE per `/fix p1` invocation.
-
-**p2a / void-star:**
+**p2f / interface-decoupling:**
 Spawn a **Sonnet subagent** to:
-1. Read `src/world/world_document.h` and list all `void*` fields
-2. For each, determine from context whether it should be: a concrete Qt type, removed (if unused), or initialized to nullptr with a TODO
-3. Apply changes. Run `/build` and `/test`.
+1. Read `src/world/world_document.h` and identify which methods subsystems actually call
+2. Define `IWorldContext` interface exposing only necessary services
+3. Inject into subsystems instead of full `WorldDocument&`
+4. Run `/build` and `/test` after each change
 
-**p2b / defines:**
+**p3g / qint32-audit:**
 Spawn a **Sonnet subagent** to:
-1. Read `src/world/world_document.h` lines 64-325 and `src/automation/trigger.h` `#define` constants
-2. Group by domain: Telnet opcodes, ANSI codes, MXP modes, flags, trigger constants
-3. Convert each group to `inline constexpr` values or `enum class` as appropriate
-4. Move `MAX_WILDCARDS` to a shared constants header, remove duplicates
-5. Run `/build` and `/test`.
+1. Grep for `qint32` across `src/` (excluding third-party)
+2. Audit internal methods — convert return types to `std::int32_t` where appropriate
+3. Keep `qint32` at Qt API boundaries (signals, slots, QVariant)
+4. Run `/build` and `/test`
 
-**p3a / socket:**
+**p4a / god-class:**
 Spawn a **Sonnet subagent** to:
-1. Read the WorldSocket creation in `world_document.cpp` constructor
-2. Determine if Qt parent-child ownership is in effect (check constructor args)
-3. Either: document the ownership model with a comment, OR convert to unique_ptr
-4. Run `/build` and `/test`.
+1. Read `src/world/world_document.h` and group related fields into config structs (`DisplayConfig`, `ScriptConfig`, `LoggingConfig`, etc.)
+2. Apply ONE struct grouping per invocation to keep changes reviewable
+3. Long-term: further decomposition (ScriptEngine manager, UI state manager) — only if explicitly requested
+4. Run `/build` and `/test`
 
-**p3b / tests:**
-Spawn a **Sonnet subagent** with the code generation persona to:
-1. Find all `new WorldDocument()`, `new Trigger()`, `new Alias()`, `new Timer()`, `new Line()` in `tests/`
-2. Convert to `std::make_unique` where the test owns the object
-3. Remove corresponding `delete` calls
-4. Fix Timer leaks in `test_timer_fire_calculation_gtest.cpp`
-5. Run `/build` and `/test`.
-
-**p4a / db-errors:**
+**n1 / proxy:**
 Spawn a **Sonnet subagent** to:
-1. Read the database error constants in `world_document.h`
-2. Create `enum class DatabaseErrorType` and a `DatabaseError` struct
-3. Convert database functions to return `std::expected<T, DatabaseError>`
-4. Run `/build` and `/test`.
+1. Read `src/network/connection_manager.cpp` and `src/network/world_socket.cpp`
+2. Implement SOCKS4/5 proxy support using `QNetworkProxy`
+3. Implement HTTP CONNECT proxy support
+4. Add proxy config fields to WorldDocument and wire to preferences UI
+5. Run `/build` and `/test`
+
+**n2 / chat:**
+Spawn a **Sonnet subagent** to:
+1. Study the zChat/MudMaster chat protocol from `reference/mushclient-original/chat.cpp`
+2. Implement peer-to-peer chat server/client
+3. Implement chat API functions (ChatCall, ChatAccept, ChatMessage, etc.)
+4. Run `/build` and `/test`
+
+**n5 / logging:**
+Spawn a **Sonnet subagent** to:
+1. Add `m_nLogLines` (int), `m_bAppendToLogFile` (bool), log format enum to WorldDocument
+2. Wire log dialog load/save to these fields (`log_dialog.cpp:79,85,102,108`)
+3. Wire log format combo in world properties (`world_properties_dialog.cpp:534`)
+4. Implement `%D` delta time in output preamble (`output_view.cpp:673`)
+5. Run `/build` and `/test`
+
+**ui-mxp / mxp-settings:**
+Spawn a **Sonnet subagent** to:
+1. Read `src/ui/dialogs/world_properties_dialog.cpp` MXP/Pueblo tab
+2. Replace placeholder with functional settings (MXP mode, Pueblo support toggle, entity display)
+3. Wire settings to WorldDocument MXP fields
+4. Run `/build` and `/test`
 
 ### Step 2: Execute
 The Sonnet agent applies all changes directly using Edit/Write tools.
@@ -77,12 +92,13 @@ Run `/build` and `/test`. If failures occur, the Sonnet agent fixes them.
 
 ### Step 4: Update Tracking
 After successful build + test:
-1. Update the checkbox in `docs/architecture_review.md` from `[ ]` to `[x]` for completed items
+1. Update the checkbox in the relevant `docs/*.md` file from `[ ]` to `[x]` for completed items
 2. Report results to user
 
 ## Notes
 - The Overseer (Opus) coordinates but does NOT do the implementation work.
-- For P1 (decomposition), only extract ONE subsystem per invocation to keep changes reviewable.
-- For P0 (quint16), do trigger.h and alias.h together (small), then world_document.h separately (large).
-- Always preserve serialization compatibility — `quint16` → `bool` conversions need explicit casts at serialization boundaries.
+- For p4a (god class), only extract ONE config struct per invocation to keep changes reviewable.
+- For n1 (proxy), prefer Qt's built-in `QNetworkProxy` over manual SOCKS implementation.
+- For n2 (chat), this is a large effort — plan before implementing.
+- Always preserve serialization compatibility at world file load/save boundaries.
 - If a target has no remaining unchecked items, report "already complete" and exit.

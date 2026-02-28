@@ -60,6 +60,8 @@ class AutomationRegistry {
     qint32 m_iTriggersMatchedThisSessionCount = 0;
     qint32 m_iAliasesMatchedThisSessionCount = 0;
     qint32 m_iTimersFiredThisSessionCount = 0;
+    double m_trigger_time_elapsed = 0.0; // seconds spent evaluating triggers
+    double m_alias_time_elapsed = 0.0;   // seconds spent evaluating aliases
 
     // ========== Trigger Registry ==========
     [[nodiscard]] std::expected<void, WorldError> addTrigger(const QString& name,

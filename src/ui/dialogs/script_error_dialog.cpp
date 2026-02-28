@@ -75,13 +75,5 @@ void ScriptErrorDialog::setupUi()
 
 void ScriptErrorDialog::onCopyToOutput()
 {
-    // TODO: Implement copying error details to output window
-    // This will need to interact with the main window's output system
-    // For now, this is a placeholder that can be implemented when
-    // the output window system is available
-
-    // Expected behavior:
-    // 1. Format error details as a readable message
-    // 2. Send to the output window
-    // 3. Optionally provide user feedback that copy was successful
+    // TODO(feature): Copy error details to world output window via WorldDocument::Note().
 }

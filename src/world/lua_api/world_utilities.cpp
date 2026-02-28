@@ -2573,7 +2573,7 @@ int L_SetTrace(lua_State* L)
             // Turning on - print message after enabling
             pDoc->note("TRACE: Trace on");
         }
-        // TODO: Emit signal for UI update (menu checkmark) when we have trace menu item
+        // TODO(ui): Emit signal for trace menu checkmark update.
     }
     return 0;
 }
@@ -2672,7 +2672,8 @@ int L_SetSpeedWalkDelay(lua_State* L)
     WorldDocument* pDoc = doc(L);
     int delay = luaL_checkinteger(L, 1);
     pDoc->m_iSpeedWalkDelay = delay;
-    // TODO: If we add timer window support, call ChangeTimerRate here
+    // Not applicable: Windows MFC timer list window refresh. Timer changes take effect on next
+    // check.
     return 0;
 }
 
@@ -2871,8 +2872,7 @@ int L_GetWorldList(lua_State* L)
 
     lua_newtable(L);
 
-    // For now, just return this world's name
-    // TODO: If multi-world support is added, iterate over all worlds
+    // TODO(multi-world): Iterate over all open worlds, not just current.
     QByteArray name = pDoc->m_mush_name.toUtf8();
     lua_pushlstring(L, name.constData(), name.length());
     lua_rawseti(L, -2, 1);
@@ -2902,8 +2902,7 @@ int L_GetWorldIdList(lua_State* L)
 
     lua_newtable(L);
 
-    // For now, just return this world's ID
-    // TODO: If multi-world support is added, iterate over all worlds
+    // TODO(multi-world): Iterate over all open worlds, not just current.
     QByteArray id = pDoc->m_strWorldID.toUtf8();
     lua_pushlstring(L, id.constData(), id.length());
     lua_rawseti(L, -2, 1);
@@ -3001,7 +3000,7 @@ int L_GetWorldById(lua_State* L)
 int L_Open(lua_State* L)
 {
     luaL_checkstring(L, 1); // filename — accepted but not yet used
-    // TODO: Requires MainWindow access for openWorld(); stub for now
+    // TODO(ui): Implement via MainWindow callback to open world files programmatically.
     lua_pushboolean(L, 0);
     return 1;
 }

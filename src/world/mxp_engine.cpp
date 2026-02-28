@@ -293,8 +293,7 @@ void MXPEngine::MXP_On()
     InitializeMXPElements();
     InitializeMXPEntities();
 
-    // TODO: Execute OnMXP_Start script
-    // TODO: SendToAllPluginCallbacks(ON_PLUGIN_MXP_START)
+    // TODO(mxp): Fire OnMXP_Start script callback and ON_PLUGIN_MXP_START plugin notification.
 }
 
 /**
@@ -352,8 +351,7 @@ void MXPEngine::MXP_Off(bool force)
         m_bPuebloActive = false;
         m_bMXP = false;
 
-        // TODO: Execute OnMXP_Stop script
-        // TODO: SendToAllPluginCallbacks(ON_PLUGIN_MXP_STOP)
+        // TODO(mxp): Fire OnMXP_Stop script callback and ON_PLUGIN_MXP_STOP plugin notification.
     }
 }
 
@@ -395,7 +393,7 @@ void MXPEngine::MXP_mode_change(int mode)
         qCDebug(lcWorld) << "MXP mode change from" << oldMode << "to" << newMode;
     }
 
-    // TODO: Close open tags when moving from open to not-open
+    // TODO(mxp): Close open tags when transitioning from OPEN to SECURE/LOCKED mode.
     // if (MXP_Open() && mode != eMXP_open && mode != eMXP_perm_open) {
     //     MXP_CloseOpenTags();
     // }
@@ -1552,7 +1550,7 @@ void MXPEngine::MXP_DefineEntity(const QString& defString)
     m_customEntityMap.emplace(strName, std::move(entity));
     qCDebug(lcMXP) << "Defined custom entity:" << strName << "=" << strFixedValue;
 
-    // TODO: Plugin callback (ON_PLUGIN_MXP_SETENTITY)
+    // TODO(mxp): Fire ON_PLUGIN_MXP_SETENTITY plugin callback when MXP entity is set.
 }
 
 /**
@@ -1616,7 +1614,7 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
         case MXP_ACTION_H4:
         case MXP_ACTION_H5:
         case MXP_ACTION_H6:
-            // TODO: Set heading style (bold + larger size)
+            // TODO(mxp): Apply heading style (bold + scaled font size) to output runs.
             qCDebug(lcMXP) << "Heading action:" << elem->strName;
             break;
 
@@ -1697,18 +1695,21 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
             QString color = MXP_GetArgument("color", args);
 
             if (!face.isEmpty()) {
-                // TODO: Push font face onto style stack
+                // TODO(mxp): Push font face onto MXP style stack (requires style stack
+                // implementation).
                 qCDebug(lcMXP) << "Set font face:" << face;
             }
 
             if (!size.isEmpty()) {
-                // TODO: Push font size onto style stack
+                // TODO(mxp): Push font size onto MXP style stack (requires style stack
+                // implementation).
                 qCDebug(lcMXP) << "Set font size:" << size;
             }
 
             if (!color.isEmpty()) {
                 QRgb fgColor = MXP_GetColor(color);
-                // TODO: Push font color onto style stack
+                // TODO(mxp): Push font color onto MXP style stack (requires style stack
+                // implementation).
                 qCDebug(lcMXP) << "Set font color:" << color;
             }
             break;
@@ -1801,19 +1802,21 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
         // ========== SERVER COMMANDS ==========
         case MXP_ACTION_VERSION:
             // Send client version to server
-            // TODO: Send version string
+            // Not implemented: MXP VERSION tag — would send client version to server. Rarely used.
             qCDebug(lcMXP) << "Send version (not implemented)";
             break;
 
         case MXP_ACTION_USER:
             // Send username to server
-            // TODO: Send from world settings
+            // Not implemented: MXP USER tag — automatic credential sending. Security risk; omitted
+            // by design.
             qCDebug(lcMXP) << "Send username (not implemented)";
             break;
 
         case MXP_ACTION_PASSWORD:
             // Send password to server (masked input)
-            // TODO: Prompt for password or send from settings
+            // Not implemented: MXP PASSWORD tag — automatic credential sending. Security risk;
+            // omitted by design.
             qCDebug(lcMXP) << "Send password (not implemented)";
             break;
 
@@ -1822,7 +1825,8 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
             QString server = MXP_GetArgument("server", args);
             QString port = MXP_GetArgument("port", args);
 
-            // TODO: Disconnect and reconnect to new server
+            // Not implemented: MXP RELOCATE tag — server-initiated redirect. Would need connection
+            // manager support.
             qCDebug(lcMXP) << "Relocate to:" << server << ":" << port << "(not implemented)";
             break;
         }
@@ -1885,7 +1889,7 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
             QString name = MXP_GetArgument("name", args);
             QString when = MXP_GetArgument("when", args);
 
-            // TODO: Mark text for expiration
+            // Not implemented: MXP EXPIRE tag — timed text removal. Rarely used by MUDs.
             qCDebug(lcMXP) << "Expire:" << name << "when:" << when;
             break;
         }
@@ -1895,14 +1899,14 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
             QString name = MXP_GetArgument("name", args);
             QString value = MXP_GetArgument("value", args);
 
-            // TODO: Set MXP variable (stored in m_mxpVariableMap)
+            // TODO(mxp): Set MXP variable in m_mxpVariableMap from VAR tag content.
             qCDebug(lcMXP) << "Set variable:" << name << "=" << value;
             break;
         }
 
         case MXP_ACTION_AFK:
             // <afk> - mark player as away from keyboard
-            // TODO: Record AFK time
+            // Not implemented: MXP AFK tag — idle time tracking. Rarely used by MUDs.
             qCDebug(lcMXP) << "AFK marker (not implemented)";
             break;
 
@@ -1920,7 +1924,7 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
 
         case MXP_ACTION_SUPPORT: {
             // <support> - report what we support
-            // TODO: Send list of supported tags
+            // TODO(mxp): Reply with list of supported MXP tags for server capability negotiation.
             qCDebug(lcMXP) << "Support query (not implemented)";
             break;
         }
@@ -1930,7 +1934,8 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
             QString option = MXP_GetArgument("option", args);
             QString value = MXP_GetArgument("value", args);
 
-            // TODO: Set client option
+            // Not implemented: MXP OPTION/RECOMMEND_OPTION — server-controlled client settings.
+            // Omitted for security.
             qCDebug(lcMXP) << "Set option:" << option << "=" << value;
             break;
         }
@@ -1940,7 +1945,8 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
             QString option = MXP_GetArgument("option", args);
             QString value = MXP_GetArgument("value", args);
 
-            // TODO: Consider setting client option
+            // Not implemented: MXP OPTION/RECOMMEND_OPTION — server-controlled client settings.
+            // Omitted for security.
             qCDebug(lcMXP) << "Recommend option:" << option << "=" << value;
             break;
         }
@@ -1961,7 +1967,8 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
 
         case MXP_ACTION_LI:
             // List item
-            // TODO: Insert list item with bullet or number
+            // Not implemented: MXP LI tag — bulleted/numbered lists. Text-only rendering;
+            // decorative.
             qCDebug(lcMXP) << "List item";
             break;
 
@@ -1995,7 +2002,7 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
         case MXP_ACTION_SCRIPT: {
             // <script>lua code</script> or <script language="lua">
             QString language = MXP_GetArgument("language", args);
-            // TODO: Execute script (security check required!)
+            // Not implemented: MXP SCRIPT tag — server-sent code execution. Disabled for security.
             qCDebug(lcMXP) << "Script action (not implemented, security risk)";
             break;
         }
@@ -2054,7 +2061,8 @@ void MXPEngine::MXP_EndAction(int action)
         case MXP_ACTION_H4:
         case MXP_ACTION_H5:
         case MXP_ACTION_H6:
-            // TODO: Restore previous heading style
+            // TODO(mxp): Pop heading style from MXP style stack (requires style stack
+            // implementation).
             qCDebug(lcMXP) << "End heading";
             break;
 
@@ -2080,13 +2088,14 @@ void MXPEngine::MXP_EndAction(int action)
 
         // ========== COLOR ==========
         case MXP_ACTION_COLOR:
-            // TODO: Pop color state from style stack
+            // TODO(mxp): Pop color state from MXP style stack (requires style stack
+            // implementation).
             qCDebug(lcMXP) << "End color";
             break;
 
         // ========== FONT ==========
         case MXP_ACTION_FONT:
-            // TODO: Pop font state from style stack
+            // TODO(mxp): Pop font state from MXP style stack (requires style stack implementation).
             qCDebug(lcMXP) << "End font";
             break;
 
@@ -2130,23 +2139,24 @@ void MXPEngine::MXP_EndAction(int action)
         case MXP_ACTION_GAUGE:
         case MXP_ACTION_STAT:
             // These capture text between tags
-            // TODO: Update gauge/stat with captured text
+            // TODO(mxp): Update gauge/stat display with captured text from GAUGE/STAT tag.
             qCDebug(lcMXP) << "End gauge/stat";
             break;
 
         case MXP_ACTION_EXPIRE:
-            // TODO: Set expiration timer for captured text
+            // Not implemented: MXP EXPIRE close — paired with EXPIRE open tag (also not
+            // implemented).
             qCDebug(lcMXP) << "End expire";
             break;
 
         case MXP_ACTION_VAR:
-            // TODO: Set variable to captured text
+            // TODO(mxp): Set MXP variable to captured text content (paired with VAR open tag).
             qCDebug(lcMXP) << "End var";
             break;
 
         // ========== SCRIPT ==========
         case MXP_ACTION_SCRIPT:
-            // TODO: Execute captured script code
+            // Not implemented: MXP SCRIPT close — server-sent code execution disabled for security.
             qCDebug(lcMXP) << "End script (not executed)";
             break;
 

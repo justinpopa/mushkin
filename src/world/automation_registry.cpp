@@ -25,6 +25,7 @@
 #include <QRegularExpression>
 #include <QTime>
 #include <algorithm>
+#include <chrono>
 #include <expected>
 
 // ============================================================
@@ -449,6 +450,8 @@ void AutomationRegistry::evaluateTriggers(Line* line)
         return;
     }
 
+    auto triggerTimingStart = std::chrono::high_resolution_clock::now();
+
     m_iTriggersEvaluatedCount += m_TriggerArray.size();
 
     QString oneShotToDelete;
@@ -520,6 +523,10 @@ void AutomationRegistry::evaluateTriggers(Line* line)
     }
 
     m_doc.m_CurrentPlugin = savedPlugin;
+
+    auto triggerTimingEnd = std::chrono::high_resolution_clock::now();
+    m_trigger_time_elapsed +=
+        std::chrono::duration<double>(triggerTimingEnd - triggerTimingStart).count();
 }
 
 // ============================================================
@@ -559,6 +566,8 @@ bool AutomationRegistry::evaluateAliases(const QString& command)
     if (m_aliasesNeedSorting) {
         rebuildAliasArray();
     }
+
+    auto aliasTimingStart = std::chrono::high_resolution_clock::now();
 
     Plugin* savedPlugin = m_doc.m_CurrentPlugin;
     m_doc.m_CurrentPlugin = nullptr;
@@ -617,9 +626,19 @@ bool AutomationRegistry::evaluateAliases(const QString& command)
 
     if (anyMatched) {
         qDebug() << "evaluateAliases: Alias(es) matched and handled command:" << command;
+
+        auto aliasTimingEnd = std::chrono::high_resolution_clock::now();
+        m_alias_time_elapsed +=
+            std::chrono::duration<double>(aliasTimingEnd - aliasTimingStart).count();
+
         return true;
     }
     qDebug() << "evaluateAliases: No alias matched, sending to MUD:" << command;
+
+    auto aliasTimingEnd = std::chrono::high_resolution_clock::now();
+    m_alias_time_elapsed +=
+        std::chrono::duration<double>(aliasTimingEnd - aliasTimingStart).count();
+
     return false;
 }
 

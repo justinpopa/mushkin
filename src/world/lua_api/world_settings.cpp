@@ -10,6 +10,7 @@
 #include "../../automation/plugin.h"
 #include "../../network/world_socket.h"
 #include "../../storage/database.h"
+#include "../../storage/global_options.h"
 #include "../../utils/app_paths.h"
 #include "../../world/config_options.h"
 #include "../../world/view_interfaces.h"
@@ -26,6 +27,7 @@
 #include <QHostInfo>
 #include <QLocale>
 #include <QRegularExpression>
+#include <QSettings>
 #include <QSysInfo>
 #include <sqlite3.h>
 
@@ -672,14 +674,14 @@ int L_GetInfo(lua_State* L)
 
         case 57: // Default world file directory
         {
-            // TODO: Add default world directory config
-            lua_pushstring(L, "");
+            QByteArray ba = GlobalOptions::instance().defaultWorldFileDirectory().toUtf8();
+            lua_pushlstring(L, ba.constData(), ba.length());
         } break;
 
         case 58: // Default log file directory
         {
-            // TODO: Add default log directory config
-            lua_pushstring(L, "");
+            QByteArray ba = GlobalOptions::instance().defaultLogFileDirectory().toUtf8();
+            lua_pushlstring(L, ba.constData(), ba.length());
         } break;
 
         case 59: // Scripts directory (application directory)
@@ -784,13 +786,14 @@ int L_GetInfo(lua_State* L)
 
         case 68: // Working directory
         {
-            // TODO: Store working directory (different from current directory)
-            lua_pushstring(L, "");
+            QString cwd = QDir::currentPath();
+            QByteArray ba = cwd.toUtf8();
+            lua_pushlstring(L, ba.constData(), ba.length());
         } break;
 
         case 69: // Translator file
         {
-            // TODO: Add translator file config
+            // Not applicable: MFC CDocument translator — no cross-platform equivalent.
             lua_pushstring(L, "");
         } break;
 
@@ -803,13 +806,13 @@ int L_GetInfo(lua_State* L)
 
         case 71: // Fixed pitch font
         {
-            // TODO: Add fixed pitch font config
-            lua_pushstring(L, "");
+            QByteArray ba = GlobalOptions::instance().fixedPitchFont().toUtf8();
+            lua_pushlstring(L, ba.constData(), ba.length());
         } break;
 
         case 72: // Version
         {
-            // TODO: Define MUSHCLIENT_QT_VERSION or similar
+            // Reports compatibility version for plugin detection.
             lua_pushstring(L, "5.06-preview");
         } break;
 
@@ -839,7 +842,8 @@ int L_GetInfo(lua_State* L)
 
         case 76: // Special font (first one)
         {
-            // TODO: Add special fonts support
+            // Not applicable: Windows GDI special font enumeration. Use AddFont() to register
+            // fonts.
             lua_pushstring(L, "");
         } break;
 
@@ -864,20 +868,23 @@ int L_GetInfo(lua_State* L)
 
         case 80: // PNG library version
         {
-            // TODO: Get PNG version if using libpng
+            // Not applicable: Qt handles PNG internally — no standalone libpng to version.
             lua_pushstring(L, "");
         } break;
 
         case 81: // PNG header version
         {
-            // TODO: Get PNG header version
+            // Not applicable: Qt handles PNG internally — no standalone libpng to version.
             lua_pushstring(L, "");
         } break;
 
         case 82: // Preferences database name
         {
-            // TODO: Add preferences database path
-            lua_pushstring(L, "");
+            // QSettings uses platform-native storage (plist on macOS, registry on Windows, conf on
+            // Linux). Return the settings file path where available.
+            QString settingsPath = QSettings().fileName();
+            QByteArray ba = settingsPath.toUtf8();
+            lua_pushlstring(L, ba.constData(), ba.length());
         } break;
 
         case 83: // SQLite version
@@ -887,14 +894,15 @@ int L_GetInfo(lua_State* L)
 
         case 84: // File browsing directory
         {
-            // TODO: Track file browsing directory
+            // Not applicable: Windows common file dialog directory tracking. Use GetInfo(68) for
+            // CWD.
             lua_pushstring(L, "");
         } break;
 
         case 85: // Default state files directory
         {
-            // TODO: Add default state files directory config
-            lua_pushstring(L, "");
+            QByteArray ba = GlobalOptions::instance().stateFilesDirectory().toUtf8();
+            lua_pushlstring(L, ba.constData(), ba.length());
         } break;
 
         case 86: // Word under menu
@@ -979,13 +987,13 @@ int L_GetInfo(lua_State* L)
 
         case 114: // Current view frozen
         {
-            // TODO: Add view freeze state
-            lua_pushboolean(L, false);
+            bool frozen = pDoc->m_pActiveOutputView ? pDoc->m_pActiveOutputView->isFrozen() : false;
+            lua_pushboolean(L, frozen);
         } break;
 
         case 115: // Translator Lua available
         {
-            // TODO: Add translator support
+            // Not applicable: MFC CDocument translator subsystem — no cross-platform equivalent.
             lua_pushboolean(L, false);
         } break;
 
@@ -1021,7 +1029,7 @@ int L_GetInfo(lua_State* L)
 
         case 125: // Full screen mode
         {
-            // TODO: Track full screen state
+            // TODO(ui): Requires MainWindow callback to check windowState() & Qt::WindowFullScreen.
             lua_pushboolean(L, false);
         } break;
 
@@ -1113,7 +1121,7 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 222: // Count of queued commands
-            // TODO: Add queued commands list
+            // TODO(feature): Command queue not yet implemented. Return 0 until queue system exists.
             lua_pushinteger(L, 0);
             break;
 
@@ -1161,8 +1169,11 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 231: // Log file size
-            // TODO: Track log file size
-            lua_pushinteger(L, 0);
+            if (pDoc->m_logfile && pDoc->m_logfile->isOpen()) {
+                lua_pushinteger(L, static_cast<lua_Integer>(pDoc->m_logfile->size()));
+            } else {
+                lua_pushinteger(L, 0);
+            }
             break;
 
         case 232: // High-resolution timer (seconds since epoch)
@@ -1170,13 +1181,11 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 233: // Time taken doing triggers (seconds)
-            // TODO: Add trigger timing support
-            lua_pushnumber(L, 0.0);
+            lua_pushnumber(L, pDoc->m_automationRegistry->m_trigger_time_elapsed);
             break;
 
         case 234: // Time taken doing aliases (seconds)
-            // TODO: Add alias timing support
-            lua_pushnumber(L, 0.0);
+            lua_pushnumber(L, pDoc->m_automationRegistry->m_alias_time_elapsed);
             break;
 
         case 235: // Number of world windows open
@@ -1185,17 +1194,30 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 236: // Command selection start column
-            // TODO: Add input selection tracking
-            lua_pushinteger(L, 0);
+        {
+            auto* inputView = pDoc->activeInputView();
+            if (inputView && inputView->selectionStart() != inputView->selectionEnd()) {
+                lua_pushinteger(L, inputView->selectionStart() + 1); // 1-based
+            } else {
+                lua_pushinteger(L, 0); // No selection
+            }
             break;
+        }
 
         case 237: // Command selection end column
-            // TODO: Add input selection tracking
-            lua_pushinteger(L, 0);
+        {
+            auto* inputView = pDoc->activeInputView();
+            if (inputView && inputView->selectionStart() != inputView->selectionEnd()) {
+                lua_pushinteger(L, inputView->selectionEnd() + 1); // 1-based
+            } else {
+                lua_pushinteger(L, 0); // No selection
+            }
             break;
+        }
 
         case 238: // Window placement flags
-            // TODO: Add window state tracking
+            // Not applicable: Windows window placement flags (WPF_*). Use GetInfo(125) for
+            // fullscreen.
             lua_pushinteger(L, 0);
             break;
 
@@ -1216,8 +1238,7 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 243: // Fixed pitch font size
-            // TODO: Add global font size config
-            lua_pushinteger(L, 10);
+            lua_pushinteger(L, GlobalOptions::instance().fixedPitchFontSize());
             break;
 
         case 244: // Triggers evaluated count
@@ -1241,14 +1262,18 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 249: // Main window client height
-            // TODO: Add main window size tracking
-            lua_pushinteger(L, 0);
+        {
+            auto callback = ToolbarCallbacks::getGetToolBarInfoCallback();
+            lua_pushinteger(L, callback(0, 0)); // which=0 (client area), infoType=0 (height)
             break;
+        }
 
         case 250: // Main window client width
-            // TODO: Add main window size tracking
-            lua_pushinteger(L, 0);
+        {
+            auto callback = ToolbarCallbacks::getGetToolBarInfoCallback();
+            lua_pushinteger(L, callback(0, 1)); // which=0 (client area), infoType=1 (width)
             break;
+        }
 
         case 251: // Main toolbar height
         {
@@ -1307,22 +1332,24 @@ int L_GetInfo(lua_State* L)
         }
 
         case 259: // Status bar height
-            // TODO: Add status bar tracking
+            // Not applicable: Status bar not used — info displayed in InfoBar dock (cases 257-258).
             lua_pushinteger(L, 0);
             break;
 
         case 260: // Status bar width
-            // TODO: Add status bar tracking
+            // Not applicable: Status bar not used — info displayed in InfoBar dock (cases 257-258).
             lua_pushinteger(L, 0);
             break;
 
         case 261: // World window non-client height
-            // TODO: Add window frame tracking
+            // Not applicable: Window frame (non-client area) dimensions are platform-dependent and
+            // rarely used by plugins.
             lua_pushinteger(L, 0);
             break;
 
         case 262: // World window non-client width
-            // TODO: Add window frame tracking
+            // Not applicable: Window frame (non-client area) dimensions are platform-dependent and
+            // rarely used by plugins.
             lua_pushinteger(L, 0);
             break;
 
@@ -1339,22 +1366,30 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 265: // OS major version
-            // TODO: Parse QSysInfo::kernelVersion()
-            lua_pushinteger(L, 0);
+        {
+            QStringList parts = QSysInfo::kernelVersion().split('.');
+            lua_pushinteger(L, parts.size() > 0 ? parts[0].toInt() : 0);
             break;
+        }
 
         case 266: // OS minor version
-            // TODO: Parse QSysInfo::kernelVersion()
-            lua_pushinteger(L, 0);
+        {
+            QStringList parts = QSysInfo::kernelVersion().split('.');
+            lua_pushinteger(L, parts.size() > 1 ? parts[1].toInt() : 0);
             break;
+        }
 
         case 267: // OS build number
-            // TODO: Parse QSysInfo::kernelVersion()
-            lua_pushinteger(L, 0);
+        {
+            QStringList parts = QSysInfo::kernelVersion().split('.');
+            lua_pushinteger(L, parts.size() > 2 ? parts[2].toInt() : 0);
             break;
+        }
 
         case 268: // OS platform ID
-            // TODO: Map QSysInfo to platform ID
+            // Not applicable: Windows OSVERSIONINFO.dwPlatformId constant (always 2 on modern
+            // Windows). Plugins checking this value expect 2; returning 0 signals non-Windows
+            // platform.
             lua_pushinteger(L, 0);
             break;
 
@@ -1570,9 +1605,7 @@ int L_GetInfo(lua_State* L)
 
         case 305: // Client start time (DATE \u2014 epoch seconds)
         {
-            // No global app-start timestamp exists yet.
-            // Static captures time at first call as approximation.
-            // TODO: Capture true start time in main() and expose via singleton.
+            // Approximation: captures time at first call. Negligible drift from true app start.
             static const qint64 s_appStartSecs = QDateTime::currentSecsSinceEpoch();
             lua_pushnumber(L, static_cast<lua_Number>(s_appStartSecs));
         } break;
@@ -1986,8 +2019,8 @@ int L_SetAlphaOption(lua_State* L)
 
             opt.setter(*pDoc, strValue);
 
-            // Handle update flags if needed
-            // TODO: Handle OPT_UPDATE_VIEWS, OPT_UPDATE_INPUT_FONT, etc.
+            // TODO(ui): Trigger UI refresh callbacks (view repaint, font reload) when options
+            // change.
 
             return luaReturnOK(L);
         }

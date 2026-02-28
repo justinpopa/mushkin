@@ -232,7 +232,7 @@ void WorldPropertiesDialog::setupLoggingTab()
     fileLayout->addWidget(m_logFileEdit);
 
     m_logFileBrowse = new QPushButton("Browse...");
-    // TODO: Connect to file browser when implemented
+    // TODO(ui): Connect Browse button to QFileDialog for file selection.
     fileLayout->addWidget(m_logFileBrowse);
 
     layout->addRow("Log file:", fileLayout);
@@ -264,7 +264,7 @@ void WorldPropertiesDialog::setupScriptingTab()
     fileLayout->addWidget(m_scriptFileEdit);
 
     m_scriptFileBrowse = new QPushButton("Browse...");
-    // TODO: Connect to file browser when implemented
+    // TODO(ui): Connect Browse button to QFileDialog for file selection.
     fileLayout->addWidget(m_scriptFileBrowse);
 
     layout->addRow("Script file:", fileLayout);
@@ -484,7 +484,8 @@ void WorldPropertiesDialog::loadSettings()
     m_outputFontLabel->setText(
         QString("%1, %2pt").arg(m_outputFont.family()).arg(m_outputFont.pointSize()));
 
-    // TODO: ANSI colors - WorldDocument needs m_normalColour[8] and m_boldColour[8] arrays
+    // TODO(feature): Wire ANSI color picker to WorldDocument m_normalColour/m_boldColour arrays.
+    // WorldDocument has m_normalcolour[8] and m_boldcolour[8] — initialize from them here.
     // For now, initialize with default colors
     const std::array<QRgb, 16> defaultColors = {
         qRgb(0, 0, 0),       // Black
@@ -521,7 +522,8 @@ void WorldPropertiesDialog::loadSettings()
         QString("%1, %2pt").arg(m_inputFont.family()).arg(m_inputFont.pointSize()));
 
     m_echoInputCheck->setChecked(m_doc->m_display_my_input);
-    // TODO: m_echoColorCombo - needs echo color setting in WorldDocument
+    // TODO(feature): Wire echo color combo to WorldDocument m_echo_colour (quint16, index into
+    // color table).
 
     // Command history size
     m_historySizeSpin->setValue(m_doc->m_maxCommandHistory);
@@ -529,12 +531,18 @@ void WorldPropertiesDialog::loadSettings()
     // Logging tab
     m_enableLogCheck->setChecked(m_doc->m_bLogOutput);
     m_logFileEdit->setText(m_doc->m_strAutoLogFileName);
-    // TODO: m_logFormatCombo - WorldDocument needs log format enum
+    // Log format: Text=0, HTML=1, Raw=2
+    if (m_doc->m_bLogHTML)
+        m_logFormatCombo->setCurrentIndex(1);
+    else if (m_doc->m_bLogRaw)
+        m_logFormatCombo->setCurrentIndex(2);
+    else
+        m_logFormatCombo->setCurrentIndex(0);
 
     // Scripting tab
     m_enableScriptCheck->setChecked(m_doc->m_bEnableScripts);
     m_scriptFileEdit->setText(m_doc->m_strScriptFilename);
-    // TODO: m_scriptLanguageCombo - WorldDocument needs script language setting
+    // Not applicable: Script language is always Lua — no multi-language support needed.
 
     // Paste to World tab
     m_pastePreambleEdit->setText(m_doc->m_paste_preamble);
@@ -584,7 +592,8 @@ void WorldPropertiesDialog::saveSettings()
     m_doc->m_font_name = m_outputFont.family();
     m_doc->m_font_height = m_outputFont.pointSize(); // Store as points
     m_doc->m_font_weight = m_outputFont.weight();
-    // TODO: ANSI colors - save to m_normalColour[] and m_boldColour[] when they exist
+    // TODO(feature): Wire ANSI color picker to WorldDocument m_normalColour/m_boldColour arrays.
+    // WorldDocument has m_normalcolour[8] and m_boldcolour[8] — save m_ansiColors[] to them here.
 
     // Activity settings
     m_doc->m_bFlashIcon = m_flashIconCheck->isChecked();
@@ -595,7 +604,8 @@ void WorldPropertiesDialog::saveSettings()
     m_doc->m_input_font_weight = m_inputFont.weight();
     m_doc->m_input_font_italic = m_inputFont.italic() ? 1 : 0;
     m_doc->m_display_my_input = m_echoInputCheck->isChecked();
-    // TODO: m_echoColorCombo - save when WorldDocument has echo color setting
+    // TODO(feature): Wire echo color combo to WorldDocument m_echo_colour (quint16, index into
+    // color table).
 
     // Command history size
     m_doc->m_maxCommandHistory = m_historySizeSpin->value();
@@ -603,11 +613,14 @@ void WorldPropertiesDialog::saveSettings()
     // Logging tab
     m_doc->m_bLogOutput = m_enableLogCheck->isChecked();
     m_doc->m_strAutoLogFileName = m_logFileEdit->text();
+    // Log format: Text=0, HTML=1, Raw=2
+    m_doc->m_bLogHTML = (m_logFormatCombo->currentIndex() == 1);
+    m_doc->m_bLogRaw = (m_logFormatCombo->currentIndex() == 2);
 
     // Scripting tab
     m_doc->m_bEnableScripts = m_enableScriptCheck->isChecked();
     m_doc->m_strScriptFilename = m_scriptFileEdit->text();
-    // TODO: m_scriptLanguageCombo - save when WorldDocument has script language
+    // Not applicable: Script language is always Lua — no multi-language support needed.
 
     // Paste to World tab
     m_doc->m_paste_preamble = m_pastePreambleEdit->text();

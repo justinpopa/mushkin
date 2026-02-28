@@ -108,7 +108,8 @@ void WorldDocument::changeLineColors(Trigger* trigger, Line* line)
     }
 
     // Modify all style runs in the line
-    // TODO: Only modify style runs in matched portion (iStartCol to iEndCol)
+    // TODO(feature): Restrict color change to matched portion (iStartCol to iEndCol) instead of
+    // full line.
     for (const auto& style : line->styleList) {
         switch (trigger->colour_change_type) {
             case ColourChangeType::Both:
@@ -134,7 +135,7 @@ void WorldDocument::changeLineColors(Trigger* trigger, Line* line)
         }
     }
 
-    // TODO: Update the display to show the color change
+    // TODO(feature): Request output view repaint after trigger color change is applied.
     // updateLine(line->m_nLineNumber);
 }
 
@@ -186,7 +187,7 @@ void WorldDocument::executeTrigger(Trigger* trigger, Line* line, const QString& 
 
     // Omit from output
     if (trigger->omit_from_output) {
-        // TODO: Mark line as omitted
+        // TODO(feature): Set omit flag on Line object for omit-from-output triggers.
         // line->flags |= OMITTED;
         qCDebug(lcWorld) << "Trigger omit from output (not yet implemented)";
     }

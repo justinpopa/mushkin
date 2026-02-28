@@ -730,11 +730,13 @@ class WorldDocument : public QObject {
     bool m_bUnpauseOnSend; // cancel pause on send?
 
     // ========== Logging Options ==========
-    bool m_log_input;    // log player input?
-    bool m_bLogOutput;   // log MUD output?
-    bool m_bLogNotes;    // log notes?
-    bool m_bLogInColour; // HTML logging in colour?
-    bool m_bLogRaw;      // log raw input from MUD?
+    bool m_log_input;        // log player input?
+    bool m_bLogOutput;       // log MUD output?
+    bool m_bLogNotes;        // log notes?
+    bool m_bLogInColour;     // HTML logging in colour?
+    bool m_bLogRaw;          // log raw input from MUD?
+    int m_nLogLines;         // max output lines to include in log (0 = unlimited)
+    bool m_bAppendToLogFile; // append vs overwrite when opening log file
 
     // ========== Tree Views ==========
     bool m_bTreeviewTriggers; // show triggers in tree?

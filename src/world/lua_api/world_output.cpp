@@ -293,7 +293,8 @@ int L_AnsiNote(lua_State* L)
                 // Bright background colors
                 backColor = ansiBrightColors[code - 100];
             }
-            // TODO: 256-color and RGB modes (38;5;N and 38;2;R;G;B)
+            // TODO(feature): Handle 256-color (38;5;N) and RGB (38;2;R;G;B) ANSI modes in this code
+            // path.
         }
     }
 

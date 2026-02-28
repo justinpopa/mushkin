@@ -1281,7 +1281,7 @@ int L_SetTriggerOption(lua_State* L)
             trigger->send_to = static_cast<SendTo>(value);
         } else if (qOption == "sequence") {
             trigger->sequence = value;
-            // TODO: Re-sort triggers
+            pDoc->m_automationRegistry->m_triggersNeedSorting = true;
         } else if (qOption == "user") {
             trigger->user_option = value;
         }
@@ -1340,7 +1340,7 @@ int L_SetTriggerOption(lua_State* L)
             (void)trigger->compileRegexp(); // Recompile with new pattern
         } else if (qOption == "script") {
             trigger->procedure = qValue;
-            // TODO: Update dispid
+            // Not applicable: Windows COM dispatch ID (IDispatch). Not used in Qt port.
         } else if (qOption == "sound") {
             trigger->sound_to_play = qValue;
         } else if (qOption == "send") {
