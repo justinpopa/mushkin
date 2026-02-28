@@ -497,7 +497,6 @@ class WorldDocument : public QObject, public IWorldContext {
     QString m_file_preamble;
     QString m_line_postamble;
     QString m_line_preamble;
-    QString m_strLogFilePreamble;
 
     // ========== Paste Settings ==========
     QString m_paste_postamble;
@@ -597,14 +596,7 @@ class WorldDocument : public QObject, public IWorldContext {
     bool m_bTabCompleteFunctions;               // show Lua functions in Shift+Tab menu
 
     // ========== Auto Logging ==========
-    QString m_strAutoLogFileName;        // auto-log filename
-    QString m_strLogLinePreambleOutput;  // log preamble for output
-    QString m_strLogLinePreambleInput;   // log preamble for input
-    QString m_strLogLinePreambleNotes;   // log preamble for notes
-    QString m_strLogFilePostamble;       // log file postamble
-    QString m_strLogLinePostambleOutput; // log postamble for output
-    QString m_strLogLinePostambleInput;  // log postamble for input
-    QString m_strLogLinePostambleNotes;  // log postamble for notes
+    // (fields moved to LoggingConfig m_logging below)
 
     // ========== Output Line Preambles ==========
     QString m_strOutputLinePreambleOutput;     // output preamble for MUD output
@@ -640,9 +632,8 @@ class WorldDocument : public QObject, public IWorldContext {
     qint32 m_bWarnIfScriptingInactive;     // warn if can't invoke script?
 
     // ========== Sending Options ==========
-    bool m_bWriteWorldNameToLog; // write world name to log?
-    bool m_bSendEcho;            // echo sends?
-    bool m_bPasteEcho;           // echo pastes?
+    bool m_bSendEcho;  // echo sends?
+    bool m_bPasteEcho; // echo pastes?
 
     // ========== Default Options ==========
     bool m_bUseDefaultColours;
@@ -694,7 +685,6 @@ class WorldDocument : public QObject, public IWorldContext {
 
     // ========== Script Errors ==========
     bool m_bScriptErrorsToOutputWindow; // show errors in output?
-    bool m_bLogScriptErrors;            // log script errors?
 
     // ========== Command Window Auto-resize ==========
     bool m_bAutoResizeCommandWindow;        // auto-resize command window?
@@ -727,17 +717,33 @@ class WorldDocument : public QObject, public IWorldContext {
     bool m_bPlaySoundsInBackground; // use global sound buffer?
 
     // ========== HTML Logging ==========
-    bool m_bLogHTML;       // convert HTML sequences?
     bool m_bUnpauseOnSend; // cancel pause on send?
 
-    // ========== Logging Options ==========
-    bool m_log_input;        // log player input?
-    bool m_bLogOutput;       // log MUD output?
-    bool m_bLogNotes;        // log notes?
-    bool m_bLogInColour;     // HTML logging in colour?
-    bool m_bLogRaw;          // log raw input from MUD?
-    int m_nLogLines;         // max output lines to include in log (0 = unlimited)
-    bool m_bAppendToLogFile; // append vs overwrite when opening log file
+    // ========== Logging Configuration ==========
+    struct LoggingConfig {
+        // Log file settings
+        QString auto_log_file_name;    // auto-log filename
+        QString file_preamble;         // log file preamble
+        QString file_postamble;        // log file postamble
+        QString line_preamble_output;  // log preamble for output
+        QString line_preamble_input;   // log preamble for input
+        QString line_preamble_notes;   // log preamble for notes
+        QString line_postamble_output; // log postamble for output
+        QString line_postamble_input;  // log postamble for input
+        QString line_postamble_notes;  // log postamble for notes
+
+        // Logging flags
+        bool log_html = false;          // convert HTML sequences?
+        bool log_input = false;         // log player input?
+        bool log_output = false;        // log MUD output?
+        bool log_notes = false;         // log notes?
+        bool log_in_colour = false;     // HTML logging in colour?
+        bool log_raw = false;           // log raw input from MUD?
+        bool write_world_name = false;  // write world name to log?
+        bool log_script_errors = false; // log script errors?
+        bool append_to_log_file = true; // append vs overwrite
+        int log_lines = 0;              // max lines (0 = unlimited)
+    } m_logging;
 
     // ========== Tree Views ==========
     bool m_bTreeviewTriggers; // show triggers in tree?

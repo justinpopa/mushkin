@@ -586,7 +586,8 @@ void WorldWidget::sendCommand()
                 // This sends directly without alias/trigger processing
                 // (original sendvw.cpp)
                 m_document->SendMsg(m_document->m_strAutoSayString + line,
-                                    m_document->m_display_my_input, false, m_document->m_log_input);
+                                    m_document->m_display_my_input, false,
+                                    m_document->m_logging.log_input);
             }
         }
 

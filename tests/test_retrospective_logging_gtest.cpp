@@ -84,17 +84,17 @@ class RetrospectiveLoggingTest : public ::testing::Test {
 // Verifies that all flagged lines are written to the log.
 TEST_F(RetrospectiveLoggingTest, WriteBufferedLines)
 {
-    doc->m_bLogHTML = false;
-    doc->m_bLogRaw = false;
-    doc->m_bLogOutput = true;
-    doc->m_bLogNotes = true;
-    doc->m_log_input = true;
-    doc->m_strLogLinePreambleOutput = "[OUT] ";
-    doc->m_strLogLinePreambleNotes = "[NOTE] ";
-    doc->m_strLogLinePreambleInput = "[IN] ";
-    doc->m_strLogLinePostambleOutput = "";
-    doc->m_strLogLinePostambleNotes = "";
-    doc->m_strLogLinePostambleInput = "";
+    doc->m_logging.log_html = false;
+    doc->m_logging.log_raw = false;
+    doc->m_logging.log_output = true;
+    doc->m_logging.log_notes = true;
+    doc->m_logging.log_input = true;
+    doc->m_logging.line_preamble_output = "[OUT] ";
+    doc->m_logging.line_preamble_notes = "[NOTE] ";
+    doc->m_logging.line_preamble_input = "[IN] ";
+    doc->m_logging.line_postamble_output = "";
+    doc->m_logging.line_postamble_notes = "";
+    doc->m_logging.line_postamble_input = "";
 
     // Create 3 buffered lines with LOG_LINE flag set
     doc->m_lineList.push_back(createLine(1, "First line from MUD", LOG_LINE));
@@ -135,13 +135,13 @@ TEST_F(RetrospectiveLoggingTest, WriteBufferedLines)
 // Verifies that raw mode skips preambles, postambles, and HTML escaping.
 TEST_F(RetrospectiveLoggingTest, RawLoggingMode)
 {
-    doc->m_bLogHTML = false;
-    doc->m_bLogRaw = true; // Raw mode enabled
-    doc->m_bLogOutput = true;
-    doc->m_strLogLinePreambleOutput = "[OUT] ";        // Should be ignored
-    doc->m_strLogLinePostambleOutput = " [END]";       // Should be ignored
-    doc->m_strLogFilePreamble = "==== Log Start ===="; // Should be ignored
-    doc->m_strLogFilePostamble = "==== Log End ====";  // Should be ignored
+    doc->m_logging.log_html = false;
+    doc->m_logging.log_raw = true; // Raw mode enabled
+    doc->m_logging.log_output = true;
+    doc->m_logging.line_preamble_output = "[OUT] ";       // Should be ignored
+    doc->m_logging.line_postamble_output = " [END]";      // Should be ignored
+    doc->m_logging.file_preamble = "==== Log Start ===="; // Should be ignored
+    doc->m_logging.file_postamble = "==== Log End ====";  // Should be ignored
 
     QString logFile = getTempLogFile("test_raw_logging.log");
 
@@ -176,12 +176,12 @@ TEST_F(RetrospectiveLoggingTest, RawLoggingMode)
 // Verifies that retrospective logging respects HTML mode.
 TEST_F(RetrospectiveLoggingTest, RetrospectiveLoggingWithHTML)
 {
-    doc->m_bLogHTML = true;
-    doc->m_bLogInColour = false; // HTML without colors
-    doc->m_bLogRaw = false;
-    doc->m_bLogOutput = true;
-    doc->m_strLogLinePreambleOutput = "";
-    doc->m_strLogLinePostambleOutput = "";
+    doc->m_logging.log_html = true;
+    doc->m_logging.log_in_colour = false; // HTML without colors
+    doc->m_logging.log_raw = false;
+    doc->m_logging.log_output = true;
+    doc->m_logging.line_preamble_output = "";
+    doc->m_logging.line_postamble_output = "";
 
     // Create line with HTML special characters
     doc->m_lineList.push_back(createLine(1, "<script>alert('XSS')</script>", LOG_LINE));
@@ -205,9 +205,9 @@ TEST_F(RetrospectiveLoggingTest, RetrospectiveLoggingWithHTML)
 // Verifies that opening log with empty buffer doesn't crash.
 TEST_F(RetrospectiveLoggingTest, EmptyBufferRetrospectiveLogging)
 {
-    doc->m_bLogHTML = false;
-    doc->m_bLogRaw = false;
-    doc->m_bLogOutput = true;
+    doc->m_logging.log_html = false;
+    doc->m_logging.log_raw = false;
+    doc->m_logging.log_output = true;
 
     // No lines in buffer
     EXPECT_TRUE(doc->m_lineList.empty()) << "Buffer should be empty";
@@ -230,17 +230,17 @@ TEST_F(RetrospectiveLoggingTest, EmptyBufferRetrospectiveLogging)
 // Tests that different line types (output, notes, input) use correct preambles.
 TEST_F(RetrospectiveLoggingTest, MixedLineTypesRetrospectiveLogging)
 {
-    doc->m_bLogHTML = false;
-    doc->m_bLogRaw = false;
-    doc->m_bLogOutput = true;
-    doc->m_bLogNotes = true;
-    doc->m_log_input = true;
-    doc->m_strLogLinePreambleOutput = "[OUT] ";
-    doc->m_strLogLinePreambleNotes = "[NOTE] ";
-    doc->m_strLogLinePreambleInput = "[CMD] ";
-    doc->m_strLogLinePostambleOutput = "";
-    doc->m_strLogLinePostambleNotes = "";
-    doc->m_strLogLinePostambleInput = "";
+    doc->m_logging.log_html = false;
+    doc->m_logging.log_raw = false;
+    doc->m_logging.log_output = true;
+    doc->m_logging.log_notes = true;
+    doc->m_logging.log_input = true;
+    doc->m_logging.line_preamble_output = "[OUT] ";
+    doc->m_logging.line_preamble_notes = "[NOTE] ";
+    doc->m_logging.line_preamble_input = "[CMD] ";
+    doc->m_logging.line_postamble_output = "";
+    doc->m_logging.line_postamble_notes = "";
+    doc->m_logging.line_postamble_input = "";
 
     // Output line, Note line, Input line
     doc->m_lineList.push_back(createLine(1, "MUD says hello", LOG_LINE));

@@ -529,12 +529,12 @@ void WorldPropertiesDialog::loadSettings()
     m_historySizeSpin->setValue(m_doc->m_maxCommandHistory);
 
     // Logging tab
-    m_enableLogCheck->setChecked(m_doc->m_bLogOutput);
-    m_logFileEdit->setText(m_doc->m_strAutoLogFileName);
+    m_enableLogCheck->setChecked(m_doc->m_logging.log_output);
+    m_logFileEdit->setText(m_doc->m_logging.auto_log_file_name);
     // Log format: Text=0, HTML=1, Raw=2
-    if (m_doc->m_bLogHTML)
+    if (m_doc->m_logging.log_html)
         m_logFormatCombo->setCurrentIndex(1);
-    else if (m_doc->m_bLogRaw)
+    else if (m_doc->m_logging.log_raw)
         m_logFormatCombo->setCurrentIndex(2);
     else
         m_logFormatCombo->setCurrentIndex(0);
@@ -611,11 +611,11 @@ void WorldPropertiesDialog::saveSettings()
     m_doc->m_maxCommandHistory = m_historySizeSpin->value();
 
     // Logging tab
-    m_doc->m_bLogOutput = m_enableLogCheck->isChecked();
-    m_doc->m_strAutoLogFileName = m_logFileEdit->text();
+    m_doc->m_logging.log_output = m_enableLogCheck->isChecked();
+    m_doc->m_logging.auto_log_file_name = m_logFileEdit->text();
     // Log format: Text=0, HTML=1, Raw=2
-    m_doc->m_bLogHTML = (m_logFormatCombo->currentIndex() == 1);
-    m_doc->m_bLogRaw = (m_logFormatCombo->currentIndex() == 2);
+    m_doc->m_logging.log_html = (m_logFormatCombo->currentIndex() == 1);
+    m_doc->m_logging.log_raw = (m_logFormatCombo->currentIndex() == 2);
 
     // Scripting tab
     m_doc->m_bEnableScripts = m_enableScriptCheck->isChecked();

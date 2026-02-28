@@ -168,7 +168,7 @@ int L_SendImmediate(lua_State* L)
     }
 
     // Send immediately (bypasses queue) using world's display/log settings
-    pDoc->DoSendMsg(QString::fromUtf8(text), pDoc->m_display_my_input, pDoc->m_log_input);
+    pDoc->DoSendMsg(QString::fromUtf8(text), pDoc->m_display_my_input, pDoc->m_logging.log_input);
 
     return luaReturnOK(L);
 }

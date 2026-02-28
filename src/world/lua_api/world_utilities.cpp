@@ -3045,7 +3045,7 @@ int L_Reset(lua_State* L)
 int L_GetLogInput(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    lua_pushboolean(L, pDoc->m_log_input);
+    lua_pushboolean(L, pDoc->m_logging.log_input);
     return 1;
 }
 
@@ -3073,7 +3073,7 @@ int L_SetLogInput(lua_State* L)
     WorldDocument* pDoc = doc(L);
     // Default to true if no argument provided (matches original optboolean behavior)
     bool enable = lua_isnone(L, 1) ? true : lua_toboolean(L, 1);
-    pDoc->m_log_input = enable;
+    pDoc->m_logging.log_input = enable;
     return 0;
 }
 
@@ -3095,7 +3095,7 @@ int L_SetLogInput(lua_State* L)
 int L_GetLogNotes(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    lua_pushboolean(L, pDoc->m_bLogNotes);
+    lua_pushboolean(L, pDoc->m_logging.log_notes);
     return 1;
 }
 
@@ -3121,7 +3121,7 @@ int L_SetLogNotes(lua_State* L)
     WorldDocument* pDoc = doc(L);
     // Default to true if no argument provided (matches original optboolean behavior)
     bool enable = lua_isnone(L, 1) ? true : lua_toboolean(L, 1);
-    pDoc->m_bLogNotes = enable;
+    pDoc->m_logging.log_notes = enable;
     return 0;
 }
 
@@ -3143,7 +3143,7 @@ int L_SetLogNotes(lua_State* L)
 int L_GetLogOutput(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    lua_pushboolean(L, pDoc->m_bLogOutput);
+    lua_pushboolean(L, pDoc->m_logging.log_output);
     return 1;
 }
 
@@ -3171,7 +3171,7 @@ int L_SetLogOutput(lua_State* L)
     WorldDocument* pDoc = doc(L);
     // Default to true if no argument provided (matches original optboolean behavior)
     bool enable = lua_isnone(L, 1) ? true : lua_toboolean(L, 1);
-    pDoc->m_bLogOutput = enable;
+    pDoc->m_logging.log_output = enable;
     return 0;
 }
 

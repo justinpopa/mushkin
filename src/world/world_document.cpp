@@ -177,7 +177,6 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_file_preamble = QString();
     m_line_postamble = QString();
     m_line_preamble = QString();
-    m_strLogFilePreamble = QString();
 
     // ========== Initialize paste settings ==========
     m_paste_postamble = QString();
@@ -267,14 +266,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     // m_ExtraShiftTabCompleteItems initialized empty by default
 
     // ========== Initialize auto logging ==========
-    m_strAutoLogFileName = QString();
-    m_strLogLinePreambleOutput = QString();
-    m_strLogLinePreambleInput = QString();
-    m_strLogLinePreambleNotes = QString();
-    m_strLogFilePostamble = QString();
-    m_strLogLinePostambleOutput = QString();
-    m_strLogLinePostambleInput = QString();
-    m_strLogLinePostambleNotes = QString();
+    // (LoggingConfig m_logging uses default member initializers)
 
     // ========== Initialize output line preambles ==========
     // Colors stored in BGR format (Windows COLORREF)
@@ -311,7 +303,6 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_bWarnIfScriptingInactive = 1; // Default: true (like original)
 
     // ========== Initialize sending options ==========
-    m_bWriteWorldNameToLog = true; // Default: true (like original)
     m_bSendEcho = false;
     m_bPasteEcho = false;
 
@@ -365,7 +356,6 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
 
     // ========== Initialize script errors ==========
     m_bScriptErrorsToOutputWindow = false;
-    m_bLogScriptErrors = false;
 
     // ========== Initialize command window auto-resize ==========
     m_bAutoResizeCommandWindow = false;
@@ -398,17 +388,8 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_bPlaySoundsInBackground = false;
 
     // ========== Initialize HTML logging ==========
-    m_bLogHTML = false;
     m_bUnpauseOnSend = false;
-
-    // ========== Initialize logging options ==========
-    m_log_input = false;
-    m_bLogOutput = false;
-    m_bLogNotes = false;
-    m_bLogInColour = false;
-    m_bLogRaw = false;
-    m_nLogLines = 0;           // 0 = unlimited
-    m_bAppendToLogFile = true; // append by default (matches MUSHclient)
+    // (LoggingConfig m_logging bool flags use default member initializers)
 
     // ========== Initialize tree views ==========
     m_bTreeviewTriggers = true;
@@ -1156,7 +1137,7 @@ bool WorldDocument::sendTextToMud(const QString& text, const QString& preamble,
     int totalLines = lines.size();
 
     // Use actual logging setting
-    bool bLog = m_log_input;
+    bool bLog = m_logging.log_input;
 
     // Track state for commented softcode mode
     bool hashCommenting = false;
@@ -1280,7 +1261,7 @@ bool WorldDocument::sendTextToMud(const QString& text, const QString& preamble,
  * Features:
  * - Spam prevention (inserts spam message if too many repeats)
  * - Input echoing to output window (if bEcho=true and m_display_my_input)
- * - Input logging to log file (if bLog=true and m_log_input)
+ * - Input logging to log file (if bLog=true and m_logging.log_input)
  * - IAC doubling (telnet protocol)
  *
  * @param text - Single line of text to send
@@ -1317,7 +1298,7 @@ void WorldDocument::DoSendMsg(const QString& text, bool bEcho, bool bLog)
         m_iLastCommandCount > m_iSpamLineCount) {
         // Reset counter and send spam message
         m_iLastCommandCount = 0;
-        DoSendMsg(m_strSpamMessage, m_display_my_input, m_log_input);
+        DoSendMsg(m_strSpamMessage, m_display_my_input, m_logging.log_input);
 
         // Reset tracking for current command
         m_strLastCommandSent = str;
@@ -1338,7 +1319,7 @@ void WorldDocument::DoSendMsg(const QString& text, bool bEcho, bool bLog)
 
     // ========== Input Logging ==========
     // Log sent text to log file if requested
-    if (bLog && m_log_input && IsLogOpen()) {
+    if (bLog && m_logging.log_input && IsLogOpen()) {
         logCommand(str);
     }
 
@@ -1394,23 +1375,23 @@ void WorldDocument::logCommand(const QString& text)
     }
 
     // Write preamble (if any)
-    if (!m_strLogLinePreambleInput.isEmpty()) {
-        QString preamble =
-            FormatTime(QDateTime::currentDateTime(), m_strLogLinePreambleInput, m_bLogHTML);
+    if (!m_logging.line_preamble_input.isEmpty()) {
+        QString preamble = FormatTime(QDateTime::currentDateTime(), m_logging.line_preamble_input,
+                                      m_logging.log_html);
         WriteToLog(preamble);
     }
 
     // Write the command text
-    if (m_bLogHTML) {
+    if (m_logging.log_html) {
         WriteToLog(FixHTMLString(text));
     } else {
         WriteToLog(text);
     }
 
     // Write postamble (if any)
-    if (!m_strLogLinePostambleInput.isEmpty()) {
-        QString postamble =
-            FormatTime(QDateTime::currentDateTime(), m_strLogLinePostambleInput, m_bLogHTML);
+    if (!m_logging.line_postamble_input.isEmpty()) {
+        QString postamble = FormatTime(QDateTime::currentDateTime(), m_logging.line_postamble_input,
+                                       m_logging.log_html);
         WriteToLog(postamble);
     }
 
@@ -1506,7 +1487,7 @@ void WorldDocument::Execute(const QString& command)
             }
 
             // Send expanded speedwalk commands via SendMsg with queue=true
-            SendMsg(expandedSpeedwalk, m_display_my_input, true, m_log_input);
+            SendMsg(expandedSpeedwalk, m_display_my_input, true, m_logging.log_input);
         }
         return; // Don't process further (speedwalk handled)
     }
@@ -1576,7 +1557,7 @@ void WorldDocument::Execute(const QString& command)
             // No alias matched - send to MUD
             bool bEcho = m_display_my_input;
             bool bQueue = false;
-            bool bLog = m_log_input;
+            bool bLog = m_logging.log_input;
 
             SendMsg(processedCommand, bEcho, bQueue, bLog);
 
@@ -2725,13 +2706,13 @@ void WorldDocument::StartNewLine(bool bNewLine, unsigned char iFlags)
                 QString::fromUtf8(m_currentLine->text().data(), m_currentLine->text().size());
             unsigned char lineFlags = m_currentLine->flags;
             if (lineFlags & COMMENT) {
-                Screendraw(COMMENT, m_bLogNotes, lineText);
+                Screendraw(COMMENT, m_logging.log_notes, lineText);
             } else if (lineFlags & USER_INPUT) {
-                Screendraw(USER_INPUT, m_log_input, lineText);
+                Screendraw(USER_INPUT, m_logging.log_input, lineText);
             } else {
                 // Regular MUD output (type 0)
-                // Log flag: m_bLogOutput AND not omitted
-                Screendraw(0, m_bLogOutput && !m_bOmitCurrentLineFromLog, lineText);
+                // Log flag: m_logging.log_output AND not omitted
+                Screendraw(0, m_logging.log_output && !m_bOmitCurrentLineFromLog, lineText);
             }
         }
 

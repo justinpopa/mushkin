@@ -28,9 +28,9 @@ class LineLoggingTest : public ::testing::Test {
         doc = std::make_unique<WorldDocument>();
 
         // Initialize default logging settings
-        doc->m_bLogOutput = false;
-        doc->m_bLogNotes = false;
-        doc->m_log_input = false;
+        doc->m_logging.log_output = false;
+        doc->m_logging.log_notes = false;
+        doc->m_logging.log_input = false;
         doc->m_bOmitCurrentLineFromLog = false;
     }
 
@@ -109,11 +109,11 @@ class LineLoggingTest : public ::testing::Test {
  */
 TEST_F(LineLoggingTest, LogOutputLine)
 {
-    doc->m_bLogOutput = true; // Enable output logging
-    doc->m_bLogNotes = false;
-    doc->m_log_input = false;
-    doc->m_strLogLinePreambleOutput = "";
-    doc->m_strLogLinePostambleOutput = "";
+    doc->m_logging.log_output = true; // Enable output logging
+    doc->m_logging.log_notes = false;
+    doc->m_logging.log_input = false;
+    doc->m_logging.line_preamble_output = "";
+    doc->m_logging.line_postamble_output = "";
 
     // Open log file
     qint32 result = doc->OpenLog("test_output.log", false);
@@ -148,11 +148,11 @@ TEST_F(LineLoggingTest, LogOutputLine)
  */
 TEST_F(LineLoggingTest, LogNoteLine)
 {
-    doc->m_bLogOutput = false;
-    doc->m_bLogNotes = true; // Enable notes logging
-    doc->m_log_input = false;
-    doc->m_strLogLinePreambleNotes = "[NOTE] ";
-    doc->m_strLogLinePostambleNotes = "";
+    doc->m_logging.log_output = false;
+    doc->m_logging.log_notes = true; // Enable notes logging
+    doc->m_logging.log_input = false;
+    doc->m_logging.line_preamble_notes = "[NOTE] ";
+    doc->m_logging.line_postamble_notes = "";
 
     doc->OpenLog("test_notes.log", false);
 
@@ -184,11 +184,11 @@ TEST_F(LineLoggingTest, LogNoteLine)
  */
 TEST_F(LineLoggingTest, LogInputLine)
 {
-    doc->m_bLogOutput = false;
-    doc->m_bLogNotes = false;
-    doc->m_log_input = true; // Enable input logging
-    doc->m_strLogLinePreambleInput = "> ";
-    doc->m_strLogLinePostambleInput = "";
+    doc->m_logging.log_output = false;
+    doc->m_logging.log_notes = false;
+    doc->m_logging.log_input = true; // Enable input logging
+    doc->m_logging.line_preamble_input = "> ";
+    doc->m_logging.line_postamble_input = "";
 
     doc->OpenLog("test_input.log", false);
 
@@ -217,9 +217,9 @@ TEST_F(LineLoggingTest, LogInputLine)
  */
 TEST_F(LineLoggingTest, TriggerOmitFromLog)
 {
-    doc->m_bLogOutput = true; // Logging enabled
-    doc->m_strLogLinePreambleOutput = "";
-    doc->m_strLogLinePostambleOutput = "";
+    doc->m_logging.log_output = true; // Logging enabled
+    doc->m_logging.line_preamble_output = "";
+    doc->m_logging.line_postamble_output = "";
 
     doc->OpenLog("test_omit.log", false);
 
@@ -253,9 +253,9 @@ TEST_F(LineLoggingTest, TriggerOmitFromLog)
  */
 TEST_F(LineLoggingTest, LOG_LINEFlag)
 {
-    doc->m_bLogOutput = true;
-    doc->m_bLogNotes = false;
-    doc->m_log_input = false;
+    doc->m_logging.log_output = true;
+    doc->m_logging.log_notes = false;
+    doc->m_logging.log_input = false;
 
     // NO log file open - testing flag setting without writing
 
@@ -266,7 +266,7 @@ TEST_F(LineLoggingTest, LOG_LINEFlag)
     EXPECT_TRUE((line1->flags & LOG_LINE) != 0) << "LOG_LINE should be set when logging enabled";
 
     // Test 2: Output line with logging disabled
-    doc->m_bLogOutput = false;
+    doc->m_logging.log_output = false;
     auto line2 = createLine(0, "test");
 
     doc->logCompletedLine(line2.get());
@@ -293,11 +293,11 @@ TEST_F(LineLoggingTest, LOG_LINEFlag)
 TEST_F(LineLoggingTest, SelectiveLogging)
 {
     // Test: Only log notes, not output or input
-    doc->m_bLogOutput = false;
-    doc->m_bLogNotes = true;
-    doc->m_log_input = false;
-    doc->m_strLogLinePreambleNotes = "";
-    doc->m_strLogLinePostambleNotes = "";
+    doc->m_logging.log_output = false;
+    doc->m_logging.log_notes = true;
+    doc->m_logging.log_input = false;
+    doc->m_logging.line_preamble_notes = "";
+    doc->m_logging.line_postamble_notes = "";
 
     doc->OpenLog("test_selective.log", false);
 
@@ -330,11 +330,11 @@ TEST_F(LineLoggingTest, SelectiveLogging)
  */
 TEST_F(LineLoggingTest, PreamblePostamble)
 {
-    doc->m_bLogOutput = true;
+    doc->m_logging.log_output = true;
 
     // Set preamble with time codes
-    doc->m_strLogLinePreambleOutput = "[%H:%M:%S] ";
-    doc->m_strLogLinePostambleOutput = "%n"; // Newline
+    doc->m_logging.line_preamble_output = "[%H:%M:%S] ";
+    doc->m_logging.line_postamble_output = "%n"; // Newline
 
     doc->OpenLog("test_preamble.log", false);
 
@@ -366,11 +366,11 @@ TEST_F(LineLoggingTest, PreamblePostamble)
  */
 TEST_F(LineLoggingTest, HTMLEscaping)
 {
-    doc->m_bLogOutput = true;
-    doc->m_bLogHTML = true;      // Enable HTML mode
-    doc->m_bLogInColour = false; // Without colors (uses FixHTMLString)
-    doc->m_strLogLinePreambleOutput = "";
-    doc->m_strLogLinePostambleOutput = "";
+    doc->m_logging.log_output = true;
+    doc->m_logging.log_html = true;       // Enable HTML mode
+    doc->m_logging.log_in_colour = false; // Without colors (uses FixHTMLString)
+    doc->m_logging.line_preamble_output = "";
+    doc->m_logging.line_postamble_output = "";
 
     doc->OpenLog("test_html_escape.log", false);
 
@@ -417,11 +417,11 @@ TEST_F(LineLoggingTest, HTMLEscaping)
  */
 TEST_F(LineLoggingTest, HTMLColorLogging)
 {
-    doc->m_bLogOutput = true;
-    doc->m_bLogHTML = true;     // Enable HTML mode
-    doc->m_bLogInColour = true; // WITH colors (uses LogLineInHTMLcolour)
-    doc->m_strLogLinePreambleOutput = "";
-    doc->m_strLogLinePostambleOutput = "";
+    doc->m_logging.log_output = true;
+    doc->m_logging.log_html = true;      // Enable HTML mode
+    doc->m_logging.log_in_colour = true; // WITH colors (uses LogLineInHTMLcolour)
+    doc->m_logging.line_preamble_output = "";
+    doc->m_logging.line_postamble_output = "";
 
     doc->OpenLog("test_html_color.log", false);
 

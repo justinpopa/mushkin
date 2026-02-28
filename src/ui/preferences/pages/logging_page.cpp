@@ -89,18 +89,18 @@ void LoggingPage::loadSettings()
     m_logInputCheck->blockSignals(true);
     m_logNotesCheck->blockSignals(true);
 
-    m_enableLogCheck->setChecked(m_doc->m_bLogOutput);
-    m_logFileEdit->setText(m_doc->m_strAutoLogFileName);
-    // Determine format from flags: HTML if m_bLogHTML, Raw if m_bLogRaw, else Text
-    if (m_doc->m_bLogHTML)
+    m_enableLogCheck->setChecked(m_doc->m_logging.log_output);
+    m_logFileEdit->setText(m_doc->m_logging.auto_log_file_name);
+    // Determine format from flags: HTML if log_html, Raw if log_raw, else Text
+    if (m_doc->m_logging.log_html)
         m_logFormatCombo->setCurrentIndex(1);
-    else if (m_doc->m_bLogRaw)
+    else if (m_doc->m_logging.log_raw)
         m_logFormatCombo->setCurrentIndex(2);
     else
         m_logFormatCombo->setCurrentIndex(0);
-    m_appendLogCheck->setChecked(m_doc->m_bAppendToLogFile);
-    m_logInputCheck->setChecked(m_doc->m_log_input);
-    m_logNotesCheck->setChecked(m_doc->m_bLogNotes);
+    m_appendLogCheck->setChecked(m_doc->m_logging.append_to_log_file);
+    m_logInputCheck->setChecked(m_doc->m_logging.log_input);
+    m_logNotesCheck->setChecked(m_doc->m_logging.log_notes);
 
     // Unblock signals
     m_enableLogCheck->blockSignals(false);
@@ -118,14 +118,14 @@ void LoggingPage::saveSettings()
     if (!m_doc)
         return;
 
-    m_doc->m_bLogOutput = m_enableLogCheck->isChecked();
-    m_doc->m_strAutoLogFileName = m_logFileEdit->text();
+    m_doc->m_logging.log_output = m_enableLogCheck->isChecked();
+    m_doc->m_logging.auto_log_file_name = m_logFileEdit->text();
     // Save format as flags
-    m_doc->m_bLogHTML = (m_logFormatCombo->currentIndex() == 1);
-    m_doc->m_bLogRaw = (m_logFormatCombo->currentIndex() == 2);
-    m_doc->m_bAppendToLogFile = m_appendLogCheck->isChecked();
-    m_doc->m_log_input = m_logInputCheck->isChecked();
-    m_doc->m_bLogNotes = m_logNotesCheck->isChecked();
+    m_doc->m_logging.log_html = (m_logFormatCombo->currentIndex() == 1);
+    m_doc->m_logging.log_raw = (m_logFormatCombo->currentIndex() == 2);
+    m_doc->m_logging.append_to_log_file = m_appendLogCheck->isChecked();
+    m_doc->m_logging.log_input = m_logInputCheck->isChecked();
+    m_doc->m_logging.log_notes = m_logNotesCheck->isChecked();
 
     m_doc->setModified(true);
 

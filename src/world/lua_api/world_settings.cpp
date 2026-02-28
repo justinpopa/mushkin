@@ -397,49 +397,49 @@ int L_GetInfo(lua_State* L)
 
         case 11: // Log file preamble
         {
-            QByteArray ba = pDoc->m_strLogFilePreamble.toUtf8();
+            QByteArray ba = pDoc->m_logging.file_preamble.toUtf8();
             lua_pushlstring(L, ba.constData(), ba.length());
         } break;
 
         case 12: // Log file postamble
         {
-            QByteArray ba = pDoc->m_strLogFilePostamble.toUtf8();
+            QByteArray ba = pDoc->m_logging.file_postamble.toUtf8();
             lua_pushlstring(L, ba.constData(), ba.length());
         } break;
 
         case 13: // Log line preamble (input)
         {
-            QByteArray ba = pDoc->m_strLogLinePreambleInput.toUtf8();
+            QByteArray ba = pDoc->m_logging.line_preamble_input.toUtf8();
             lua_pushlstring(L, ba.constData(), ba.length());
         } break;
 
         case 14: // Log line preamble (notes)
         {
-            QByteArray ba = pDoc->m_strLogLinePreambleNotes.toUtf8();
+            QByteArray ba = pDoc->m_logging.line_preamble_notes.toUtf8();
             lua_pushlstring(L, ba.constData(), ba.length());
         } break;
 
         case 15: // Log line preamble (output)
         {
-            QByteArray ba = pDoc->m_strLogLinePreambleOutput.toUtf8();
+            QByteArray ba = pDoc->m_logging.line_preamble_output.toUtf8();
             lua_pushlstring(L, ba.constData(), ba.length());
         } break;
 
         case 16: // Log line postamble (input)
         {
-            QByteArray ba = pDoc->m_strLogLinePostambleInput.toUtf8();
+            QByteArray ba = pDoc->m_logging.line_postamble_input.toUtf8();
             lua_pushlstring(L, ba.constData(), ba.length());
         } break;
 
         case 17: // Log line postamble (notes)
         {
-            QByteArray ba = pDoc->m_strLogLinePostambleNotes.toUtf8();
+            QByteArray ba = pDoc->m_logging.line_postamble_notes.toUtf8();
             lua_pushlstring(L, ba.constData(), ba.length());
         } break;
 
         case 18: // Log line postamble (output)
         {
-            QByteArray ba = pDoc->m_strLogLinePostambleOutput.toUtf8();
+            QByteArray ba = pDoc->m_logging.line_postamble_output.toUtf8();
             lua_pushlstring(L, ba.constData(), ba.length());
         } break;
 
@@ -571,7 +571,7 @@ int L_GetInfo(lua_State* L)
 
         case 40: // Auto-log filename
         {
-            QByteArray ba = pDoc->m_strAutoLogFileName.toUtf8();
+            QByteArray ba = pDoc->m_logging.auto_log_file_name.toUtf8();
             lua_pushlstring(L, ba.constData(), ba.length());
         } break;
 

@@ -180,7 +180,7 @@ qint32 WorldDocument::OpenLog(const QString& filename, bool append)
     if (logName.isEmpty()) {
         // Use auto-generated filename with time substitution
         QDateTime now = QDateTime::currentDateTime();
-        logName = FormatTime(now, m_strAutoLogFileName, false);
+        logName = FormatTime(now, m_logging.auto_log_file_name, false);
     }
 
     // Filename still empty? Error
@@ -213,15 +213,15 @@ qint32 WorldDocument::OpenLog(const QString& filename, bool append)
     qCDebug(lcLogging) << "OpenLog: Successfully opened" << logName << "(append=" << append << ")";
 
     // Write file preamble if not in raw mode
-    if (!m_strLogFilePreamble.isEmpty() && !m_bLogRaw) {
+    if (!m_logging.file_preamble.isEmpty() && !m_logging.log_raw) {
         QDateTime now = QDateTime::currentDateTime();
-        QString preamble = m_strLogFilePreamble;
+        QString preamble = m_logging.file_preamble;
 
         // Expand %n to newline
         preamble.replace("%n", "\n");
 
         // Expand time codes
-        preamble = FormatTime(now, preamble, m_bLogHTML);
+        preamble = FormatTime(now, preamble, m_logging.log_html);
 
         // Write preamble
         WriteToLog(preamble);
@@ -264,15 +264,15 @@ qint32 WorldDocument::CloseLog()
     qCDebug(lcLogging) << "CloseLog: Closing log file" << m_logfile_name;
 
     // Write file postamble if not in raw mode
-    if (!m_strLogFilePostamble.isEmpty() && !m_bLogRaw) {
+    if (!m_logging.file_postamble.isEmpty() && !m_logging.log_raw) {
         QDateTime now = QDateTime::currentDateTime();
-        QString postamble = m_strLogFilePostamble;
+        QString postamble = m_logging.file_postamble;
 
         // Expand %n to newline
         postamble.replace("%n", "\n");
 
         // Expand time codes
-        postamble = FormatTime(now, postamble, m_bLogHTML);
+        postamble = FormatTime(now, postamble, m_logging.log_html);
 
         // Write postamble
         WriteToLog(postamble);
@@ -580,19 +580,19 @@ void WorldDocument::logCompletedLine(Line* line)
     QString preamble, postamble;
 
     // Determine if this line should be logged based on type
-    if ((flags & COMMENT) && m_bLogNotes) {
+    if ((flags & COMMENT) && m_logging.log_notes) {
         bShouldLog = true;
-        preamble = m_strLogLinePreambleNotes;
-        postamble = m_strLogLinePostambleNotes;
-    } else if ((flags & USER_INPUT) && m_log_input) {
+        preamble = m_logging.line_preamble_notes;
+        postamble = m_logging.line_postamble_notes;
+    } else if ((flags & USER_INPUT) && m_logging.log_input) {
         bShouldLog = true;
-        preamble = m_strLogLinePreambleInput;
-        postamble = m_strLogLinePostambleInput;
-    } else if (!(flags & NOTE_OR_COMMAND) && m_bLogOutput) {
+        preamble = m_logging.line_preamble_input;
+        postamble = m_logging.line_postamble_input;
+    } else if (!(flags & NOTE_OR_COMMAND) && m_logging.log_output) {
         // Regular MUD output (not notes or user input)
         bShouldLog = true;
-        preamble = m_strLogLinePreambleOutput;
-        postamble = m_strLogLinePostambleOutput;
+        preamble = m_logging.line_preamble_output;
+        postamble = m_logging.line_postamble_output;
     }
 
     // Check if a trigger wants to omit this line from log
@@ -606,13 +606,13 @@ void WorldDocument::logCompletedLine(Line* line)
     }
 
     // Write to log file if open and not raw mode
-    if (bShouldLog && m_logfile && !m_bLogRaw) {
+    if (bShouldLog && m_logfile && !m_logging.log_raw) {
         // Expand %n to newline in preamble
         preamble.replace("%n", "\n");
 
         // Expand time codes if preamble contains %
         if (preamble.contains('%')) {
-            preamble = FormatTime(line->m_theTime, preamble, m_bLogHTML);
+            preamble = FormatTime(line->m_theTime, preamble, m_logging.log_html);
         }
 
         // Expand %n to newline in postamble
@@ -620,7 +620,7 @@ void WorldDocument::logCompletedLine(Line* line)
 
         // Expand time codes if postamble contains %
         if (postamble.contains('%')) {
-            postamble = FormatTime(line->m_theTime, postamble, m_bLogHTML);
+            postamble = FormatTime(line->m_theTime, postamble, m_logging.log_html);
         }
 
         // Write preamble
@@ -629,10 +629,10 @@ void WorldDocument::logCompletedLine(Line* line)
         // Write line content
         QString lineText = QString::fromUtf8(line->text().data(), line->text().size());
 
-        if (m_bLogHTML && m_bLogInColour) {
+        if (m_logging.log_html && m_logging.log_in_colour) {
             // HTML logging with colors
             LogLineInHTMLcolour(line);
-        } else if (m_bLogHTML) {
+        } else if (m_logging.log_html) {
             // HTML logging without colors
             WriteToLog(FixHTMLString(lineText));
         } else {
@@ -644,10 +644,10 @@ void WorldDocument::logCompletedLine(Line* line)
         WriteToLog(postamble);
 
         // Write newline (unless HTML color mode already added one)
-        if (!(m_bLogHTML && m_bLogInColour)) {
+        if (!(m_logging.log_html && m_logging.log_in_colour)) {
             WriteToLog("\n");
         }
-    } else if (bShouldLog && m_logfile && m_bLogRaw) {
+    } else if (bShouldLog && m_logfile && m_logging.log_raw) {
         // Raw mode: just write the line as-is
         QString lineText = QString::fromUtf8(line->text().data(), line->text().size());
         WriteToLog(lineText);
@@ -702,19 +702,19 @@ void WorldDocument::writeRetrospectiveLog()
         unsigned char flags = line->flags;
 
         if (flags & COMMENT) {
-            preamble = m_strLogLinePreambleNotes;
-            postamble = m_strLogLinePostambleNotes;
+            preamble = m_logging.line_preamble_notes;
+            postamble = m_logging.line_postamble_notes;
         } else if (flags & USER_INPUT) {
-            preamble = m_strLogLinePreambleInput;
-            postamble = m_strLogLinePostambleInput;
+            preamble = m_logging.line_preamble_input;
+            postamble = m_logging.line_postamble_input;
         } else {
             // Regular MUD output
-            preamble = m_strLogLinePreambleOutput;
-            postamble = m_strLogLinePostambleOutput;
+            preamble = m_logging.line_preamble_output;
+            postamble = m_logging.line_postamble_output;
         }
 
         // Write the line (respecting raw/HTML modes)
-        if (m_bLogRaw) {
+        if (m_logging.log_raw) {
             // Raw mode: just write the line as-is
             QString lineText = QString::fromUtf8(line->text().data(), line->text().size());
             WriteToLog(lineText);
@@ -723,22 +723,22 @@ void WorldDocument::writeRetrospectiveLog()
             // Formatted mode: expand preambles/postambles and handle HTML
             preamble.replace("%n", "\n");
             if (preamble.contains('%')) {
-                preamble = FormatTime(line->m_theTime, preamble, m_bLogHTML);
+                preamble = FormatTime(line->m_theTime, preamble, m_logging.log_html);
             }
 
             postamble.replace("%n", "\n");
             if (postamble.contains('%')) {
-                postamble = FormatTime(line->m_theTime, postamble, m_bLogHTML);
+                postamble = FormatTime(line->m_theTime, postamble, m_logging.log_html);
             }
 
             WriteToLog(preamble);
 
             QString lineText = QString::fromUtf8(line->text().data(), line->text().size());
 
-            if (m_bLogHTML && m_bLogInColour) {
+            if (m_logging.log_html && m_logging.log_in_colour) {
                 // HTML logging with colors
                 LogLineInHTMLcolour(line);
-            } else if (m_bLogHTML) {
+            } else if (m_logging.log_html) {
                 // HTML logging without colors
                 WriteToLog(FixHTMLString(lineText));
             } else {
@@ -749,7 +749,7 @@ void WorldDocument::writeRetrospectiveLog()
             WriteToLog(postamble);
 
             // Write newline (unless HTML color mode already added one)
-            if (!(m_bLogHTML && m_bLogInColour)) {
+            if (!(m_logging.log_html && m_logging.log_in_colour)) {
                 WriteToLog("\n");
             }
         }
