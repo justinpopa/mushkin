@@ -267,51 +267,7 @@ bool SaveWorldXML(WorldDocument* doc, const QString& filename)
     for (int i = 0; OptionsTable[i].pName != nullptr; i++) {
         const tConfigurationNumericOption& opt = OptionsTable[i];
 
-        // Calculate pointer to field in document
-        const char* basePtr = reinterpret_cast<const char*>(doc);
-        const char* fieldPtr = basePtr + opt.iOffset;
-
-        double value = 0.0;
-
-        // Read value based on field length
-        switch (opt.iLength) {
-            case 1: // unsigned char or bool
-                if (opt.iMaximum == 0 && opt.iMinimum == 0) {
-                    // Boolean
-                    value = *reinterpret_cast<const bool*>(fieldPtr) ? 1.0 : 0.0;
-                } else {
-                    value = *reinterpret_cast<const unsigned char*>(fieldPtr);
-                }
-                break;
-
-            case 2: // unsigned short or qint16
-                value = *reinterpret_cast<const quint16*>(fieldPtr);
-                break;
-
-            case 4: // qint32, quint32, or float
-                if (opt.iFlags & OPT_DOUBLE) {
-                    value = *reinterpret_cast<const float*>(fieldPtr);
-                } else if (opt.iFlags & OPT_RGB_COLOUR) {
-                    // RGB color stored as QRgb (quint32)
-                    QRgb rgb = *reinterpret_cast<const QRgb*>(fieldPtr);
-                    value = rgb;
-                } else {
-                    value = *reinterpret_cast<const qint32*>(fieldPtr);
-                }
-                break;
-
-            case 8: // qint64 or double
-                if (opt.iFlags & OPT_DOUBLE) {
-                    value = *reinterpret_cast<const double*>(fieldPtr);
-                } else {
-                    value = *reinterpret_cast<const qint64*>(fieldPtr);
-                }
-                break;
-
-            default:
-                qWarning() << "Unknown field length" << opt.iLength << "for option" << opt.pName;
-                continue;
-        }
+        double value = opt.getter(*doc);
 
         // Handle custom color indexing (add 1 when saving)
         double saveValue = value;
@@ -351,13 +307,7 @@ bool SaveWorldXML(WorldDocument* doc, const QString& filename)
     for (int i = 0; AlphaOptionsTable[i].pName != nullptr; i++) {
         const tConfigurationAlphaOption& opt = AlphaOptionsTable[i];
 
-        // Calculate pointer to field in document
-        const char* basePtr = reinterpret_cast<const char*>(doc);
-        const char* fieldPtr = basePtr + opt.iOffset;
-
-        // Read QString value
-        const QString* strPtr = reinterpret_cast<const QString*>(fieldPtr);
-        QString value = *strPtr;
+        QString value = opt.getter(*doc);
 
         // Skip multi-line options in this pass
         if ((opt.iFlags & OPT_MULTLINE) || value.contains('\n')) {
@@ -385,13 +335,7 @@ bool SaveWorldXML(WorldDocument* doc, const QString& filename)
     for (int i = 0; AlphaOptionsTable[i].pName != nullptr; i++) {
         const tConfigurationAlphaOption& opt = AlphaOptionsTable[i];
 
-        // Calculate pointer to field in document
-        const char* basePtr = reinterpret_cast<const char*>(doc);
-        const char* fieldPtr = basePtr + opt.iOffset;
-
-        // Read QString value
-        const QString* strPtr = reinterpret_cast<const QString*>(fieldPtr);
-        QString value = *strPtr;
+        QString value = opt.getter(*doc);
 
         // Only process multi-line options in this pass
         if (!((opt.iFlags & OPT_MULTLINE) || value.contains('\n'))) {
@@ -611,44 +555,11 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
                 }
 
                 // Write value to document
-                char* basePtr = reinterpret_cast<char*>(doc);
-                char* fieldPtr = basePtr + opt.iOffset;
-
-                switch (opt.iLength) {
-                    case 1: // unsigned char or bool
-                        if (opt.iMaximum == 0.0 && opt.iMinimum == 0.0) {
-                            *reinterpret_cast<bool*>(fieldPtr) = (value != 0.0);
-                        } else {
-                            *reinterpret_cast<unsigned char*>(fieldPtr) =
-                                static_cast<unsigned char>(value);
-                        }
-                        break;
-
-                    case 2: // quint16
-                        *reinterpret_cast<quint16*>(fieldPtr) = static_cast<quint16>(value);
-                        break;
-
-                    case 4: // qint32, quint32, float, or QRgb
-                        if (opt.iFlags & OPT_DOUBLE) {
-                            *reinterpret_cast<float*>(fieldPtr) = static_cast<float>(value);
-                        } else if (opt.iFlags & OPT_RGB_COLOUR) {
-                            // For RGB colors, 0 might mean "use default" in old MUSHclient files
-                            // Only set if value is non-zero, otherwise keep the default
-                            if (value != 0.0) {
-                                *reinterpret_cast<QRgb*>(fieldPtr) = static_cast<QRgb>(value);
-                            }
-                        } else {
-                            *reinterpret_cast<qint32*>(fieldPtr) = static_cast<qint32>(value);
-                        }
-                        break;
-
-                    case 8: // qint64 or double
-                        if (opt.iFlags & OPT_DOUBLE) {
-                            *reinterpret_cast<double*>(fieldPtr) = value;
-                        } else {
-                            *reinterpret_cast<qint64*>(fieldPtr) = static_cast<qint64>(value);
-                        }
-                        break;
+                // For RGB colors, 0 might mean "use default" in old MUSHclient files
+                if ((opt.iFlags & OPT_RGB_COLOUR) && value == 0.0) {
+                    // Keep the default
+                } else {
+                    opt.setter(*doc, value);
                 }
             }
 
@@ -673,11 +584,7 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
                     }
                 }
 
-                // Write to document
-                char* basePtr = reinterpret_cast<char*>(doc);
-                char* fieldPtr = basePtr + opt.iOffset;
-                QString* strPtr = reinterpret_cast<QString*>(fieldPtr);
-                *strPtr = value;
+                opt.setter(*doc, value);
             }
 
             // ================================================================
@@ -805,11 +712,7 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
                                 }
                             }
 
-                            // Write to document
-                            char* basePtr = reinterpret_cast<char*>(doc);
-                            char* fieldPtr = basePtr + opt.iOffset;
-                            QString* strPtr = reinterpret_cast<QString*>(fieldPtr);
-                            *strPtr = value;
+                            opt.setter(*doc, value);
                             break;
                         }
                     }
@@ -870,42 +773,12 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
     // Snapshot loaded values for GetLoadedValue API
     for (int i = 0; OptionsTable[i].pName != nullptr; i++) {
         const tConfigurationNumericOption& opt = OptionsTable[i];
-        const char* basePtr = reinterpret_cast<const char*>(doc);
-        const char* fieldPtr = basePtr + opt.iOffset;
-
-        double value = 0.0;
-        switch (opt.iLength) {
-            case 1:
-                if (opt.iMaximum == 0.0 && opt.iMinimum == 0.0)
-                    value = *reinterpret_cast<const bool*>(fieldPtr) ? 1.0 : 0.0;
-                else
-                    value = *reinterpret_cast<const quint8*>(fieldPtr);
-                break;
-            case 2:
-                value = *reinterpret_cast<const quint16*>(fieldPtr);
-                break;
-            case 4:
-                if (opt.iFlags & OPT_DOUBLE)
-                    value = *reinterpret_cast<const float*>(fieldPtr);
-                else
-                    value = *reinterpret_cast<const qint32*>(fieldPtr);
-                break;
-            case 8:
-                if (opt.iFlags & OPT_DOUBLE)
-                    value = *reinterpret_cast<const double*>(fieldPtr);
-                else
-                    value = *reinterpret_cast<const qint64*>(fieldPtr);
-                break;
-        }
-        doc->m_loadedNumericOptions[QString::fromUtf8(opt.pName)] = value;
+        doc->m_loadedNumericOptions[QString::fromUtf8(opt.pName)] = opt.getter(*doc);
     }
 
     for (int i = 0; AlphaOptionsTable[i].pName != nullptr; i++) {
         const tConfigurationAlphaOption& opt = AlphaOptionsTable[i];
-        const char* basePtr = reinterpret_cast<const char*>(doc);
-        const char* fieldPtr = basePtr + opt.iOffset;
-        const QString* strPtr = reinterpret_cast<const QString*>(fieldPtr);
-        doc->m_loadedAlphaOptions[QString::fromUtf8(opt.pName)] = *strPtr;
+        doc->m_loadedAlphaOptions[QString::fromUtf8(opt.pName)] = opt.getter(*doc);
     }
 
     file.close();

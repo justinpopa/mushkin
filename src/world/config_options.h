@@ -52,28 +52,38 @@ inline constexpr int OPT_WORLD_ID = 0x000010;      // this is the world ID
 // OPT_UPDATE_VIEWS, OPT_UPDATE_INPUT_FONT, OPT_UPDATE_OUTPUT_FONT, etc.
 
 // ============================================================================
+// FORWARD DECLARATIONS
+// ============================================================================
+
+class WorldDocument;
+class QString;
+
+// ============================================================================
 // OPTION TABLE STRUCTURES
 // ============================================================================
 
 // Metadata for one numeric/boolean configuration option
 // Used for debug.options, MXP <option> tag, and XML serialization
+// typed accessors (getter/setter) replace the old offsetof macro approach
 typedef struct {
-    const char* pName; // name, eg. "logoutput"
-    double iDefault;   // original (default) value
-    int iOffset;       // offset in WorldDocument (use offsetof macro)
-    int iLength;       // length of field (1, 2, 4, or 8 bytes)
-    double iMinimum;   // minimum size it can be
-    double iMaximum;   // maximum size it can be, if both zero, assume boolean
-    int iFlags;        // flags: colours, access control, update triggers, etc.
+    const char* pName;                      // name, eg. "logoutput"
+    double iDefault;                        // original (default) value
+    double (*getter)(const WorldDocument&); // typed read accessor
+    void (*setter)(WorldDocument&, double); // typed write accessor
+    double iMinimum;                        // minimum value
+    double iMaximum;                        // maximum value, if both zero assume boolean
+    int iFlags;                             // flags: colours, access control, update triggers
 } tConfigurationNumericOption;
 
 // Metadata for one string configuration option
 // Used for XML load/save
+// typed accessors (getter/setter) replace the old offsetof macro approach
 typedef struct {
-    const char* pName;    // name, eg. "server"
-    const char* sDefault; // original (default) value
-    int iOffset;          // offset in WorldDocument (use offsetof macro)
-    int iFlags;           // flags: multiline, spaces, password, etc.
+    const char* pName;                              // name, eg. "server"
+    const char* sDefault;                           // original (default) value
+    const QString& (*getter)(const WorldDocument&); // typed read accessor
+    void (*setter)(WorldDocument&, const QString&); // typed write accessor
+    int iFlags;                                     // flags: multiline, spaces, password
 } tConfigurationAlphaOption;
 
 // ============================================================================

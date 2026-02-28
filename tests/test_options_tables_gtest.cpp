@@ -58,31 +58,26 @@ TEST_F(OptionsTableTest, TableHasEntries)
 TEST_F(OptionsTableTest, FirstNumericOptionsValid)
 {
     ASSERT_NE(OptionsTable[0].pName, nullptr);
-    EXPECT_GE(OptionsTable[0].iOffset, 0);
-    EXPECT_GT(OptionsTable[0].iLength, 0);
+    EXPECT_NE(OptionsTable[0].getter, nullptr);
+    EXPECT_NE(OptionsTable[0].setter, nullptr);
 
     int validEntries = 0;
     for (int i = 0; i < 5 && OptionsTable[i].pName != nullptr; i++) {
         EXPECT_NE(OptionsTable[i].pName, nullptr);
-        EXPECT_GE(OptionsTable[i].iOffset, 0);
-        EXPECT_GT(OptionsTable[i].iLength, 0);
+        EXPECT_NE(OptionsTable[i].getter, nullptr);
+        EXPECT_NE(OptionsTable[i].setter, nullptr);
         validEntries++;
     }
 
     EXPECT_GE(validEntries, 5);
 }
 
-// Test 3: Table entries have reasonable offsets
-TEST_F(OptionsTableTest, ReasonableOffsets)
+// Test 3: All numeric options have non-null accessors
+TEST_F(OptionsTableTest, AllAccessorsNonNull)
 {
     for (const tConfigurationNumericOption* opt = OptionsTable; opt->pName != nullptr; opt++) {
-        EXPECT_LT(opt->iOffset, 100000) << "Option: " << opt->pName; // Reasonable object size
-        EXPECT_GE(opt->iOffset, 0) << "Option: " << opt->pName;
-
-        // Standard primitive type sizes
-        bool validLength =
-            (opt->iLength == 1 || opt->iLength == 2 || opt->iLength == 4 || opt->iLength == 8);
-        EXPECT_TRUE(validLength) << "Option: " << opt->pName << ", Length: " << opt->iLength;
+        EXPECT_NE(opt->getter, nullptr) << "Option: " << opt->pName;
+        EXPECT_NE(opt->setter, nullptr) << "Option: " << opt->pName;
     }
 }
 
@@ -103,24 +98,26 @@ TEST_F(AlphaOptionsTableTest, TableHasEntries)
 TEST_F(AlphaOptionsTableTest, FirstAlphaOptionsValid)
 {
     ASSERT_NE(AlphaOptionsTable[0].pName, nullptr);
-    EXPECT_GE(AlphaOptionsTable[0].iOffset, 0);
+    EXPECT_NE(AlphaOptionsTable[0].getter, nullptr);
+    EXPECT_NE(AlphaOptionsTable[0].setter, nullptr);
 
     int validEntries = 0;
     for (int i = 0; i < 5 && AlphaOptionsTable[i].pName != nullptr; i++) {
         EXPECT_NE(AlphaOptionsTable[i].pName, nullptr);
-        EXPECT_GE(AlphaOptionsTable[i].iOffset, 0);
+        EXPECT_NE(AlphaOptionsTable[i].getter, nullptr);
+        EXPECT_NE(AlphaOptionsTable[i].setter, nullptr);
         validEntries++;
     }
 
     EXPECT_GE(validEntries, 5);
 }
 
-// Test 6: Alpha table entries have reasonable offsets
-TEST_F(AlphaOptionsTableTest, ReasonableOffsets)
+// Test 6: All alpha options have non-null accessors
+TEST_F(AlphaOptionsTableTest, AllAccessorsNonNull)
 {
     for (const tConfigurationAlphaOption* opt = AlphaOptionsTable; opt->pName != nullptr; opt++) {
-        EXPECT_LT(opt->iOffset, 100000) << "Option: " << opt->pName; // Reasonable object size
-        EXPECT_GE(opt->iOffset, 0) << "Option: " << opt->pName;
+        EXPECT_NE(opt->getter, nullptr) << "Option: " << opt->pName;
+        EXPECT_NE(opt->setter, nullptr) << "Option: " << opt->pName;
     }
 }
 
@@ -141,7 +138,8 @@ TEST_F(AlphaOptionsTableTest, ValidDefaultValues)
 TEST_F(OptionsWorldDocumentTest, NumericOptionsPointToValidFields)
 {
     if (OptionsTable[0].pName != nullptr) {
-        EXPECT_LT(OptionsTable[0].iOffset, sizeof(WorldDocument));
+        EXPECT_NE(OptionsTable[0].getter, nullptr);
+        EXPECT_NE(OptionsTable[0].setter, nullptr);
     }
 }
 
@@ -149,7 +147,8 @@ TEST_F(OptionsWorldDocumentTest, NumericOptionsPointToValidFields)
 TEST_F(OptionsWorldDocumentTest, AlphaOptionsPointToValidFields)
 {
     if (AlphaOptionsTable[0].pName != nullptr) {
-        EXPECT_LT(AlphaOptionsTable[0].iOffset, sizeof(WorldDocument));
+        EXPECT_NE(AlphaOptionsTable[0].getter, nullptr);
+        EXPECT_NE(AlphaOptionsTable[0].setter, nullptr);
     }
 }
 
@@ -160,16 +159,17 @@ TEST_F(OptionsWorldDocumentTest, IterateThroughAllOptions)
     for (const tConfigurationNumericOption* opt = OptionsTable; opt->pName != nullptr; opt++) {
         numericCount++;
         [[maybe_unused]] const char* name = opt->pName;
-        [[maybe_unused]] int offset = opt->iOffset;
-        [[maybe_unused]] int length = opt->iLength;
-        [[maybe_unused]] int defaultVal = opt->iDefault;
+        [[maybe_unused]] auto* getter = opt->getter;
+        [[maybe_unused]] auto* setter = opt->setter;
+        [[maybe_unused]] double defaultVal = opt->iDefault;
     }
 
     int alphaCount = 0;
     for (const tConfigurationAlphaOption* opt = AlphaOptionsTable; opt->pName != nullptr; opt++) {
         alphaCount++;
         [[maybe_unused]] const char* name = opt->pName;
-        [[maybe_unused]] int offset = opt->iOffset;
+        [[maybe_unused]] auto* getter = opt->getter;
+        [[maybe_unused]] auto* setter = opt->setter;
         [[maybe_unused]] const char* defaultVal = opt->sDefault;
     }
 

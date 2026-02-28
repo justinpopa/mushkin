@@ -12,18 +12,25 @@
 #include "world_document.h"
 #include <QColor>
 #include <climits>
+#include <type_traits>
 
 // ============================================================================
 // HELPER MACROS FOR TABLE DEFINITIONS
 // ============================================================================
 
-// O(arg) expands to: offsetof(WorldDocument, arg), sizeof(WorldDocument::arg)
-// This calculates the byte offset AND size of a field for generic access
-#define O(arg) offsetof(WorldDocument, arg), sizeof(((WorldDocument*)nullptr)->arg)
+// O(field) expands to a getter lambda and a setter lambda for numeric fields.
+// The getter casts the field to double; the setter casts double back to the exact field type.
+#define O(field)                                                                                   \
+    +[](const WorldDocument& d) -> double { return static_cast<double>(d.field); },                \
+        +[](WorldDocument& d, double v) {                                                          \
+            d.field = static_cast<std::remove_cvref_t<decltype(d.field)>>(v);                      \
+        }
 
-// A(arg) expands to: offsetof(WorldDocument, arg)
-// Simpler version for alpha (string) options which don't need size
-#define A(arg) offsetof(WorldDocument, arg)
+// A(field) expands to a getter lambda and a setter lambda for QString fields.
+// The getter returns a const reference; the setter assigns by value.
+#define A(field)                                                                                   \
+    +[](const WorldDocument& d) -> const QString& { return d.field; },                             \
+        +[](WorldDocument& d, const QString& v) { d.field = v; }
 
 // ============================================================================
 // CONSTANTS & ENUMS (from original MUSHclient)
@@ -82,7 +89,7 @@ inline constexpr int PLUGIN_UNIQUE_ID_LENGTH = 24;
 // ============================================================================
 // NUMERIC OPTIONS TABLE (173 entries)
 // ============================================================================
-// Format: { name, default_value, offsetof(field), sizeof(field), min, max, flags }
+// Format: { name, default_value, getter, setter, min, max, flags }
 // Note: If min==0 and max==0, the option is treated as boolean
 
 const tConfigurationNumericOption OptionsTable[] = {
@@ -292,7 +299,7 @@ const tConfigurationNumericOption OptionsTable[] = {
 // ============================================================================
 // ALPHA (STRING) OPTIONS TABLE (67 entries)
 // ============================================================================
-// Format: { name, default_value, offsetof(field), flags }
+// Format: { name, default_value, getter, setter, flags }
 
 const tConfigurationAlphaOption AlphaOptionsTable[] = {
     {"auto_log_file_name", "", A(m_strAutoLogFileName)},

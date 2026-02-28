@@ -1662,10 +1662,7 @@ int L_SetOption(lua_State* L)
         return luaReturnError(L, ePluginCannotSetOption);
     }
 
-    // Set the option value based on its offset and length
     const tConfigurationNumericOption& opt = OptionsTable[optionIndex];
-    char* basePtr = reinterpret_cast<char*>(pDoc);
-    char* fieldPtr = basePtr + opt.iOffset;
 
     // Clamp value to min/max if specified
     if (opt.iMinimum != 0 || opt.iMaximum != 0) {
@@ -1675,30 +1672,7 @@ int L_SetOption(lua_State* L)
             value = opt.iMaximum;
     }
 
-    // Write value based on field length
-    switch (opt.iLength) {
-        case 1:
-            // Boolean (bool is 1 byte): write 0 or 1 via bool* to avoid UB
-            if (opt.iMaximum == 0.0 && opt.iMinimum == 0.0) {
-                *reinterpret_cast<bool*>(fieldPtr) = (value != 0.0);
-            } else {
-                *reinterpret_cast<qint8*>(fieldPtr) = static_cast<qint8>(value);
-            }
-            break;
-        case 2:
-            *reinterpret_cast<qint16*>(fieldPtr) = static_cast<qint16>(value);
-            break;
-        case 4:
-            *reinterpret_cast<qint32*>(fieldPtr) = static_cast<qint32>(value);
-            break;
-        case 8:
-            if (opt.iFlags & OPT_DOUBLE) {
-                *reinterpret_cast<double*>(fieldPtr) = value;
-            } else {
-                *reinterpret_cast<qint64*>(fieldPtr) = static_cast<qint64>(value);
-            }
-            break;
-    }
+    opt.setter(*pDoc, value);
 
     return luaReturnOK(L);
 }
@@ -1723,50 +1697,7 @@ int L_GetOption(lua_State* L)
         const tConfigurationNumericOption& opt = OptionsTable[i];
 
         if (strcmp(opt.pName, optionName) == 0) {
-            // Calculate pointer to field in document
-            const char* basePtr = reinterpret_cast<const char*>(pDoc);
-            const char* fieldPtr = basePtr + opt.iOffset;
-
-            double value = 0.0;
-
-            // Read value based on field length
-            switch (opt.iLength) {
-                case 1: // unsigned char or bool
-                    if (opt.iMaximum == 0.0 && opt.iMinimum == 0.0) {
-                        // Boolean option
-                        value = *reinterpret_cast<const bool*>(fieldPtr) ? 1.0 : 0.0;
-                    } else {
-                        value = *reinterpret_cast<const quint8*>(fieldPtr);
-                    }
-                    break;
-
-                case 2: // quint16
-                    value = *reinterpret_cast<const quint16*>(fieldPtr);
-                    break;
-
-                case 4: // quint32 or int
-                    if (opt.iFlags & OPT_DOUBLE) {
-                        // Actually a float (should be rare)
-                        value = *reinterpret_cast<const float*>(fieldPtr);
-                    } else {
-                        value = *reinterpret_cast<const qint32*>(fieldPtr);
-                    }
-                    break;
-
-                case 8: // double or qint64
-                    if (opt.iFlags & OPT_DOUBLE) {
-                        value = *reinterpret_cast<const double*>(fieldPtr);
-                    } else {
-                        value = *reinterpret_cast<const qint64*>(fieldPtr);
-                    }
-                    break;
-
-                default:
-                    lua_pushnil(L);
-                    return 1;
-            }
-
-            lua_pushnumber(L, value);
+            lua_pushnumber(L, opt.getter(*pDoc));
             return 1;
         }
     }
@@ -1776,13 +1707,7 @@ int L_GetOption(lua_State* L)
         const tConfigurationAlphaOption& opt = AlphaOptionsTable[i];
 
         if (strcmp(opt.pName, optionName) == 0) {
-            // Calculate pointer to field in document
-            const char* basePtr = reinterpret_cast<const char*>(pDoc);
-            const char* fieldPtr = basePtr + opt.iOffset;
-
-            // Read QString value
-            const QString* strPtr = reinterpret_cast<const QString*>(fieldPtr);
-            lua_pushstring(L, strPtr->toUtf8().constData());
+            lua_pushstring(L, opt.getter(*pDoc).toUtf8().constData());
             return 1;
         }
     }
@@ -1821,13 +1746,7 @@ int L_GetAlphaOption(lua_State* L)
                 return 1;
             }
 
-            // Calculate pointer to field in document
-            const char* basePtr = reinterpret_cast<const char*>(pDoc);
-            const char* fieldPtr = basePtr + opt.iOffset;
-
-            // Read QString value
-            const QString* strPtr = reinterpret_cast<const QString*>(fieldPtr);
-            lua_pushstring(L, strPtr->toUtf8().constData());
+            lua_pushstring(L, opt.getter(*pDoc).toUtf8().constData());
             return 1;
         }
     }
@@ -1861,38 +1780,7 @@ int L_GetCurrentValue(lua_State* L)
                 return 1;
             }
 
-            const char* basePtr = reinterpret_cast<const char*>(pDoc);
-            const char* fieldPtr = basePtr + opt.iOffset;
-
-            double value = 0.0;
-            switch (opt.iLength) {
-                case 1:
-                    if (opt.iMaximum == 0.0 && opt.iMinimum == 0.0)
-                        value = *reinterpret_cast<const bool*>(fieldPtr) ? 1.0 : 0.0;
-                    else
-                        value = *reinterpret_cast<const quint8*>(fieldPtr);
-                    break;
-                case 2:
-                    value = *reinterpret_cast<const quint16*>(fieldPtr);
-                    break;
-                case 4:
-                    if (opt.iFlags & OPT_DOUBLE)
-                        value = *reinterpret_cast<const float*>(fieldPtr);
-                    else
-                        value = *reinterpret_cast<const qint32*>(fieldPtr);
-                    break;
-                case 8:
-                    if (opt.iFlags & OPT_DOUBLE)
-                        value = *reinterpret_cast<const double*>(fieldPtr);
-                    else
-                        value = *reinterpret_cast<const qint64*>(fieldPtr);
-                    break;
-                default:
-                    lua_pushnil(L);
-                    return 1;
-            }
-
-            lua_pushnumber(L, value);
+            lua_pushnumber(L, opt.getter(*pDoc));
             return 1;
         }
     }
@@ -1907,10 +1795,7 @@ int L_GetCurrentValue(lua_State* L)
                 return 1;
             }
 
-            const char* basePtr = reinterpret_cast<const char*>(pDoc);
-            const char* fieldPtr = basePtr + opt.iOffset;
-            const QString* strPtr = reinterpret_cast<const QString*>(fieldPtr);
-            lua_pushstring(L, strPtr->toUtf8().constData());
+            lua_pushstring(L, opt.getter(*pDoc).toUtf8().constData());
             return 1;
         }
     }
@@ -2102,13 +1987,7 @@ int L_SetAlphaOption(lua_State* L)
                 strValue.remove('\r');
             }
 
-            // Calculate pointer to field in document
-            char* basePtr = reinterpret_cast<char*>(pDoc);
-            char* fieldPtr = basePtr + opt.iOffset;
-
-            // Write QString value
-            QString* strPtr = reinterpret_cast<QString*>(fieldPtr);
-            *strPtr = strValue;
+            opt.setter(*pDoc, strValue);
 
             // Handle update flags if needed
             // TODO: Handle OPT_UPDATE_VIEWS, OPT_UPDATE_INPUT_FONT, etc.

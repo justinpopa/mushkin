@@ -262,8 +262,8 @@ Note: Lua API boundary functions intentionally return integers (Lua convention).
 **Risk:** `WorldDocument` inherits `QObject` (non-standard-layout). Using `offsetof()` in `config_options.cpp` to build the options table is technically undefined behavior per the C++ standard. Works in practice on all compilers, but a conforming implementation could break it.
 
 **Targets:**
-- [ ] `src/world/config_options.cpp` — 233 uses of `offsetof(WorldDocument, m_field)` for the numeric/alpha options tables
-- [ ] Redesign options table to use member pointers (`qint32 WorldDocument::*`) or accessor lambdas instead of raw byte offsets
+- [x] `src/world/config_options.cpp` — 233 uses of `offsetof(WorldDocument, m_field)` replaced with captureless lambda getter/setter function pointers
+- [x] Options table redesigned: `iOffset`/`iLength` replaced with typed `getter`/`setter` function pointers; all `reinterpret_cast` chains eliminated from 15 consumer sites across `world_settings.cpp` and `xml_serialization.cpp`
 
 **Acceptance:** Zero `-Winvalid-offsetof` warnings. Build + test pass.
 
