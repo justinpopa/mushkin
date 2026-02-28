@@ -4,13 +4,14 @@
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QMessageBox>
+#include <QSizePolicy>
 #include <QVBoxLayout>
 
 ItemListPageBase::ItemListPageBase(WorldDocument* doc, QWidget* parent)
     : PreferencesPageBase(doc, parent), m_table(nullptr), m_infoLabel(nullptr),
-      m_addButton(nullptr), m_editButton(nullptr), m_deleteButton(nullptr),
-      m_enableButton(nullptr), m_disableButton(nullptr), m_enableGroupButton(nullptr),
-      m_disableGroupButton(nullptr), m_deleteGroupButton(nullptr)
+      m_addButton(nullptr), m_editButton(nullptr), m_deleteButton(nullptr), m_enableButton(nullptr),
+      m_disableButton(nullptr), m_enableGroupButton(nullptr), m_disableGroupButton(nullptr),
+      m_deleteGroupButton(nullptr)
 {
 }
 
@@ -52,8 +53,8 @@ void ItemListPageBase::setupUi()
 
     mainLayout->addWidget(m_table, 1);
 
-    // Buttons layout
-    QHBoxLayout* buttonLayout = new QHBoxLayout();
+    // Buttons layout — vertical stack so each group gets full width
+    QVBoxLayout* buttonLayout = new QVBoxLayout();
 
     // Single item operations
     QString typeName = itemTypeName();
@@ -63,10 +64,15 @@ void ItemListPageBase::setupUi()
     QHBoxLayout* singleLayout = new QHBoxLayout(singleGroup);
 
     m_addButton = new QPushButton(tr("&Add..."), this);
+    m_addButton->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
     m_editButton = new QPushButton(tr("&Edit..."), this);
+    m_editButton->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
     m_deleteButton = new QPushButton(tr("&Delete"), this);
+    m_deleteButton->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
     m_enableButton = new QPushButton(tr("E&nable"), this);
+    m_enableButton->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
     m_disableButton = new QPushButton(tr("D&isable"), this);
+    m_disableButton->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
 
     connect(m_addButton, &QPushButton::clicked, this, &ItemListPageBase::onAddItem);
     connect(m_editButton, &QPushButton::clicked, this, &ItemListPageBase::onEditItem);
@@ -79,6 +85,7 @@ void ItemListPageBase::setupUi()
     singleLayout->addWidget(m_deleteButton);
     singleLayout->addWidget(m_enableButton);
     singleLayout->addWidget(m_disableButton);
+    singleLayout->addStretch();
 
     buttonLayout->addWidget(singleGroup);
 
@@ -87,8 +94,11 @@ void ItemListPageBase::setupUi()
     QHBoxLayout* groupLayout = new QHBoxLayout(groupGroup);
 
     m_enableGroupButton = new QPushButton(tr("Enable &Group"), this);
+    m_enableGroupButton->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
     m_disableGroupButton = new QPushButton(tr("Disable G&roup"), this);
+    m_disableGroupButton->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
     m_deleteGroupButton = new QPushButton(tr("Delete Gro&up"), this);
+    m_deleteGroupButton->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
 
     connect(m_enableGroupButton, &QPushButton::clicked, this, &ItemListPageBase::onEnableGroup);
     connect(m_disableGroupButton, &QPushButton::clicked, this, &ItemListPageBase::onDisableGroup);
@@ -97,6 +107,7 @@ void ItemListPageBase::setupUi()
     groupLayout->addWidget(m_enableGroupButton);
     groupLayout->addWidget(m_disableGroupButton);
     groupLayout->addWidget(m_deleteGroupButton);
+    groupLayout->addStretch();
 
     buttonLayout->addWidget(groupGroup);
 
@@ -185,7 +196,7 @@ void ItemListPageBase::setReadOnlyItem(int row, int col, const QString& text)
 }
 
 void ItemListPageBase::setReadOnlyItemWithData(int row, int col, const QString& text,
-                                                const QVariant& data)
+                                               const QVariant& data)
 {
     QTableWidgetItem* item = new QTableWidgetItem(text);
     item->setData(Qt::DisplayRole, data);
@@ -340,9 +351,11 @@ void ItemListPageBase::onDeleteGroup()
         }
 
         loadItems();
-        QMessageBox::information(
-            this, tr("Delete Group"),
-            tr("Deleted %1 %2 from group '%3'").arg(toDelete.size()).arg(itemTypeNamePlural()).arg(groupName));
+        QMessageBox::information(this, tr("Delete Group"),
+                                 tr("Deleted %1 %2 from group '%3'")
+                                     .arg(toDelete.size())
+                                     .arg(itemTypeNamePlural())
+                                     .arg(groupName));
     }
 }
 

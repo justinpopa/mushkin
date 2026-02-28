@@ -92,7 +92,7 @@ void OutputPage::setupUi()
         QHBoxLayout* colorRow = new QHBoxLayout();
 
         QLabel* label = new QLabel(colorNames[i], this);
-        label->setMinimumWidth(100);
+        label->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Preferred);
         colorRow->addWidget(label);
 
         m_colorButtons[i] = new QPushButton(this);

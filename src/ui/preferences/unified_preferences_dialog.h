@@ -72,9 +72,8 @@ class UnifiedPreferencesDialog : public QDialog {
      * @param initialPage Page to show initially
      * @param parent Parent widget
      */
-    explicit UnifiedPreferencesDialog(WorldDocument* doc,
-                                       Page initialPage = Page::Connection,
-                                       QWidget* parent = nullptr);
+    explicit UnifiedPreferencesDialog(WorldDocument* doc, Page initialPage = Page::Connection,
+                                      QWidget* parent = nullptr);
 
     ~UnifiedPreferencesDialog() override;
 
@@ -96,6 +95,8 @@ class UnifiedPreferencesDialog : public QDialog {
     void onOkClicked();
     void onCancelClicked();
     void onPageSettingsChanged();
+
+    bool eventFilter(QObject* obj, QEvent* event) override;
 
   private:
     void setupUi();

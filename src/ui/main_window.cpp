@@ -330,9 +330,9 @@ void MainWindow::createMenus()
 
     m_editMenu->addSeparator();
 
-    m_colourPickerAction = m_editMenu->addAction("Colour Picker");
+    m_colourPickerAction = m_editMenu->addAction("Color Picker");
     m_colourPickerAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_P));
-    m_colourPickerAction->setStatusTip("Open colour picker dialog");
+    m_colourPickerAction->setStatusTip("Open color picker dialog");
     connect(m_colourPickerAction, &QAction::triggered, this, &MainWindow::colourPicker);
 
     m_debugPacketsAction = m_editMenu->addAction("Debug Packets");
@@ -561,15 +561,15 @@ void MainWindow::createMenus()
     m_configureMxpAction->setMenuRole(QAction::NoRole);
     connect(m_configureMxpAction, &QAction::triggered, this, &MainWindow::configureMxp);
 
-    m_configureColoursAction = configureMenu->addAction("ANSI C&olours...");
+    m_configureColoursAction = configureMenu->addAction("ANSI C&olors...");
     m_configureColoursAction->setShortcut(QKeySequence(Qt::ALT | Qt::Key_6));
-    m_configureColoursAction->setStatusTip("Configure ANSI colours");
+    m_configureColoursAction->setStatusTip("Configure ANSI colors");
     m_configureColoursAction->setMenuRole(QAction::NoRole);
     connect(m_configureColoursAction, &QAction::triggered, this, &MainWindow::configureColours);
 
-    m_configureCustomColoursAction = configureMenu->addAction("&Custom Colours...");
+    m_configureCustomColoursAction = configureMenu->addAction("&Custom Colors...");
     m_configureCustomColoursAction->setShortcut(QKeySequence(Qt::ALT | Qt::Key_8));
-    m_configureCustomColoursAction->setStatusTip("Configure custom colours");
+    m_configureCustomColoursAction->setStatusTip("Configure custom colors");
     m_configureCustomColoursAction->setMenuRole(QAction::NoRole);
     connect(m_configureCustomColoursAction, &QAction::triggered, this,
             &MainWindow::configureColours);
@@ -2608,7 +2608,7 @@ void MainWindow::flipToNotepad()
 
 void MainWindow::colourPicker()
 {
-    QColor color = QColorDialog::getColor(Qt::white, this, "Choose Colour");
+    QColor color = QColorDialog::getColor(Qt::white, this, "Choose Color");
     if (color.isValid()) {
         // Copy color info to clipboard
         QString colorInfo = QString("RGB: %1, %2, %3\nHex: %4")

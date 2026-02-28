@@ -243,7 +243,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_nBoldPrintStyle.fill(0);
 
     // ========== Initialize display options (version 9+) ==========
-    m_bShowBold = false; // Default: false (like original)
+    m_bShowBold = true;
     m_bShowItalic = true;
     m_bShowUnderline = true;
     m_bAltArrowRecallsPartial = false;
@@ -403,7 +403,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
 
     // ========== Initialize logging options ==========
     m_log_input = false;
-    m_bLogOutput = true; // Log output by default
+    m_bLogOutput = false;
     m_bLogNotes = false;
     m_bLogInColour = false;
     m_bLogRaw = false;

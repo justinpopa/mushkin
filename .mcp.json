@@ -4,6 +4,10 @@
       "command": "npx",
       "args": ["-y", "@upstash/context7-mcp@latest"]
     },
+    "desktop-automation": {
+      "command": "npx",
+      "args": ["-y", "mcp-desktop-automation"]
+    },
     "sqlite": {
       "command": "npx",
       "args": [
