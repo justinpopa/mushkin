@@ -76,6 +76,7 @@ add_library(world STATIC
     lua_api/world_sounds.cpp        # Sound system API
     lua_api/world_notepads.cpp      # Notepad window API
     lua_api/world_arrays.cpp        # Named arrays API
+    lua_api/world_mapper.cpp        # Mapper API
     lua_api/lrexlib.cpp             # rex PCRE regex library
 )
 

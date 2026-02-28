@@ -463,6 +463,21 @@ extern int L_WindowLoadImageMemory(lua_State* L);
 extern int L_BlendPixel(lua_State* L);
 extern int L_FilterPixel(lua_State* L);
 
+// Mapper functions (defined in world_mapper.cpp)
+extern int L_AddToMapper(lua_State* L);
+extern int L_AddMapperComment(lua_State* L);
+extern int L_DeleteAllMapItems(lua_State* L);
+extern int L_DeleteLastMapItem(lua_State* L);
+extern int L_EnableMapping(lua_State* L);
+extern int L_GetMappingCount(lua_State* L);
+extern int L_GetMappingItem(lua_State* L);
+extern int L_GetMappingString(lua_State* L);
+extern int L_Mapping(lua_State* L);
+extern int L_GetMapColour(lua_State* L);
+extern int L_MapColour(lua_State* L);
+extern int L_MapColourList(lua_State* L);
+extern int L_RemoveMapReverses(lua_State* L);
+
 // Forward declaration of constants registration (defined in lua_constants.cpp)
 extern void register_lua_constants(lua_State* L);
 
@@ -919,6 +934,21 @@ int RegisterLuaRoutines(lua_State* L)
         {"NotepadSaveMethod", L_NotepadSaveMethod},
         {"MoveNotepadWindow", L_MoveNotepadWindow},
         {"GetNotepadWindowPosition", L_GetNotepadWindowPosition},
+
+        // Mapper functions
+        {"AddToMapper", L_AddToMapper},
+        {"AddMapperComment", L_AddMapperComment},
+        {"DeleteAllMapItems", L_DeleteAllMapItems},
+        {"DeleteLastMapItem", L_DeleteLastMapItem},
+        {"EnableMapping", L_EnableMapping},
+        {"GetMappingCount", L_GetMappingCount},
+        {"GetMappingItem", L_GetMappingItem},
+        {"GetMappingString", L_GetMappingString},
+        {"Mapping", L_Mapping},
+        {"GetMapColour", L_GetMapColour},
+        {"MapColour", L_MapColour},
+        {"MapColourList", L_MapColourList},
+        {"RemoveMapReverses", L_RemoveMapReverses},
 
         {nullptr, nullptr} // Sentinel
     };

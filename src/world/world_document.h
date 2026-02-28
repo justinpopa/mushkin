@@ -1006,6 +1006,12 @@ class WorldDocument : public QObject {
     // Access via m_connectionManager->m_CommandQueue.
     bool m_bShowingMapperStatus;
 
+    // Mapper state (Lua API: AddToMapper, GetMappingString, etc.)
+    QStringList m_mapList;                   // Ordered list of map entries (directions/comments)
+    bool m_bMapping = false;                 // Whether mapping is active
+    bool m_bRemoveMapReverses = true;        // Auto-cancel opposite directions
+    QMap<QRgb, QRgb> m_colourTranslationMap; // Color substitution map for display
+
     // ========== Plugins ==========
     std::vector<std::unique_ptr<Plugin>> m_PluginList; // List of installed plugins
     Plugin* m_CurrentPlugin; // Currently executing plugin (nullptr = world context)

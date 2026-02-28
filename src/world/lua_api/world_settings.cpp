@@ -970,10 +970,8 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 112: // Mapping enabled
-        {
-            // TODO: Add mapping support flag
-            lua_pushboolean(L, false);
-        } break;
+            lua_pushboolean(L, pDoc->m_bMapping);
+            break;
 
         case 113: // Window open (has active views)
             lua_pushboolean(L, pDoc->m_pActiveOutputView != nullptr);
@@ -1120,8 +1118,7 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 223: // Count of mapper items
-            // TODO: Add mapper support (mapper list not yet implemented)
-            lua_pushinteger(L, 0);
+            lua_pushinteger(L, static_cast<lua_Integer>(pDoc->m_mapList.size()));
             break;
 
         case 224: // Count of lines in output window
