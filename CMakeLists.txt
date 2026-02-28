@@ -7,6 +7,10 @@ project(mushkin VERSION 0.1.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Suppress Qt 6.9 qyieldcpu.h warning on ARM (implicit __yield declaration).
+# This is a Qt framework bug — the header should include <arm_acle.h>.
+add_compile_options(-Wno-implicit-function-declaration)
+
 # Workaround: Homebrew LLVM + macOS 26 SDK header incompatibility.
 # When Qt (or other imported targets) add the SDK include path via -isystem,
 # it breaks LLVM's libc++ header wrapping (size_t, wint_t etc. not found).
@@ -370,6 +374,10 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 
 # Make GoogleTest available
 FetchContent_MakeAvailable(googletest)
+
+# Suppress warnings from GoogleTest internals (char8_t conversion, etc.)
+target_compile_options(gtest PRIVATE -w)
+target_compile_options(gtest_main PRIVATE -w)
 
 # Testing
 enable_testing()

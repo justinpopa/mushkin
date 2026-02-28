@@ -78,7 +78,8 @@ class TriggerExecutionTest : public ::testing::Test {
         trigger->internal_name = label;
         Trigger* raw = trigger.get();
 
-        doc->addTrigger(label, std::move(trigger));
+        auto addResult = doc->addTrigger(label, std::move(trigger));
+        EXPECT_TRUE(addResult.has_value());
         doc->rebuildTriggerArray();
 
         return raw;

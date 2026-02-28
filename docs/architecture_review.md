@@ -256,6 +256,51 @@ Note: Lua API boundary functions intentionally return integers (Lua convention).
 
 ---
 
+### P5a — `offsetof()` on non-standard-layout type (233 warnings)
+
+**Agreement:** Build audit (compiler warning `-Winvalid-offsetof`)
+**Risk:** `WorldDocument` inherits `QObject` (non-standard-layout). Using `offsetof()` in `config_options.cpp` to build the options table is technically undefined behavior per the C++ standard. Works in practice on all compilers, but a conforming implementation could break it.
+
+**Targets:**
+- [ ] `src/world/config_options.cpp` — 233 uses of `offsetof(WorldDocument, m_field)` for the numeric/alpha options tables
+- [ ] Redesign options table to use member pointers (`qint32 WorldDocument::*`) or accessor lambdas instead of raw byte offsets
+
+**Acceptance:** Zero `-Winvalid-offsetof` warnings. Build + test pass.
+
+---
+
+### P5b — `[[nodiscard]]` return values ignored in tests (37 warnings)
+
+**Agreement:** Build audit (compiler warning `-Wunused-result`)
+**Risk:** Tests calling `std::expected`-returning functions without checking the result. These tests could be silently passing despite actual failures.
+
+**Targets (9 test files):**
+- [x] `tests/test_xml_serialization_gtest.cpp`
+- [x] `tests/test_xml_roundtrip_gtest.cpp`
+- [x] `tests/test_trigger_matching_gtest.cpp`
+- [x] `tests/test_trigger_execution_gtest.cpp`
+- [x] `tests/test_triggers_aliases_gtest.cpp`
+- [x] `tests/test_alias_execution_gtest.cpp`
+- [x] `tests/test_alias_integration_gtest.cpp`
+- [x] `tests/test_plugin_state_gtest.cpp`
+- [x] `tests/test_sendto_integration_gtest.cpp`
+
+**Acceptance:** Zero `-Wunused-result` warnings. All `[[nodiscard]]` return values checked with `EXPECT_TRUE(result.has_value())` or equivalent. Build + test pass.
+
+---
+
+### P5c — `quint16` compared to `-1` (always false)
+
+**Agreement:** Build audit (compiler warning `-Wtautological-constant-out-of-range-compare`)
+**Risk:** `world_triggers.cpp:313` — comparison is always false, indicating dead code or a type error. Related to uncompleted P2b (`match_type` still `quint16`).
+
+**Targets:**
+- [ ] `src/world/lua_api/world_triggers.cpp:313` — fix comparison or convert `match_type` to `enum class MatchType` (P2b)
+
+**Acceptance:** Zero `-Wtautological` warnings. Build + test pass.
+
+---
+
 ## Additional Findings (single-model, non-priority)
 
 | Finding | Source | Notes |

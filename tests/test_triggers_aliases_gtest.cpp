@@ -93,7 +93,7 @@ TEST_F(TriggersAliasesTest, GetTrigger)
     auto t1Owned = std::make_unique<Trigger>();
     t1Owned->label = "test_trigger";
     Trigger* t1 = t1Owned.get();
-    doc->addTrigger("test_trigger", std::move(t1Owned));
+    EXPECT_TRUE(doc->addTrigger("test_trigger", std::move(t1Owned)).has_value());
 
     Trigger* retrieved = doc->getTrigger("test_trigger");
     EXPECT_EQ(retrieved, t1) << "getTrigger() should return correct trigger";
@@ -107,7 +107,7 @@ TEST_F(TriggersAliasesTest, DuplicateTriggerPrevention)
 {
     auto t1Owned = std::make_unique<Trigger>();
     t1Owned->label = "duplicate_trigger";
-    doc->addTrigger("duplicate_trigger", std::move(t1Owned));
+    EXPECT_TRUE(doc->addTrigger("duplicate_trigger", std::move(t1Owned)).has_value());
 
     auto duplicateResult = doc->addTrigger("duplicate_trigger", std::make_unique<Trigger>());
 
@@ -123,19 +123,19 @@ TEST_F(TriggersAliasesTest, TriggerSequenceSorting)
     t1Owned->label = "hp_trigger";
     t1Owned->sequence = 100;
     Trigger* t1 = t1Owned.get();
-    doc->addTrigger("hp_trigger", std::move(t1Owned));
+    EXPECT_TRUE(doc->addTrigger("hp_trigger", std::move(t1Owned)).has_value());
 
     auto t2Owned = std::make_unique<Trigger>();
     t2Owned->label = "hunger_trigger";
     t2Owned->sequence = 50; // Lower sequence = earlier
     Trigger* t2 = t2Owned.get();
-    doc->addTrigger("hunger_trigger", std::move(t2Owned));
+    EXPECT_TRUE(doc->addTrigger("hunger_trigger", std::move(t2Owned)).has_value());
 
     auto t3Owned = std::make_unique<Trigger>();
     t3Owned->label = "thirst_trigger";
     t3Owned->sequence = 200; // Higher sequence = later
     Trigger* t3 = t3Owned.get();
-    doc->addTrigger("thirst_trigger", std::move(t3Owned));
+    EXPECT_TRUE(doc->addTrigger("thirst_trigger", std::move(t3Owned)).has_value());
 
     ASSERT_EQ(doc->m_automationRegistry->m_TriggerArray.size(), 3)
         << "All 3 triggers should be in array";
@@ -157,7 +157,7 @@ TEST_F(TriggersAliasesTest, DeleteTrigger)
 {
     auto t1Owned = std::make_unique<Trigger>();
     t1Owned->label = "temp_trigger";
-    doc->addTrigger("temp_trigger", std::move(t1Owned));
+    EXPECT_TRUE(doc->addTrigger("temp_trigger", std::move(t1Owned)).has_value());
 
     auto deleteResult = doc->deleteTrigger("temp_trigger");
 
@@ -202,7 +202,7 @@ TEST_F(TriggersAliasesTest, GetAlias)
     auto a1 = std::make_unique<Alias>();
     a1->label = "test_alias";
     Alias* a1Ptr = a1.get();
-    doc->addAlias("test_alias", std::move(a1));
+    EXPECT_TRUE(doc->addAlias("test_alias", std::move(a1)).has_value());
 
     Alias* retrievedAlias = doc->getAlias("test_alias");
     EXPECT_EQ(retrievedAlias, a1Ptr) << "getAlias() should return correct alias";
@@ -218,7 +218,7 @@ TEST_F(TriggersAliasesTest, DeleteAlias)
     auto a1 = std::make_unique<Alias>();
     a1->label = "temp_alias";
     Alias* a1Ptr = a1.get();
-    doc->addAlias("temp_alias", std::move(a1));
+    EXPECT_TRUE(doc->addAlias("temp_alias", std::move(a1)).has_value());
 
     auto aliasDeleteResult = doc->deleteAlias("temp_alias");
 
@@ -292,9 +292,9 @@ TEST_F(TriggersAliasesTest, AliasSequenceSorting)
     Alias* westPtr = west.get();
     Alias* eastPtr = east.get();
 
-    doc->addAlias("south_alias", std::move(south));
-    doc->addAlias("west_alias", std::move(west));
-    doc->addAlias("east_alias", std::move(east));
+    EXPECT_TRUE(doc->addAlias("south_alias", std::move(south)).has_value());
+    EXPECT_TRUE(doc->addAlias("west_alias", std::move(west)).has_value());
+    EXPECT_TRUE(doc->addAlias("east_alias", std::move(east)).has_value());
 
     // Force rebuild of alias array (lazy sorting)
     doc->rebuildAliasArray();
@@ -329,7 +329,7 @@ TEST_F(TriggersAliasesTest, TriggerFieldPreservation)
     detailedOwned->group = "Currency";
     detailedOwned->user_option = 42;
 
-    doc->addTrigger("gold_trigger", std::move(detailedOwned));
+    EXPECT_TRUE(doc->addTrigger("gold_trigger", std::move(detailedOwned)).has_value());
 
     Trigger* verified = doc->getTrigger("gold_trigger");
 

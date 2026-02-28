@@ -296,7 +296,7 @@ TEST_F(XmlSerializationTest, TriggersSaveAndLoadCorrectly)
     triggerOwned->expand_variables = true;
     triggerOwned->group = "Combat";
 
-    doc1->addTrigger("test_trigger", std::move(triggerOwned));
+    EXPECT_TRUE(doc1->addTrigger("test_trigger", std::move(triggerOwned)).has_value());
 
     // Generate unique filename (avoids Windows file locking with QTemporaryFile)
     QString filename = generateTempFilename("triggers");
@@ -360,7 +360,7 @@ TEST_F(XmlSerializationTest, AliasesSaveAndLoadCorrectly)
     alias->echo_alias = true;
     alias->group = "Movement";
 
-    doc1->addAlias("test_alias", std::move(alias));
+    EXPECT_TRUE(doc1->addAlias("test_alias", std::move(alias)).has_value());
 
     // Generate unique filename (avoids Windows file locking with QTemporaryFile)
     QString filename = generateTempFilename("aliases");
@@ -417,7 +417,7 @@ TEST_F(XmlSerializationTest, MultipleTriggersAndAliases)
         trigger->enabled = true;
         trigger->sequence = 100 + i;
         QString label = trigger->label;
-        doc1->addTrigger(label, std::move(trigger));
+        EXPECT_TRUE(doc1->addTrigger(label, std::move(trigger)).has_value());
     }
 
     // Create multiple aliases
@@ -430,7 +430,7 @@ TEST_F(XmlSerializationTest, MultipleTriggersAndAliases)
         alias->enabled = true;
         alias->sequence = 100 + i;
         QString label = alias->label;
-        doc1->addAlias(label, std::move(alias));
+        EXPECT_TRUE(doc1->addAlias(label, std::move(alias)).has_value());
     }
 
     // Generate unique filename (avoids Windows file locking with QTemporaryFile)

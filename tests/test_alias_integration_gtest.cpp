@@ -37,7 +37,8 @@ class AliasIntegrationTest : public ::testing::Test {
         alias->sequence = 100;
 
         Alias* aliasPtr = alias.get();
-        doc->addAlias(label, std::move(alias));
+        auto addResult = doc->addAlias(label, std::move(alias));
+        EXPECT_TRUE(addResult.has_value());
 
         return aliasPtr;
     }

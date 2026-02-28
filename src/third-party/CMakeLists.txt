@@ -15,6 +15,9 @@ target_link_libraries(third-party PUBLIC
     Lua::Lua
 )
 
+# Suppress warnings from third-party C code (not our code to fix)
+target_compile_options(third-party PRIVATE -w)
+
 # Set C files to be compiled as C (not C++)
 set_source_files_properties(
     lsqlite3.c

@@ -101,7 +101,7 @@ TEST_F(XmlRoundtripTest, TriggerStyleDecomposition)
     triggerOwned->style = 0x0001 | 0x0004; // HILITE | BLINK (make_bold | make_italic)
     Trigger* trigger = triggerOwned.get();
 
-    doc1->addTrigger("test_trigger", std::move(triggerOwned));
+    EXPECT_TRUE(doc1->addTrigger("test_trigger", std::move(triggerOwned)).has_value());
 
     QString content = saveAndReadXml(doc1.get());
 
@@ -151,7 +151,7 @@ TEST_F(XmlRoundtripTest, TriggerMatchDecomposition)
         (5 << 4) | (2 << 8) | 0x0001 | 0x4000; // text=5, back=2, bold, match_italic
     Trigger* trigger = triggerOwned.get();
 
-    doc1->addTrigger("match_trigger", std::move(triggerOwned));
+    EXPECT_TRUE(doc1->addTrigger("match_trigger", std::move(triggerOwned)).has_value());
 
     QString content = saveAndReadXml(doc1.get());
 
@@ -194,7 +194,7 @@ TEST_F(XmlRoundtripTest, TriggerCustomColors)
     triggerOwned->other_background = BGR(32, 64, 128);  // Will save as #204080
     Trigger* trigger = triggerOwned.get();
 
-    doc1->addTrigger("color_trigger", std::move(triggerOwned));
+    EXPECT_TRUE(doc1->addTrigger("color_trigger", std::move(triggerOwned)).has_value());
 
     QString content = saveAndReadXml(doc1.get());
 
@@ -238,7 +238,7 @@ TEST_F(XmlRoundtripTest, TriggerUserAttribute)
     triggerOwned->user_option = 123;
     Trigger* trigger = triggerOwned.get();
 
-    doc1->addTrigger("user_trigger", std::move(triggerOwned));
+    EXPECT_TRUE(doc1->addTrigger("user_trigger", std::move(triggerOwned)).has_value());
 
     QString content = saveAndReadXml(doc1.get());
 
@@ -287,7 +287,7 @@ TEST_F(XmlRoundtripTest, TriggerCompleteRoundtrip)
     triggerOwned->user_option = 123;
     Trigger* trigger = triggerOwned.get();
 
-    doc1->addTrigger("complete_trigger", std::move(triggerOwned));
+    EXPECT_TRUE(doc1->addTrigger("complete_trigger", std::move(triggerOwned)).has_value());
 
     saveAndReadXml(doc1.get());
 
@@ -350,7 +350,7 @@ TEST_F(XmlRoundtripTest, AliasUserAttribute)
     QString expectedGroup = alias->group;
     int expectedUserOption = alias->user_option;
 
-    doc1->addAlias("test_alias", std::move(alias));
+    EXPECT_TRUE(doc1->addAlias("test_alias", std::move(alias)).has_value());
 
     QString content = saveAndReadXml(doc1.get());
 
@@ -406,7 +406,7 @@ TEST_F(XmlRoundtripTest, TimerIntervalRoundtrip)
     timerOwned->user_option = 789;
     Timer* timer = timerOwned.get();
 
-    doc1->addTimer("test_timer", std::move(timerOwned));
+    EXPECT_TRUE(doc1->addTimer("test_timer", std::move(timerOwned)).has_value());
 
     QString content = saveAndReadXml(doc1.get());
 

@@ -188,7 +188,7 @@ TEST_F(PluginStateTest, SaveStateWithArrays)
 TEST_F(PluginStateTest, OnPluginSaveStateCallback)
 {
     // Save state
-    plugin->SaveState();
+    EXPECT_TRUE(plugin->SaveState().has_value());
 
     // Verify OnPluginSaveState callback was called
     lua_State* L = plugin->m_ScriptEngine->L;
@@ -228,7 +228,7 @@ TEST_F(PluginStateTest, VerifyXMLStructure)
     plugin->m_Arrays["array2"] = array2;
 
     // Save state
-    plugin->SaveState();
+    EXPECT_TRUE(plugin->SaveState().has_value());
 
     // Parse and verify XML
     QFile xmlFile(stateFilePath);
@@ -291,7 +291,7 @@ TEST_F(PluginStateTest, LoadStateRestoresVariables)
     var3->contents = "Wizards";
     plugin->m_VariableMap["guild"] = std::move(var3);
 
-    plugin->SaveState();
+    EXPECT_TRUE(plugin->SaveState().has_value());
 
     // Clear variables (unique_ptr handles deletion automatically)
     plugin->m_VariableMap.clear();
@@ -334,7 +334,7 @@ TEST_F(PluginStateTest, LoadStateRestoresArrays)
     stats["dexterity"] = "14";
     plugin->m_Arrays["stats"] = stats;
 
-    plugin->SaveState();
+    EXPECT_TRUE(plugin->SaveState().has_value());
 
     // Clear arrays
     plugin->m_Arrays.clear();
@@ -425,17 +425,17 @@ TEST_F(PluginStateTest, MultipleSaveLoadCycles)
     plugin->m_VariableMap["cycle_test"] = std::move(var);
 
     // First save
-    plugin->SaveState();
+    EXPECT_TRUE(plugin->SaveState().has_value());
 
     // Modify
     plugin->m_VariableMap["cycle_test"]->contents = "iteration 2";
 
     // Second save
-    plugin->SaveState();
+    EXPECT_TRUE(plugin->SaveState().has_value());
 
     // Clear and reload
     plugin->m_VariableMap.clear();
-    plugin->LoadState();
+    EXPECT_TRUE(plugin->LoadState().has_value());
 
     // Verify latest value
     ASSERT_TRUE(plugin->m_VariableMap.find("cycle_test") != plugin->m_VariableMap.end())
@@ -469,14 +469,14 @@ TEST_F(PluginStateTest, ComplexStateSaveLoad)
     plugin->m_Arrays["array2"] = array2;
 
     // Save
-    plugin->SaveState();
+    EXPECT_TRUE(plugin->SaveState().has_value());
 
     // Clear
     plugin->m_VariableMap.clear();
     plugin->m_Arrays.clear();
 
     // Load
-    plugin->LoadState();
+    EXPECT_TRUE(plugin->LoadState().has_value());
 
     // Verify everything restored
     EXPECT_EQ(plugin->m_VariableMap.size(), 2) << "Should have 2 variables";

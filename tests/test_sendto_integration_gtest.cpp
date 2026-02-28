@@ -83,7 +83,8 @@ TEST_F(SendToIntegrationTest, SendToExecuteTriggersAliases)
     alias->enabled = true;
     alias->sequence = 100;
 
-    doc->addAlias("test_alias", std::move(alias));
+    auto addResult = doc->addAlias("test_alias", std::move(alias));
+    EXPECT_TRUE(addResult.has_value());
 
     QString output;
 
