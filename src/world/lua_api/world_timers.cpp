@@ -253,6 +253,9 @@ int L_DeleteTimer(lua_State* L)
         if (it == currentPlugin->m_TimerMap.end()) {
             return luaReturnError(L, eTimerNotFound);
         }
+        if (it->second->executing_script) {
+            return luaReturnError(L, eItemInUse);
+        }
         currentPlugin->m_TimerRevMap.remove(it->second.get());
         currentPlugin->m_TimerMap.erase(it);
     } else {

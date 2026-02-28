@@ -586,10 +586,18 @@ void TelnetParser::Phase_SUBNEGOTIATION_IAC(unsigned char c)
  */
 void TelnetParser::Phase_UTF8(unsigned char c)
 {
-    // Append to our UTF-8 sequence
+    // Append to our UTF-8 sequence.
+    // Find the first null slot, capped at size()-2 to leave room for the byte and
+    // its null terminator. If the buffer is already full this indicates a corrupt
+    // state (e.g. m_iUTF8BytesLeft was wrong); treat it as a bad UTF-8 sequence.
     int i = 0;
-    while (m_doc.m_UTF8Sequence[i]) {
+    const int maxWriteIndex = static_cast<int>(m_doc.m_UTF8Sequence.size()) - 2;
+    while (i <= maxWriteIndex && m_doc.m_UTF8Sequence[i]) {
         i++;
+    }
+    if (i > maxWriteIndex) {
+        m_doc.OutputBadUTF8characters();
+        return;
     }
     m_doc.m_UTF8Sequence[i] = c;
     m_doc.m_UTF8Sequence[i + 1] = 0; // null terminator

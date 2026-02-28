@@ -89,14 +89,14 @@ void WorldDocument::executeAlias(Alias* alias, const QString& command)
         addToCommandHistory(command);
     }
 
-    // One-shot: delete alias after firing
+    qCDebug(lcWorld) << "Alias executed:" << alias->label << "matched:" << alias->matched
+                     << "times";
+
+    // One-shot: delete alias after firing (must be last — alias pointer becomes invalid)
     if (alias->one_shot) {
         qCDebug(lcWorld) << "Deleting one-shot alias:" << alias->label;
         (void)deleteAlias(alias->internal_name); // intentional: one-shot, fired and done
     }
-
-    qCDebug(lcWorld) << "Alias executed:" << alias->label << "matched:" << alias->matched
-                     << "times";
 }
 
 /**
