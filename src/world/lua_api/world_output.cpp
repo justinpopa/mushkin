@@ -6,6 +6,7 @@
  */
 
 #include "../color_utils.h"
+#include "../view_interfaces.h"
 #include "lua_common.h"
 
 /**
@@ -1535,6 +1536,268 @@ int L_SetEntity(lua_State* L)
     customMap[entityName] = std::move(entity);
 
     return 0;
+}
+
+// ========== Text Manipulation Functions ==========
+
+/**
+ * world.DeleteLines(count)
+ *
+ * Deletes the specified number of lines from the end of the output buffer.
+ * If a sentinel (empty, no hard_return) line is present at the back it is
+ * counted as one of the lines to delete so the visible line count decreases
+ * by exactly `count`.
+ *
+ * @param count (integer) Number of lines to delete (no-op if <= 0)
+ *
+ * @return Nothing
+ *
+ * @example
+ * DeleteLines(5)  -- remove the last 5 visible lines
+ *
+ * @see DeleteOutput
+ */
+int L_DeleteLines(lua_State* L)
+{
+    WorldDocument* pDoc = doc(L);
+
+    if (pDoc->m_bInSendToScript) {
+        return 0;
+    }
+
+    int count = static_cast<int>(luaL_checkinteger(L, 1));
+    if (count <= 0) {
+        return 0;
+    }
+
+    // If the last line is an empty sentinel (current line not yet committed),
+    // absorb it into the deletion count so the caller removes exactly `count`
+    // visible lines.
+    if (!pDoc->m_lineList.empty() && pDoc->m_lineList.back()->textBuffer.empty()) {
+        ++count;
+    }
+
+    while (count-- > 0 && !pDoc->m_lineList.empty()) {
+        pDoc->m_lineList.pop_back();
+        --pDoc->m_total_lines;
+    }
+
+    // Decide whether m_currentLine is still usable.
+    // A COMMENT line without hard_return can still receive appended text.
+    bool needNewLine = true;
+    if (!pDoc->m_lineList.empty()) {
+        const Line* back = pDoc->m_lineList.back().get();
+        if ((back->flags & COMMENT) && !back->hard_return) {
+            needNewLine = false;
+        }
+    }
+
+    if (needNewLine || pDoc->m_lineList.empty()) {
+        pDoc->m_lineList.push_back(std::make_unique<Line>(
+            pDoc->m_total_lines + 1, pDoc->m_nWrapColumn, 0, pDoc->m_normalcolour[7],
+            pDoc->m_normalcolour[0], pDoc->m_bUTF_8));
+    }
+
+    pDoc->Repaint();
+    return 0;
+}
+
+/**
+ * world.DeleteOutput()
+ *
+ * Clears the entire output buffer, resetting the display to a blank state.
+ * Resets the line counter, clears recent-lines history, and clears the
+ * current text selection.
+ *
+ * @return Nothing
+ *
+ * @example
+ * DeleteOutput()  -- wipe the output window
+ *
+ * @see DeleteLines
+ */
+int L_DeleteOutput(lua_State* L)
+{
+    WorldDocument* pDoc = doc(L);
+
+    pDoc->m_lineList.clear();
+    pDoc->m_total_lines = 0;
+
+    pDoc->m_currentLine = std::make_unique<Line>(1, pDoc->m_nWrapColumn, 0, pDoc->m_normalcolour[7],
+                                                 pDoc->m_normalcolour[0], pDoc->m_bUTF_8);
+
+    pDoc->m_selectionStartLine = 0;
+    pDoc->m_selectionStartChar = 0;
+    pDoc->m_selectionEndLine = 0;
+    pDoc->m_selectionEndChar = 0;
+
+    pDoc->Repaint();
+    return 0;
+}
+
+/**
+ * world.SetSelection(startLine, endLine, startCol, endCol)
+ *
+ * Sets the current text selection in the output window. All parameters are
+ * 1-based and are converted to 0-based indices internally.
+ *
+ * @param startLine (integer) First line of the selection (1-based)
+ * @param endLine   (integer) Last line of the selection (1-based)
+ * @param startCol  (integer) Start column within startLine (1-based)
+ * @param endCol    (integer) End column within endLine (1-based)
+ *
+ * @return Nothing
+ *
+ * @example
+ * SetSelection(1, 3, 1, 10)  -- select from line 1 col 1 to line 3 col 10
+ *
+ * @see GetSelectionStartLine, GetSelectionEndLine
+ */
+int L_SetSelection(lua_State* L)
+{
+    WorldDocument* pDoc = doc(L);
+
+    const int startLine = static_cast<int>(luaL_checkinteger(L, 1)) - 1;
+    const int endLine = static_cast<int>(luaL_checkinteger(L, 2)) - 1;
+    const int startCol = static_cast<int>(luaL_checkinteger(L, 3)) - 1;
+    const int endCol = static_cast<int>(luaL_checkinteger(L, 4)) - 1;
+
+    pDoc->m_selectionStartLine = startLine;
+    pDoc->m_selectionEndLine = endLine;
+    pDoc->m_selectionStartChar = startCol;
+    pDoc->m_selectionEndChar = endCol;
+
+    pDoc->Repaint();
+    return 0;
+}
+
+// ========== Display/UI Functions ==========
+
+/**
+ * world.Bookmark(lineNumber [, set])
+ *
+ * Sets or clears the bookmark flag on the specified output line.
+ *
+ * @param lineNumber (integer) 1-based line number
+ * @param set        (boolean, optional) true to set bookmark, false to clear (default: true)
+ *
+ * @return Nothing
+ *
+ * @example
+ * Bookmark(10)         -- bookmark line 10
+ * Bookmark(10, false)  -- remove bookmark from line 10
+ */
+int L_Bookmark(lua_State* L)
+{
+    WorldDocument* pDoc = doc(L);
+
+    const int lineNumber = static_cast<int>(luaL_checkinteger(L, 1));
+    const bool set = lua_isnoneornil(L, 2) ? true : lua_toboolean(L, 2) != 0;
+
+    if (lineNumber <= 0 || lineNumber > static_cast<int>(pDoc->m_lineList.size())) {
+        return 0;
+    }
+
+    Line* line = pDoc->m_lineList[static_cast<std::size_t>(lineNumber - 1)].get();
+    if (set) {
+        line->flags |= static_cast<unsigned char>(BOOKMARK);
+    } else {
+        line->flags &= static_cast<unsigned char>(~BOOKMARK);
+    }
+
+    pDoc->Repaint();
+    return 0;
+}
+
+/**
+ * world.SetUnseenLines(counter)
+ *
+ * Overrides the "unseen lines" counter — the number of lines that have arrived
+ * since the user last scrolled to the bottom of the output window.
+ *
+ * @param counter (integer) New unseen-line count
+ *
+ * @return Nothing
+ *
+ * @example
+ * SetUnseenLines(0)  -- mark all output as seen
+ */
+int L_SetUnseenLines(lua_State* L)
+{
+    WorldDocument* pDoc = doc(L);
+    pDoc->m_new_lines = static_cast<qint32>(luaL_checkinteger(L, 1));
+    return 0;
+}
+
+/**
+ * world.ResetStatusTime()
+ *
+ * Resets the status-bar timestamp to the current date/time. The status time
+ * records when the mouse was last over a particular output line and is
+ * displayed in the world's status bar.
+ *
+ * @return Nothing
+ *
+ * @example
+ * ResetStatusTime()
+ */
+int L_ResetStatusTime(lua_State* L)
+{
+    WorldDocument* pDoc = doc(L);
+    pDoc->m_tStatusTime = QDateTime::currentDateTime();
+    return 0;
+}
+
+/**
+ * world.Transparency(key, amount)
+ *
+ * Sets the opacity of the world's top-level window.
+ *
+ * The `key` parameter exists for MUSHclient API compatibility (color-keyed
+ * transparency) but is ignored under Qt, which only supports alpha-channel
+ * opacity.  `amount` is clamped to [0, 255] where 0 is fully transparent and
+ * 255 is fully opaque.
+ *
+ * @param key    (integer) Ignored (color-key, not supported under Qt)
+ * @param amount (integer) Opacity in [0, 255]
+ *
+ * @return (boolean) true if the window was found and opacity was set, false otherwise
+ *
+ * @example
+ * Transparency(0, 200)  -- set window to ~78% opacity
+ * Transparency(0, 255)  -- fully opaque (default)
+ */
+int L_Transparency(lua_State* L)
+{
+    WorldDocument* pDoc = doc(L);
+
+    // key is accepted for API compatibility but unused under Qt
+    luaL_checkinteger(L, 1);
+    int amount = static_cast<int>(luaL_checkinteger(L, 2));
+
+    // Clamp to [0, 255]
+    if (amount < 0) {
+        amount = 0;
+    } else if (amount > 255) {
+        amount = 255;
+    }
+
+    QWidget* window = nullptr;
+    if (pDoc->m_pActiveOutputView != nullptr) {
+        window = pDoc->m_pActiveOutputView->parentWindow();
+        if (window != nullptr) {
+            window = window->window(); // Ensure we have the actual top-level widget
+        }
+    }
+
+    if (window != nullptr) {
+        window->setWindowOpacity(static_cast<double>(amount) / 255.0);
+        lua_pushboolean(L, 1);
+    } else {
+        lua_pushboolean(L, 0);
+    }
+
+    return 1;
 }
 
 // ========== Registration ==========

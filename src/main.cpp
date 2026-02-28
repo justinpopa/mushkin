@@ -118,6 +118,9 @@ int main(int argc, char* argv[])
     // Use only relative paths for portability - no system paths
     // Working directory is set to AppPaths::getAppDirectory() at startup
     QStringList luaPaths = {
+        // Bundled modules first — prevents conflicts with incompatible user versions
+        exeDir + "/../Resources/lua/?.lua",
+        exeDir + "/../Resources/lua/?/init.lua",
         "./?.lua",
         "./lua/?.lua",
         "./lua/?/init.lua",

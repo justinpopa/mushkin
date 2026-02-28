@@ -254,7 +254,12 @@ void ScriptEngine::openLua()
     // Working directory is set to AppPaths::getAppDirectory() at startup
     lua_getglobal(L, "package");
 
+    // Bundled modules (inside app bundle) take priority over user files
+    // to avoid conflicts with incompatible versions (e.g., lua-openssl vs LuaSec).
+    QString exeDir2 = AppPaths::getExecutableDirectory();
     QStringList luaPaths = {
+        exeDir2 + "/../Resources/lua/?.lua",
+        exeDir2 + "/../Resources/lua/?/init.lua",
         "./?.lua",
         "./lua/?.lua",
         "./lua/?/init.lua",

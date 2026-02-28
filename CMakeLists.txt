@@ -360,6 +360,12 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/external/yuescript/src/yuescript/yuescript.cpp")
     message(STATUS "YueScript: Building yue module for .yue file support")
 endif()
 
+# llthreads2 - Lua threading module (used by Aardwolf async.lua)
+if(EXISTS "${CMAKE_SOURCE_DIR}/external/llthreads2/CMakeLists.txt")
+    add_subdirectory(external/llthreads2)
+    message(STATUS "llthreads2: Building Lua threading module")
+endif()
+
 # ========== Google Test Framework ==========
 # Fetch GoogleTest for unit testing
 include(FetchContent)

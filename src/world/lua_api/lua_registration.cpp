@@ -43,6 +43,15 @@ extern int L_GetEntity(lua_State* L);
 extern int L_GetXMLEntity(lua_State* L);
 extern int L_SetEntity(lua_State* L);
 
+// Text manipulation / display functions (also in world_output.cpp)
+extern int L_DeleteLines(lua_State* L);
+extern int L_DeleteOutput(lua_State* L);
+extern int L_SetSelection(lua_State* L);
+extern int L_Bookmark(lua_State* L);
+extern int L_SetUnseenLines(lua_State* L);
+extern int L_ResetStatusTime(lua_State* L);
+extern int L_Transparency(lua_State* L);
+
 // Info bar functions
 extern int L_Info(lua_State* L);
 extern int L_InfoClear(lua_State* L);
@@ -225,6 +234,11 @@ extern int L_ActivateClient(lua_State* L);
 extern int L_GetWorldID(lua_State* L);
 extern int L_GetWorldList(lua_State* L);
 extern int L_GetWorldIdList(lua_State* L);
+// World management functions (also in world_utilities.cpp)
+extern int L_GetWorld(lua_State* L);
+extern int L_GetWorldById(lua_State* L);
+extern int L_Open(lua_State* L);
+extern int L_Reset(lua_State* L);
 extern int L_EditDistance(lua_State* L);
 extern int L_OpenBrowser(lua_State* L);
 extern int L_ChangeDir(lua_State* L);
@@ -525,6 +539,17 @@ int RegisterLuaRoutines(lua_State* L)
         {"Hyperlink", L_Hyperlink},
         {"Simulate", L_Simulate},
 
+        // Text manipulation functions
+        {"DeleteLines", L_DeleteLines},
+        {"DeleteOutput", L_DeleteOutput},
+        {"SetSelection", L_SetSelection},
+
+        // Display/UI functions
+        {"Bookmark", L_Bookmark},
+        {"SetUnseenLines", L_SetUnseenLines},
+        {"ResetStatusTime", L_ResetStatusTime},
+        {"Transparency", L_Transparency},
+
         // Info bar functions
         {"Info", L_Info},
         {"InfoClear", L_InfoClear},
@@ -708,6 +733,10 @@ int RegisterLuaRoutines(lua_State* L)
         {"GetWorldID", L_GetWorldID},
         {"GetWorldList", L_GetWorldList},
         {"GetWorldIdList", L_GetWorldIdList},
+        {"GetWorld", L_GetWorld},
+        {"GetWorldById", L_GetWorldById},
+        {"Open", L_Open},
+        {"Reset", L_Reset},
         {"GetUdpPort", L_GetUdpPort},
         {"UdpSend", L_UdpSend},
         {"UdpListen", L_UdpListen},

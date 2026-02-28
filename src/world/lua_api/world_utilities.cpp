@@ -2911,6 +2911,121 @@ int L_GetWorldIdList(lua_State* L)
     return 1;
 }
 
+// ========== World Management Functions ==========
+
+/**
+ * world.GetWorld(name)
+ *
+ * Returns the world object with the given name, or nil if not found.
+ * Note: In the Qt version, only the current world is available.
+ *
+ * @param name (string) The world name to look up (case-insensitive)
+ * @return (userdata|nil) World userdata, or nil if not found
+ *
+ * @example
+ * local w = GetWorld("My MUD")
+ * if w then
+ *     Note("Found world: " .. w.name)
+ * end
+ *
+ * @see GetWorldById, GetWorldList
+ */
+int L_GetWorld(lua_State* L)
+{
+    WorldDocument* pDoc = doc(L);
+    const char* name = luaL_checkstring(L, 1);
+
+    if (pDoc->m_mush_name.compare(QString::fromUtf8(name), Qt::CaseInsensitive) == 0) {
+        WorldDocument** ppDoc =
+            static_cast<WorldDocument**>(lua_newuserdata(L, sizeof(WorldDocument*)));
+        *ppDoc = pDoc;
+        luaL_getmetatable(L, "mushclient");
+        lua_setmetatable(L, -2);
+        return 1;
+    }
+
+    return 0;
+}
+
+/**
+ * world.GetWorldById(id)
+ *
+ * Returns the world object with the given ID, or nil if not found.
+ * Note: In the Qt version, only the current world is available.
+ *
+ * @param id (string) The world ID to look up (case-insensitive)
+ * @return (userdata|nil) World userdata, or nil if not found
+ *
+ * @example
+ * local w = GetWorldById("abc123")
+ * if w then
+ *     Note("Found world by ID")
+ * end
+ *
+ * @see GetWorld, GetWorldID, GetWorldIdList
+ */
+int L_GetWorldById(lua_State* L)
+{
+    WorldDocument* pDoc = doc(L);
+    const char* id = luaL_checkstring(L, 1);
+
+    if (pDoc->m_strWorldID.compare(QString::fromUtf8(id), Qt::CaseInsensitive) == 0) {
+        WorldDocument** ppDoc =
+            static_cast<WorldDocument**>(lua_newuserdata(L, sizeof(WorldDocument*)));
+        *ppDoc = pDoc;
+        luaL_getmetatable(L, "mushclient");
+        lua_setmetatable(L, -2);
+        return 1;
+    }
+
+    return 0;
+}
+
+/**
+ * world.Open(filename)
+ *
+ * Opens a world file.
+ * Note: Not yet implemented in the Qt version.
+ *
+ * @param filename (string) Path to the world file (.mcl) to open
+ * @return (boolean) true on success, false if not yet implemented
+ *
+ * @example
+ * local ok = Open("/path/to/world.mcl")
+ * if not ok then
+ *     Note("Open not yet supported")
+ * end
+ *
+ * @see GetWorld, GetWorldList
+ */
+int L_Open(lua_State* L)
+{
+    luaL_checkstring(L, 1); // filename — accepted but not yet used
+    // TODO: Requires MainWindow access for openWorld(); stub for now
+    lua_pushboolean(L, 0);
+    return 1;
+}
+
+/**
+ * world.Reset()
+ *
+ * Resets the MXP parser state (soft reset).
+ * Equivalent to the original MUSHclient Reset() function.
+ *
+ * @return (none)
+ *
+ * @example
+ * Reset()  -- clear MXP parser state
+ *
+ * @see Connect, Disconnect
+ */
+int L_Reset(lua_State* L)
+{
+    WorldDocument* pDoc = doc(L);
+    pDoc->MXP_Off(false); // soft reset — resets parser state without fully disabling MXP
+    return 0;
+}
+
 // ========== Logging Functions ==========
 
 /**

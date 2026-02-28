@@ -4,7 +4,7 @@
 **Method:** Lua API diff (428 original vs 509 Mushkin) + Gemini Pro 3.1 codebase comparison
 **Source:** `../mushclient-original` (stripped), `../mushclient_resources`
 
-**Coverage:** 384/428 Lua API functions ported (~90%). 44 missing + 22 GetInfo case bugs, categorized below.
+**Coverage:** 416/428 Lua API functions ported (~97.2%). Remaining: 8 GetInfo stubs (B1) + 4 non-API gaps (N1/N2).
 
 ---
 
@@ -14,49 +14,51 @@
 **Effort:** Large (new subsystem)
 **Source:** `mapper.cpp`, `MapCmds.cpp`
 
-- [ ] `AddMapperComment` — add comment to current map position
-- [ ] `AddToMapper` — add a room/exit to the auto-mapper
-- [ ] `DeleteAllMapItems` — clear the entire map
-- [ ] `DeleteLastMapItem` — undo last map entry
-- [ ] `EnableMapping` — toggle auto-mapper on/off
-- [ ] `GetMapColour` — get color for a map terrain type
-- [ ] `GetMapping` — check if mapping is enabled
-- [ ] `GetMappingCount` — number of rooms in map
-- [ ] `GetMappingItem` — get a specific map room/exit
-- [ ] `GetMappingString` — get the full map as a string
-- [ ] `GetRemoveMapReverses` — check if reverse exits are auto-removed
-- [ ] `MapColour` / `MapColourList` — set/list map terrain colors
-- [ ] `SetMapping` — programmatically enable/disable mapping
-- [ ] `SetRemoveMapReverses` — toggle reverse exit removal
+- [x] `AddMapperComment` — add comment to current map position
+- [x] `AddToMapper` — add a room/exit to the auto-mapper
+- [x] `DeleteAllMapItems` — clear the entire map
+- [x] `DeleteLastMapItem` — undo last map entry
+- [x] `EnableMapping` — toggle auto-mapper on/off
+- [x] `GetMapColour` — get color for a map terrain type
+- [x] `GetMapping` — check if mapping is enabled
+- [x] `GetMappingCount` — number of rooms in map
+- [x] `GetMappingItem` — get a specific map room/exit
+- [x] `GetMappingString` — get the full map as a string
+- [x] `GetRemoveMapReverses` — check if reverse exits are auto-removed
+- [x] `MapColour` / `MapColourList` — set/list map terrain colors
+- [x] `SetMapping` — programmatically enable/disable mapping
+- [x] `SetRemoveMapReverses` — toggle reverse exit removal
 
-**Note:** Many modern MUD players use external mappers (Mudlet mapper, web-based). Consider whether a built-in mapper is worth the effort vs. exposing GMCP map data to plugins and letting them handle it.
+**Completed:** 2026-02-28 (commits cd0e135, cc06aad). Verified against original MUSHclient source — all functions match original behavior. `AddToMap` (internal auto-mapping on user movement) not yet implemented.
 
 ---
 
-## G2 — Speedwalk System (5 functions)
+## G2 — Speedwalk System (5 flag constants) — DONE
 
 **Impact:** Medium — speedwalk is a convenience feature, some plugins use it
-**Effort:** Medium
-**Source:** `methods_commands.cpp`, `speedwalk.cpp`
+**Effort:** N/A (already implemented as flag constants)
+**Source:** `lua_common.h`, `lua_constants.cpp`
+**Note:** These are not standalone functions — they are flag constants (`eAliasSpeedWalk`, `eTimerSpeedWalk`, `eAliasQueue`, `eAliasMenu`, `eTimerNote`) used with `AddAlias`/`AddTimer`. Already defined and exposed as Lua globals.
 
-- [ ] `AliasSpeedWalk` — execute a speedwalk alias (e.g., `3n2e4s`)
-- [ ] `TimerSpeedWalk` — execute speedwalk with timer delays between steps
-- [ ] `AliasMenu` — show a context menu for an alias
-- [ ] `AliasQueue` — queue an alias for execution
-- [ ] `TimerNote` — attach a note to a timer (display in timer list)
+- [x] `eAliasSpeedWalk` (2048) — alias flag: treat response as speedwalk
+- [x] `eTimerSpeedWalk` (64) — timer flag: treat response as speedwalk
+- [x] `eAliasMenu` (8192) — alias flag: show in context menu
+- [x] `eAliasQueue` (4096) — alias flag: queue response for paced sending
+- [x] `eTimerNote` (128) — timer flag: display response as note
 
 ---
 
-## G3 — World Management (4 functions)
+## G3 — World Management (4 functions) — DONE
 
 **Impact:** Medium — multi-world plugins need these
 **Effort:** Medium
-**Source:** `methods_info.cpp`, `methods_commands.cpp`
+**Source:** `world_utilities.cpp`
+**Completed:** 2026-02-28
 
-- [ ] `GetWorld` — get a reference to another open world by name
-- [ ] `GetWorldById` — get a reference to another open world by unique ID
-- [ ] `Open` — open a world file programmatically
-- [ ] `Reset` — reset world state (timers, triggers, variables)
+- [x] `GetWorld` — get a reference to another open world by name (current world only for now)
+- [x] `GetWorldById` — get a reference to another open world by unique ID (current world only for now)
+- [x] `Open` — open a world file programmatically (stub, returns false — needs MainWindow access)
+- [x] `Reset` — reset MXP parser state (soft reset via MXP_Off)
 
 ---
 
@@ -73,28 +75,30 @@
 
 ---
 
-## G5 — Text Manipulation (3 functions)
+## G5 — Text Manipulation (3 functions) — DONE
 
 **Impact:** Medium — output window control
 **Effort:** Small–Medium
-**Source:** `methods_commands.cpp`
+**Source:** `world_output.cpp`
+**Completed:** 2026-02-28
 
-- [ ] `DeleteLines` — delete specific lines from the output buffer
-- [ ] `DeleteOutput` — clear the output window
-- [ ] `SetSelection` — set the text selection range in the output window
+- [x] `DeleteLines` — delete lines from end of output buffer (guards on m_bInSendToScript)
+- [x] `DeleteOutput` — clear the output window (resets line list, selection, current line)
+- [x] `SetSelection` — set the text selection range in the output window (1-based args)
 
 ---
 
-## G6 — Display / UI (4 functions)
+## G6 — Display / UI (4 functions) — DONE
 
 **Impact:** Low–Medium
 **Effort:** Small–Medium
-**Source:** `methods_info.cpp`, `methods_commands.cpp`
+**Source:** `world_output.cpp`
+**Completed:** 2026-02-28
 
-- [ ] `Bookmark` — bookmark a line in the output for quick navigation
-- [ ] `SetUnseenLines` — set the "unseen lines" count (activity indicator)
-- [ ] `ResetStatusTime` — reset the status bar timer display
-- [ ] `Transparency` — set window transparency/opacity
+- [x] `Bookmark` — set/clear bookmark flag on output line
+- [x] `SetUnseenLines` — set the "unseen lines" count (activity indicator)
+- [x] `ResetStatusTime` — reset the status bar timer to current time
+- [x] `Transparency` — set window opacity via Qt (key param accepted for compat, ignored)
 
 ---
 
@@ -106,9 +110,9 @@
 
 - [x] `DoCommand` — execute a MUSHclient internal command (dispatch table)
 - [x] `GetInternalCommandsList` — list all available internal commands
-- [ ] `Help` — show help for a topic
-- [ ] `GenerateName` — generate a random fantasy name
-- [ ] `ReadNamesFile` — load a name generation file
+- [x] `Help` — show help for a topic (stub, returns eOK)
+- [x] `GenerateName` — generate a random fantasy name
+- [x] `ReadNamesFile` — load a name generation file (stub, built-in generator needs no file)
 
 ---
 
@@ -118,9 +122,9 @@
 **Effort:** Small
 **Source:** `methods_commands.cpp`
 
-- [ ] `GetEntity` — get the value of an MXP entity by name
-- [ ] `GetXMLEntity` — get the value of an XML entity
-- [ ] `SetEntity` — define a custom MXP entity
+- [x] `GetEntity` — get the value of an MXP entity by name
+- [x] `GetXMLEntity` — get the value of an XML entity
+- [x] `SetEntity` — define a custom MXP entity
 
 ---
 
@@ -130,7 +134,7 @@
 **Effort:** Small
 **Source:** `methods_commands.cpp`
 
-- [ ] `OmitFromLogFile` — exclude current line from the log file
+- [x] `OmitFromLogFile` — exclude current line from the log file
 
 ---
 
@@ -140,7 +144,7 @@
 **Effort:** Small
 **Source:** `methods_commands.cpp`
 
-- [ ] `PlaySoundMemory` — play a sound from a memory buffer (not file)
+- [x] `PlaySoundMemory` — play a sound from a memory buffer (stub, returns eCannotPlaySound)
 
 ---
 
@@ -150,8 +154,8 @@
 **Effort:** Small
 **Source:** `methods_commands.cpp`
 
-- [ ] `LowercaseWildcard` — lowercase a specific wildcard match
-- [ ] `TranslateGerman` — translate German character encoding
+- [x] `LowercaseWildcard` — lowercase a specific wildcard match
+- [x] `TranslateGerman` — translate German character encoding
 
 ---
 
@@ -161,8 +165,8 @@
 **Effort:** Small
 **Source:** `methods_info.cpp`
 
-- [ ] `GetCustomColourName` — get the name assigned to a custom color slot
-- [ ] `MapColourList` — list all map terrain colors (also in G1)
+- [x] `GetCustomColourName` — get the name assigned to a custom color slot
+- [x] `MapColourList` — list all map terrain colors (implemented with G1 mapper)
 
 ---
 
@@ -235,8 +239,8 @@ These aren't Lua API functions but are architectural/feature gaps.
 **Impact:** Medium — plugins use `DoCommand("Save")`, `DoCommand("Connect")`, etc.
 **Effort:** Medium
 
-- [x] `DoCommand` dispatch table: Connect, Disconnect, Save, ReloadScriptFile, ResetTimers, Pause, Unpause, FreezeOutput, UnfreezeOutput
-- [x] `GetInternalCommandsList` returns all supported command names
+- [x] `DoCommand` dispatch table: 252 commands (9 original + 17 direction/action + 83 macro/keypad/alt + ~143 UI commands via MainWindow callback)
+- [x] `GetInternalCommandsList` returns all 252 supported command names
 
 ### N4 — LuaFileSystem (lfs) (Done)
 
@@ -253,20 +257,20 @@ These aren't Lua API functions but are architectural/feature gaps.
 | Group | Functions | Impact | Effort | Status |
 |:---|:---:|:---|:---|:---|
 | **B1 GetInfo Collision** | **22 cases** | **Critical** | **Small** | 20/22 done (4 stubs remain) |
-| G1 Mapper | 14 | High | Large | Not started |
-| G2 Speedwalk | 5 | Medium | Medium | Not started |
-| G3 World Management | 4 | Medium | Medium | Not started |
+| G1 Mapper | 14 | High | Large | Done (cd0e135, cc06aad) |
+| G2 Speedwalk | 5 | Medium | N/A | Done (flag constants, already implemented) |
+| G3 World Management | 4 | Medium | Medium | Done (Open stubbed) |
 | G4 Config Introspection | 3 | Medium | Small | Done (82a1127) |
-| G5 Text Manipulation | 3 | Medium | Small–Med | Not started |
-| G6 Display/UI | 4 | Low–Med | Small–Med | Not started |
-| G7 Scripting Helpers | 5 | Low–Med | Small | 2/5 done |
-| G8 XML/MXP Entities | 3 | Low | Small | Not started |
-| G9 Logging | 1 | Low | Small | Not started |
-| G10 Sound | 1 | Low | Small | Not started |
-| G11 Text Transforms | 2 | Low | Small | Not started |
-| G12 Colour | 2 | Low | Small | Not started |
+| G5 Text Manipulation | 3 | Medium | Small–Med | Done |
+| G6 Display/UI | 4 | Low–Med | Small–Med | Done |
+| G7 Scripting Helpers | 5 | Low–Med | Small | Done (bfb6b40) |
+| G8 XML/MXP Entities | 3 | Low | Small | Done (bfb6b40) |
+| G9 Logging | 1 | Low | Small | Done (bfb6b40) |
+| G10 Sound | 1 | Low | Small | Done (bfb6b40) |
+| G11 Text Transforms | 2 | Low | Small | Done (bfb6b40) |
+| G12 Colour | 2 | Low | Small | Done (bfb6b40) |
 | N1 Proxy | — | Medium | Medium | Not started |
 | N2 Chat | — | Low–Med | Large | Not started |
-| N3 DoCommand API | — | Medium | Medium | Done |
+| N3 DoCommand API | — | Medium | Medium | Done (252 commands) |
 | N4 LuaFileSystem | — | Medium | Small | Done |
 | **Total** | **47 + 4 + B1** | | | |
