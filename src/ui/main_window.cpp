@@ -2307,9 +2307,8 @@ void MainWindow::worldProperties()
 
 void MainWindow::globalPreferences()
 {
-    // TODO: Implement global preferences dialog
-    QMessageBox::information(this, "Global Preferences",
-                             "Global preferences dialog is not yet implemented.");
+    GlobalPreferencesDialog dialog(this);
+    dialog.exec();
 }
 
 void MainWindow::reloadDefaults()

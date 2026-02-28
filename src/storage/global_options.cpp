@@ -70,6 +70,13 @@ void GlobalOptions::load()
     m_tabInsertsTab = settings.value("TabInsertsTabInMultiLineDialogs", 0).toInt() != 0;
     m_regexpMatchEmpty = settings.value("RegexpMatchEmpty", 1).toInt() != 0;
     m_f1Macro = settings.value("F1macro", 0).toInt() != 0;
+    m_disableKeyboardMenuActivation =
+        settings.value("DisableKeyboardMenuActivation", 0).toInt() != 0;
+    m_colourGradientConfig = settings.value("ColourGradientConfig", 1).toInt() != 0;
+    m_bleedBackground = settings.value("BleedBackground", 0).toInt() != 0;
+    m_flatToolbars = settings.value("FlatToolbars", 1).toInt() != 0;
+    m_openActivityWindow = settings.value("OpenActivityWindow", 0).toInt() != 0;
+    m_confirmBeforeClosingMXPdebug = settings.value("ConfirmBeforeClosingMXPdebug", 0).toInt() != 0;
 
     m_defaultInputFontHeight = settings.value("DefaultInputFontHeight", 9).toInt();
     m_defaultInputFontWeight = settings.value("DefaultInputFontWeight", 400).toInt();
@@ -89,12 +96,16 @@ void GlobalOptions::load()
     m_iconPlacement = settings.value("IconPlacement", 0).toInt();
     m_trayIcon = settings.value("TrayIcon", 0).toInt();
     m_themeMode = settings.value("ThemeMode", ThemeSystem).toInt();
+    m_activityButtonBarStyle = settings.value("ActivityButtonBarStyle", 0).toInt();
+    m_parenMatchFlags = settings.value("ParenMatchFlags", 0x0061).toInt();
+    m_notepadFontHeight = settings.value("NotepadFontHeight", 10).toInt();
 
     m_defaultLogFileDirectory = settings.value("DefaultLogFileDirectory", "./logs/").toString();
     m_defaultWorldFileDirectory =
         settings.value("DefaultWorldFileDirectory", "./worlds/").toString();
     m_pluginsDirectory = settings.value("PluginsDirectory", "./worlds/plugins/").toString();
-    m_stateFilesDirectory = settings.value("StateFilesDirectory", "./worlds/plugins/state/").toString();
+    m_stateFilesDirectory =
+        settings.value("StateFilesDirectory", "./worlds/plugins/state/").toString();
     m_defaultTriggersFile = settings.value("DefaultTriggersFile", "").toString();
     m_defaultAliasesFile = settings.value("DefaultAliasesFile", "").toString();
     m_defaultTimersFile = settings.value("DefaultTimersFile", "").toString();
@@ -110,6 +121,10 @@ void GlobalOptions::load()
     m_luaScript = settings.value("LuaScript", "").toString();
     m_locale = settings.value("Locale", "EN").toString();
     m_trayIconFileName = settings.value("TrayIconFileName", "").toString();
+    m_notepadFontName = settings.value("NotepadFont", "Courier").toString();
+    m_worldList = settings.value("WorldList", "").toString().split("\n", Qt::SkipEmptyParts);
+    m_globalPluginList =
+        settings.value("PluginList", "").toString().split("\n", Qt::SkipEmptyParts);
 
     settings.endGroup();
     m_loaded = true;
@@ -145,6 +160,12 @@ void GlobalOptions::save()
     settings.setValue("TabInsertsTabInMultiLineDialogs", m_tabInsertsTab ? 1 : 0);
     settings.setValue("RegexpMatchEmpty", m_regexpMatchEmpty ? 1 : 0);
     settings.setValue("F1macro", m_f1Macro ? 1 : 0);
+    settings.setValue("DisableKeyboardMenuActivation", m_disableKeyboardMenuActivation ? 1 : 0);
+    settings.setValue("ColourGradientConfig", m_colourGradientConfig ? 1 : 0);
+    settings.setValue("BleedBackground", m_bleedBackground ? 1 : 0);
+    settings.setValue("FlatToolbars", m_flatToolbars ? 1 : 0);
+    settings.setValue("OpenActivityWindow", m_openActivityWindow ? 1 : 0);
+    settings.setValue("ConfirmBeforeClosingMXPdebug", m_confirmBeforeClosingMXPdebug ? 1 : 0);
 
     settings.setValue("DefaultInputFontHeight", m_defaultInputFontHeight);
     settings.setValue("DefaultInputFontWeight", m_defaultInputFontWeight);
@@ -164,6 +185,9 @@ void GlobalOptions::save()
     settings.setValue("IconPlacement", m_iconPlacement);
     settings.setValue("TrayIcon", m_trayIcon);
     settings.setValue("ThemeMode", m_themeMode);
+    settings.setValue("ActivityButtonBarStyle", m_activityButtonBarStyle);
+    settings.setValue("ParenMatchFlags", m_parenMatchFlags);
+    settings.setValue("NotepadFontHeight", m_notepadFontHeight);
 
     settings.setValue("DefaultLogFileDirectory", m_defaultLogFileDirectory);
     settings.setValue("DefaultWorldFileDirectory", m_defaultWorldFileDirectory);
@@ -184,6 +208,9 @@ void GlobalOptions::save()
     settings.setValue("LuaScript", m_luaScript);
     settings.setValue("Locale", m_locale);
     settings.setValue("TrayIconFileName", m_trayIconFileName);
+    settings.setValue("NotepadFont", m_notepadFontName);
+    settings.setValue("WorldList", m_worldList.join("\n"));
+    settings.setValue("PluginList", m_globalPluginList.join("\n"));
 
     settings.endGroup();
     settings.sync();
@@ -216,6 +243,12 @@ void GlobalOptions::resetToDefaults()
     m_tabInsertsTab = false;
     m_regexpMatchEmpty = true;
     m_f1Macro = false;
+    m_disableKeyboardMenuActivation = false;
+    m_colourGradientConfig = true;
+    m_bleedBackground = false;
+    m_flatToolbars = true;
+    m_openActivityWindow = false;
+    m_confirmBeforeClosingMXPdebug = false;
 
     m_defaultInputFontHeight = 9;
     m_defaultInputFontWeight = 400;
@@ -235,6 +268,9 @@ void GlobalOptions::resetToDefaults()
     m_iconPlacement = 0;
     m_trayIcon = 0;
     m_themeMode = ThemeSystem;
+    m_activityButtonBarStyle = 0;
+    m_parenMatchFlags = 0x0061;
+    m_notepadFontHeight = 10;
 
     m_defaultLogFileDirectory = "./logs/";
     m_defaultWorldFileDirectory = "./worlds/";
@@ -255,4 +291,7 @@ void GlobalOptions::resetToDefaults()
     m_luaScript.clear();
     m_locale = "EN";
     m_trayIconFileName.clear();
+    m_notepadFontName = "Courier";
+    m_worldList.clear();
+    m_globalPluginList.clear();
 }

@@ -71,7 +71,9 @@
 **Description:** Shows a message box: "Global preferences dialog is not yet implemented."
 
 **Targets:**
-- [ ] Implement `GlobalPreferencesDialog` or disable/hide the menu item until implemented
+- [x] `src/ui/main_window.cpp` — Replaced QMessageBox stub with `GlobalPreferencesDialog`
+- [x] `src/storage/global_options.h/.cpp` — Added 12 missing fields (worldList, pluginList, parenMatchFlags, etc.)
+- [x] `src/ui/dialogs/global_preferences_dialog.cpp` — Rewrote load/save to use `GlobalOptions` (QSettings) instead of `Database` (SQLite)
 
 **Acceptance:** Menu item either opens a functional dialog or is hidden/grayed.
 
