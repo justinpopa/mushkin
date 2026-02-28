@@ -5,7 +5,7 @@
  * evaluation pipeline (evaluateTriggers, evaluateAliases, checkTimerList).
  *
  * Execution callbacks (executeTrigger, executeAlias, executeTimer) remain on
- * WorldDocument and are called through the m_doc back-reference.
+ * IWorldContext and are called through the m_ctx back-reference.
  */
 
 #include "automation_registry.h"
@@ -17,7 +17,6 @@
 #include "../text/line.h"
 #include "../text/style.h"
 #include "logging.h"
-#include "world_document.h"
 #include "world_error.h"
 
 #include <QDateTime>
@@ -32,7 +31,7 @@
 // Constructor
 // ============================================================
 
-AutomationRegistry::AutomationRegistry(WorldDocument& doc) : m_doc(doc)
+AutomationRegistry::AutomationRegistry(IWorldContext& ctx) : m_ctx(ctx)
 {
 }
 
@@ -335,14 +334,14 @@ static bool matchTriggerPattern(Trigger* trigger, const QString& text)
 }
 
 static bool matchTriggerWithRepeat(Trigger* trigger, const QString& text, Line* line,
-                                   WorldDocument* doc)
+                                   IWorldContext* ctx)
 {
     if (!matchStyle(trigger, line)) {
         return false;
     }
     if (!trigger->repeat) {
         if (matchTriggerPattern(trigger, text)) {
-            doc->executeTrigger(trigger, line, text);
+            ctx->executeTrigger(trigger, line, text);
             return true;
         }
         return false;
@@ -376,7 +375,7 @@ static bool matchTriggerWithRepeat(Trigger* trigger, const QString& text, Line* 
             }
             trigger->wildcards[i] = captured;
         }
-        doc->executeTrigger(trigger, line, text);
+        ctx->executeTrigger(trigger, line, text);
         anyMatch = true;
         offset = match.capturedEnd();
         if (offset <= match.capturedStart()) {
@@ -389,7 +388,7 @@ static bool matchTriggerWithRepeat(Trigger* trigger, const QString& text, Line* 
 // Helper: evaluate one sorted trigger array (world or plugin).
 // Returns true if evaluation should stop.
 static bool evaluateOneTriggerSequence(const QVector<Trigger*>& triggerArray, Line* line,
-                                       const QString& lineText, WorldDocument* doc,
+                                       const QString& lineText, IWorldContext* ctx,
                                        AutomationRegistry* registry, QString& oneShotToDelete)
 {
     for (Trigger* trigger : triggerArray) {
@@ -400,18 +399,18 @@ static bool evaluateOneTriggerSequence(const QVector<Trigger*>& triggerArray, Li
         bool matched = false;
         if (trigger->multi_line && trigger->lines_to_match > 1) {
             QString multiLineText;
-            int bufferSize = static_cast<int>(doc->m_recentLines.size());
+            int bufferSize = static_cast<int>(ctx->recentLines().size());
             int startPos = bufferSize - trigger->lines_to_match;
             if (startPos < 0) {
                 startPos = 0;
             }
             for (int i = startPos; i < bufferSize; ++i) {
-                multiLineText += doc->m_recentLines[static_cast<size_t>(i)];
+                multiLineText += ctx->recentLines()[static_cast<size_t>(i)];
                 multiLineText += '\n';
             }
-            matched = matchTriggerWithRepeat(trigger, multiLineText, line, doc);
+            matched = matchTriggerWithRepeat(trigger, multiLineText, line, ctx);
         } else {
-            matched = matchTriggerWithRepeat(trigger, lineText, line, doc);
+            matched = matchTriggerWithRepeat(trigger, lineText, line, ctx);
         }
 
         if (matched) {
@@ -438,7 +437,7 @@ void AutomationRegistry::evaluateTriggers(Line* line)
 
     QString lineText = QString::fromUtf8(line->text().data(), line->text().size());
 
-    if (!m_doc.SendToAllPluginCallbacks(ON_PLUGIN_LINE_RECEIVED, lineText, true)) {
+    if (!m_ctx.SendToAllPluginCallbacks(ON_PLUGIN_LINE_RECEIVED, lineText, true)) {
         return;
     }
 
@@ -446,7 +445,7 @@ void AutomationRegistry::evaluateTriggers(Line* line)
         rebuildTriggerArray();
     }
 
-    if (!m_doc.m_enable_triggers) {
+    if (!m_ctx.triggersEnabled()) {
         return;
     }
 
@@ -455,12 +454,12 @@ void AutomationRegistry::evaluateTriggers(Line* line)
     m_iTriggersEvaluatedCount += m_TriggerArray.size();
 
     QString oneShotToDelete;
-    Plugin* savedPlugin = m_doc.m_CurrentPlugin;
-    m_doc.m_CurrentPlugin = nullptr;
+    Plugin* savedPlugin = m_ctx.currentPlugin();
+    m_ctx.setCurrentPlugin(nullptr);
     bool stopEvaluation = false;
 
     // Phase 1: plugins with negative sequence
-    for (const auto& plugin : m_doc.m_PluginList) {
+    for (const auto& plugin : m_ctx.pluginList()) {
         if (plugin->m_iSequence >= 0) {
             break;
         }
@@ -470,35 +469,35 @@ void AutomationRegistry::evaluateTriggers(Line* line)
         if (plugin->m_triggersNeedSorting) {
             plugin->rebuildTriggerArray();
         }
-        m_doc.m_CurrentPlugin = plugin.get();
+        m_ctx.setCurrentPlugin(plugin.get());
         m_iTriggersEvaluatedCount += plugin->m_TriggerArray.size();
-        stopEvaluation = evaluateOneTriggerSequence(plugin->m_TriggerArray, line, lineText, &m_doc,
+        stopEvaluation = evaluateOneTriggerSequence(plugin->m_TriggerArray, line, lineText, &m_ctx,
                                                     this, oneShotToDelete);
         if (stopEvaluation) {
             if (!oneShotToDelete.isEmpty()) {
                 plugin->m_TriggerMap.erase(oneShotToDelete);
                 plugin->m_triggersNeedSorting = true;
             }
-            m_doc.m_CurrentPlugin = savedPlugin;
+            m_ctx.setCurrentPlugin(savedPlugin);
             return;
         }
     }
 
     // Phase 2: world triggers
-    m_doc.m_CurrentPlugin = nullptr;
+    m_ctx.setCurrentPlugin(nullptr);
     stopEvaluation =
-        evaluateOneTriggerSequence(m_TriggerArray, line, lineText, &m_doc, this, oneShotToDelete);
+        evaluateOneTriggerSequence(m_TriggerArray, line, lineText, &m_ctx, this, oneShotToDelete);
     if (stopEvaluation) {
         if (!oneShotToDelete.isEmpty()) {
             qCDebug(lcWorld) << "Deleting one-shot world trigger:" << oneShotToDelete;
             (void)deleteTrigger(oneShotToDelete);
         }
-        m_doc.m_CurrentPlugin = savedPlugin;
+        m_ctx.setCurrentPlugin(savedPlugin);
         return;
     }
 
     // Phase 3: plugins with zero/positive sequence
-    for (const auto& plugin : m_doc.m_PluginList) {
+    for (const auto& plugin : m_ctx.pluginList()) {
         if (plugin->m_iSequence < 0) {
             continue;
         }
@@ -508,21 +507,21 @@ void AutomationRegistry::evaluateTriggers(Line* line)
         if (plugin->m_triggersNeedSorting) {
             plugin->rebuildTriggerArray();
         }
-        m_doc.m_CurrentPlugin = plugin.get();
+        m_ctx.setCurrentPlugin(plugin.get());
         m_iTriggersEvaluatedCount += plugin->m_TriggerArray.size();
-        stopEvaluation = evaluateOneTriggerSequence(plugin->m_TriggerArray, line, lineText, &m_doc,
+        stopEvaluation = evaluateOneTriggerSequence(plugin->m_TriggerArray, line, lineText, &m_ctx,
                                                     this, oneShotToDelete);
         if (stopEvaluation) {
             if (!oneShotToDelete.isEmpty()) {
                 plugin->m_TriggerMap.erase(oneShotToDelete);
                 plugin->m_triggersNeedSorting = true;
             }
-            m_doc.m_CurrentPlugin = savedPlugin;
+            m_ctx.setCurrentPlugin(savedPlugin);
             return;
         }
     }
 
-    m_doc.m_CurrentPlugin = savedPlugin;
+    m_ctx.setCurrentPlugin(savedPlugin);
 
     auto triggerTimingEnd = std::chrono::high_resolution_clock::now();
     m_trigger_time_elapsed +=
@@ -535,7 +534,7 @@ void AutomationRegistry::evaluateTriggers(Line* line)
 // ============================================================
 
 static bool evaluateOneAliasSequence(const QVector<Alias*>& aliasArray, const QString& command,
-                                     WorldDocument* doc, bool& anyMatched)
+                                     IWorldContext* ctx, bool& anyMatched)
 {
     for (Alias* alias : aliasArray) {
         if (!alias->enabled) {
@@ -546,7 +545,7 @@ static bool evaluateOneAliasSequence(const QVector<Alias*>& aliasArray, const QS
             qDebug() << "Alias MATCHED:" << alias->label << "pattern:" << alias->name
                      << "script:" << alias->procedure;
             anyMatched = true;
-            doc->executeAlias(alias, command);
+            ctx->executeAlias(alias, command);
             if (!alias->keep_evaluating) {
                 return true;
             }
@@ -569,13 +568,13 @@ bool AutomationRegistry::evaluateAliases(const QString& command)
 
     auto aliasTimingStart = std::chrono::high_resolution_clock::now();
 
-    Plugin* savedPlugin = m_doc.m_CurrentPlugin;
-    m_doc.m_CurrentPlugin = nullptr;
+    Plugin* savedPlugin = m_ctx.currentPlugin();
+    m_ctx.setCurrentPlugin(nullptr);
     bool stopEvaluation = false;
     bool anyMatched = false;
 
     // Phase 1: plugins with negative sequence
-    for (const auto& plugin : m_doc.m_PluginList) {
+    for (const auto& plugin : m_ctx.pluginList()) {
         if (plugin->m_iSequence >= 0) {
             break;
         }
@@ -585,25 +584,25 @@ bool AutomationRegistry::evaluateAliases(const QString& command)
         if (plugin->m_aliasesNeedSorting) {
             plugin->rebuildAliasArray();
         }
-        m_doc.m_CurrentPlugin = plugin.get();
+        m_ctx.setCurrentPlugin(plugin.get());
         stopEvaluation =
-            evaluateOneAliasSequence(plugin->m_AliasArray, command, &m_doc, anyMatched);
+            evaluateOneAliasSequence(plugin->m_AliasArray, command, &m_ctx, anyMatched);
         if (stopEvaluation) {
-            m_doc.m_CurrentPlugin = savedPlugin;
+            m_ctx.setCurrentPlugin(savedPlugin);
             return true;
         }
     }
 
     // Phase 2: world aliases
-    m_doc.m_CurrentPlugin = nullptr;
-    stopEvaluation = evaluateOneAliasSequence(m_AliasArray, command, &m_doc, anyMatched);
+    m_ctx.setCurrentPlugin(nullptr);
+    stopEvaluation = evaluateOneAliasSequence(m_AliasArray, command, &m_ctx, anyMatched);
     if (stopEvaluation) {
-        m_doc.m_CurrentPlugin = savedPlugin;
+        m_ctx.setCurrentPlugin(savedPlugin);
         return true;
     }
 
     // Phase 3: plugins with zero/positive sequence
-    for (const auto& plugin : m_doc.m_PluginList) {
+    for (const auto& plugin : m_ctx.pluginList()) {
         if (plugin->m_iSequence < 0) {
             continue;
         }
@@ -613,16 +612,16 @@ bool AutomationRegistry::evaluateAliases(const QString& command)
         if (plugin->m_aliasesNeedSorting) {
             plugin->rebuildAliasArray();
         }
-        m_doc.m_CurrentPlugin = plugin.get();
+        m_ctx.setCurrentPlugin(plugin.get());
         stopEvaluation =
-            evaluateOneAliasSequence(plugin->m_AliasArray, command, &m_doc, anyMatched);
+            evaluateOneAliasSequence(plugin->m_AliasArray, command, &m_ctx, anyMatched);
         if (stopEvaluation) {
-            m_doc.m_CurrentPlugin = savedPlugin;
+            m_ctx.setCurrentPlugin(savedPlugin);
             return true;
         }
     }
 
-    m_doc.m_CurrentPlugin = savedPlugin;
+    m_ctx.setCurrentPlugin(savedPlugin);
 
     if (anyMatched) {
         qDebug() << "evaluateAliases: Alias(es) matched and handled command:" << command;
@@ -696,33 +695,21 @@ void AutomationRegistry::resetAllTimers()
 void AutomationRegistry::checkTimers()
 {
     // Flush log file to disk every 2 minutes
-    if (m_doc.m_logfile && m_doc.m_logfile->isOpen()) {
-        QDateTime now = QDateTime::currentDateTime();
-        qint64 elapsed = m_doc.m_LastFlushTime.secsTo(now);
-        if (elapsed > 120) {
-            m_doc.m_LastFlushTime = now;
-            QString savedFileName = m_doc.m_logfile_name;
-            m_doc.m_logfile->close();
-            QIODevice::OpenMode mode = QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text;
-            if (!m_doc.m_logfile->open(mode)) {
-                qCDebug(lcWorld) << "CheckTimers: Failed to reopen log file" << savedFileName;
-            }
-        }
-    }
+    m_ctx.flushLogIfNeeded();
 
-    if (!m_doc.m_bEnableTimers) {
+    if (!m_ctx.timersEnabled()) {
         return;
     }
 
     checkTimerList();
 
-    for (const auto& plugin : m_doc.m_PluginList) {
+    for (const auto& plugin : m_ctx.pluginList()) {
         if (plugin && plugin->enabled()) {
             checkPluginTimerList(plugin.get());
         }
     }
 
-    m_doc.SendToAllPluginCallbacks(ON_PLUGIN_TICK);
+    m_ctx.SendToAllPluginCallbacks(ON_PLUGIN_TICK);
 }
 
 void AutomationRegistry::checkTimerList()
@@ -735,8 +722,7 @@ void AutomationRegistry::checkTimerList()
         if (!timer->enabled) {
             continue;
         }
-        if (!timer->active_when_closed &&
-            m_doc.m_connectionManager->m_iConnectPhase != eConnectConnectedToMud) {
+        if (!timer->active_when_closed && !m_ctx.isConnectedToMud()) {
             continue;
         }
         if (timer->fire_time > now) {
@@ -776,7 +762,7 @@ void AutomationRegistry::checkTimerList()
             timer->enabled = false;
         }
 
-        m_doc.executeTimer(timer, name);
+        m_ctx.executeTimer(timer, name);
 
         if (m_TimerMap.find(name) == m_TimerMap.end()) {
             continue;
@@ -802,8 +788,7 @@ void AutomationRegistry::checkPluginTimerList(Plugin* plugin)
         if (!timer->enabled) {
             continue;
         }
-        if (!timer->active_when_closed &&
-            m_doc.m_connectionManager->m_iConnectPhase != eConnectConnectedToMud) {
+        if (!timer->active_when_closed && !m_ctx.isConnectedToMud()) {
             continue;
         }
         if (timer->fire_time > now) {
@@ -844,7 +829,7 @@ void AutomationRegistry::checkPluginTimerList(Plugin* plugin)
             timer->enabled = false;
         }
 
-        m_doc.executePluginTimer(plugin, timer, name);
+        m_ctx.executePluginTimer(plugin, timer, name);
 
         auto checkIt = plugin->m_TimerMap.find(name);
         if (checkIt == plugin->m_TimerMap.end()) {

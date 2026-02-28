@@ -31,6 +31,7 @@
 #include "mxp_engine.h"          // MXPEngine companion object (owns MXP protocol state)
 #include "sound_manager.h"       // SoundManager companion object (owns spatial audio state)
 #include "telnet_parser.h"       // TelnetParser, Phase enum, telnet constants
+#include "world_context.h"       // IWorldContext interface
 #include "world_error.h"         // WorldError, WorldErrorType
 
 #include "../automation/script_language.h" // ScriptLanguage enum
@@ -349,7 +350,7 @@ enum {
  * Don't try to organize into sub-objects yet.
  */
 
-class WorldDocument : public QObject {
+class WorldDocument : public QObject, public IWorldContext {
     Q_OBJECT
 
   public:
@@ -1278,7 +1279,7 @@ class WorldDocument : public QObject {
     {
         return m_pActiveInputView;
     }
-    IOutputView* activeOutputView() const
+    IOutputView* activeOutputView() const override
     {
         return m_pActiveOutputView;
     }
@@ -1421,7 +1422,7 @@ class WorldDocument : public QObject {
 
     // ========== Trigger Execution and Actions ==========
     void executeTrigger(Trigger* trigger, Line* line,
-                        const QString& matchedText); // Execute trigger action
+                        const QString& matchedText) override; // Execute trigger action
     void executeTriggerScript(Trigger* trigger,
                               const QString& matchedText); // Execute Lua script callback
     QString replaceWildcards(const QString& text,
@@ -1437,8 +1438,8 @@ class WorldDocument : public QObject {
     {
         m_automationRegistry->rebuildAliasArray();
     }
-    void executeAlias(Alias* alias, const QString& command);       // Execute alias action
-    void executeAliasScript(Alias* alias, const QString& command); // Execute Lua script callback
+    void executeAlias(Alias* alias, const QString& command) override; // Execute alias action
+    void executeAliasScript(Alias* alias, const QString& command);    // Execute Lua script callback
 
     // ========== Trigger/Alias XML Serialization ==========
     void saveTriggersToXml(class QXmlStreamWriter& xml); // Save triggers to XML
@@ -1521,8 +1522,8 @@ class WorldDocument : public QObject {
     }
 
     // ========== Timer Execution ==========
-    void executeTimer(Timer* timer, const QString& name);       // Execute a fired timer
-    void executeTimerScript(Timer* timer, const QString& name); // Execute Lua script callback
+    void executeTimer(Timer* timer, const QString& name) override; // Execute a fired timer
+    void executeTimerScript(Timer* timer, const QString& name);    // Execute Lua script callback
 
     // ========== Plugin Timer Execution ==========
     void checkPluginTimerList(Plugin* plugin)
@@ -1530,7 +1531,7 @@ class WorldDocument : public QObject {
         m_automationRegistry->checkPluginTimerList(plugin);
     }
     void executePluginTimer(Plugin* plugin, Timer* timer,
-                            const QString& name); // Execute plugin timer
+                            const QString& name) override; // Execute plugin timer
     void executePluginTimerScript(Plugin* plugin, Timer* timer,
                                   const QString& name); // Execute plugin timer script
 
@@ -1611,7 +1612,7 @@ class WorldDocument : public QObject {
     {
         return m_CurrentPlugin;
     } // Get currently executing plugin
-    void setCurrentPlugin(Plugin* plugin)
+    void setCurrentPlugin(Plugin* plugin) override
     {
         m_CurrentPlugin = plugin;
     } // Set currently executing plugin
@@ -1622,9 +1623,10 @@ class WorldDocument : public QObject {
                       qint16 charset, qint16 pitchAndFamily); // Add font to miniwindow
 
     // ========== Plugin Callbacks ==========
-    void SendToAllPluginCallbacks(const QString& callbackName); // Call all plugins (no args)
+    void
+    SendToAllPluginCallbacks(const QString& callbackName) override; // Call all plugins (no args)
     bool SendToAllPluginCallbacks(const QString& callbackName, const QString& arg,
-                                  bool bStopOnFalse = false); // Call all plugins (1 arg)
+                                  bool bStopOnFalse = false) override; // Call all plugins (1 arg)
     bool SendToAllPluginCallbacks(const QString& callbackName, qint32 arg1, const QString& arg2,
                                   bool bStopOnTrue = false); // Call all plugins (int + string)
     bool SendToAllPluginCallbacks(const QString& callbackName, qint32 arg1, qint32 arg2,
@@ -1721,6 +1723,34 @@ class WorldDocument : public QObject {
     QString RecallText(const QString& searchText, bool matchCase, bool useRegex, bool includeOutput,
                        bool includeCommands, bool includeNotes, int lineCount,
                        const QString& linePreamble);
+
+    // ========== IWorldContext Implementation ==========
+    const std::vector<std::unique_ptr<Plugin>>& pluginList() const override
+    {
+        return m_PluginList;
+    }
+    Plugin* currentPlugin() const override
+    {
+        return m_CurrentPlugin;
+    }
+    bool triggersEnabled() const override
+    {
+        return m_enable_triggers;
+    }
+    bool timersEnabled() const override
+    {
+        return m_bEnableTimers;
+    }
+    const std::deque<QString>& recentLines() const override
+    {
+        return m_recentLines;
+    }
+    void unregisterNotepad(NotepadWidget* notepad) override
+    {
+        UnregisterNotepad(notepad);
+    }
+    bool isConnectedToMud() const override;
+    void flushLogIfNeeded() override;
 
   signals:
     void worldNameChanged(const QString& name);

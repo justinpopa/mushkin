@@ -13,7 +13,8 @@
 #include "../automation/trigger.h"
 #include "world_error.h"
 
-class WorldDocument;
+#include "world_context.h"
+
 class Line;
 class Plugin;
 
@@ -30,10 +31,10 @@ class Plugin;
  */
 class AutomationRegistry {
   public:
-    explicit AutomationRegistry(WorldDocument& doc);
+    explicit AutomationRegistry(IWorldContext& ctx);
     ~AutomationRegistry() = default;
 
-    // Non-copyable, non-movable (holds a WorldDocument&)
+    // Non-copyable, non-movable (holds an IWorldContext&)
     AutomationRegistry(const AutomationRegistry&) = delete;
     AutomationRegistry& operator=(const AutomationRegistry&) = delete;
 
@@ -97,7 +98,7 @@ class AutomationRegistry {
     void checkPluginTimerList(Plugin* plugin);
 
   private:
-    WorldDocument& m_doc;
+    IWorldContext& m_ctx;
 };
 
 #endif // AUTOMATION_REGISTRY_H

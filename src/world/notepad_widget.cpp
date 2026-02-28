@@ -1,5 +1,6 @@
 #include "notepad_widget.h"
-#include "../world/world_document.h"
+#include "world_context.h"
+#include "world_document.h"
 #include <QColor>
 #include <QFile>
 #include <QFileInfo>
@@ -7,10 +8,9 @@
 #include <QTextStream>
 #include <QVBoxLayout>
 
-NotepadWidget::NotepadWidget(WorldDocument* parent, const QString& title, const QString& contents,
+NotepadWidget::NotepadWidget(IWorldContext* ctx, const QString& title, const QString& contents,
                              QWidget* mdiParent)
-    : QWidget(mdiParent), m_strTitle(title), m_pRelatedWorld(parent),
-      m_iUniqueDocumentNumber(parent ? parent->m_iUniqueDocumentNumber : 0),
+    : QWidget(mdiParent), m_strTitle(title), m_pWorldContext(ctx), m_iUniqueDocumentNumber(0),
       m_pMdiSubWindow(nullptr), m_iFontSize(10), m_iFontWeight(QFont::Normal), m_iFontCharset(0),
       m_bFontItalic(false), m_bFontUnderline(false), m_bFontStrikeout(false),
       m_textColour(qRgb(0, 0, 0)), m_backColour(qRgb(255, 255, 255)), m_bReadOnly(false),
@@ -21,27 +21,31 @@ NotepadWidget::NotepadWidget(WorldDocument* parent, const QString& title, const 
     // Set initial content
     m_pTextEdit->setPlainText(contents);
 
-    // Apply default font/colors from world if available
-    if (parent) {
-        m_strFontName = parent->m_input_font_name;
-        m_iFontSize = parent->m_input_font_height;
-        m_iFontWeight = parent->m_input_font_weight;
-        m_iFontCharset = parent->m_input_font_charset;
-        m_textColour = parent->m_input_text_colour;
-        m_backColour = parent->m_input_background_colour;
+    // Apply default font/colors from world if available.
+    // We cast to WorldDocument* for the concrete member access during init; this is safe
+    // because the only concrete type implementing IWorldContext is WorldDocument.
+    if (ctx) {
+        WorldDocument* doc = static_cast<WorldDocument*>(ctx);
+        m_iUniqueDocumentNumber = doc->m_iUniqueDocumentNumber;
+        m_strFontName = doc->m_input_font_name;
+        m_iFontSize = doc->m_input_font_height;
+        m_iFontWeight = doc->m_input_font_weight;
+        m_iFontCharset = doc->m_input_font_charset;
+        m_textColour = doc->m_input_text_colour;
+        m_backColour = doc->m_input_background_colour;
 
         ApplyFont();
         ApplyColours();
 
         // Register with world
-        parent->RegisterNotepad(this);
+        doc->RegisterNotepad(this);
     }
 }
 
 NotepadWidget::~NotepadWidget()
 {
-    if (m_pRelatedWorld) {
-        m_pRelatedWorld->UnregisterNotepad(this);
+    if (m_pWorldContext) {
+        m_pWorldContext->unregisterNotepad(this);
     }
 }
 

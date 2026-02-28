@@ -115,8 +115,8 @@ The migration notes mark this as "acceptable — C library interop pattern," but
 **Risk:** All 5 extracted subsystems hold `WorldDocument&` back-references and access public members directly. Makes isolation testing impossible.
 
 **Targets:**
-- [ ] Define interface (e.g., `IWorldContext`) that exposes only necessary services
-- [ ] Inject into subsystems instead of full `WorldDocument&`
+- [x] Define interface (e.g., `IWorldContext`) that exposes only necessary services — `src/world/world_context.h` with 12 pure virtual methods (plugin dispatch, automation execution, state queries, logging, output, notepad)
+- [x] Inject into subsystems instead of full `WorldDocument&` — Phase 1 complete: AutomationRegistry, SoundManager, NotepadWidget now take `IWorldContext&`/`IWorldContext*`. Phase 2 (ScriptEngine, ConnectionManager, TelnetParser, MXPEngine) deferred — 60-80+ accesses each.
 
 **Acceptance:** Subsystems depend on abstract interface, not concrete WorldDocument. Aspirational — may require multiple passes.
 

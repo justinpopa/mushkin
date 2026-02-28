@@ -6,7 +6,7 @@
 #include <QTextEdit>
 #include <QWidget>
 
-class WorldDocument;
+class IWorldContext;
 class QMdiSubWindow;
 
 // Notepad type enumeration
@@ -42,7 +42,7 @@ class NotepadWidget : public QWidget {
     Q_OBJECT
 
   public:
-    explicit NotepadWidget(WorldDocument* parent, const QString& title, const QString& contents,
+    explicit NotepadWidget(IWorldContext* ctx, const QString& title, const QString& contents,
                            QWidget* mdiParent = nullptr);
     ~NotepadWidget() override;
 
@@ -64,7 +64,7 @@ class NotepadWidget : public QWidget {
 
     // Public members (matching original MUSHclient's public member access pattern)
     QString m_strTitle;                      // Window title
-    WorldDocument* m_pRelatedWorld;          // Parent world
+    IWorldContext* m_pWorldContext;          // Parent world context
     qint64 m_iUniqueDocumentNumber;          // World instance ID
     QPointer<QMdiSubWindow> m_pMdiSubWindow; // Parent MDI window (null-safe observing pointer)
 

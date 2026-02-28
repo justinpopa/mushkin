@@ -37,7 +37,7 @@
 class QAudioEngine;
 class QAudioListener;
 class QSpatialSound;
-class WorldDocument;
+class IWorldContext;
 
 inline constexpr int MAX_SOUND_BUFFERS = 10;
 
@@ -50,7 +50,7 @@ struct SoundBuffer {
 
 class SoundManager {
   public:
-    explicit SoundManager(WorldDocument& doc);
+    explicit SoundManager(IWorldContext& ctx);
     ~SoundManager();
 
     SoundManager(const SoundManager&) = delete;
@@ -79,7 +79,7 @@ class SoundManager {
     void cleanup();
 
   private:
-    WorldDocument& m_doc;
+    IWorldContext& m_ctx;
 
     // UAF guard: set to false in cleanup(); MSP lambdas weak_ptr-check before use.
     std::shared_ptr<bool> m_alive{std::make_shared<bool>(true)};

@@ -30,7 +30,7 @@
 #include "sound_manager.h"
 #include "lua_api/lua_common.h" // For error codes: eOK, eCannotPlaySound
 #include "view_interfaces.h"
-#include "world_document.h"
+#include "world_context.h"
 #include <QAudioEngine>
 #include <QAudioListener>
 #include <QDir>
@@ -50,7 +50,7 @@
 // Construction / destruction
 // ---------------------------------------------------------------------------
 
-SoundManager::SoundManager(WorldDocument& doc) : m_doc(doc)
+SoundManager::SoundManager(IWorldContext& ctx) : m_ctx(ctx)
 {
     // m_soundBuffers is value-initialised by the aggregate initialiser in the header.
     // The audio engine is lazy-created on first playSound() call.
@@ -472,8 +472,9 @@ void SoundManager::playMSPSound(const QString& filename, const QString& url, boo
     QDir().mkpath(cacheDir);
 
     // Create network manager for this download (will be deleted when done).
-    // Parent is &m_doc so the manager lifetime is bounded by the document.
-    QNetworkAccessManager* manager = new QNetworkAccessManager(&m_doc);
+    // No Qt parent: manager->deleteLater() is called in the reply finished handler
+    // (both success and early-exit paths), so lifetime is bounded by the reply.
+    QNetworkAccessManager* manager = new QNetworkAccessManager(nullptr);
     QUrl downloadQUrl(downloadUrl);
     QNetworkRequest netRequest(downloadQUrl);
     netRequest.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
@@ -577,7 +578,7 @@ QString SoundManager::resolveFilePath(const QString& filename)
  */
 bool SoundManager::isWindowActive()
 {
-    IOutputView* view = m_doc.activeOutputView();
+    IOutputView* view = m_ctx.activeOutputView();
     if (!view)
         return false;
 
