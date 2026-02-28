@@ -103,6 +103,8 @@ extern int L_GetGlobalOptionList(lua_State* L);
 // Command and queue functions
 extern int L_Queue(lua_State* L);
 extern int L_DiscardQueue(lua_State* L);
+extern int L_DoCommand(lua_State* L);
+extern int L_GetInternalCommandsList(lua_State* L);
 
 // Color functions
 extern int L_GetNormalColour(lua_State* L);
@@ -537,6 +539,8 @@ int RegisterLuaRoutines(lua_State* L)
         {"GetGlobalOptionList", L_GetGlobalOptionList},
         {"Queue", L_Queue},
         {"DiscardQueue", L_DiscardQueue},
+        {"DoCommand", L_DoCommand},
+        {"GetInternalCommandsList", L_GetInternalCommandsList},
 
         // Color functions
         {"GetNormalColour", L_GetNormalColour},

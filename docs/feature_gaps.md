@@ -104,8 +104,8 @@
 **Effort:** Small
 **Source:** `methods_commands.cpp`, `methods_info.cpp`
 
-- [ ] `DoCommand` — execute a MUSHclient internal command (slash-command)
-- [ ] `GetInternalCommandsList` — list all available internal commands
+- [x] `DoCommand` — execute a MUSHclient internal command (dispatch table)
+- [x] `GetInternalCommandsList` — list all available internal commands
 - [ ] `Help` — show help for a topic
 - [ ] `GenerateName` — generate a random fantasy name
 - [ ] `ReadNamesFile` — load a name generation file
@@ -230,20 +230,21 @@ These aren't Lua API functions but are architectural/feature gaps.
 - [ ] Peer-to-peer chat protocol implementation
 - [ ] Chat API functions (ChatCall, ChatAccept, ChatMessage, etc.)
 
-### N3 — Internal Slash-Commands
+### N3 — DoCommand API (Done)
 
-**Impact:** Medium — power users expect `/help`, `/save`, `/quit`, etc.
+**Impact:** Medium — plugins use `DoCommand("Save")`, `DoCommand("Connect")`, etc.
 **Effort:** Medium
 
-- [ ] Command parser for `/` prefix commands
-- [ ] `/help`, `/save`, `/quit`, `/reload`, etc.
+- [x] `DoCommand` dispatch table: Connect, Disconnect, Save, ReloadScriptFile, ResetTimers, Pause, Unpause, FreezeOutput, UnfreezeOutput
+- [x] `GetInternalCommandsList` returns all supported command names
 
-### N4 — LuaFileSystem (lfs)
+### N4 — LuaFileSystem (lfs) (Done)
 
 **Impact:** Medium — many plugins use `lfs.dir()`, `lfs.mkdir()`, etc.
 **Effort:** Small (bundle existing C library)
 
-- [ ] Bundle `lfs` library and register in Lua state
+- [x] Bundle `lfs` v1.8.0 library (statically linked in third-party)
+- [x] Register in Lua state (`lfs` global + `require("lfs")` support)
 
 ---
 
@@ -258,7 +259,7 @@ These aren't Lua API functions but are architectural/feature gaps.
 | G4 Config Introspection | 3 | Medium | Small | Done (82a1127) |
 | G5 Text Manipulation | 3 | Medium | Small–Med | Not started |
 | G6 Display/UI | 4 | Low–Med | Small–Med | Not started |
-| G7 Scripting Helpers | 5 | Low–Med | Small | Not started |
+| G7 Scripting Helpers | 5 | Low–Med | Small | 2/5 done |
 | G8 XML/MXP Entities | 3 | Low | Small | Not started |
 | G9 Logging | 1 | Low | Small | Not started |
 | G10 Sound | 1 | Low | Small | Not started |
@@ -266,6 +267,6 @@ These aren't Lua API functions but are architectural/feature gaps.
 | G12 Colour | 2 | Low | Small | Not started |
 | N1 Proxy | — | Medium | Medium | Not started |
 | N2 Chat | — | Low–Med | Large | Not started |
-| N3 Slash-Commands | — | Medium | Medium | Not started |
-| N4 LuaFileSystem | — | Medium | Small | Not started |
+| N3 DoCommand API | — | Medium | Medium | Done |
+| N4 LuaFileSystem | — | Medium | Small | Done |
 | **Total** | **47 + 4 + B1** | | | |
