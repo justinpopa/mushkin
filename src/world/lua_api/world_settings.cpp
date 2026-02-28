@@ -8,6 +8,7 @@
  */
 
 #include "../../automation/plugin.h"
+#include "../../network/world_socket.h"
 #include "../../storage/database.h"
 #include "../../utils/app_paths.h"
 #include "../../world/config_options.h"
@@ -18,7 +19,10 @@
 #include <QCoreApplication>
 #include <QCursor>
 #include <QDir>
+#include <QFileInfo>
 #include <QFontDatabase>
+#include <QGuiApplication>
+#include <QHostAddress>
 #include <QHostInfo>
 #include <QLocale>
 #include <QRegularExpression>
@@ -713,8 +717,13 @@ int L_GetInfo(lua_State* L)
 
         case 61: // IP address from socket connection
         {
-            // TODO: Extract IP from the active connection socket
-            lua_pushstring(L, "");
+            if (pDoc->m_connectionManager->isConnected() && pDoc->m_connectionManager->m_pSocket) {
+                QString addr = pDoc->m_connectionManager->m_pSocket->peerAddress();
+                QByteArray ba = addr.toUtf8();
+                lua_pushlstring(L, ba.constData(), ba.length());
+            } else {
+                lua_pushstring(L, "");
+            }
         } break;
 
         case 62: // Proxy server (removed in original)
@@ -761,8 +770,16 @@ int L_GetInfo(lua_State* L)
 
         case 67: // World file directory
         {
-            // TODO: Extract directory from world file path
-            lua_pushstring(L, "");
+            if (!pDoc->m_strWorldFilePath.isEmpty()) {
+                QString dir = QFileInfo(pDoc->m_strWorldFilePath).path();
+                if (!dir.endsWith("/")) {
+                    dir += "/";
+                }
+                QByteArray ba = dir.toUtf8();
+                lua_pushlstring(L, ba.constData(), ba.length());
+            } else {
+                lua_pushstring(L, "");
+            }
         } break;
 
         case 68: // Working directory
@@ -949,10 +966,8 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 111: // World modified (IsModified)
-        {
-            // TODO: Track world modified state
-            lua_pushboolean(L, false);
-        } break;
+            lua_pushboolean(L, pDoc->isModified());
+            break;
 
         case 112: // Mapping enabled
         {
@@ -1115,23 +1130,30 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 225: // Count of custom MXP elements
-            // TODO: Add MXP custom element support
-            lua_pushinteger(L, 0);
+            lua_pushinteger(L,
+                            static_cast<lua_Integer>(pDoc->m_mxpEngine->m_customElementMap.size()));
             break;
 
         case 226: // Count of custom MXP entities
-            // TODO: Add MXP custom entity support
-            lua_pushinteger(L, 0);
+            lua_pushinteger(L,
+                            static_cast<lua_Integer>(pDoc->m_mxpEngine->m_customEntityMap.size()));
             break;
 
         case 227: // Connection phase
             lua_pushinteger(L, pDoc->m_connectionManager->m_iConnectPhase);
             break;
 
-        case 228: // IP address (as integer)
-            // TODO: Convert QHostAddress to integer
-            lua_pushinteger(L, 0);
-            break;
+        case 228: // IP address as integer (host byte order)
+        {
+            if (pDoc->m_connectionManager->isConnected() && pDoc->m_connectionManager->m_pSocket) {
+                QHostAddress addr(pDoc->m_connectionManager->m_pSocket->peerAddress());
+                bool ok = false;
+                quint32 ipv4 = addr.toIPv4Address(&ok);
+                lua_pushinteger(L, ok ? static_cast<lua_Integer>(ipv4) : 0);
+            } else {
+                lua_pushinteger(L, 0);
+            }
+        } break;
 
         case 229: // Proxy (always 0 - proxy support removed)
             lua_pushinteger(L, 0);
@@ -1461,79 +1483,112 @@ int L_GetInfo(lua_State* L)
             lua_pushinteger(L, pDoc->m_computedTextRectangle.bottom());
             break;
 
-        case 294: // Scroll bar max position
-            // TODO: Add scroll bar position tracking
-            lua_pushinteger(L, 0);
-            break;
+        case 294: // State of keyboard modifier keys and mouse buttons
+        {
+            // Based on: GetKeyState(VK_*) bitmask in original.
+            // Qt cannot distinguish L/R modifier keys or lock-key toggle states
+            // portably. Bits 0x08-0x100 (L/R variants) and 0x200-0x8000 (lock
+            // key states) are always 0 on non-Windows platforms.
+            long result = 0;
+            Qt::KeyboardModifiers mods = QGuiApplication::queryKeyboardModifiers();
+            if (mods & Qt::ShiftModifier)
+                result |= 0x01;
+            if (mods & Qt::ControlModifier)
+                result |= 0x02;
+            if (mods & Qt::AltModifier)
+                result |= 0x04;
+            Qt::MouseButtons btns = QGuiApplication::mouseButtons();
+            if (btns & Qt::LeftButton)
+                result |= 0x10000;
+            if (btns & Qt::RightButton)
+                result |= 0x20000;
+            if (btns & Qt::MiddleButton)
+                result |= 0x40000;
+            lua_pushinteger(L, static_cast<lua_Integer>(result));
+        } break;
 
-        case 295: // Scroll bar page size
-            // TODO: Add scroll bar page size tracking
-            lua_pushinteger(L, 0);
+        case 295: // Times output window redrawn
+            lua_pushinteger(L, static_cast<lua_Integer>(pDoc->m_iOutputWindowRedrawCount));
             break;
 
         case 296: // Output window scroll bar position
-            // Based on: methods_info.cpp
             if (pDoc->m_pActiveOutputView) {
-                // Return current scroll position in pixels (Y coordinate)
                 lua_pushinteger(L, pDoc->m_pActiveOutputView->getScrollPositionPixels());
             } else {
                 lua_pushnil(L);
             }
             break;
 
-        case 297: // Horizontal scroll bar position
-            // TODO: Add horizontal scroll bar tracking
-            lua_pushinteger(L, 0);
+        case 297: // High-resolution timer frequency
+            // Original: App.m_iCounterFrequency (QueryPerformanceFrequency).
+            // Qt uses millisecond timers, so frequency is 1000.0.
+            lua_pushnumber(L, 1000.0);
             break;
 
-        case 298: // Horizontal scroll bar max position
-            // TODO: Add horizontal scroll bar tracking
-            lua_pushinteger(L, 0);
+        case 298: // SQLite3 version number
+            lua_pushinteger(L, static_cast<lua_Integer>(sqlite3_libversion_number()));
             break;
 
-        case 299: // Horizontal scroll bar page size
-            // TODO: Add horizontal scroll bar tracking
-            lua_pushinteger(L, 0);
+        case 299: // ANSI code page (UTF-8 = 65001)
+            lua_pushinteger(L, 65001);
             break;
 
-        case 300: // Commands in history buffer
-            // TODO: Add input history tracking
-            lua_pushinteger(L, 0);
+        case 300: // OEM code page (UTF-8 = 65001)
+            lua_pushinteger(L, 65001);
             break;
 
-        case 301: // Number of sent packets
-            // TODO: Distinguish between sent packets and sent lines
-            lua_pushinteger(L, pDoc->m_connectionManager->m_nTotalLinesSent);
-            break;
-
-        case 302: // Connect time (seconds since connected)
-            // TODO: Track connection start time
-            lua_pushnumber(L, 0.0);
-            break;
-
-        case 303: // Number of MXP elements
-            // TODO: Add MXP element tracking
-            lua_pushinteger(L, 0);
-            break;
-
-        case 304: // Locale
+        case 301: // Time connected (DATE \u2014 epoch seconds)
         {
-            QString locale = QLocale::system().name();
-            QByteArray ba = locale.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            const QDateTime& ct = pDoc->m_connectionManager->m_tConnectTime;
+            if (ct.isValid()) {
+                lua_pushnumber(L, static_cast<lua_Number>(ct.toSecsSinceEpoch()));
+            } else {
+                lua_pushnil(L);
+            }
         } break;
 
-        case 305: // Client start time (when application started)
-            // TODO: Track application start time
-            // Original: App.m_whenClientStarted
-            lua_pushnumber(L, 0.0);
+        case 302: // Time log file last flushed (DATE \u2014 epoch seconds)
+        {
+            if (pDoc->m_LastFlushTime.isValid()) {
+                lua_pushnumber(L,
+                               static_cast<lua_Number>(pDoc->m_LastFlushTime.toSecsSinceEpoch()));
+            } else {
+                lua_pushnil(L);
+            }
+        } break;
+
+        case 303: // Script file modification time (DATE \u2014 epoch seconds)
+        {
+            if (pDoc->m_timeScriptFileMod.isValid()) {
+                lua_pushnumber(
+                    L, static_cast<lua_Number>(pDoc->m_timeScriptFileMod.toSecsSinceEpoch()));
+            } else {
+                lua_pushnil(L);
+            }
+        } break;
+
+        case 304: // Current time (DATE \u2014 epoch seconds)
+            lua_pushnumber(L, static_cast<lua_Number>(QDateTime::currentSecsSinceEpoch()));
             break;
 
-        case 306: // World start time (when world connected)
-            // TODO: Track world connection start time
-            // Original: m_whenWorldStarted
-            lua_pushnumber(L, 0.0);
-            break;
+        case 305: // Client start time (DATE \u2014 epoch seconds)
+        {
+            // No global app-start timestamp exists yet.
+            // Static captures time at first call as approximation.
+            // TODO: Capture true start time in main() and expose via singleton.
+            static const qint64 s_appStartSecs = QDateTime::currentSecsSinceEpoch();
+            lua_pushnumber(L, static_cast<lua_Number>(s_appStartSecs));
+        } break;
+
+        case 306: // World start time (DATE \u2014 epoch seconds)
+        {
+            const QDateTime& ws = pDoc->m_connectionManager->m_whenWorldStarted;
+            if (ws.isValid()) {
+                lua_pushnumber(L, static_cast<lua_Number>(ws.toSecsSinceEpoch()));
+            } else {
+                lua_pushnil(L);
+            }
+        } break;
 
         case 310: // Newlines received count
             lua_pushinteger(L, pDoc->m_newlines_received);

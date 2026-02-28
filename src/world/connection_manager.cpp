@@ -93,6 +93,7 @@ void ConnectionManager::onConnect(int errorCode)
                          << m_doc.m_server << ":" << m_doc.m_port;
         m_iConnectPhase = CONNECT_CONNECTED_TO_MUD;
         m_tConnectTime = QDateTime::currentDateTime();
+        m_whenWorldStarted = m_tConnectTime;
 
         // Reset telnet parser state.
         m_doc.m_telnetParser->reset();

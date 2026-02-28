@@ -28,6 +28,7 @@ class WorldSocket : public QObject {
     std::expected<qint64, QString> send(std::span<const char> data);
     std::expected<qint64, QString> receive(std::span<char> buffer);
     bool isConnected() const;
+    [[nodiscard]] QString peerAddress() const;
 
     WorldDocument* m_pDoc;
     QString m_outstanding_data;
