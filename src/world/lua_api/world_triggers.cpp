@@ -310,7 +310,7 @@ int L_GetTrigger(lua_State* L)
     lua_pushstring(L, trigger->trigger.toUtf8().constData());
     lua_pushstring(L, trigger->contents.toUtf8().constData());
     lua_pushnumber(L, flags);
-    lua_pushnumber(L, trigger->colour == -1 ? -1 : trigger->colour);
+    lua_pushnumber(L, trigger->colour);
     lua_pushnumber(L, trigger->clipboard_arg);
     lua_pushstring(L, trigger->sound_to_play.toUtf8().constData());
     lua_pushstring(L, trigger->procedure.toUtf8().constData());

@@ -65,7 +65,7 @@ The migration notes mark this as "acceptable — C library interop pattern," but
 
 **Targets:**
 - [x] `src/automation/trigger.h`, `alias.h`, `timer.h` — `quint16 send_to` → `SendTo` enum class
-- [ ] `src/automation/trigger.h` — `quint16 match_type` → `enum class MatchType` (Sonnet found `TRIGGER_MATCH_*` #defined in two separate .cpp files)
+- [x] `src/automation/trigger.h` — `match_type` stays `quint16` by design: it's a compound bitmask (color indices in bits 4-11, style flags in bits 12-15, color presence in bits 7/11). Not suitable for `enum class`. Documented in trigger.h:36-53. `TRIGGER_MATCH_*` constants consolidated as `inline constexpr` in trigger.h.
 - [x] `src/automation/trigger.h` — `TRIGGER_COLOUR_CHANGE_*` constants → `enum class ColourChangeType`
 
 **Acceptance:** All automation "type" fields use proper enum class. Build + test pass.
@@ -295,7 +295,7 @@ Note: Lua API boundary functions intentionally return integers (Lua convention).
 **Risk:** `world_triggers.cpp:313` — comparison is always false, indicating dead code or a type error. Related to uncompleted P2b (`match_type` still `quint16`).
 
 **Targets:**
-- [ ] `src/world/lua_api/world_triggers.cpp:313` — fix comparison or convert `match_type` to `enum class MatchType` (P2b)
+- [x] `src/world/lua_api/world_triggers.cpp:313` — removed dead `trigger->colour == -1 ? -1 : trigger->colour` ternary (quint16 can never equal -1; simplified to `trigger->colour`)
 
 **Acceptance:** Zero `-Wtautological` warnings. Build + test pass.
 
