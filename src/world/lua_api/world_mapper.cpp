@@ -3,12 +3,12 @@
  *
  * Implements the MUSHclient mapper API: AddToMapper, AddMapperComment,
  * DeleteAllMapItems, DeleteLastMapItem, EnableMapping, GetMappingCount,
- * GetMappingItem, GetMappingString, Mapping, GetMapColour, MapColour,
- * MapColourList, RemoveMapReverses.
+ * GetMappingItem, GetMappingString, GetMapping, SetMapping, GetMapColour,
+ * MapColour, MapColourList, GetRemoveMapReverses, SetRemoveMapReverses.
  *
  * Map list entries are stored as:
  *   - Short direction:   "n", "s", "ne", etc.
- *   - Special move:      "forward_part/reverse_part"  e.g. "climb tree/down"
+ *   - Special move:      "forward_part/reverse_part"  e.g. "climb tree/close door"
  *   - Comment:           "{text}"
  */
 
@@ -39,8 +39,11 @@ struct MapDirection {
  * GetMappingString will emit (e.g. "n").  The reverse field is always the
  * abbreviation of the opposite direction (e.g. "s").
  *
- * One-char abbreviations are included so AddToMapper("n") can normalise and
- * detect reverses without a separate code-path.
+ * One-char abbreviations are included so the auto-mapping path can normalise
+ * directions without a separate code-path.
+ *
+ * The "f" entry is a self-reversing filler direction used by some MUSHclient
+ * scripts.
  */
 static const std::unordered_map<std::string_view, MapDirection> kDirectionMap = {
     // Long names
@@ -50,10 +53,6 @@ static const std::unordered_map<std::string_view, MapDirection> kDirectionMap = 
     {"west", {"w", "e"}},
     {"up", {"u", "d"}},
     {"down", {"d", "u"}},
-    {"northeast", {"ne", "sw"}},
-    {"northwest", {"nw", "se"}},
-    {"southeast", {"se", "nw"}},
-    {"southwest", {"sw", "ne"}},
     // Short names (abbrevs)
     {"n", {"n", "s"}},
     {"s", {"s", "n"}},
@@ -65,6 +64,8 @@ static const std::unordered_map<std::string_view, MapDirection> kDirectionMap = 
     {"nw", {"nw", "se"}},
     {"se", {"se", "nw"}},
     {"sw", {"sw", "ne"}},
+    // Self-reversing filler direction
+    {"f", {"f", "f"}},
 };
 
 /**
@@ -87,18 +88,13 @@ static bool containsInvalidChar(std::string_view s)
 // ========== Lua API Functions ==========
 
 /**
- * world.AddToMapper(direction [, reverse])
+ * world.AddToMapper(direction, reverse)
  *
  * Adds one step to the in-memory map list.
  *
- * With two arguments the entry is stored as "direction/reverse".
- * With one argument:
- *   - If the direction is a recognised compass direction (long or short form)
- *     the stored short_form is used.
- *   - Otherwise the text is stored as-is.
- *
- * If m_bRemoveMapReverses is true and the last entry in the list is the
- * reverse of this direction, that entry is popped instead of appending.
+ * Always requires exactly two arguments: direction and reverse.
+ * Both arguments are stored verbatim as "direction/reverse" (no normalization).
+ * Either argument alone may be an empty string, but not BOTH at the same time.
  *
  * Validation: neither argument may contain { } ( ) / \
  *
@@ -108,46 +104,20 @@ int L_AddToMapper(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    int nargs = lua_gettop(L);
-
     const char* dir_raw = luaL_checkstring(L, 1);
-    std::string_view dir_sv(dir_raw);
+    const char* rev_raw = luaL_checkstring(L, 2);
 
-    if (dir_sv.empty() || containsInvalidChar(dir_sv))
+    std::string_view dir_sv(dir_raw);
+    std::string_view rev_sv(rev_raw);
+
+    // Reject only when BOTH are empty; either one alone being empty is acceptable
+    if (dir_sv.empty() && rev_sv.empty())
         return luaReturnError(L, eBadMapItem);
 
-    if (nargs >= 2) {
-        // Two-argument form: "direction/reverse"
-        const char* rev_raw = luaL_checkstring(L, 2);
-        std::string_view rev_sv(rev_raw);
+    if (containsInvalidChar(dir_sv) || containsInvalidChar(rev_sv))
+        return luaReturnError(L, eBadMapItem);
 
-        if (rev_sv.empty() || containsInvalidChar(rev_sv))
-            return luaReturnError(L, eBadMapItem);
-
-        QString entry = QString::fromUtf8(dir_raw) + QChar('/') + QString::fromUtf8(rev_raw);
-        pDoc->m_mapList.append(entry);
-        return luaReturnOK(L);
-    }
-
-    // One-argument form: look up in direction table
-    auto it = kDirectionMap.find(dir_sv);
-    QString entry;
-    QString reverseShort;
-
-    if (it != kDirectionMap.end()) {
-        entry = QString::fromLatin1(it->second.short_form);
-        reverseShort = QString::fromLatin1(it->second.reverse);
-    } else {
-        entry = QString::fromUtf8(dir_raw);
-    }
-
-    // Auto-cancel reverses: if the last item is the opposite direction, pop it.
-    if (pDoc->m_bRemoveMapReverses && !reverseShort.isEmpty() && !pDoc->m_mapList.isEmpty() &&
-        pDoc->m_mapList.last() == reverseShort) {
-        pDoc->m_mapList.removeLast();
-        return luaReturnOK(L);
-    }
-
+    QString entry = QString::fromUtf8(dir_raw) + QChar('/') + QString::fromUtf8(rev_raw);
     pDoc->m_mapList.append(entry);
     return luaReturnOK(L);
 }
@@ -157,6 +127,7 @@ int L_AddToMapper(lua_State* L)
  *
  * Appends a freeform comment to the map list.  The comment is stored as
  * "{comment}" so GetMappingString can distinguish it from direction entries.
+ * An empty comment string is allowed (stored as "{}").
  *
  * @return eOK (0) on success, eBadMapItem (30023) on invalid input.
  */
@@ -167,7 +138,7 @@ int L_AddMapperComment(lua_State* L)
     const char* text = luaL_checkstring(L, 1);
     std::string_view sv(text);
 
-    if (sv.empty() || containsInvalidChar(sv))
+    if (containsInvalidChar(sv))
         return luaReturnError(L, eBadMapItem);
 
     pDoc->m_mapList.append(QChar('{') + QString::fromUtf8(text) + QChar('}'));
@@ -211,17 +182,18 @@ int L_DeleteLastMapItem(lua_State* L)
 }
 
 /**
- * world.EnableMapping(enabled)
+ * world.EnableMapping([enabled])
  *
  * Enables or disables the mapper.
+ * Defaults to true when called with no arguments.
  *
- * @param enabled (boolean) true to enable, false to disable
+ * @param enabled (boolean, optional) true to enable, false to disable (default: true)
  * @return eOK (0)
  */
 int L_EnableMapping(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    pDoc->m_bMapping = lua_toboolean(L, 1) != 0;
+    pDoc->m_bMapping = lua_gettop(L) < 1 || lua_toboolean(L, 1);
     return luaReturnOK(L);
 }
 
@@ -241,10 +213,10 @@ int L_GetMappingCount(lua_State* L)
  * world.GetMappingItem(index)
  *
  * Returns the raw stored string at the given 0-based index.
- * Returns an empty string if the index is out of range.
+ * Returns nil if the index is out of range (VT_NULL in original MUSHclient).
  *
  * @param index (number) 0-based index into the map list
- * @return (string) The stored entry string, or "" if out of range.
+ * @return (string) The stored entry string, or nil if out of range.
  */
 int L_GetMappingItem(lua_State* L)
 {
@@ -253,7 +225,7 @@ int L_GetMappingItem(lua_State* L)
     int index = static_cast<int>(luaL_checknumber(L, 1));
 
     if (index < 0 || index >= pDoc->m_mapList.size()) {
-        lua_pushliteral(L, "");
+        lua_pushnil(L);
         return 1;
     }
 
@@ -269,14 +241,15 @@ int L_GetMappingItem(lua_State* L)
  *
  * Formatting rules:
  *   - Consecutive identical single-char directions are collapsed with a count
- *     prefix: "3n", "2e".
+ *     prefix, capped at 99 per run: "3n ", "99n ".
  *   - Multi-char directions (ne/nw/se/sw) with count > 1 are parenthesized:
- *     "2(ne)".
- *   - Single occurrences are emitted without count: "n", "ne".
- *   - Special moves (entries containing "/") show only the forward part,
- *     parenthesized: "(climb tree)".
- *   - Comments ("{text}") are included as-is.
- *   - Tokens are joined with a single space.
+ *     "2(ne) ".
+ *   - Single occurrences are emitted without count: "n ", "ne ".
+ *   - Special moves (entries containing "/") are parenthesized in full:
+ *     "(open door/close door) ".
+ *   - Comments ("{text}" with length > 2) flush the current run, then are
+ *     separated from surrounding content with \r\n before and after.
+ *   - Tokens are built by appending each token with a trailing space.
  *
  * @return (string) The formatted speedwalk string.
  */
@@ -291,76 +264,95 @@ int L_GetMappingString(lua_State* L)
         return 1;
     }
 
-    QStringList tokens;
+    QString result;
     int i = 0;
     int total = list.size();
+
+    // Helper lambda: flush a direction run into result
+    auto flushRun = [&](const QString& item, int run) {
+        if (run <= 0)
+            return;
+        if (run == 1) {
+            result += item + QChar(' ');
+        } else if (item.size() == 1) {
+            // Single-char direction: "3n "
+            result += QString::number(run) + item + QChar(' ');
+        } else {
+            // Multi-char direction (ne/nw/se/sw): "2(ne) "
+            result += QString::number(run) + QChar('(') + item + QChar(')') + QChar(' ');
+        }
+    };
 
     while (i < total) {
         const QString& item = list.at(i);
 
-        // Comment entry: starts with '{'
-        if (item.startsWith(QChar('{'))) {
-            tokens.append(item);
+        // Comment entry: starts with '{' and ends with '}' with length > 2
+        if (item.startsWith(QChar('{')) && item.endsWith(QChar('}')) && item.size() > 2) {
+            // Flush any accumulated run before the comment (already done inline below)
+            // Prepend \r\n if there is already output
+            if (!result.isEmpty())
+                result += QStringLiteral("\r\n");
+            result += item;
+            result += QStringLiteral("\r\n");
             ++i;
             continue;
         }
 
-        // Special move: contains '/'
+        // Special move: contains '/' — treat entire stored string as one token
         if (item.contains(QChar('/'))) {
-            int slash = item.indexOf(QChar('/'));
-            QString forward = item.left(slash);
-            tokens.append(QChar('(') + forward + QChar(')'));
+            result += QChar('(') + item + QChar(')') + QChar(' ');
             ++i;
             continue;
         }
 
-        // Plain direction: count consecutive identical entries
+        // Plain direction: count consecutive identical entries, capped at 99
         int run = 1;
-        while (i + run < total && list.at(i + run) == item && !item.contains(QChar('/')) &&
-               !item.startsWith(QChar('{'))) {
+        while (run < 99 && i + run < total && list.at(i + run) == item &&
+               !item.contains(QChar('/')) && !item.startsWith(QChar('{'))) {
             ++run;
         }
 
-        if (run == 1) {
-            tokens.append(item);
-        } else if (item.size() == 1) {
-            // Single-char direction: "3n"
-            tokens.append(QString::number(run) + item);
-        } else {
-            // Multi-char direction (ne/nw/se/sw): "2(ne)"
-            tokens.append(QString::number(run) + QChar('(') + item + QChar(')'));
-        }
-
+        flushRun(item, run);
         i += run;
+
+        // If we hit the 99 cap and the next item is the same direction, the
+        // loop will naturally start a new run on the next iteration.
     }
 
-    QByteArray result = tokens.join(QChar(' ')).toUtf8();
-    lua_pushlstring(L, result.constData(), result.size());
+    QByteArray bytes = result.toUtf8();
+    lua_pushlstring(L, bytes.constData(), bytes.size());
     return 1;
 }
 
 /**
- * world.Mapping([enabled])
+ * world.GetMapping()
  *
- * Dual get/set for the mapping active flag.
+ * Returns the current state of the mapping active flag.
  *
- * With no arguments: returns the current boolean value.
- * With one argument: sets the flag and returns eOK.
- *
- * @param enabled (boolean, optional) New value for the flag
- * @return (boolean|number) Current flag (get) or eOK (set)
+ * @return (boolean) true if mapping is enabled, false otherwise.
  */
-int L_Mapping(lua_State* L)
+int L_GetMapping(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-
-    if (lua_gettop(L) >= 1) {
-        pDoc->m_bMapping = lua_toboolean(L, 1) != 0;
-        return luaReturnOK(L);
-    }
-
     lua_pushboolean(L, pDoc->m_bMapping ? 1 : 0);
     return 1;
+}
+
+/**
+ * world.SetMapping([enabled])
+ *
+ * Sets the mapping active flag.
+ * Defaults to true when called with no arguments.
+ *
+ * @param enabled (boolean, optional) New value for the flag (default: true)
+ * @return eOK (0)
+ */
+int L_SetMapping(lua_State* L)
+{
+    WorldDocument* pDoc = doc(L);
+    // Default to true if no argument (optboolean pattern)
+    pDoc->m_bMapping = lua_gettop(L) < 1 || lua_toboolean(L, 1);
+    return luaReturnOK(L);
 }
 
 /**
@@ -432,25 +424,31 @@ int L_MapColourList(lua_State* L)
 }
 
 /**
- * world.RemoveMapReverses([enabled])
+ * world.GetRemoveMapReverses()
  *
- * Dual get/set for the auto-cancel-reverses flag.
+ * Returns the current state of the auto-cancel-reverses flag.
  *
- * With no arguments: returns the current boolean value.
- * With one argument: sets the flag and returns eOK.
- *
- * @param enabled (boolean, optional) New value for the flag
- * @return (boolean|number) Current flag (get) or eOK (set)
+ * @return (boolean) true if auto-cancelling reverses is enabled, false otherwise.
  */
-int L_RemoveMapReverses(lua_State* L)
+int L_GetRemoveMapReverses(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-
-    if (lua_gettop(L) >= 1) {
-        pDoc->m_bRemoveMapReverses = lua_toboolean(L, 1) != 0;
-        return luaReturnOK(L);
-    }
-
     lua_pushboolean(L, pDoc->m_bRemoveMapReverses ? 1 : 0);
     return 1;
+}
+
+/**
+ * world.SetRemoveMapReverses(enabled)
+ *
+ * Sets the auto-cancel-reverses flag.
+ * Requires an explicit boolean argument.
+ *
+ * @param enabled (boolean) New value for the flag
+ * @return eOK (0)
+ */
+int L_SetRemoveMapReverses(lua_State* L)
+{
+    WorldDocument* pDoc = doc(L);
+    pDoc->m_bRemoveMapReverses = lua_toboolean(L, 1) != 0;
+    return luaReturnOK(L);
 }

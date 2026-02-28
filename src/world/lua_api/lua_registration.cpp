@@ -472,11 +472,13 @@ extern int L_EnableMapping(lua_State* L);
 extern int L_GetMappingCount(lua_State* L);
 extern int L_GetMappingItem(lua_State* L);
 extern int L_GetMappingString(lua_State* L);
-extern int L_Mapping(lua_State* L);
+extern int L_GetMapping(lua_State* L);
+extern int L_SetMapping(lua_State* L);
 extern int L_GetMapColour(lua_State* L);
 extern int L_MapColour(lua_State* L);
 extern int L_MapColourList(lua_State* L);
-extern int L_RemoveMapReverses(lua_State* L);
+extern int L_GetRemoveMapReverses(lua_State* L);
+extern int L_SetRemoveMapReverses(lua_State* L);
 
 // Forward declaration of constants registration (defined in lua_constants.cpp)
 extern void register_lua_constants(lua_State* L);
@@ -944,11 +946,13 @@ int RegisterLuaRoutines(lua_State* L)
         {"GetMappingCount", L_GetMappingCount},
         {"GetMappingItem", L_GetMappingItem},
         {"GetMappingString", L_GetMappingString},
-        {"Mapping", L_Mapping},
+        {"GetMapping", L_GetMapping},
+        {"SetMapping", L_SetMapping},
         {"GetMapColour", L_GetMapColour},
         {"MapColour", L_MapColour},
         {"MapColourList", L_MapColourList},
-        {"RemoveMapReverses", L_RemoveMapReverses},
+        {"GetRemoveMapReverses", L_GetRemoveMapReverses},
+        {"SetRemoveMapReverses", L_SetRemoveMapReverses},
 
         {nullptr, nullptr} // Sentinel
     };
