@@ -116,7 +116,18 @@ The migration notes mark this as "acceptable — C library interop pattern," but
 
 **Targets:**
 - [x] Define interface (e.g., `IWorldContext`) that exposes only necessary services — `src/world/world_context.h` with 12 pure virtual methods (plugin dispatch, automation execution, state queries, logging, output, notepad)
-- [x] Inject into subsystems instead of full `WorldDocument&` — Phase 1 complete: AutomationRegistry, SoundManager, NotepadWidget now take `IWorldContext&`/`IWorldContext*`. Phase 2 (ScriptEngine, ConnectionManager, TelnetParser, MXPEngine) deferred — 60-80+ accesses each.
+- [x] Inject into subsystems instead of full `WorldDocument&` — Phase 1 complete: AutomationRegistry, SoundManager, NotepadWidget now take `IWorldContext&`/`IWorldContext*`.
+
+**Phase 2 — deferred (not planned):** The remaining 4 subsystems each have 60-80+ direct accesses to WorldDocument fields and methods, making interface extraction impractical without essentially duplicating the entire WorldDocument public API:
+
+| Subsystem | Accesses | Primary dependencies |
+|:---|:---:|:---|
+| ScriptEngine | 80+ | Lua callbacks, plugin dispatch, output, error reporting |
+| ConnectionManager | 60+ | Socket state, UTF-8 parsing, line buffer, remote server config |
+| TelnetParser | 60+ | ANSI codes, MXP engine, protocol flags, output pipeline |
+| MXPEngine | 60+ | Style flags, colors, line output, sound, tag parsing |
+
+These subsystems are companion objects by design — tightly coupled internal organs of WorldDocument. Further decoupling would require god-class decomposition (P4a) first to reduce the surface area they depend on.
 
 **Acceptance:** Subsystems depend on abstract interface, not concrete WorldDocument. Aspirational — may require multiple passes.
 
