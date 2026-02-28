@@ -28,7 +28,7 @@ class RemoteAccessServer : public QObject {
 
   public:
     explicit RemoteAccessServer(WorldDocument* doc, QObject* parent = nullptr);
-    ~RemoteAccessServer();
+    ~RemoteAccessServer() override;
 
     // Start the server. By default binds to localhost only for security.
     // Pass QHostAddress::Any to allow connections from other machines.

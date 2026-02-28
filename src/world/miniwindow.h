@@ -71,7 +71,7 @@ class MiniWindow : public QObject {
 
   public:
     explicit MiniWindow(WorldDocument* doc, QObject* parent = nullptr);
-    ~MiniWindow();
+    ~MiniWindow() override;
 
     // ========== Basic Properties ==========
 

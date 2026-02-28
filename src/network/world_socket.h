@@ -21,7 +21,7 @@ class WorldSocket : public QObject {
 
   public:
     explicit WorldSocket(WorldDocument* doc, QObject* parent = nullptr);
-    ~WorldSocket();
+    ~WorldSocket() override;
 
     void connectToHost(const QString& host, quint16 port);
     void disconnectFromHost();

@@ -354,7 +354,7 @@ class WorldDocument : public QObject {
 
   public:
     explicit WorldDocument(QObject* parent = nullptr);
-    ~WorldDocument();
+    ~WorldDocument() override;
 
     // Public member variables (for direct port compatibility)
 

@@ -301,6 +301,38 @@ Note: Lua API boundary functions intentionally return integers (Lua convention).
 
 ---
 
+### P5d — Missing `override` on QObject destructors (4 sites) — DONE
+
+**Agreement:** clang-tidy `modernize-use-override`
+**Risk:** Missing `override` on virtual destructors in QObject-derived classes. If the base class destructor signature changed, the derived destructor would silently become a separate function instead of a compile error.
+
+**Targets:**
+- [x] `src/network/world_socket.h:24` — `~WorldSocket()`
+- [x] `src/network/remote_access_server.h:31` — `~RemoteAccessServer()`
+- [x] `src/world/miniwindow.h:74` — `~MiniWindow()`
+- [x] `src/world/world_document.h:357` — `~WorldDocument()`
+
+**Acceptance:** Zero `modernize-use-override` findings. Build + test pass.
+
+---
+
+### P6 — clang-tidy remaining findings (56 findings, style only)
+
+**Agreement:** Full clang-tidy run across all src/ files (2026-02-27)
+**Risk:** None of these are correctness issues. All are style/modernization suggestions.
+
+| Check | Count | Files | Notes |
+|:---|:---:|:---|:---|
+| `modernize-use-trailing-return-type` | 40 | world_document.h, trigger.h, alias.h, timer.h, sendto.h, script_language.h | Style preference (`auto f() -> T`). Consider disabling this check. |
+| `performance-enum-size` | 8 | sendto.h, script_language.h, timer.h, trigger.h, world_document.h, world_error.h | Enums using `int` where `uint8_t` suffices. Minor memory savings. |
+| `modernize-use-default-member-init` | 6 | variable.h, world_document.h (LuaDatabase struct) | Move initializers from constructor to declaration. |
+| `modernize-use-using` | 3 | variable.h (2), world_document.h (1) | `typedef` → `using`. Trivial. |
+| `cppcoreguidelines-avoid-c-arrays` | 2 | style.h, world_document.h | C-style arrays → `std::array`. Already tracked in P2b. |
+
+**Acceptance:** Informational only — fix opportunistically when touching these files.
+
+---
+
 ## Additional Findings (single-model, non-priority)
 
 | Finding | Source | Notes |
