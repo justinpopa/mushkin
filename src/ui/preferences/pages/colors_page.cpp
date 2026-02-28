@@ -8,8 +8,7 @@
 #include <QTableWidget>
 #include <QVBoxLayout>
 
-ColorsPage::ColorsPage(WorldDocument* doc, QWidget* parent)
-    : PreferencesPageBase(doc, parent)
+ColorsPage::ColorsPage(WorldDocument* doc, QWidget* parent) : PreferencesPageBase(doc, parent)
 {
     setupUi();
 }
@@ -20,10 +19,12 @@ void ColorsPage::setupUi()
     mainLayout->setContentsMargins(0, 0, 0, 0);
 
     // Help text
-    QLabel* helpLabel = new QLabel(
-        tr("Custom colors can be used in triggers and other features. "
-           "Each color has a text (foreground) and background component."),
-        this);
+    QLabel* helpLabel =
+        new QLabel(tr("Custom colors can be used in triggers and other features. "
+                      "Each color has a text (foreground) and background component.\n\n"
+                      "Note: ANSI terminal colors (the 16 standard colors used for MUD output) "
+                      "are configured on the Output page."),
+                   this);
     helpLabel->setWordWrap(true);
     mainLayout->addWidget(helpLabel);
 
@@ -154,8 +155,9 @@ void ColorsPage::onBackColorClicked()
         return;
 
     int index = btn->property("colorIndex").toInt();
-    QColor color = QColorDialog::getColor(QColor(m_customBack[index]), this,
-                                          tr("Choose background color for custom %1").arg(index + 1));
+    QColor color =
+        QColorDialog::getColor(QColor(m_customBack[index]), this,
+                               tr("Choose background color for custom %1").arg(index + 1));
 
     if (color.isValid()) {
         m_customBack[index] = color.rgb();

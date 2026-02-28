@@ -86,7 +86,7 @@
 **Description:** Shows a message box: "Reload defaults is not yet implemented."
 
 **Targets:**
-- [ ] Implement reload-defaults functionality or disable/hide the menu item
+- [x] `src/ui/main_window.cpp` — Implemented: loads default trigger/alias/timer/macro/colour XML files from `GlobalOptions` into active world via `ImportXML()`
 
 **Acceptance:** Menu item either works or is hidden/grayed.
 
@@ -100,7 +100,7 @@
 
 **Targets:**
 - [ ] Implement MXP/Pueblo settings or show a more informative placeholder
-- [ ] Remove the redundant inner "MXP / Pueblo" heading
+- [x] `src/ui/preferences/pages/stub_page.cpp` — Removed redundant `<h2>` heading (dialog header already shows page title)
 
 **Acceptance:** Page either has controls or a clean placeholder without duplicate headers.
 
@@ -155,7 +155,7 @@
 
 **Targets:**
 - [x] Renamed "Colors" to "Custom Colors" in tree and page header to clarify scope
-- [ ] Consider moving ANSI palette to the Custom Colors page, or adding a note directing users to Output for ANSI colors
+- [x] `src/ui/preferences/pages/colors_page.cpp` — Added note in help text directing users to Output page for ANSI colors
 
 **Acceptance:** User can find ANSI color settings without confusion.
 

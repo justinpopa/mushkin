@@ -6,6 +6,7 @@
 #include "../utils/app_paths.h"
 #include "../world/notepad_widget.h"
 #include "../world/world_document.h"
+#include "../world/xml_serialization.h"
 #include "dialogs/alias_list_dialog.h"
 #include "dialogs/ascii_art_dialog.h"
 #include "dialogs/command_history_dialog.h"
@@ -2313,8 +2314,55 @@ void MainWindow::globalPreferences()
 
 void MainWindow::reloadDefaults()
 {
-    // TODO: Implement reload defaults functionality
-    QMessageBox::information(this, "Reload Defaults", "Reload defaults is not yet implemented.");
+    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
+    if (!activeSubWindow) {
+        statusBar()->showMessage("No active world", 3000);
+        return;
+    }
+
+    WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
+    if (!worldWidget) {
+        statusBar()->showMessage("No active world", 3000);
+        return;
+    }
+
+    WorldDocument* doc = worldWidget->document();
+    if (!doc) {
+        statusBar()->showMessage("No active world", 3000);
+        return;
+    }
+
+    const auto& opts = GlobalOptions::instance();
+
+    const std::array<std::pair<QString, int>, 5> defaultFiles = {{
+        {opts.defaultTriggersFile(), XML_TRIGGERS},
+        {opts.defaultAliasesFile(), XML_ALIASES},
+        {opts.defaultTimersFile(), XML_TIMERS},
+        {opts.defaultMacrosFile(), XML_MACROS},
+        {opts.defaultColoursFile(), XML_COLOURS},
+    }};
+
+    int totalImported = 0;
+    int filesProcessed = 0;
+
+    for (const auto& [path, flag] : defaultFiles) {
+        if (path.isEmpty())
+            continue;
+
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+            continue;
+
+        totalImported += XmlSerialization::ImportXML(doc, QString::fromUtf8(file.readAll()), flag);
+        ++filesProcessed;
+    }
+
+    if (filesProcessed == 0) {
+        statusBar()->showMessage(tr("No default files configured"), 3000);
+    } else {
+        statusBar()->showMessage(tr("Reloaded defaults: %1 item(s) imported").arg(totalImported),
+                                 3000);
+    }
 }
 
 void MainWindow::toggleLogSession()

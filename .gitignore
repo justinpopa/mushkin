@@ -84,3 +84,6 @@ plugins/
 6.*/
 aqtinstall.log
 docs/wiki/
+
+# Reference copies of original MUSHclient source (not part of this project)
+reference/
