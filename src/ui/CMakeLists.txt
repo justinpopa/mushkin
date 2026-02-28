@@ -179,6 +179,8 @@ add_library(ui
     # Lua dialog callback registration
     lua_dialog_registration.h
     lua_dialog_registration.cpp
+    # DoCommand UI dispatch
+    main_window_commands.cpp
 )
 
 target_link_libraries(ui PUBLIC

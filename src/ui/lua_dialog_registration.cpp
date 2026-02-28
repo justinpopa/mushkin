@@ -10,6 +10,7 @@
 #include "dialogs/lua_choose_list_dialog.h"
 #include "dialogs/lua_choose_list_multi_dialog.h"
 #include "dialogs/lua_input_box_dialog.h"
+#include "docommand_callbacks.h"
 #include "lua_dialog_callbacks.h"
 #include "main_window.h"
 #include "views/output_view.h"
@@ -212,6 +213,12 @@ void registerDialogCallbacks()
     InfoBarCallbacks::setInfoBarSetColorCallback(infoBarSetColorImpl);
     InfoBarCallbacks::setInfoBarSetFontCallback(infoBarSetFontImpl);
     InfoBarCallbacks::setInfoBarSetBackgroundCallback(infoBarSetBackgroundImpl);
+
+    // Register DoCommand UI callback
+    DoCommandCallbacks::set([](const char* name) -> int {
+        MainWindow* mainWindow = getMainWindow();
+        return mainWindow ? mainWindow->executeDoCommand(name) : 30054;
+    });
 }
 
 } // namespace LuaDialogRegistration

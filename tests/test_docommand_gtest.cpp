@@ -7,8 +7,10 @@
  * 2. world.GetInternalCommandsList is registered as a function in the world table
  * 3. GetInternalCommandsList() returns a table
  * 4. GetInternalCommandsList() contains all expected command names
- * 5. GetInternalCommandsList() returns exactly 9 entries
+ * 5. GetInternalCommandsList() returns 252 entries (9 original + 17 direction/action +
+ *    36 macro + 30 keypad + 17 alt + ~143 UI commands)
  * 6. DoCommand() returns eNoSuchCommand (30054) for an unknown command name
+ * 7. Spot-checks: North, CascadeWindows, Find, MacroF1, ConfigureAliases, AltA
  */
 
 #include "../src/world/script_engine.h"
@@ -88,7 +90,7 @@ TEST_F(DoCommandTest, GetInternalCommandsListCorrectCount)
     ASSERT_TRUE(lua_isnumber(L, -1)) << "# operator should return a number";
     int count = static_cast<int>(lua_tointeger(L, -1));
     lua_pop(L, 1);
-    EXPECT_EQ(count, 9) << "GetInternalCommandsList() should contain exactly 9 entries";
+    EXPECT_EQ(count, 252) << "GetInternalCommandsList() should contain exactly 252 entries";
 }
 
 TEST_F(DoCommandTest, GetInternalCommandsListContainsConnect)
@@ -228,6 +230,87 @@ TEST_F(DoCommandTest, DoCommandRejectsUnknownCommand)
     int error_code = static_cast<int>(lua_tointeger(L, -1));
     lua_pop(L, 1);
     EXPECT_EQ(error_code, 30054) << "Unknown command should return eNoSuchCommand (30054)";
+}
+
+// ========== Spot-checks for newly added commands ==========
+
+TEST_F(DoCommandTest, GetInternalCommandsListContainsNorth)
+{
+    const char* code = "local t = world.GetInternalCommandsList()\n"
+                       "for _, v in ipairs(t) do\n"
+                       "    if v == 'North' then return true end\n"
+                       "end\n"
+                       "return false";
+    int rc = luaL_dostring(L, code);
+    ASSERT_EQ(rc, 0) << lua_tostring(L, -1);
+    EXPECT_TRUE(lua_toboolean(L, -1)) << "'North' should be in GetInternalCommandsList()";
+    lua_pop(L, 1);
+}
+
+TEST_F(DoCommandTest, GetInternalCommandsListContainsCascadeWindows)
+{
+    const char* code = "local t = world.GetInternalCommandsList()\n"
+                       "for _, v in ipairs(t) do\n"
+                       "    if v == 'CascadeWindows' then return true end\n"
+                       "end\n"
+                       "return false";
+    int rc = luaL_dostring(L, code);
+    ASSERT_EQ(rc, 0) << lua_tostring(L, -1);
+    EXPECT_TRUE(lua_toboolean(L, -1)) << "'CascadeWindows' should be in GetInternalCommandsList()";
+    lua_pop(L, 1);
+}
+
+TEST_F(DoCommandTest, GetInternalCommandsListContainsFind)
+{
+    const char* code = "local t = world.GetInternalCommandsList()\n"
+                       "for _, v in ipairs(t) do\n"
+                       "    if v == 'Find' then return true end\n"
+                       "end\n"
+                       "return false";
+    int rc = luaL_dostring(L, code);
+    ASSERT_EQ(rc, 0) << lua_tostring(L, -1);
+    EXPECT_TRUE(lua_toboolean(L, -1)) << "'Find' should be in GetInternalCommandsList()";
+    lua_pop(L, 1);
+}
+
+TEST_F(DoCommandTest, GetInternalCommandsListContainsMacroF1)
+{
+    const char* code = "local t = world.GetInternalCommandsList()\n"
+                       "for _, v in ipairs(t) do\n"
+                       "    if v == 'MacroF1' then return true end\n"
+                       "end\n"
+                       "return false";
+    int rc = luaL_dostring(L, code);
+    ASSERT_EQ(rc, 0) << lua_tostring(L, -1);
+    EXPECT_TRUE(lua_toboolean(L, -1)) << "'MacroF1' should be in GetInternalCommandsList()";
+    lua_pop(L, 1);
+}
+
+TEST_F(DoCommandTest, GetInternalCommandsListContainsConfigureAliases)
+{
+    const char* code = "local t = world.GetInternalCommandsList()\n"
+                       "for _, v in ipairs(t) do\n"
+                       "    if v == 'ConfigureAliases' then return true end\n"
+                       "end\n"
+                       "return false";
+    int rc = luaL_dostring(L, code);
+    ASSERT_EQ(rc, 0) << lua_tostring(L, -1);
+    EXPECT_TRUE(lua_toboolean(L, -1))
+        << "'ConfigureAliases' should be in GetInternalCommandsList()";
+    lua_pop(L, 1);
+}
+
+TEST_F(DoCommandTest, GetInternalCommandsListContainsAltA)
+{
+    const char* code = "local t = world.GetInternalCommandsList()\n"
+                       "for _, v in ipairs(t) do\n"
+                       "    if v == 'AltA' then return true end\n"
+                       "end\n"
+                       "return false";
+    int rc = luaL_dostring(L, code);
+    ASSERT_EQ(rc, 0) << lua_tostring(L, -1);
+    EXPECT_TRUE(lua_toboolean(L, -1)) << "'AltA' should be in GetInternalCommandsList()";
+    lua_pop(L, 1);
 }
 
 int main(int argc, char** argv)

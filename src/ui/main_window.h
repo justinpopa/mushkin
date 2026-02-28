@@ -71,6 +71,14 @@ class MainWindow : public QMainWindow {
     int getToolBarInfo(int which, int infoType);
 
     /**
+     * Execute a named UI command (for Lua DoCommand API)
+     * Dispatches MUSHclient-compatible command names to MainWindow slots/actions.
+     * @param name Command name (case-sensitive, e.g. "NewWorld", "Find")
+     * @return 0 (eOK) on success, 30054 (eNoSuchCommand) if not found in UI table
+     */
+    int executeDoCommand(const char* name);
+
+    /**
      * Info Bar Lua API methods
      */
     void showInfoBar(bool visible);
@@ -393,7 +401,7 @@ class MainWindow : public QMainWindow {
     QLabel* m_timeIndicator;
     QLabel* m_linesIndicator;
     QLabel* m_logIndicator;
-    QTimer* m_statusBarTimer;  // Updates time indicator every second
+    QTimer* m_statusBarTimer; // Updates time indicator every second
 
     // Currently tracked world for status updates
     QPointer<class WorldWidget> m_trackedWorld;

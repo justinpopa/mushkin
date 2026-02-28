@@ -52,6 +52,8 @@ add_library(world STATIC
     lua_utils.cpp
     lua_dialog_callbacks.h
     lua_dialog_callbacks.cpp
+    docommand_callbacks.h
+    docommand_callbacks.cpp
     # Lua API modules
     lua_api/lua_registration.cpp
     lua_api/lua_constants.cpp
