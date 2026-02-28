@@ -1783,6 +1783,197 @@ int L_GetAlphaOption(lua_State* L)
 }
 
 /**
+ * GetCurrentValue - Get current value of any option by name
+ *
+ * Lua signature: value = GetCurrentValue(option_name)
+ * Unified wrapper that searches both numeric and alpha tables.
+ * Enforces OPT_PLUGIN_CANNOT_READ on both tables.
+ */
+int L_GetCurrentValue(lua_State* L)
+{
+    WorldDocument* pDoc = doc(L);
+    const char* optionName = luaL_checkstring(L, 1);
+    QString normalizedName = QString::fromUtf8(optionName).toLower().trimmed();
+
+    // Search numeric options table first
+    for (int i = 0; OptionsTable[i].pName != nullptr; i++) {
+        const tConfigurationNumericOption& opt = OptionsTable[i];
+
+        if (normalizedName == opt.pName) {
+            // Check if plugin is allowed to read this option
+            if (pDoc->m_CurrentPlugin && (opt.iFlags & OPT_PLUGIN_CANNOT_READ)) {
+                lua_pushnil(L);
+                return 1;
+            }
+
+            const char* basePtr = reinterpret_cast<const char*>(pDoc);
+            const char* fieldPtr = basePtr + opt.iOffset;
+
+            double value = 0.0;
+            switch (opt.iLength) {
+                case 1:
+                    if (opt.iMaximum == 0.0 && opt.iMinimum == 0.0)
+                        value = *reinterpret_cast<const bool*>(fieldPtr) ? 1.0 : 0.0;
+                    else
+                        value = *reinterpret_cast<const quint8*>(fieldPtr);
+                    break;
+                case 2:
+                    value = *reinterpret_cast<const quint16*>(fieldPtr);
+                    break;
+                case 4:
+                    if (opt.iFlags & OPT_DOUBLE)
+                        value = *reinterpret_cast<const float*>(fieldPtr);
+                    else
+                        value = *reinterpret_cast<const qint32*>(fieldPtr);
+                    break;
+                case 8:
+                    if (opt.iFlags & OPT_DOUBLE)
+                        value = *reinterpret_cast<const double*>(fieldPtr);
+                    else
+                        value = *reinterpret_cast<const qint64*>(fieldPtr);
+                    break;
+                default:
+                    lua_pushnil(L);
+                    return 1;
+            }
+
+            lua_pushnumber(L, value);
+            return 1;
+        }
+    }
+
+    // Search alpha (string) options table
+    for (int i = 0; AlphaOptionsTable[i].pName != nullptr; i++) {
+        const tConfigurationAlphaOption& opt = AlphaOptionsTable[i];
+
+        if (normalizedName == opt.pName) {
+            if (pDoc->m_CurrentPlugin && (opt.iFlags & OPT_PLUGIN_CANNOT_READ)) {
+                lua_pushnil(L);
+                return 1;
+            }
+
+            const char* basePtr = reinterpret_cast<const char*>(pDoc);
+            const char* fieldPtr = basePtr + opt.iOffset;
+            const QString* strPtr = reinterpret_cast<const QString*>(fieldPtr);
+            lua_pushstring(L, strPtr->toUtf8().constData());
+            return 1;
+        }
+    }
+
+    lua_pushnil(L);
+    return 1;
+}
+
+/**
+ * GetDefaultValue - Get the default value of any option by name
+ *
+ * Lua signature: value = GetDefaultValue(option_name)
+ * Returns the hardcoded default from the options table metadata.
+ * Enforces OPT_PLUGIN_CANNOT_READ on both tables.
+ */
+int L_GetDefaultValue(lua_State* L)
+{
+    WorldDocument* pDoc = doc(L);
+    const char* optionName = luaL_checkstring(L, 1);
+    QString normalizedName = QString::fromUtf8(optionName).toLower().trimmed();
+
+    // Search numeric options table first
+    for (int i = 0; OptionsTable[i].pName != nullptr; i++) {
+        const tConfigurationNumericOption& opt = OptionsTable[i];
+
+        if (normalizedName == opt.pName) {
+            if (pDoc->m_CurrentPlugin && (opt.iFlags & OPT_PLUGIN_CANNOT_READ)) {
+                lua_pushnil(L);
+                return 1;
+            }
+
+            lua_pushnumber(L, opt.iDefault);
+            return 1;
+        }
+    }
+
+    // Search alpha (string) options table
+    for (int i = 0; AlphaOptionsTable[i].pName != nullptr; i++) {
+        const tConfigurationAlphaOption& opt = AlphaOptionsTable[i];
+
+        if (normalizedName == opt.pName) {
+            if (pDoc->m_CurrentPlugin && (opt.iFlags & OPT_PLUGIN_CANNOT_READ)) {
+                lua_pushnil(L);
+                return 1;
+            }
+
+            if (opt.sDefault) {
+                lua_pushstring(L, opt.sDefault);
+            } else {
+                lua_pushstring(L, "");
+            }
+            return 1;
+        }
+    }
+
+    lua_pushnil(L);
+    return 1;
+}
+
+/**
+ * GetLoadedValue - Get the value of an option as it was when last loaded from disk
+ *
+ * Lua signature: value = GetLoadedValue(option_name)
+ * Returns the snapshot taken after XML load completed.
+ * Enforces OPT_PLUGIN_CANNOT_READ on both tables.
+ */
+int L_GetLoadedValue(lua_State* L)
+{
+    WorldDocument* pDoc = doc(L);
+    const char* optionName = luaL_checkstring(L, 1);
+    QString normalizedName = QString::fromUtf8(optionName).toLower().trimmed();
+
+    // Search numeric options table first
+    for (int i = 0; OptionsTable[i].pName != nullptr; i++) {
+        const tConfigurationNumericOption& opt = OptionsTable[i];
+
+        if (normalizedName == opt.pName) {
+            if (pDoc->m_CurrentPlugin && (opt.iFlags & OPT_PLUGIN_CANNOT_READ)) {
+                lua_pushnil(L);
+                return 1;
+            }
+
+            auto it = pDoc->m_loadedNumericOptions.find(normalizedName);
+            if (it != pDoc->m_loadedNumericOptions.end()) {
+                lua_pushnumber(L, it->second);
+            } else {
+                // No loaded snapshot available (world not loaded from file)
+                lua_pushnil(L);
+            }
+            return 1;
+        }
+    }
+
+    // Search alpha (string) options table
+    for (int i = 0; AlphaOptionsTable[i].pName != nullptr; i++) {
+        const tConfigurationAlphaOption& opt = AlphaOptionsTable[i];
+
+        if (normalizedName == opt.pName) {
+            if (pDoc->m_CurrentPlugin && (opt.iFlags & OPT_PLUGIN_CANNOT_READ)) {
+                lua_pushnil(L);
+                return 1;
+            }
+
+            auto it = pDoc->m_loadedAlphaOptions.find(normalizedName);
+            if (it != pDoc->m_loadedAlphaOptions.end()) {
+                lua_pushstring(L, it->second.toUtf8().constData());
+            } else {
+                lua_pushnil(L);
+            }
+            return 1;
+        }
+    }
+
+    lua_pushnil(L);
+    return 1;
+}
+
+/**
  * SetAlphaOption - Set a string option by name
  *
  * Lua signature: result = SetAlphaOption(option_name, value)

@@ -15,15 +15,16 @@
 #include <QSet>
 #include <QString>
 #include <QStringList>
-#include <QTimer>     // Timer evaluation loop
-#include <QVector>    // TriggerArray, AliasArray
-#include <array>      // For std::array (fixed-size collections)
-#include <deque>      // For m_recentLines (multi-line triggers)
-#include <expected>   // For std::expected (fallible operations)
-#include <functional> // For std::function (progress callback)
-#include <memory>     // For std::unique_ptr
-#include <span>       // For std::span (buffer parameters)
-#include <vector>     // For std::vector (line buffer)
+#include <QTimer>        // Timer evaluation loop
+#include <QVector>       // TriggerArray, AliasArray
+#include <array>         // For std::array (fixed-size collections)
+#include <deque>         // For m_recentLines (multi-line triggers)
+#include <expected>      // For std::expected (fallible operations)
+#include <functional>    // For std::function (progress callback)
+#include <memory>        // For std::unique_ptr
+#include <span>          // For std::span (buffer parameters)
+#include <unordered_map> // For std::unordered_map (option snapshots)
+#include <vector>        // For std::vector (line buffer)
 
 #include "automation_registry.h" // AutomationRegistry companion object (owns automation storage)
 #include "connection_manager.h"  // ConnectionManager companion object (owns connection state)
@@ -347,6 +348,7 @@ enum {
  * IMPORTANT: This is intentionally kept as a FLAT structure for initial port.
  * Don't try to organize into sub-objects yet.
  */
+
 class WorldDocument : public QObject {
     Q_OBJECT
 
@@ -1014,6 +1016,11 @@ class WorldDocument : public QObject {
     qint32 m_iLastCommandCount;
     qint32 m_iExecutionDepth;
     bool m_bOmitFromCommandHistory;
+
+    // ========== Option snapshots (for GetLoadedValue API) ==========
+    // Populated after XML load completes; reflects values at load time.
+    std::unordered_map<QString, double> m_loadedNumericOptions;
+    std::unordered_map<QString, QString> m_loadedAlphaOptions;
 
     // ========== Arrays for scripting ==========
     // Named arrays for Lua ArrayCreate/ArrayGet/ArraySet etc.

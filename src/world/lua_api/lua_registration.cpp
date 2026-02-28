@@ -67,6 +67,9 @@ extern int L_GetOption(lua_State* L);
 extern int L_SetOption(lua_State* L);
 extern int L_GetAlphaOption(lua_State* L);
 extern int L_SetAlphaOption(lua_State* L);
+extern int L_GetCurrentValue(lua_State* L);
+extern int L_GetDefaultValue(lua_State* L);
+extern int L_GetLoadedValue(lua_State* L);
 extern int L_SetStatus(lua_State* L);
 extern int L_Repaint(lua_State* L);
 extern int L_TextRectangle(lua_State* L);
@@ -500,6 +503,9 @@ int RegisterLuaRoutines(lua_State* L)
         {"SetOption", L_SetOption},
         {"GetAlphaOption", L_GetAlphaOption},
         {"SetAlphaOption", L_SetAlphaOption},
+        {"GetCurrentValue", L_GetCurrentValue},
+        {"GetDefaultValue", L_GetDefaultValue},
+        {"GetLoadedValue", L_GetLoadedValue},
         {"SetStatus", L_SetStatus},
         {"Repaint", L_Repaint},
         {"TextRectangle", L_TextRectangle},

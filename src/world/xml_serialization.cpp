@@ -867,6 +867,47 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
         }
     }
 
+    // Snapshot loaded values for GetLoadedValue API
+    for (int i = 0; OptionsTable[i].pName != nullptr; i++) {
+        const tConfigurationNumericOption& opt = OptionsTable[i];
+        const char* basePtr = reinterpret_cast<const char*>(doc);
+        const char* fieldPtr = basePtr + opt.iOffset;
+
+        double value = 0.0;
+        switch (opt.iLength) {
+            case 1:
+                if (opt.iMaximum == 0.0 && opt.iMinimum == 0.0)
+                    value = *reinterpret_cast<const bool*>(fieldPtr) ? 1.0 : 0.0;
+                else
+                    value = *reinterpret_cast<const quint8*>(fieldPtr);
+                break;
+            case 2:
+                value = *reinterpret_cast<const quint16*>(fieldPtr);
+                break;
+            case 4:
+                if (opt.iFlags & OPT_DOUBLE)
+                    value = *reinterpret_cast<const float*>(fieldPtr);
+                else
+                    value = *reinterpret_cast<const qint32*>(fieldPtr);
+                break;
+            case 8:
+                if (opt.iFlags & OPT_DOUBLE)
+                    value = *reinterpret_cast<const double*>(fieldPtr);
+                else
+                    value = *reinterpret_cast<const qint64*>(fieldPtr);
+                break;
+        }
+        doc->m_loadedNumericOptions[QString::fromUtf8(opt.pName)] = value;
+    }
+
+    for (int i = 0; AlphaOptionsTable[i].pName != nullptr; i++) {
+        const tConfigurationAlphaOption& opt = AlphaOptionsTable[i];
+        const char* basePtr = reinterpret_cast<const char*>(doc);
+        const char* fieldPtr = basePtr + opt.iOffset;
+        const QString* strPtr = reinterpret_cast<const QString*>(fieldPtr);
+        doc->m_loadedAlphaOptions[QString::fromUtf8(opt.pName)] = *strPtr;
+    }
+
     file.close();
 
     if (reader.hasError()) {

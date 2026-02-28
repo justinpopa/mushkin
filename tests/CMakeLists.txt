@@ -897,3 +897,20 @@ target_link_libraries(test-url-detection-gtest PRIVATE
 gtest_discover_tests(test-url-detection-gtest
     DISCOVERY_TIMEOUT 30
 )
+
+# ========== Config Introspection Tests ==========
+add_executable(test-config-introspection-gtest
+    test_config_introspection_gtest.cpp
+)
+
+target_link_libraries(test-config-introspection-gtest PRIVATE
+    GTest::gtest
+    Qt6::Core
+    Qt6::Gui
+    Qt6::Widgets
+    ui
+)
+
+gtest_discover_tests(test-config-introspection-gtest
+    DISCOVERY_TIMEOUT 30
+)
