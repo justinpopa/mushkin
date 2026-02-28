@@ -123,22 +123,22 @@ void ConnectionManager::onConnect(int errorCode)
         m_doc.SendToAllPluginCallbacks(ON_PLUGIN_CONNECT);
 
         // Start remote access server if configured.
-        qCDebug(lcWorld) << "Remote access check: enabled=" << m_doc.m_bEnableRemoteAccess
-                         << "port=" << m_doc.m_iRemotePort
-                         << "password_set=" << !m_doc.m_strRemotePassword.isEmpty();
-        if (m_doc.m_bEnableRemoteAccess && m_doc.m_iRemotePort > 0 &&
-            !m_doc.m_strRemotePassword.isEmpty()) {
+        qCDebug(lcWorld) << "Remote access check: enabled=" << m_doc.m_remote.enabled
+                         << "port=" << m_doc.m_remote.port
+                         << "password_set=" << !m_doc.m_remote.password.isEmpty();
+        if (m_doc.m_remote.enabled && m_doc.m_remote.port > 0 &&
+            !m_doc.m_remote.password.isEmpty()) {
             if (!m_doc.m_pRemoteServer) {
                 m_doc.m_pRemoteServer = std::make_unique<RemoteAccessServer>(&m_doc);
             }
-            m_doc.m_pRemoteServer->setPassword(m_doc.m_strRemotePassword);
-            m_doc.m_pRemoteServer->setScrollbackLines(m_doc.m_iRemoteScrollbackLines);
-            m_doc.m_pRemoteServer->setMaxClients(m_doc.m_iRemoteMaxClients);
-            if (auto result = m_doc.m_pRemoteServer->start(m_doc.m_iRemotePort); result) {
-                qCDebug(lcWorld) << "Remote access server started on port" << m_doc.m_iRemotePort;
+            m_doc.m_pRemoteServer->setPassword(m_doc.m_remote.password);
+            m_doc.m_pRemoteServer->setScrollbackLines(m_doc.m_remote.scrollback_lines);
+            m_doc.m_pRemoteServer->setMaxClients(m_doc.m_remote.max_clients);
+            if (auto result = m_doc.m_pRemoteServer->start(m_doc.m_remote.port); result) {
+                qCDebug(lcWorld) << "Remote access server started on port" << m_doc.m_remote.port;
             } else {
                 qCWarning(lcWorld)
-                    << "Remote access server FAILED to start on port" << m_doc.m_iRemotePort;
+                    << "Remote access server FAILED to start on port" << m_doc.m_remote.port;
             }
         } else {
             qCDebug(lcWorld) << "Remote access server not starting (conditions not met)";

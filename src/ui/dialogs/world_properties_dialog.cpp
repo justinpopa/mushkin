@@ -567,11 +567,11 @@ void WorldPropertiesDialog::loadSettings()
     m_fileConfirmCheck->setChecked(m_doc->m_bConfirmOnSend);
 
     // Remote Access tab
-    m_enableRemoteAccessCheck->setChecked(m_doc->m_bEnableRemoteAccess);
-    m_remotePortSpin->setValue(m_doc->m_iRemotePort > 0 ? m_doc->m_iRemotePort : 4001);
-    m_remotePasswordEdit->setText(m_doc->m_strRemotePassword);
-    m_remoteScrollbackSpin->setValue(m_doc->m_iRemoteScrollbackLines);
-    m_remoteMaxClientsSpin->setValue(m_doc->m_iRemoteMaxClients);
+    m_enableRemoteAccessCheck->setChecked(m_doc->m_remote.enabled);
+    m_remotePortSpin->setValue(m_doc->m_remote.port > 0 ? m_doc->m_remote.port : 4001);
+    m_remotePasswordEdit->setText(m_doc->m_remote.password);
+    m_remoteScrollbackSpin->setValue(m_doc->m_remote.scrollback_lines);
+    m_remoteMaxClientsSpin->setValue(m_doc->m_remote.max_clients);
 
     qCDebug(lcDialog) << "WorldPropertiesDialog::loadSettings() - loaded from WorldDocument";
 }
@@ -645,11 +645,11 @@ void WorldPropertiesDialog::saveSettings()
     m_doc->m_bConfirmOnSend = m_fileConfirmCheck->isChecked();
 
     // Remote Access tab
-    m_doc->m_bEnableRemoteAccess = m_enableRemoteAccessCheck->isChecked();
-    m_doc->m_iRemotePort = m_remotePortSpin->value();
-    m_doc->m_strRemotePassword = m_remotePasswordEdit->text();
-    m_doc->m_iRemoteScrollbackLines = m_remoteScrollbackSpin->value();
-    m_doc->m_iRemoteMaxClients = m_remoteMaxClientsSpin->value();
+    m_doc->m_remote.enabled = m_enableRemoteAccessCheck->isChecked();
+    m_doc->m_remote.port = m_remotePortSpin->value();
+    m_doc->m_remote.password = m_remotePasswordEdit->text();
+    m_doc->m_remote.scrollback_lines = m_remoteScrollbackSpin->value();
+    m_doc->m_remote.max_clients = m_remoteMaxClientsSpin->value();
 
     m_doc->setModified(true);
 

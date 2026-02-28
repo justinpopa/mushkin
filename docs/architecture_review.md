@@ -236,7 +236,7 @@ Note: Lua API boundary functions intentionally return integers (Lua convention).
 **Risk:** Despite decomposition into 5 subsystems, WorldDocument still owns ~100+ direct fields (display, logging, scripting, UI state, flags, serialization). Constructor is ~650 lines.
 
 **Targets:**
-- [ ] Group related fields into config structs (`DisplayConfig`, `ScriptConfig`, `LoggingConfig`, etc.)
+- [x] Group related fields into config structs — `RemoteAccessConfig` extracted (7 fields → `m_remote` struct with default member initializers, 5 files updated). Pattern established for further extraction (LoggingConfig 11 files, ScriptConfig 15 files).
 - [ ] Long-term: further decomposition (ScriptEngine manager, UI state manager)
 
 **Acceptance:** Aspirational. No immediate action required.

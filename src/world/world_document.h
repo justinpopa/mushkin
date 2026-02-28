@@ -761,13 +761,15 @@ class WorldDocument : public QObject, public IWorldContext {
     bool m_bCtrlBackspaceDeletesLastWord;    // Ctrl+Backspace behavior?
 
     // ========== Remote Access Server Settings ==========
-    bool m_bEnableRemoteAccess;       // enable remote access server?
-    quint16 m_iRemotePort;            // port to listen on (0 = disabled)
-    QString m_strRemotePassword;      // password for authentication (required)
-    quint16 m_iRemoteScrollbackLines; // lines to send on connect (default 100)
-    quint16 m_iRemoteMaxClients;      // max simultaneous clients (default 5)
-    quint16 m_iRemoteLockoutAttempts; // failed attempts before lockout (default 3)
-    quint16 m_iRemoteLockoutSeconds;  // lockout duration (default 300)
+    struct RemoteAccessConfig {
+        bool enabled = false;           // enable remote access server?
+        quint16 port = 0;               // port to listen on (0 = disabled)
+        QString password;               // password for authentication (required)
+        quint16 scrollback_lines = 100; // lines to send on connect
+        quint16 max_clients = 5;        // max simultaneous clients
+        quint16 lockout_attempts = 3;   // failed attempts before lockout
+        quint16 lockout_seconds = 300;  // lockout duration
+    } m_remote;
 
     // ========== RUNTIME STATE VARIABLES (Not saved to disk) ==========
 

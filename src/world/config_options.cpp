@@ -288,12 +288,12 @@ const tConfigurationNumericOption OptionsTable[] = {
     {"write_world_name_to_log", true, O(m_bWriteWorldNameToLog), 0, 0, 0},
 
     // Remote Access Server settings
-    {"remote_access_enabled", false, O(m_bEnableRemoteAccess), 0, 0, 0},
-    {"remote_port", 0, O(m_iRemotePort), 0, 65535, 0},
-    {"remote_scrollback_lines", 100, O(m_iRemoteScrollbackLines), 0, 10000, 0},
-    {"remote_max_clients", 5, O(m_iRemoteMaxClients), 1, 100, 0},
-    {"remote_lockout_attempts", 3, O(m_iRemoteLockoutAttempts), 0, 100, 0},
-    {"remote_lockout_seconds", 300, O(m_iRemoteLockoutSeconds), 0, 86400, 0},
+    {"remote_access_enabled", false, O(m_remote.enabled), 0, 0, 0},
+    {"remote_port", 0, O(m_remote.port), 0, 65535, 0},
+    {"remote_scrollback_lines", 100, O(m_remote.scrollback_lines), 0, 10000, 0},
+    {"remote_max_clients", 5, O(m_remote.max_clients), 1, 100, 0},
+    {"remote_lockout_attempts", 3, O(m_remote.lockout_attempts), 0, 100, 0},
+    {"remote_lockout_seconds", 300, O(m_remote.lockout_seconds), 0, 86400, 0},
 
     {nullptr} // NULL sentinel - end of table marker
 };
@@ -370,7 +370,7 @@ const tConfigurationAlphaOption AlphaOptionsTable[] = {
     {"timestamp_output", "", A(m_strOutputLinePreambleOutput), OPT_KEEP_SPACES | OPT_UPDATE_VIEWS},
 
     // Remote Access Server settings
-    {"remote_password", "", A(m_strRemotePassword), OPT_PASSWORD | OPT_PLUGIN_CANNOT_RW},
+    {"remote_password", "", A(m_remote.password), OPT_PASSWORD | OPT_PLUGIN_CANNOT_RW},
 
     {nullptr} // NULL sentinel - end of table marker
 };

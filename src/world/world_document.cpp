@@ -431,14 +431,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_FadeOutputSeconds = 8;
     m_bCtrlBackspaceDeletesLastWord = false;
 
-    // ========== Initialize remote access server settings ==========
-    m_bEnableRemoteAccess = false;
-    m_iRemotePort = 0;
-    m_strRemotePassword = QString();
-    m_iRemoteScrollbackLines = 100;
-    m_iRemoteMaxClients = 5;
-    m_iRemoteLockoutAttempts = 3;
-    m_iRemoteLockoutSeconds = 300;
+    // m_remote fields use default member initializers (RemoteAccessConfig struct)
     // m_pRemoteServer is automatically nullptr via unique_ptr
 
     // ========== RUNTIME STATE VARIABLES (not saved to disk) ==========
