@@ -388,6 +388,15 @@ class WorldDocument : public QObject, public IWorldContext {
     quint16 m_port;      // port number (1-65535)
     bool m_connect_now;  // auto-connect flag (see enum above)
 
+    // ========== Proxy Configuration ==========
+    struct ProxyConfig {
+        quint16 type = 0; // 0=None, 1=SOCKS5, 2=HTTP CONNECT
+        QString server;   // proxy hostname
+        quint16 port = 0; // proxy port (0 = disabled)
+        QString username; // optional auth username
+        QString password; // optional auth password
+    } m_proxy;
+
     // ========== Display Settings ==========
     QString m_font_name;    // output font face name
     qint32 m_font_height;   // font size in pixels

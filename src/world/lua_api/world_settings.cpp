@@ -728,9 +728,10 @@ int L_GetInfo(lua_State* L)
             }
         } break;
 
-        case 62: // Proxy server (removed in original)
+        case 62: // Proxy server
         {
-            lua_pushstring(L, "");
+            QByteArray ba = pDoc->m_proxy.server.toUtf8();
+            lua_pushlstring(L, ba.constData(), ba.length());
         } break;
 
         case 63: // Hostname
@@ -1160,8 +1161,8 @@ int L_GetInfo(lua_State* L)
             }
         } break;
 
-        case 229: // Proxy (always 0 - proxy support removed)
-            lua_pushinteger(L, 0);
+        case 229: // Proxy type (0=None, 1=SOCKS5, 2=HTTP CONNECT)
+            lua_pushinteger(L, pDoc->m_proxy.type);
             break;
 
         case 230: // Execution depth (script call depth)

@@ -2,6 +2,7 @@
 #include "../world/world_document.h"
 #include "logging.h"
 #include <QDebug>
+#include <QNetworkProxy>
 
 WorldSocket::WorldSocket(WorldDocument* doc, QObject* parent)
     : QObject(parent), m_pDoc(doc), m_socket(new QTcpSocket(this))
@@ -17,6 +18,25 @@ WorldSocket::~WorldSocket() = default;
 
 void WorldSocket::connectToHost(const QString& host, quint16 port)
 {
+    // Apply proxy settings
+    if (m_pDoc->m_proxy.type != 0 && !m_pDoc->m_proxy.server.isEmpty() &&
+        m_pDoc->m_proxy.port != 0) {
+        QNetworkProxy proxy;
+        if (m_pDoc->m_proxy.type == 1) {
+            proxy.setType(QNetworkProxy::Socks5Proxy);
+        } else if (m_pDoc->m_proxy.type == 2) {
+            proxy.setType(QNetworkProxy::HttpProxy);
+        }
+        proxy.setHostName(m_pDoc->m_proxy.server);
+        proxy.setPort(m_pDoc->m_proxy.port);
+        if (!m_pDoc->m_proxy.username.isEmpty()) {
+            proxy.setUser(m_pDoc->m_proxy.username);
+            proxy.setPassword(m_pDoc->m_proxy.password);
+        }
+        m_socket->setProxy(proxy);
+    } else {
+        m_socket->setProxy(QNetworkProxy::NoProxy);
+    }
     m_socket->connectToHost(host, port);
 }
 

@@ -11,6 +11,7 @@
 #include <QFontDialog>
 #include <QFormLayout>
 #include <QGridLayout>
+#include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
@@ -101,6 +102,34 @@ void WorldPropertiesDialog::setupConnectionTab()
     // Auto-connect (note: backend support may need to be added)
     m_autoConnectCheck = new QCheckBox("Connect automatically on startup");
     layout->addRow("", m_autoConnectCheck);
+
+    // Proxy settings
+    QGroupBox* proxyGroup = new QGroupBox("Proxy");
+    QFormLayout* proxyLayout = new QFormLayout(proxyGroup);
+
+    m_proxyTypeCombo = new QComboBox();
+    m_proxyTypeCombo->addItems({"None", "SOCKS5", "HTTP CONNECT"});
+    proxyLayout->addRow("Type:", m_proxyTypeCombo);
+
+    m_proxyServerEdit = new QLineEdit();
+    m_proxyServerEdit->setPlaceholderText("proxy.example.com");
+    proxyLayout->addRow("Server:", m_proxyServerEdit);
+
+    m_proxyPortSpin = new QSpinBox();
+    m_proxyPortSpin->setRange(0, 65535);
+    m_proxyPortSpin->setSpecialValueText("Disabled");
+    proxyLayout->addRow("Port:", m_proxyPortSpin);
+
+    m_proxyUsernameEdit = new QLineEdit();
+    m_proxyUsernameEdit->setPlaceholderText("Optional");
+    proxyLayout->addRow("Username:", m_proxyUsernameEdit);
+
+    m_proxyPasswordEdit = new QLineEdit();
+    m_proxyPasswordEdit->setEchoMode(QLineEdit::Password);
+    m_proxyPasswordEdit->setPlaceholderText("Optional");
+    proxyLayout->addRow("Password:", m_proxyPasswordEdit);
+
+    layout->addRow(proxyGroup);
 
     // Add some spacing
     layout->addRow("", new QWidget()); // Spacer
@@ -573,6 +602,13 @@ void WorldPropertiesDialog::loadSettings()
     m_remoteScrollbackSpin->setValue(m_doc->m_remote.scrollback_lines);
     m_remoteMaxClientsSpin->setValue(m_doc->m_remote.max_clients);
 
+    // Proxy settings
+    m_proxyTypeCombo->setCurrentIndex(m_doc->m_proxy.type);
+    m_proxyServerEdit->setText(m_doc->m_proxy.server);
+    m_proxyPortSpin->setValue(m_doc->m_proxy.port);
+    m_proxyUsernameEdit->setText(m_doc->m_proxy.username);
+    m_proxyPasswordEdit->setText(m_doc->m_proxy.password);
+
     qCDebug(lcDialog) << "WorldPropertiesDialog::loadSettings() - loaded from WorldDocument";
 }
 
@@ -650,6 +686,13 @@ void WorldPropertiesDialog::saveSettings()
     m_doc->m_remote.password = m_remotePasswordEdit->text();
     m_doc->m_remote.scrollback_lines = m_remoteScrollbackSpin->value();
     m_doc->m_remote.max_clients = m_remoteMaxClientsSpin->value();
+
+    // Proxy settings
+    m_doc->m_proxy.type = static_cast<quint16>(m_proxyTypeCombo->currentIndex());
+    m_doc->m_proxy.server = m_proxyServerEdit->text();
+    m_doc->m_proxy.port = static_cast<quint16>(m_proxyPortSpin->value());
+    m_doc->m_proxy.username = m_proxyUsernameEdit->text();
+    m_doc->m_proxy.password = m_proxyPasswordEdit->text();
 
     m_doc->setModified(true);
 

@@ -222,8 +222,10 @@ These aren't Lua API functions but are architectural/feature gaps.
 **Effort:** Medium
 **Source:** `sockshdr.cpp`
 
-- [ ] SOCKS4/5 proxy support in ConnectionManager
-- [ ] HTTP CONNECT proxy support
+- [x] SOCKS4/5 proxy support in ConnectionManager — via `QNetworkProxy::Socks5Proxy` on per-socket `setProxy()`
+- [x] HTTP CONNECT proxy support — via `QNetworkProxy::HttpProxy` on per-socket `setProxy()`
+
+**Completed:** ProxyConfig struct in WorldDocument (type/server/port/username/password), 5 config_options entries for XML serialization, proxy group box in Connection tab UI, legacy Lua API stubs (GetInfo case 62, GetOption case 229) wired to real fields.
 
 ### N2 — Chat System (peer-to-peer)
 
@@ -281,7 +283,7 @@ These aren't Lua API functions but are architectural/feature gaps.
 | G10 Sound | 1 | Low | Small | Done (bfb6b40) |
 | G11 Text Transforms | 2 | Low | Small | Done (bfb6b40) |
 | G12 Colour | 2 | Low | Small | Done (bfb6b40) |
-| N1 Proxy | — | Medium | Medium | Not started |
+| N1 Proxy | — | Medium | Medium | Done (QNetworkProxy) |
 | N2 Chat | — | Low–Med | Large | Not started |
 | N3 DoCommand API | — | Medium | Medium | Done (252 commands) |
 | N4 LuaFileSystem | — | Medium | Small | Done |

@@ -15,6 +15,7 @@ class QSpinBox;
 class QCheckBox;
 class QLabel;
 class QComboBox;
+class QGroupBox;
 
 /**
  * WorldPropertiesDialog - World configuration dialog
@@ -100,6 +101,13 @@ class WorldPropertiesDialog : public QDialog {
     QLineEdit* m_nameEdit;
     QLineEdit* m_passwordEdit;
     QCheckBox* m_autoConnectCheck;
+
+    // Proxy widgets
+    QComboBox* m_proxyTypeCombo;
+    QLineEdit* m_proxyServerEdit;
+    QSpinBox* m_proxyPortSpin;
+    QLineEdit* m_proxyUsernameEdit;
+    QLineEdit* m_proxyPasswordEdit;
 
     // Output tab widgets
     QPushButton* m_outputFontButton;

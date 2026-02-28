@@ -1267,15 +1267,17 @@ int L_Metaphone(lua_State* L)
 /**
  * world.ResetIP()
  *
- * Resets IP address cache (deprecated - proxy support removed).
+ * Resets IP address cache (deprecated).
  * This function is a stub for backward compatibility.
+ * Proxy support has been re-implemented via QNetworkProxy (m_proxy in WorldDocument).
  *
  * Based on methods_utilities.cpp
  */
 int L_ResetIP(lua_State* L)
 {
     Q_UNUSED(L);
-    // Proxy support was removed during MFC→Qt port
+    // No-op: proxy support is now handled via QNetworkProxy set per-socket in
+    // WorldSocket::connectToHost()
     return 0;
 }
 
