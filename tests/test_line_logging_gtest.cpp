@@ -16,6 +16,7 @@
 #include <QFile>
 #include <QTextStream>
 #include <gtest/gtest.h>
+#include <memory>
 
 // Test fixture for line logging tests
 // Provides common setup/teardown and helper methods
@@ -24,7 +25,7 @@ class LineLoggingTest : public ::testing::Test {
     void SetUp() override
     {
         // Create world document
-        doc = new WorldDocument();
+        doc = std::make_unique<WorldDocument>();
 
         // Initialize default logging settings
         doc->m_bLogOutput = false;
@@ -44,14 +45,12 @@ class LineLoggingTest : public ::testing::Test {
         cleanupLogFile("test_preamble.log");
         cleanupLogFile("test_html_escape.log");
         cleanupLogFile("test_html_color.log");
-
-        delete doc;
     }
 
     // Helper method to create a line with text
-    Line* createLine(quint16 flags, const char* text)
+    std::unique_ptr<Line> createLine(quint16 flags, const char* text)
     {
-        Line* line = new Line(1, 80, flags, 0xFFFFFF, 0x000000, false);
+        auto line = std::make_unique<Line>(1, 80, flags, 0xFFFFFF, 0x000000, false);
         int len = strlen(text);
         line->textBuffer.resize(len);
         memcpy(line->textBuffer.data(), text, len);
@@ -97,7 +96,7 @@ class LineLoggingTest : public ::testing::Test {
         }
     }
 
-    WorldDocument* doc = nullptr;
+    std::unique_ptr<WorldDocument> doc;
 };
 
 /**
@@ -121,11 +120,11 @@ TEST_F(LineLoggingTest, LogOutputLine)
     ASSERT_EQ(result, 0) << "OpenLog should succeed";
 
     // Create a normal MUD output line (no COMMENT or USER_INPUT flags)
-    Line* line = createLine(0, "You swing at the goblin!");
-    addStyle(line, line->len());
+    auto line = createLine(0, "You swing at the goblin!");
+    addStyle(line.get(), line->len());
 
     // Log the line
-    doc->logCompletedLine(line);
+    doc->logCompletedLine(line.get());
 
     // Verify LOG_LINE flag was set
     EXPECT_TRUE((line->flags & LOG_LINE) != 0) << "LOG_LINE flag should be set on output line";
@@ -137,8 +136,6 @@ TEST_F(LineLoggingTest, LogOutputLine)
     QString content = readLogFile("test_output.log");
     ASSERT_FALSE(content.isEmpty()) << "Should be able to read log file";
     EXPECT_TRUE(content.contains("You swing at the goblin!")) << "Log should contain line text";
-
-    delete line;
 }
 
 /**
@@ -160,11 +157,11 @@ TEST_F(LineLoggingTest, LogNoteLine)
     doc->OpenLog("test_notes.log", false);
 
     // Create a note line (COMMENT flag)
-    Line* line = createLine(COMMENT, "This is a note from script");
-    addStyle(line, line->len());
+    auto line = createLine(COMMENT, "This is a note from script");
+    addStyle(line.get(), line->len());
 
     // Log the line
-    doc->logCompletedLine(line);
+    doc->logCompletedLine(line.get());
 
     EXPECT_TRUE((line->flags & LOG_LINE) != 0) << "LOG_LINE flag should be set on note line";
 
@@ -175,8 +172,6 @@ TEST_F(LineLoggingTest, LogNoteLine)
     ASSERT_FALSE(content.isEmpty()) << "Should be able to read log file";
     EXPECT_TRUE(content.contains("[NOTE]")) << "Log should contain note preamble";
     EXPECT_TRUE(content.contains("This is a note from script")) << "Log should contain note text";
-
-    delete line;
 }
 
 /**
@@ -198,10 +193,10 @@ TEST_F(LineLoggingTest, LogInputLine)
     doc->OpenLog("test_input.log", false);
 
     // Create a user input line (USER_INPUT flag)
-    Line* line = createLine(USER_INPUT, "north");
-    addStyle(line, line->len());
+    auto line = createLine(USER_INPUT, "north");
+    addStyle(line.get(), line->len());
 
-    doc->logCompletedLine(line);
+    doc->logCompletedLine(line.get());
 
     EXPECT_TRUE((line->flags & LOG_LINE) != 0) << "LOG_LINE flag should be set on input line";
 
@@ -210,8 +205,6 @@ TEST_F(LineLoggingTest, LogInputLine)
     QString content = readLogFile("test_input.log");
     ASSERT_FALSE(content.isEmpty()) << "Should be able to read log file";
     EXPECT_TRUE(content.contains("> north")) << "Log should contain input with preamble";
-
-    delete line;
 }
 
 /**
@@ -231,14 +224,14 @@ TEST_F(LineLoggingTest, TriggerOmitFromLog)
     doc->OpenLog("test_omit.log", false);
 
     // Create a normal line
-    Line* line = createLine(0, "Password: secret123");
-    addStyle(line, line->len());
+    auto line = createLine(0, "Password: secret123");
+    addStyle(line.get(), line->len());
 
     // Simulate trigger setting omit flag
     doc->m_bOmitCurrentLineFromLog = true;
 
     // Log the line
-    doc->logCompletedLine(line);
+    doc->logCompletedLine(line.get());
 
     // LOG_LINE flag should NOT be set when omitted
     EXPECT_FALSE((line->flags & LOG_LINE) != 0) << "LOG_LINE flag should NOT be set when omitted";
@@ -248,8 +241,6 @@ TEST_F(LineLoggingTest, TriggerOmitFromLog)
     // Verify log file does NOT contain the password
     QString content = readLogFile("test_omit.log");
     EXPECT_FALSE(content.contains("secret123")) << "Log should NOT contain omitted line";
-
-    delete line;
 }
 
 /**
@@ -269,32 +260,25 @@ TEST_F(LineLoggingTest, LOG_LINEFlag)
     // NO log file open - testing flag setting without writing
 
     // Test 1: Output line with logging enabled
-    Line* line1 = createLine(0, "test");
-    // line1->len is now a method - use textBuffer directly: 10;
+    auto line1 = createLine(0, "test");
 
-    doc->logCompletedLine(line1);
+    doc->logCompletedLine(line1.get());
     EXPECT_TRUE((line1->flags & LOG_LINE) != 0) << "LOG_LINE should be set when logging enabled";
 
     // Test 2: Output line with logging disabled
     doc->m_bLogOutput = false;
-    Line* line2 = createLine(0, "test");
-    // line2->len is now a method - use textBuffer directly: 10;
+    auto line2 = createLine(0, "test");
 
-    doc->logCompletedLine(line2);
+    doc->logCompletedLine(line2.get());
     EXPECT_FALSE((line2->flags & LOG_LINE) != 0)
         << "LOG_LINE should NOT be set when logging disabled";
 
     // Test 3: Note line with notes logging disabled
-    Line* line3 = createLine(COMMENT, "test");
-    // line3->len is now a method - use textBuffer directly: 10;
+    auto line3 = createLine(COMMENT, "test");
 
-    doc->logCompletedLine(line3);
+    doc->logCompletedLine(line3.get());
     EXPECT_FALSE((line3->flags & LOG_LINE) != 0)
         << "LOG_LINE should NOT be set for notes when disabled";
-
-    delete line1;
-    delete line2;
-    delete line3;
 }
 
 /**
@@ -318,14 +302,14 @@ TEST_F(LineLoggingTest, SelectiveLogging)
     doc->OpenLog("test_selective.log", false);
 
     // Output line - should NOT be logged
-    Line* outputLine = createLine(0, "MUD output");
-    addStyle(outputLine, outputLine->len());
-    doc->logCompletedLine(outputLine);
+    auto outputLine = createLine(0, "MUD output");
+    addStyle(outputLine.get(), outputLine->len());
+    doc->logCompletedLine(outputLine.get());
 
     // Note line - SHOULD be logged
-    Line* noteLine = createLine(COMMENT, "Script note");
-    addStyle(noteLine, noteLine->len());
-    doc->logCompletedLine(noteLine);
+    auto noteLine = createLine(COMMENT, "Script note");
+    addStyle(noteLine.get(), noteLine->len());
+    doc->logCompletedLine(noteLine.get());
 
     doc->CloseLog();
 
@@ -334,9 +318,6 @@ TEST_F(LineLoggingTest, SelectiveLogging)
     ASSERT_FALSE(content.isEmpty()) << "Should be able to read log file";
     EXPECT_FALSE(content.contains("MUD output")) << "Output should NOT be logged when disabled";
     EXPECT_TRUE(content.contains("Script note")) << "Note should be logged when enabled";
-
-    delete outputLine;
-    delete noteLine;
 }
 
 /**
@@ -357,13 +338,13 @@ TEST_F(LineLoggingTest, PreamblePostamble)
 
     doc->OpenLog("test_preamble.log", false);
 
-    Line* line = createLine(0, "Test message");
-    addStyle(line, line->len());
+    auto line = createLine(0, "Test message");
+    addStyle(line.get(), line->len());
 
     // Set specific time for testing
     line->m_theTime = QDateTime(QDate(2025, 10, 11), QTime(14, 30, 45));
 
-    doc->logCompletedLine(line);
+    doc->logCompletedLine(line.get());
     doc->CloseLog();
 
     // Verify time formatting
@@ -371,8 +352,6 @@ TEST_F(LineLoggingTest, PreamblePostamble)
     ASSERT_FALSE(content.isEmpty()) << "Should be able to read log file";
     EXPECT_TRUE(content.contains("[14:30:45]")) << "Time codes should be expanded correctly";
     EXPECT_TRUE(content.contains("Test message")) << "Message content should be present";
-
-    delete line;
 }
 
 /**
@@ -396,7 +375,7 @@ TEST_F(LineLoggingTest, HTMLEscaping)
     doc->OpenLog("test_html_escape.log", false);
 
     // Create a line with HTML special characters
-    Line* line = createLine(0, "<script>alert(\"XSS\")</script> & more");
+    auto line = createLine(0, "<script>alert(\"XSS\")</script> & more");
 
     auto style = std::make_unique<Style>();
     style->iLength = line->len();
@@ -405,7 +384,7 @@ TEST_F(LineLoggingTest, HTMLEscaping)
     style->iBackColour = 0x000000;
     line->styleList.push_back(std::move(style));
 
-    doc->logCompletedLine(line);
+    doc->logCompletedLine(line.get());
     doc->CloseLog();
 
     // Verify HTML escaping
@@ -424,8 +403,6 @@ TEST_F(LineLoggingTest, HTMLEscaping)
     // Verify actual script tags are NOT in output (would be dangerous!)
     EXPECT_FALSE(content.contains("<script>")) << "No actual <script> tag";
     EXPECT_FALSE(content.contains("</script>")) << "No actual </script> tag";
-
-    delete line;
 }
 
 /**
@@ -449,7 +426,7 @@ TEST_F(LineLoggingTest, HTMLColorLogging)
     doc->OpenLog("test_html_color.log", false);
 
     // Create a line with multiple colored segments and special characters
-    Line* line = createLine(0, "Red <text> on black, Yellow on Blue");
+    auto line = createLine(0, "Red <text> on black, Yellow on Blue");
 
     // Style 1: "Red <text> on black," - red foreground, black background
     auto style1 = std::make_unique<Style>();
@@ -467,7 +444,7 @@ TEST_F(LineLoggingTest, HTMLColorLogging)
     style2->iBackColour = BGR(0, 0, 255);   // Blue (not black, so span needed)
     line->styleList.push_back(std::move(style2));
 
-    doc->logCompletedLine(line);
+    doc->logCompletedLine(line.get());
     doc->CloseLog();
 
     // Verify HTML color formatting
@@ -510,8 +487,6 @@ TEST_F(LineLoggingTest, HTMLColorLogging)
     // Test 6: Content is preserved
     EXPECT_TRUE(content.contains("Red") && content.contains("Yellow"))
         << "Text content should be preserved";
-
-    delete line;
 }
 
 // Main function required for GoogleTest

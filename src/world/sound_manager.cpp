@@ -42,7 +42,8 @@
 #include <QSpatialSound>
 #include <QUrl>
 #include <QVector3D>
-#include <cmath> // for pow()
+#include <cmath>  // for pow()
+#include <memory> // for std::weak_ptr
 
 // ---------------------------------------------------------------------------
 // Construction / destruction
@@ -86,24 +87,14 @@ void SoundManager::initialize()
 
     // Try to create the audio engine — may fail on headless systems
     try {
-        // QAudioEngine parent is the WorldDocument so Qt manages the engine lifetime
-        // alongside the document; SoundManager::cleanup() deletes it explicitly first.
-        m_audioEngine = new QAudioEngine(&m_doc);
-        if (!m_audioEngine) {
-            qWarning() << "Failed to create QAudioEngine - sound disabled";
-            return;
-        }
+        // No Qt parent: unique_ptr is the sole owner.  Qt parent-child would
+        // conflict with unique_ptr and cause a double-free on destruction.
+        m_audioEngine = std::make_unique<QAudioEngine>();
 
         m_audioEngine->setOutputMode(QAudioEngine::Stereo);
 
-        // Create listener at origin facing +Z (owned by engine)
-        m_audioListener = new QAudioListener(m_audioEngine);
-        if (!m_audioListener) {
-            qWarning() << "Failed to create QAudioListener - sound disabled";
-            delete m_audioEngine;
-            m_audioEngine = nullptr;
-            return;
-        }
+        // Create listener at origin facing +Z (owned by engine via Qt parent-child)
+        m_audioListener = new QAudioListener(m_audioEngine.get());
         m_audioListener->setPosition(QVector3D(0, 0, 0));
         // Default rotation faces +Z which is correct for our coordinate system
 
@@ -112,7 +103,7 @@ void SoundManager::initialize()
 
         // Create sound buffers (spatial sounds — owned by engine via parent-child)
         for (int i = 0; i < MAX_SOUND_BUFFERS; i++) {
-            m_soundBuffers[i].spatialSound = new QSpatialSound(m_audioEngine);
+            m_soundBuffers[i].spatialSound = new QSpatialSound(m_audioEngine.get());
 
             // Configure for direct sound (no room effects, minimal attenuation)
             m_soundBuffers[i].spatialSound->setDistanceModel(QSpatialSound::DistanceModel::Linear);
@@ -161,13 +152,16 @@ void SoundManager::cleanup()
         m_soundBuffers[i].filename.clear();
     }
 
-    // Stop and delete engine (also destroys listener and spatial sounds)
+    // Signal UAF guard: any in-flight MSP lambda will see alive == false and bail out.
+    *m_alive = false;
+
+    // Stop and destroy engine via unique_ptr (also destroys listener and spatial sounds
+    // via Qt parent-child).
     if (m_audioEngine) {
         m_audioEngine->stop();
-        delete m_audioEngine;
-        m_audioEngine = nullptr;
+        m_audioEngine.reset();
     }
-    m_audioListener = nullptr; // Deleted with engine
+    m_audioListener = nullptr; // Destroyed with engine above
 
     qDebug() << "Spatial audio system cleaned up";
 }
@@ -495,13 +489,25 @@ void SoundManager::playMSPSound(const QString& filename, const QString& url, boo
     reply->setProperty("msp_loop", loop);
     reply->setProperty("msp_volume", volume);
 
-    // SoundManager is not a QObject, so use QObject::connect with reply as context.
-    // The lambda captures this (SoundManager*) — valid because m_doc owns both
-    // the SoundManager and (via Qt parent-child) the reply/manager, ensuring the
-    // SoundManager outlives the download.
-    QObject::connect(reply, &QNetworkReply::finished, reply, [this, reply, manager]() {
+    // UAF guard: capture a weak_ptr so the lambda can detect if SoundManager has been
+    // destroyed (cleanup() sets *m_alive = false, invalidating all weak_ptrs).
+    // SoundManager is not a QObject so QPointer is unavailable; weak_ptr<bool> is the
+    // simplest portable alternative.
+    std::weak_ptr<bool> weakAlive{m_alive};
+
+    // Capture `this` alongside weakAlive.  The alive guard ensures `this` is only
+    // dereferenced when SoundManager is still live — cleanup() sets *m_alive = false
+    // before destroying any audio state, so a locked non-false alive guarantees safety.
+    QObject::connect(reply, &QNetworkReply::finished, reply, [this, weakAlive, reply, manager]() {
+        // Bail out if SoundManager has been cleaned up — avoids use-after-free.
+        auto alive = weakAlive.lock();
+        if (!alive || !*alive) {
+            reply->deleteLater();
+            manager->deleteLater();
+            return;
+        }
+
         // Retrieve stored parameters
-        QString storedFilename = reply->property("msp_filename").toString();
         QString storedCachedPath = reply->property("msp_cached_path").toString();
         qint16 storedBuffer = static_cast<qint16>(reply->property("msp_buffer").toInt());
         bool storedLoop = reply->property("msp_loop").toBool();
@@ -515,7 +521,7 @@ void SoundManager::playMSPSound(const QString& filename, const QString& url, boo
                 cacheFile.close();
                 qDebug() << "MSP: Downloaded and cached:" << storedCachedPath;
 
-                // Now play the cached file
+                // SoundManager alive guard confirmed above — safe to call.
                 playSound(storedBuffer, storedCachedPath, storedLoop, storedVolume, 0.0);
             } else {
                 qWarning() << "MSP: Failed to cache file:" << storedCachedPath;
@@ -523,9 +529,6 @@ void SoundManager::playMSPSound(const QString& filename, const QString& url, boo
         } else {
             qWarning() << "MSP: Download failed:" << reply->errorString();
         }
-
-        // Suppress unused-variable warning for filename (stored in QObject property)
-        Q_UNUSED(storedFilename);
 
         // Clean up
         reply->deleteLater();

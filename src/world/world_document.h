@@ -9,6 +9,7 @@
 #include <QMap>               // TriggerMap, AliasMap
 #include <QObject>
 #include <QPoint>
+#include <QPointer> // For QPointer<NotepadWidget> (null-safe observer)
 #include <QRect>
 #include <QRgb>
 #include <QSet>
@@ -32,6 +33,7 @@
 #include "world_error.h"         // WorldError, WorldErrorType
 
 #include "../automation/script_language.h" // ScriptLanguage enum
+#include "../automation/sendto.h"          // SendTo enum
 #include "../automation/variable.h"        // ArraysMap type
 #include "../text/style.h" // Style flag bits (HILITE, UNDERLINE, BLINK, INVERSE, STRIKEOUT, COLOUR_*, COLOURTYPE, ACTIONTYPE, STYLE_BITS)
 #include "miniwindow.h"    // MiniWindow (off-screen drawing surface)
@@ -87,20 +89,33 @@ struct LuaDatabase {
     {
     }
 
+    // Non-copyable, non-movable: owns sqlite3* handle; destructor calls sqlite3_close.
+    // Stored exclusively via std::unique_ptr<LuaDatabase> in m_DatabaseMap.
+    LuaDatabase(const LuaDatabase&) = delete;
+    LuaDatabase& operator=(const LuaDatabase&) = delete;
+    LuaDatabase(LuaDatabase&&) = delete;
+    LuaDatabase& operator=(LuaDatabase&&) = delete;
+
     // Defined out-of-line in world_database.cpp (requires complete sqlite3.h type)
     ~LuaDatabase();
 };
 
 // Database error codes (negative to avoid conflicting with SQLite error codes)
 // Based on methods_database.cpp
-const qint32 DATABASE_ERROR_ID_NOT_FOUND = -1;            // Unknown database ID
-const qint32 DATABASE_ERROR_NOT_OPEN = -2;                // Database not opened
-const qint32 DATABASE_ERROR_HAVE_PREPARED_STATEMENT = -3; // Already have a prepared statement
-const qint32 DATABASE_ERROR_NO_PREPARED_STATEMENT = -4;   // No prepared statement yet
-const qint32 DATABASE_ERROR_NO_VALID_ROW = -5;            // Have not stepped to valid row
-const qint32 DATABASE_ERROR_DATABASE_ALREADY_EXISTS =
-    -6;                                               // Already have a database of that disk name
-const qint32 DATABASE_ERROR_COLUMN_OUT_OF_RANGE = -7; // Requested column out of range
+enum class DatabaseError : qint32 {
+    IdNotFound = -1,            // Unknown database ID
+    NotOpen = -2,               // Database not opened
+    HavePreparedStatement = -3, // Already have a prepared statement
+    NoPreparedStatement = -4,   // No prepared statement yet
+    NoValidRow = -5,            // Have not stepped to valid row
+    DatabaseAlreadyExists = -6, // Already have a database of that disk name
+    ColumnOutOfRange = -7,      // Requested column out of range
+};
+
+[[nodiscard]] inline constexpr auto to_underlying(DatabaseError e) noexcept
+{
+    return static_cast<std::underlying_type_t<DatabaseError>>(e);
+}
 
 // Flag bits for m_iFlags1
 inline constexpr quint16 FLAGS1_ArrowRecallsPartial = 0x0001;
@@ -127,10 +142,10 @@ inline constexpr quint16 FLAGS2_LogInColour = 0x0010;
 inline constexpr quint16 FLAGS2_LogRaw = 0x0020;
 
 // Auto-connect values
-enum { eNoAutoConnect, eConnectMUSH, eConnectAndGoIntoGame };
+enum class AutoConnect : int { eNoAutoConnect, eConnectMUSH, eConnectAndGoIntoGame };
 
 // MXP usage values
-enum { eMXP_Off, eMXP_Query, eMXP_On };
+enum class MXPMode : quint16 { eMXP_Off, eMXP_Query, eMXP_On };
 
 // Connection phase values (doc.h)
 // These are now inline constexpr aliases to connection_manager.h constants.
@@ -144,7 +159,7 @@ inline constexpr qint32 eConnectDisconnecting = CONNECT_DISCONNECTING;
 // Action source values (Lua callbacks)
 // These tell scripts what triggered the current code execution
 // Based on doc.h action source enum
-enum ActionSource {
+enum class ActionSource : quint32 {
     eUnknownActionSource = 0, // Unknown/not set
     eUserAction,              // User typed a command
     eWorldAction,             // World event (connect, disconnect, open, close)
@@ -158,7 +173,7 @@ enum ActionSource {
 
 // Command history position status (command history navigation)
 // Based on sendvw.h in original MUSHclient
-enum HistoryStatus {
+enum class HistoryStatus : int {
     eAtTop,    // At the top (oldest command) of history
     eInMiddle, // Somewhere in the middle of history
     eAtBottom  // At the bottom (newest, or ready for new command)
@@ -166,7 +181,7 @@ enum HistoryStatus {
 
 // Script reload option values (for m_nReloadOption)
 // Based on doc.h script reload enum
-enum ScriptReloadOption {
+enum class ScriptReloadOption : qint32 {
     eReloadConfirm = 0, // Show dialog asking user when script file changes
     eReloadAlways = 1,  // Automatically reload script when file changes
     eReloadNever = 2    // Ignore script file changes
@@ -508,7 +523,7 @@ class WorldDocument : public QObject {
     QString m_strWorldLoseFocus;  // handler on focus loss
 
     // ========== MXP (MUD Extension Protocol) ==========
-    quint16 m_iUseMXP;              // MXP usage (see enum)
+    MXPMode m_iUseMXP;              // MXP usage (see enum)
     quint16 m_iMXPdebugLevel;       // MXP debug level
     QString m_strOnMXP_Start;       // MXP starting
     QString m_strOnMXP_Stop;        // MXP stopping
@@ -614,7 +629,7 @@ class WorldDocument : public QObject {
     qint32 m_nFileDelayPerLines;    // lines before delay
 
     // ========== Miscellaneous Options ==========
-    qint32 m_nReloadOption;                // script reload option
+    ScriptReloadOption m_nReloadOption;    // script reload option
     qint32 m_bUseDefaultOutputFont;        // use default output font?
     qint32 m_bSaveDeletedCommand;          // save deleted command?
     qint32 m_bTranslateBackslashSequences; // interpret \n \r etc.?
@@ -662,11 +677,11 @@ class WorldDocument : public QObject {
     bool m_bDoNotTranslateIACtoIACIAC; // don't translate IAC?
 
     // ========== Clipboard and Display ==========
-    bool m_bAutoCopyInHTML;         // auto-copy in HTML?
-    quint16 m_iLineSpacing;         // line spacing (0 = auto)
-    bool m_bUTF_8;                  // UTF-8 support?
-    bool m_bConvertGAtoNewline;     // convert IAC/GA to newline?
-    quint32 m_iCurrentActionSource; // what caused current script?
+    bool m_bAutoCopyInHTML;              // auto-copy in HTML?
+    quint16 m_iLineSpacing;              // line spacing (0 = auto)
+    bool m_bUTF_8;                       // UTF-8 support?
+    bool m_bConvertGAtoNewline;          // convert IAC/GA to newline?
+    ActionSource m_iCurrentActionSource; // what caused current script?
 
     // ========== Filters ==========
     QString m_strTriggersFilter;  // Lua filter for triggers
@@ -796,9 +811,13 @@ class WorldDocument : public QObject {
     QString m_strLastSelectedTimer;
     QString m_strLastSelectedVariable;
 
-    // ========== View Pointers (will be replaced with Qt equivalents) ==========
-    IInputView* m_pActiveInputView;   // Active input view (interface pointer)
-    IOutputView* m_pActiveOutputView; // Active output view (interface pointer)
+    // ========== View Pointers ==========
+    // Non-owning: lifetime managed by the parent QWidget (WorldWidget).
+    // IInputView/IOutputView are pure abstract interfaces (not QObject-derived),
+    // so QPointer cannot be used. Callers must not access these after WorldWidget
+    // has been destroyed.
+    IInputView* m_pActiveInputView;
+    IOutputView* m_pActiveOutputView;
 
     // ========== Text Selection State ==========
     // Selection coordinates (0-based internally, converted to 1-based for Lua API)
@@ -840,6 +859,7 @@ class WorldDocument : public QObject {
     qint32 m_view_number; // sequence in activity view
 
     // ========== Timer Evaluation (1-second check timer) ==========
+    // Qt parent-child owned (parent = this in constructor); do NOT manually delete.
     QTimer* m_timerCheckTimer = nullptr; // Periodic timer that calls checkTimers() every second
 
     // ========== TelnetParser (companion object) ==========
@@ -847,7 +867,7 @@ class WorldDocument : public QObject {
     // Created in WorldDocument constructor. Access via m_telnetParser->.
     //
     // Fields that previously lived directly on WorldDocument and are now in TelnetParser:
-    //   m_phase, m_ttype_sequence, m_zCompress, m_bCompress, m_bCompressInitOK,
+    //   m_phase, m_ttype_sequence, m_zlibStream (ZlibStream RAII), m_bCompress,
     //   m_CompressInput, m_CompressOutput, m_nTotalUncompressed, m_nTotalCompressed,
     //   m_iCompressionTimeTaken, m_iMCCP_type, m_bSupports_MCCP_2,
     //   m_subnegotiation_type, m_IAC_subnegotiation_data,
@@ -1026,10 +1046,13 @@ class WorldDocument : public QObject {
     std::unique_ptr<SoundManager> m_soundManager;
 
     // ========== Notepad Windows ==========
-    QList<NotepadWidget*> m_notepadList; // List of notepad windows (non-owning)
+    // Non-owning: NotepadWidget is a QWidget; Qt parent-child manages lifetime.
+    // QPointer<NotepadWidget> auto-nulls if the widget is destroyed before removal.
+    QList<QPointer<NotepadWidget>> m_notepadList;
 
     // ========== Accelerators ==========
-    AcceleratorManager* m_acceleratorManager; // Keyboard shortcut management
+    // Qt parent-child owned (parent = this in constructor); do NOT manually delete.
+    AcceleratorManager* m_acceleratorManager;
 
     bool m_bNotesNotWantedNow;
     bool m_bDoingSimulate;
@@ -1254,7 +1277,19 @@ class WorldDocument : public QObject {
     }
     qint32 Queue(const QString& message, bool echo)
     {
-        return m_connectionManager->queue(message, echo);
+        // Lua API boundary: convert std::expected<void, WorldError> → legacy integer error code.
+        auto result = m_connectionManager->queue(message, echo);
+        if (result) {
+            return 0; // eOK
+        }
+        switch (result.error().type) {
+            case WorldErrorType::NotConnected:
+                return 30002; // eWorldClosed
+            case WorldErrorType::ItemInUse:
+                return 30063; // eItemInUse
+            default:
+                return 30000; // eUnknownError
+        }
     }
     qint32 DiscardQueue()
     {
@@ -1481,7 +1516,7 @@ class WorldDocument : public QObject {
                                   const QString& name); // Execute plugin timer script
 
     // ========== SendTo() - Central Action Routing ==========
-    void sendTo(quint16 iWhere, const QString& strSendText, bool omit_from_output,
+    void sendTo(SendTo iWhere, const QString& strSendText, bool omit_from_output,
                 bool omit_from_log, const QString& strDescription, const QString& variable,
                 QString& strOutput, ScriptLanguage scriptLang = ScriptLanguage::Lua);
 
@@ -1592,7 +1627,7 @@ class WorldDocument : public QObject {
     void Trace(const QString& message);
 
     // ========== Other stub methods ==========
-    // NOTE: InitZlib moved to TelnetParser::initZlib().
+    // NOTE: InitZlib moved to ZlibStream::init() inside TelnetParser (telnet_parser.h/cpp).
     // NOTE: OnConnectionDisconnect() moved to ConnectionManager::onConnectionDisconnect().
     //       The forwarding wrapper above (WorldDocument::OnConnectionDisconnect) calls it.
     void Repaint(); // Trigger UI repaint (for miniwindows etc.)
@@ -1691,7 +1726,9 @@ class WorldDocument : public QObject {
     void initializeColors();
 
     // Script file monitoring
-    QFileSystemWatcher* m_scriptFileWatcher; // Watches script file for changes
+    // Manually owned (NOT Qt parent-child; created without parent to avoid double-free).
+    // Deleted in setupScriptFileWatcher() on reset and in ~WorldDocument() on final cleanup.
+    QFileSystemWatcher* m_scriptFileWatcher;
 };
 
 #endif // WORLD_DOCUMENT_H

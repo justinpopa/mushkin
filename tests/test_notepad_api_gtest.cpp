@@ -22,6 +22,7 @@
 #include "../src/world/world_document.h"
 #include <QApplication>
 #include <gtest/gtest.h>
+#include <memory>
 
 extern "C" {
 #include <lauxlib.h>
@@ -39,7 +40,7 @@ class NotepadApiTest : public ::testing::Test {
   protected:
     void SetUp() override
     {
-        doc = new WorldDocument();
+        doc = std::make_unique<WorldDocument>();
 
         // Initialize basic state
         doc->m_mush_name = "Test World";
@@ -55,7 +56,6 @@ class NotepadApiTest : public ::testing::Test {
 
     void TearDown() override
     {
-        delete doc;
     }
 
     // Helper to execute Lua code
@@ -93,7 +93,7 @@ class NotepadApiTest : public ::testing::Test {
         return result;
     }
 
-    WorldDocument* doc = nullptr;
+    std::unique_ptr<WorldDocument> doc;
     lua_State* L = nullptr;
 };
 

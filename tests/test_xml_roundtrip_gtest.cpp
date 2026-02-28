@@ -18,6 +18,7 @@
 #include <QTemporaryFile>
 #include <QUuid>
 #include <gtest/gtest.h>
+#include <memory>
 
 // Helper to clean up all files related to SaveWorldXML atomic save
 // (main file, .tmp, and .bak files)
@@ -42,20 +43,10 @@ class XmlRoundtripTest : public ::testing::Test {
   protected:
     void SetUp() override
     {
-        doc1 = nullptr;
-        doc2 = nullptr;
     }
 
     void TearDown() override
     {
-        if (doc1) {
-            delete doc1;
-            doc1 = nullptr;
-        }
-        if (doc2) {
-            delete doc2;
-            doc2 = nullptr;
-        }
         if (!tmpFilename.isEmpty()) {
             cleanupSaveFiles(tmpFilename);
             tmpFilename.clear();
@@ -78,40 +69,41 @@ class XmlRoundtripTest : public ::testing::Test {
         return content;
     }
 
-    WorldDocument* doc1;
-    WorldDocument* doc2;
+    std::unique_ptr<WorldDocument> doc1;
+    std::unique_ptr<WorldDocument> doc2;
     QString tmpFilename;
 };
 
 // Test 1: Trigger round-trip with style decomposition
 TEST_F(XmlRoundtripTest, TriggerStyleDecomposition)
 {
-    doc1 = new WorldDocument();
+    doc1 = std::make_unique<WorldDocument>();
     doc1->m_mush_name = "Trigger Round-trip Test";
 
-    Trigger* trigger = new Trigger();
-    trigger->label = "test_trigger";
-    trigger->internal_name = "test_trigger";
-    trigger->trigger = "You have * gold";
-    trigger->contents = "say I have %1 gold!";
-    trigger->procedure = "on_gold";
-    trigger->enabled = true;
-    trigger->send_to = 0; // SendToWorld
-    trigger->sequence = 100;
-    trigger->ignore_case = false;
-    trigger->use_regexp = false;
-    trigger->keep_evaluating = true;
-    trigger->omit_from_output = false;
-    trigger->omit_from_log = false;
-    trigger->expand_variables = true;
-    trigger->group = "Combat";
+    auto triggerOwned = std::make_unique<Trigger>();
+    triggerOwned->label = "test_trigger";
+    triggerOwned->internal_name = "test_trigger";
+    triggerOwned->trigger = "You have * gold";
+    triggerOwned->contents = "say I have %1 gold!";
+    triggerOwned->procedure = "on_gold";
+    triggerOwned->enabled = true;
+    triggerOwned->send_to = eSendToWorld;
+    triggerOwned->sequence = 100;
+    triggerOwned->ignore_case = false;
+    triggerOwned->use_regexp = false;
+    triggerOwned->keep_evaluating = true;
+    triggerOwned->omit_from_output = false;
+    triggerOwned->omit_from_log = false;
+    triggerOwned->expand_variables = true;
+    triggerOwned->group = "Combat";
 
     // Set style attributes (these should decompose into individual XML attributes)
-    trigger->style = 0x0001 | 0x0004; // HILITE | BLINK (make_bold | make_italic)
+    triggerOwned->style = 0x0001 | 0x0004; // HILITE | BLINK (make_bold | make_italic)
+    Trigger* trigger = triggerOwned.get();
 
-    doc1->addTrigger("test_trigger", std::unique_ptr<Trigger>(trigger));
+    doc1->addTrigger("test_trigger", std::move(triggerOwned));
 
-    QString content = saveAndReadXml(doc1);
+    QString content = saveAndReadXml(doc1.get());
 
     // Verify decomposed style attributes (not raw style number)
     EXPECT_TRUE(content.contains("make_bold=\"y\"")) << "Missing make_bold attribute";
@@ -120,8 +112,8 @@ TEST_F(XmlRoundtripTest, TriggerStyleDecomposition)
         << "Found raw istyle attribute (should be decomposed)";
 
     // Load into new document
-    doc2 = new WorldDocument();
-    ASSERT_TRUE(XmlSerialization::LoadWorldXML(doc2, tmpFilename)) << "Failed to load XML";
+    doc2 = std::make_unique<WorldDocument>();
+    ASSERT_TRUE(XmlSerialization::LoadWorldXML(doc2.get(), tmpFilename)) << "Failed to load XML";
 
     // Verify trigger was loaded
     Trigger* loaded = doc2->getTrigger("test_trigger");
@@ -144,22 +136,24 @@ TEST_F(XmlRoundtripTest, TriggerStyleDecomposition)
 // Test 2: Trigger round-trip with match attribute decomposition
 TEST_F(XmlRoundtripTest, TriggerMatchDecomposition)
 {
-    doc1 = new WorldDocument();
+    doc1 = std::make_unique<WorldDocument>();
     doc1->m_mush_name = "Trigger Match Test";
 
-    Trigger* trigger = new Trigger();
-    trigger->label = "match_trigger";
-    trigger->internal_name = "match_trigger";
-    trigger->trigger = "test pattern";
+    auto triggerOwned = std::make_unique<Trigger>();
+    triggerOwned->label = "match_trigger";
+    triggerOwned->internal_name = "match_trigger";
+    triggerOwned->trigger = "test pattern";
 
     // Set match attributes (should decompose into text_colour, back_colour, bold, italic, etc.)
     // Bit layout: bits 0-3: style flags, bits 4-7: text_colour, bits 8-11: back_colour, bits
     // 12-15: match flags
-    trigger->match_type = (5 << 4) | (2 << 8) | 0x0001 | 0x4000; // text=5, back=2, bold, match_italic
+    triggerOwned->match_type =
+        (5 << 4) | (2 << 8) | 0x0001 | 0x4000; // text=5, back=2, bold, match_italic
+    Trigger* trigger = triggerOwned.get();
 
-    doc1->addTrigger("match_trigger", std::unique_ptr<Trigger>(trigger));
+    doc1->addTrigger("match_trigger", std::move(triggerOwned));
 
-    QString content = saveAndReadXml(doc1);
+    QString content = saveAndReadXml(doc1.get());
 
     // Verify decomposed match attributes
     EXPECT_TRUE(content.contains("text_colour=\"5\"")) << "Missing text_colour attribute";
@@ -170,8 +164,8 @@ TEST_F(XmlRoundtripTest, TriggerMatchDecomposition)
         << "Found raw imatch attribute (should be decomposed)";
 
     // Load and verify
-    doc2 = new WorldDocument();
-    ASSERT_TRUE(XmlSerialization::LoadWorldXML(doc2, tmpFilename));
+    doc2 = std::make_unique<WorldDocument>();
+    ASSERT_TRUE(XmlSerialization::LoadWorldXML(doc2.get(), tmpFilename));
 
     Trigger* loaded = doc2->getTrigger("match_trigger");
     ASSERT_NE(loaded, nullptr);
@@ -184,24 +178,25 @@ TEST_F(XmlRoundtripTest, TriggerMatchDecomposition)
 // Test 3: Trigger round-trip with custom colors
 TEST_F(XmlRoundtripTest, TriggerCustomColors)
 {
-    doc1 = new WorldDocument();
+    doc1 = std::make_unique<WorldDocument>();
     doc1->m_mush_name = "Trigger Color Test";
 
-    Trigger* trigger = new Trigger();
-    trigger->label = "color_trigger";
-    trigger->internal_name = "color_trigger";
-    trigger->trigger = "color test";
+    auto triggerOwned = std::make_unique<Trigger>();
+    triggerOwned->label = "color_trigger";
+    triggerOwned->internal_name = "color_trigger";
+    triggerOwned->trigger = "color test";
 
     // Set custom color (should save as +1)
-    trigger->colour = 42;
+    triggerOwned->colour = 42;
 
     // Set BGR colors (MUSHclient COLORREF format, should save as hex RGB names)
-    trigger->other_foreground = BGR(255, 128, 64);  // Will save as #FF8040
-    trigger->other_background = BGR(32, 64, 128);   // Will save as #204080
+    triggerOwned->other_foreground = BGR(255, 128, 64); // Will save as #FF8040
+    triggerOwned->other_background = BGR(32, 64, 128);  // Will save as #204080
+    Trigger* trigger = triggerOwned.get();
 
-    doc1->addTrigger("color_trigger", std::unique_ptr<Trigger>(trigger));
+    doc1->addTrigger("color_trigger", std::move(triggerOwned));
 
-    QString content = saveAndReadXml(doc1);
+    QString content = saveAndReadXml(doc1.get());
 
     // Verify custom_colour is +1
     EXPECT_TRUE(content.contains("custom_colour=\"43\"")) << "custom_colour should be 43 (42+1)";
@@ -213,8 +208,8 @@ TEST_F(XmlRoundtripTest, TriggerCustomColors)
         << "other_back_colour should be #204080";
 
     // Load and verify
-    doc2 = new WorldDocument();
-    ASSERT_TRUE(XmlSerialization::LoadWorldXML(doc2, tmpFilename));
+    doc2 = std::make_unique<WorldDocument>();
+    ASSERT_TRUE(XmlSerialization::LoadWorldXML(doc2.get(), tmpFilename));
 
     Trigger* loaded = doc2->getTrigger("color_trigger");
     ASSERT_NE(loaded, nullptr);
@@ -231,28 +226,29 @@ TEST_F(XmlRoundtripTest, TriggerCustomColors)
 // Test 4: Trigger round-trip with user attribute
 TEST_F(XmlRoundtripTest, TriggerUserAttribute)
 {
-    doc1 = new WorldDocument();
+    doc1 = std::make_unique<WorldDocument>();
     doc1->m_mush_name = "Trigger User Test";
 
-    Trigger* trigger = new Trigger();
-    trigger->label = "user_trigger";
-    trigger->internal_name = "user_trigger";
-    trigger->trigger = "user test";
+    auto triggerOwned = std::make_unique<Trigger>();
+    triggerOwned->label = "user_trigger";
+    triggerOwned->internal_name = "user_trigger";
+    triggerOwned->trigger = "user test";
 
     // Set user option (should save as "user" not "user_option")
-    trigger->user_option = 123;
+    triggerOwned->user_option = 123;
+    Trigger* trigger = triggerOwned.get();
 
-    doc1->addTrigger("user_trigger", std::unique_ptr<Trigger>(trigger));
+    doc1->addTrigger("user_trigger", std::move(triggerOwned));
 
-    QString content = saveAndReadXml(doc1);
+    QString content = saveAndReadXml(doc1.get());
 
     // Verify "user" attribute (not "user_option")
     EXPECT_TRUE(content.contains("user=\"123\"")) << "Missing user attribute";
     EXPECT_FALSE(content.contains("user_option=")) << "Found user_option (should be user)";
 
     // Load and verify
-    doc2 = new WorldDocument();
-    ASSERT_TRUE(XmlSerialization::LoadWorldXML(doc2, tmpFilename));
+    doc2 = std::make_unique<WorldDocument>();
+    ASSERT_TRUE(XmlSerialization::LoadWorldXML(doc2.get(), tmpFilename));
 
     Trigger* loaded = doc2->getTrigger("user_trigger");
     ASSERT_NE(loaded, nullptr);
@@ -264,39 +260,40 @@ TEST_F(XmlRoundtripTest, TriggerUserAttribute)
 // Test 5: Complete trigger round-trip with all attributes
 TEST_F(XmlRoundtripTest, TriggerCompleteRoundtrip)
 {
-    doc1 = new WorldDocument();
+    doc1 = std::make_unique<WorldDocument>();
     doc1->m_mush_name = "Complete Trigger Test";
 
-    Trigger* trigger = new Trigger();
-    trigger->label = "complete_trigger";
-    trigger->internal_name = "complete_trigger";
-    trigger->trigger = "You have * gold";
-    trigger->contents = "say I have %1 gold!";
-    trigger->procedure = "on_gold";
-    trigger->enabled = true;
-    trigger->send_to = 0;
-    trigger->sequence = 100;
-    trigger->ignore_case = false;
-    trigger->use_regexp = false;
-    trigger->keep_evaluating = true;
-    trigger->omit_from_output = false;
-    trigger->omit_from_log = false;
-    trigger->expand_variables = true;
-    trigger->group = "Combat";
-    trigger->style = 0x0001 | 0x0004;
-    trigger->match_type = (5 << 4) | (2 << 8) | 0x0001 | 0x4000;
-    trigger->colour = 42;
-    trigger->other_foreground = BGR(255, 128, 64);  // Stored as BGR/COLORREF
-    trigger->other_background = BGR(32, 64, 128);   // Stored as BGR/COLORREF
-    trigger->user_option = 123;
+    auto triggerOwned = std::make_unique<Trigger>();
+    triggerOwned->label = "complete_trigger";
+    triggerOwned->internal_name = "complete_trigger";
+    triggerOwned->trigger = "You have * gold";
+    triggerOwned->contents = "say I have %1 gold!";
+    triggerOwned->procedure = "on_gold";
+    triggerOwned->enabled = true;
+    triggerOwned->send_to = eSendToWorld;
+    triggerOwned->sequence = 100;
+    triggerOwned->ignore_case = false;
+    triggerOwned->use_regexp = false;
+    triggerOwned->keep_evaluating = true;
+    triggerOwned->omit_from_output = false;
+    triggerOwned->omit_from_log = false;
+    triggerOwned->expand_variables = true;
+    triggerOwned->group = "Combat";
+    triggerOwned->style = 0x0001 | 0x0004;
+    triggerOwned->match_type = (5 << 4) | (2 << 8) | 0x0001 | 0x4000;
+    triggerOwned->colour = 42;
+    triggerOwned->other_foreground = BGR(255, 128, 64); // Stored as BGR/COLORREF
+    triggerOwned->other_background = BGR(32, 64, 128);  // Stored as BGR/COLORREF
+    triggerOwned->user_option = 123;
+    Trigger* trigger = triggerOwned.get();
 
-    doc1->addTrigger("complete_trigger", std::unique_ptr<Trigger>(trigger));
+    doc1->addTrigger("complete_trigger", std::move(triggerOwned));
 
-    saveAndReadXml(doc1);
+    saveAndReadXml(doc1.get());
 
     // Load and verify all attributes
-    doc2 = new WorldDocument();
-    ASSERT_TRUE(XmlSerialization::LoadWorldXML(doc2, tmpFilename));
+    doc2 = std::make_unique<WorldDocument>();
+    ASSERT_TRUE(XmlSerialization::LoadWorldXML(doc2.get(), tmpFilename));
 
     Trigger* loaded = doc2->getTrigger("complete_trigger");
     ASSERT_NE(loaded, nullptr);
@@ -320,7 +317,7 @@ TEST_F(XmlRoundtripTest, TriggerCompleteRoundtrip)
 // Test 6: Alias round-trip with user attribute
 TEST_F(XmlRoundtripTest, AliasUserAttribute)
 {
-    doc1 = new WorldDocument();
+    doc1 = std::make_unique<WorldDocument>();
     doc1->m_mush_name = "Alias Round-trip Test";
 
     auto alias = std::make_unique<Alias>();
@@ -330,7 +327,7 @@ TEST_F(XmlRoundtripTest, AliasUserAttribute)
     alias->contents = "north";
     alias->procedure = "on_north";
     alias->enabled = true;
-    alias->send_to = 0;
+    alias->send_to = eSendToWorld;
     alias->sequence = 100;
     alias->ignore_case = true;
     alias->use_regexp = false;
@@ -346,7 +343,7 @@ TEST_F(XmlRoundtripTest, AliasUserAttribute)
     QString expectedContents = alias->contents;
     QString expectedProcedure = alias->procedure;
     bool expectedEnabled = alias->enabled;
-    int expectedSendTo = alias->send_to;
+    SendTo expectedSendTo = alias->send_to;
     int expectedSequence = alias->sequence;
     bool expectedIgnoreCase = alias->ignore_case;
     bool expectedEchoAlias = alias->echo_alias;
@@ -355,15 +352,15 @@ TEST_F(XmlRoundtripTest, AliasUserAttribute)
 
     doc1->addAlias("test_alias", std::move(alias));
 
-    QString content = saveAndReadXml(doc1);
+    QString content = saveAndReadXml(doc1.get());
 
     // Verify "user" attribute (not "user_option")
     EXPECT_TRUE(content.contains("user=\"456\"")) << "Missing user attribute in alias";
     EXPECT_FALSE(content.contains("user_option=")) << "Found user_option in alias (should be user)";
 
     // Load and verify
-    doc2 = new WorldDocument();
-    ASSERT_TRUE(XmlSerialization::LoadWorldXML(doc2, tmpFilename));
+    doc2 = std::make_unique<WorldDocument>();
+    ASSERT_TRUE(XmlSerialization::LoadWorldXML(doc2.get(), tmpFilename));
 
     Alias* loaded = doc2->getAlias("test_alias");
     ASSERT_NE(loaded, nullptr) << "Alias not found after load";
@@ -384,33 +381,34 @@ TEST_F(XmlRoundtripTest, AliasUserAttribute)
 // Test 7: Timer round-trip with interval type
 TEST_F(XmlRoundtripTest, TimerIntervalRoundtrip)
 {
-    doc1 = new WorldDocument();
+    doc1 = std::make_unique<WorldDocument>();
     doc1->m_mush_name = "Timer Round-trip Test";
 
-    Timer* timer = new Timer();
-    timer->label = "test_timer";
-    timer->enabled = true;
-    timer->type = Timer::eInterval;
-    timer->every_hour = 0;
-    timer->every_minute = 5;
-    timer->every_second = 30.5;
-    timer->offset_hour = 0;
-    timer->offset_minute = 2;
-    timer->offset_second = 15.25;
-    timer->contents = "say Timer fired!";
-    timer->send_to = 0;
-    timer->procedure = "onTimerFire";
-    timer->variable = "";
-    timer->one_shot = false;
-    timer->active_when_closed = true;
-    timer->omit_from_output = false;
-    timer->omit_from_log = false;
-    timer->group = "Maintenance";
-    timer->user_option = 789;
+    auto timerOwned = std::make_unique<Timer>();
+    timerOwned->label = "test_timer";
+    timerOwned->enabled = true;
+    timerOwned->type = Timer::TimerType::Interval;
+    timerOwned->every_hour = 0;
+    timerOwned->every_minute = 5;
+    timerOwned->every_second = 30.5;
+    timerOwned->offset_hour = 0;
+    timerOwned->offset_minute = 2;
+    timerOwned->offset_second = 15.25;
+    timerOwned->contents = "say Timer fired!";
+    timerOwned->send_to = eSendToWorld;
+    timerOwned->procedure = "onTimerFire";
+    timerOwned->variable = "";
+    timerOwned->one_shot = false;
+    timerOwned->active_when_closed = true;
+    timerOwned->omit_from_output = false;
+    timerOwned->omit_from_log = false;
+    timerOwned->group = "Maintenance";
+    timerOwned->user_option = 789;
+    Timer* timer = timerOwned.get();
 
-    doc1->addTimer("test_timer", std::unique_ptr<Timer>(timer));
+    doc1->addTimer("test_timer", std::move(timerOwned));
 
-    QString content = saveAndReadXml(doc1);
+    QString content = saveAndReadXml(doc1.get());
 
     // Verify timer element exists
     EXPECT_TRUE(content.contains("<timers>")) << "Missing <timers> element";
@@ -429,8 +427,8 @@ TEST_F(XmlRoundtripTest, TimerIntervalRoundtrip)
     EXPECT_FALSE(content.contains("user_option=")) << "Found user_option in timer (should be user)";
 
     // Load and verify
-    doc2 = new WorldDocument();
-    ASSERT_TRUE(XmlSerialization::LoadWorldXML(doc2, tmpFilename));
+    doc2 = std::make_unique<WorldDocument>();
+    ASSERT_TRUE(XmlSerialization::LoadWorldXML(doc2.get(), tmpFilename));
 
     Timer* loaded = doc2->getTimer("test_timer");
     ASSERT_NE(loaded, nullptr) << "Timer not found after load";

@@ -214,7 +214,7 @@ void AliasEditDialog::loadAliasData()
     m_scriptEdit->setText(alias->procedure);
 
     // Set send-to combo
-    int index = m_sendToCombo->findData(alias->send_to);
+    int index = m_sendToCombo->findData(static_cast<int>(alias->send_to));
     if (index >= 0) {
         m_sendToCombo->setCurrentIndex(index);
     }
@@ -280,7 +280,7 @@ bool AliasEditDialog::saveAlias()
         alias->group = m_groupEdit->text().trimmed();
         alias->contents = m_sendTextEdit->toPlainText();
         alias->procedure = m_scriptEdit->text().trimmed();
-        alias->send_to = m_sendToCombo->currentData().toInt();
+        alias->send_to = static_cast<SendTo>(m_sendToCombo->currentData().toInt());
         alias->scriptLanguage =
             static_cast<ScriptLanguage>(m_scriptLanguageCombo->currentData().toInt());
 
@@ -323,7 +323,7 @@ bool AliasEditDialog::saveAlias()
         newAlias->group = m_groupEdit->text().trimmed();
         newAlias->contents = m_sendTextEdit->toPlainText();
         newAlias->procedure = m_scriptEdit->text().trimmed();
-        newAlias->send_to = m_sendToCombo->currentData().toInt();
+        newAlias->send_to = static_cast<SendTo>(m_sendToCombo->currentData().toInt());
         newAlias->scriptLanguage =
             static_cast<ScriptLanguage>(m_scriptLanguageCombo->currentData().toInt());
 

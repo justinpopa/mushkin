@@ -308,7 +308,7 @@ void TriggerEditDialog::loadTriggerData()
     // Response tab
     m_sendTextEdit->setPlainText(trigger->contents);
     m_scriptEdit->setText(trigger->procedure);
-    int index = m_sendToCombo->findData(trigger->send_to);
+    int index = m_sendToCombo->findData(static_cast<int>(trigger->send_to));
     if (index >= 0) {
         m_sendToCombo->setCurrentIndex(index);
     }
@@ -335,7 +335,8 @@ void TriggerEditDialog::loadTriggerData()
     m_foregroundColorButton->setEnabled(hasColorChange);
     m_backgroundColorButton->setEnabled(hasColorChange);
 
-    int colorIndex = m_colorChangeTypeCombo->findData(trigger->colour_change_type);
+    int colorIndex =
+        m_colorChangeTypeCombo->findData(static_cast<int>(trigger->colour_change_type));
     if (colorIndex >= 0) {
         m_colorChangeTypeCombo->setCurrentIndex(colorIndex);
     }
@@ -394,7 +395,7 @@ bool TriggerEditDialog::saveTrigger()
         // Response tab
         trigger->contents = m_sendTextEdit->toPlainText();
         trigger->procedure = m_scriptEdit->text().trimmed();
-        trigger->send_to = m_sendToCombo->currentData().toInt();
+        trigger->send_to = static_cast<SendTo>(m_sendToCombo->currentData().toInt());
         trigger->scriptLanguage =
             static_cast<ScriptLanguage>(m_scriptLanguageCombo->currentData().toInt());
 
@@ -411,11 +412,12 @@ bool TriggerEditDialog::saveTrigger()
 
         // Appearance tab
         if (m_changeColorsCheck->isChecked()) {
-            trigger->colour_change_type = m_colorChangeTypeCombo->currentData().toInt();
+            trigger->colour_change_type =
+                static_cast<ColourChangeType>(m_colorChangeTypeCombo->currentData().toInt());
             trigger->other_foreground = m_foregroundColor;
             trigger->other_background = m_backgroundColor;
         } else {
-            trigger->colour_change_type = 0;
+            trigger->colour_change_type = ColourChangeType::Both;
             trigger->other_foreground = 0;
             trigger->other_background = 0;
         }
@@ -441,8 +443,8 @@ bool TriggerEditDialog::saveTrigger()
                 pattern = pattern.left(50) + "...";
             }
             triggerPtr->internal_name = QString("trigger_%1_%2")
-                                              .arg(QDateTime::currentMSecsSinceEpoch())
-                                              .arg(qHash(pattern));
+                                            .arg(QDateTime::currentMSecsSinceEpoch())
+                                            .arg(qHash(pattern));
         } else {
             triggerPtr->internal_name = label;
         }
@@ -453,14 +455,15 @@ bool TriggerEditDialog::saveTrigger()
         triggerPtr->enabled = m_enabledCheck->isChecked();
         triggerPtr->use_regexp = m_regexpCheck->isChecked();
         triggerPtr->multi_line = m_multiLineCheck->isChecked();
-        triggerPtr->lines_to_match = m_multiLineCheck->isChecked() ? m_linesToMatchSpin->value() : 0;
+        triggerPtr->lines_to_match =
+            m_multiLineCheck->isChecked() ? m_linesToMatchSpin->value() : 0;
         triggerPtr->sequence = m_sequenceSpin->value();
         triggerPtr->group = m_groupEdit->text().trimmed();
 
         // Response tab
         triggerPtr->contents = m_sendTextEdit->toPlainText();
         triggerPtr->procedure = m_scriptEdit->text().trimmed();
-        triggerPtr->send_to = m_sendToCombo->currentData().toInt();
+        triggerPtr->send_to = static_cast<SendTo>(m_sendToCombo->currentData().toInt());
         triggerPtr->scriptLanguage =
             static_cast<ScriptLanguage>(m_scriptLanguageCombo->currentData().toInt());
 
@@ -477,11 +480,12 @@ bool TriggerEditDialog::saveTrigger()
 
         // Appearance tab
         if (m_changeColorsCheck->isChecked()) {
-            triggerPtr->colour_change_type = m_colorChangeTypeCombo->currentData().toInt();
+            triggerPtr->colour_change_type =
+                static_cast<ColourChangeType>(m_colorChangeTypeCombo->currentData().toInt());
             triggerPtr->other_foreground = m_foregroundColor;
             triggerPtr->other_background = m_backgroundColor;
         } else {
-            triggerPtr->colour_change_type = 0;
+            triggerPtr->colour_change_type = ColourChangeType::Both;
             triggerPtr->other_foreground = 0;
             triggerPtr->other_background = 0;
         }

@@ -25,6 +25,7 @@
 #include <QCoreApplication>
 #include <QDateTime>
 #include <gtest/gtest.h>
+#include <memory>
 
 extern "C" {
 #include <lauxlib.h>
@@ -37,7 +38,7 @@ class TimerApiTest : public ::testing::Test {
   protected:
     void SetUp() override
     {
-        doc = new WorldDocument();
+        doc = std::make_unique<WorldDocument>();
         doc->m_mush_name = "Test World";
         doc->m_server = "localhost";
         doc->m_port = 4000;
@@ -49,7 +50,6 @@ class TimerApiTest : public ::testing::Test {
 
     void TearDown() override
     {
-        delete doc;
     }
 
     // Helper to execute Lua code
@@ -90,7 +90,7 @@ class TimerApiTest : public ::testing::Test {
         return value;
     }
 
-    WorldDocument* doc = nullptr;
+    std::unique_ptr<WorldDocument> doc;
 };
 
 // Test 1: AddTimer - Create interval timer
@@ -108,7 +108,7 @@ TEST_F(TimerApiTest, AddTimerInterval)
     // Verify timer was created
     Timer* timer = doc->getTimer("test_timer1");
     ASSERT_NE(timer, nullptr) << "Timer should exist";
-    EXPECT_EQ(timer->type, Timer::eInterval) << "Timer should be interval type";
+    EXPECT_EQ(timer->type, Timer::TimerType::Interval) << "Timer should be interval type";
     EXPECT_EQ(timer->every_hour, 0) << "Hour should be 0";
     EXPECT_EQ(timer->every_minute, 0) << "Minute should be 0";
     EXPECT_EQ(timer->every_second, 5.0) << "Second should be 5.0";
@@ -131,7 +131,7 @@ TEST_F(TimerApiTest, AddTimerAtTime)
     // Verify timer was created
     Timer* timer = doc->getTimer("test_timer2");
     ASSERT_NE(timer, nullptr) << "Timer should exist";
-    EXPECT_EQ(timer->type, Timer::eAtTime) << "Timer should be at-time type";
+    EXPECT_EQ(timer->type, Timer::TimerType::AtTime) << "Timer should be at-time type";
     EXPECT_EQ(timer->at_hour, 15) << "Hour should be 15";
     EXPECT_EQ(timer->at_minute, 30) << "Minute should be 30";
     EXPECT_EQ(timer->at_second, 0.0) << "Second should be 0.0";
@@ -307,7 +307,8 @@ TEST_F(TimerApiTest, DoAfter)
     }
 
     ASSERT_NE(doafterTimer, nullptr) << "DoAfter timer should be created";
-    EXPECT_EQ(doafterTimer->type, Timer::eInterval) << "DoAfter timer should be interval type";
+    EXPECT_EQ(doafterTimer->type, Timer::TimerType::Interval)
+        << "DoAfter timer should be interval type";
     EXPECT_EQ(doafterTimer->every_second, 3.5) << "DoAfter timer should fire after 3.5 seconds";
     EXPECT_EQ(doafterTimer->contents, QString("north")) << "DoAfter contents should be 'north'";
     EXPECT_TRUE(doafterTimer->one_shot) << "DoAfter timer should be one-shot";
@@ -334,7 +335,7 @@ TEST_F(TimerApiTest, DoAfterNote)
     }
 
     ASSERT_NE(noteTimer, nullptr) << "DoAfterNote timer should be created";
-    EXPECT_EQ(noteTimer->send_to, (quint16)eSendToOutput) << "DoAfterNote should send to output";
+    EXPECT_EQ(noteTimer->send_to, eSendToOutput) << "DoAfterNote should send to output";
 }
 
 // Test 11: EnableTimerGroup

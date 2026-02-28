@@ -13,6 +13,7 @@
 #include "../src/world/world_document.h"
 #include <QApplication>
 #include <gtest/gtest.h>
+#include <memory>
 
 extern "C" {
 #include <lauxlib.h>
@@ -25,7 +26,7 @@ class CommandColorAPITest : public ::testing::Test {
   protected:
     void SetUp() override
     {
-        doc = new WorldDocument();
+        doc = std::make_unique<WorldDocument>();
         L = doc->m_ScriptEngine->L;
 
         // Load test script file (relative to build/tests directory)
@@ -39,7 +40,6 @@ class CommandColorAPITest : public ::testing::Test {
     void TearDown() override
     {
         delete inputView;
-        delete doc;
     }
 
     // Helper to call a Lua test function
@@ -58,7 +58,7 @@ class CommandColorAPITest : public ::testing::Test {
         EXPECT_EQ(result, 0) << functionName << " should succeed";
     }
 
-    WorldDocument* doc = nullptr;
+    std::unique_ptr<WorldDocument> doc;
     lua_State* L = nullptr;
     InputView* inputView = nullptr;
 };
@@ -79,7 +79,7 @@ TEST_F(CommandColorAPITest, GetCommandNoInputView)
 TEST_F(CommandColorAPITest, GetCommandWithInputView)
 {
     // Create InputView and set it
-    inputView = new InputView(doc, nullptr);
+    inputView = new InputView(doc.get(), nullptr);
     doc->setActiveInputView(inputView);
 
     // Set some text
@@ -101,7 +101,7 @@ TEST_F(CommandColorAPITest, GetCommandWithInputView)
 TEST_F(CommandColorAPITest, SetCommandValid)
 {
     // Create InputView (empty by default)
-    inputView = new InputView(doc, nullptr);
+    inputView = new InputView(doc.get(), nullptr);
     doc->setActiveInputView(inputView);
 
     // Call Lua test (should succeed)
@@ -115,7 +115,7 @@ TEST_F(CommandColorAPITest, SetCommandValid)
 TEST_F(CommandColorAPITest, SetCommandNotEmpty)
 {
     // Create InputView with existing text
-    inputView = new InputView(doc, nullptr);
+    inputView = new InputView(doc.get(), nullptr);
     inputView->setText("existing text");
     doc->setActiveInputView(inputView);
 
@@ -130,7 +130,7 @@ TEST_F(CommandColorAPITest, SetCommandNotEmpty)
 TEST_F(CommandColorAPITest, SetCommandSelection)
 {
     // Create InputView with text
-    inputView = new InputView(doc, nullptr);
+    inputView = new InputView(doc.get(), nullptr);
     inputView->setText("test command");
     doc->setActiveInputView(inputView);
 
@@ -146,7 +146,7 @@ TEST_F(CommandColorAPITest, SetCommandSelection)
 TEST_F(CommandColorAPITest, SetCommandSelectionEnd)
 {
     // Create InputView with text
-    inputView = new InputView(doc, nullptr);
+    inputView = new InputView(doc.get(), nullptr);
     inputView->setText("test command");
     doc->setActiveInputView(inputView);
 

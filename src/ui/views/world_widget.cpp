@@ -244,7 +244,8 @@ void WorldWidget::setupUi()
                 } else {
                     // For other sendTo types, use sendTo() method
                     QString output;
-                    m_document->sendTo(sendTo, action, false, false, QString(), QString(), output);
+                    m_document->sendTo(static_cast<SendTo>(sendTo), action, false, false, QString(),
+                                       QString(), output);
                 }
             });
 

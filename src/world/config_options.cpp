@@ -31,14 +31,19 @@
 // NOTE: These will need proper definitions once we port the relevant subsystems.
 // For now, using placeholder values to allow compilation.
 
-// RGB color macro (Windows style: 0x00BBGGRR)
-#define RGB(r, g, b) (static_cast<unsigned int>((b) << 16 | (g) << 8 | (r)))
+// RGB helper (Windows style: 0x00BBGGRR) — replaces the original Windows RGB() macro
+constexpr unsigned int makeRgb(int r, int g, int b)
+{
+    return static_cast<unsigned int>((b) << 16 | (g) << 8 | (r));
+}
+// Convenience macro so existing table entries (RGB(r,g,b)) continue to compile unchanged
+#define RGB(r, g, b) makeRgb((r), (g), (b))
 
 // Font weights
-#define FW_DONTCARE 0
+inline constexpr int FW_DONTCARE = 0;
 
 // Character sets
-#define DEFAULT_CHARSET 1
+inline constexpr int DEFAULT_CHARSET = 1;
 
 // Color limits (MAX_CUSTOM is already defined in world_document.h)
 
@@ -48,16 +53,16 @@
 #endif
 
 // Line width
-#define MAX_LINE_WIDTH 32000
+inline constexpr int MAX_LINE_WIDTH = 32000;
 
 // Connect methods (already defined in world_document.h)
-#define eConnectTypeMax 4
+inline constexpr int eConnectTypeMax = 4;
 
 // SendTo enum now in automation/sendto.h
 
 // Default sequences
-#define DEFAULT_TRIGGER_SEQUENCE 100
-#define DEFAULT_ALIAS_SEQUENCE 100
+inline constexpr int DEFAULT_TRIGGER_SEQUENCE = 100;
+inline constexpr int DEFAULT_ALIAS_SEQUENCE = 100;
 
 // Debug levels
 enum { DBG_NONE = 0 };
@@ -69,10 +74,10 @@ enum { DBG_NONE = 0 };
 enum { eNoMXP = 0, eUseMXP = 1, eOnCommandMXP = 2 };
 
 // Sound literal
-#define NOSOUNDLIT ""
+inline constexpr const char* NOSOUNDLIT = "";
 
 // Plugin ID length
-#define PLUGIN_UNIQUE_ID_LENGTH 24
+inline constexpr int PLUGIN_UNIQUE_ID_LENGTH = 24;
 
 // ============================================================================
 // NUMERIC OPTIONS TABLE (173 entries)
@@ -101,7 +106,8 @@ const tConfigurationNumericOption OptionsTable[] = {
     {"confirm_before_replacing_typing", true, O(m_bConfirmBeforeReplacingTyping), 0, 0, 0},
     {"confirm_on_paste", true, O(m_bConfirmOnPaste), 0, 0, 0},
     {"confirm_on_send", true, O(m_bConfirmOnSend), 0, 0, 0},
-    {"connect_method", eNoAutoConnect, O(m_connect_now), eNoAutoConnect, eConnectTypeMax - 1, 0},
+    {"connect_method", 0 /*AutoConnect::eNoAutoConnect*/, O(m_connect_now), 0, eConnectTypeMax - 1,
+     0},
     {"copy_selection_to_clipboard", false, O(m_bCopySelectionToClipboard), 0, 0, 0},
     {"convert_ga_to_newline", false, O(m_bConvertGAtoNewline), 0, 0, 0},
     {"ctrl_n_goes_to_next_command", false, O(m_bCtrlNGoesToNextCommand), 0, 0, 0},

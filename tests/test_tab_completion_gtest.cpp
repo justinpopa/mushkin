@@ -20,6 +20,7 @@
 #include <QApplication>
 #include <cstring>
 #include <gtest/gtest.h>
+#include <memory>
 
 // Test fixture for tab completion tests
 // Provides common setup/teardown and helper methods
@@ -27,14 +28,13 @@ class TabCompletionTest : public ::testing::Test {
   protected:
     void SetUp() override
     {
-        doc = new WorldDocument();
-        input = new InputView(doc);
+        doc = std::make_unique<WorldDocument>();
+        input = new InputView(doc.get());
     }
 
     void TearDown() override
     {
         delete input;
-        delete doc;
     }
 
     /**
@@ -65,7 +65,7 @@ class TabCompletionTest : public ::testing::Test {
         doc->m_lineList.push_back(std::move(line));
     }
 
-    WorldDocument* doc = nullptr;
+    std::unique_ptr<WorldDocument> doc;
     InputView* input = nullptr;
 };
 

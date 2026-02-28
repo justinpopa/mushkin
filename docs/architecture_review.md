@@ -1,141 +1,288 @@
-# Mushkin Architecture Review — Multi-Model Consensus
+# Mushkin Architecture Review — Multi-Model Consensus (Post-Migration)
 
 **Date:** 2026-02-27
-**Reviewers:** Gemini Pro 3.1, Claude Sonnet 4.6, Qwen 3.5 397B, Kimi K2.5, MiniMax m2.5, Claude Opus 4.6 (orchestrator)
+**Reviewers:** Gemini Pro 3.1, Claude Sonnet 4.6, Qwen 3.5 397B, MiniMax m2.5, GPT o4-mini (via Codex CLI), Kimi K2.5, Claude Opus 4.6 (orchestrator)
+
+**Context:** All P0–P4 issues from the first architecture review have been resolved. This is a fresh review of the codebase in its current post-migration state.
 
 ## Priority Issues
 
-Issues are ranked by cross-model agreement and risk. Each issue has a target and acceptance criteria so `/fix` can process them mechanically.
-
-### P0 — quint16 booleans → bool
-
-**Agreement:** 6/6 unanimous
-**Risk:** Subtle bugs from non-0/1 values in serialized data; wasted memory; obscured intent.
-
-~60+ fields across Trigger, Alias, and WorldDocument use `quint16` for boolean semantics (`enabled`, `ignore_case`, `use_regexp`, `repeat`, `keep_evaluating`, etc.). Timer already uses `bool` correctly — it's the reference pattern.
-
-**Targets:**
-- [x] `src/automation/trigger.h` — convert `quint16` boolean fields to `bool`
-- [x] `src/automation/alias.h` — convert `quint16` boolean fields to `bool`
-- [x] `src/world/world_document.h` — convert `quint16` boolean fields to `bool` (m_bEnable*, m_bLog*, m_bAuto*, etc.)
-
-**Acceptance:** All `quint16` fields with boolean semantics are `bool`. Serialization code uses explicit casts at read/write boundaries. Build + test pass.
+Issues ranked by cross-model agreement. Agreement count = how many of the 6 reviewing models independently flagged the issue.
 
 ---
 
-### P1 — WorldDocument God Object decomposition
+### P0 — Timer int type → enum class TimerType
 
-**Agreement:** 6/6 unanimous
-**Risk:** Merge conflicts, untestable subsystems, growing complexity. 1200+ line header, 200+ member fields.
+**Agreement:** 5/6 (Gemini, Sonnet, Qwen, MiniMax, Kimi)
+**Risk:** `Timer::type` is `int` but `TimerType` enum exists. Any integer can be stored without diagnostic; deserialized garbage silently accepted.
 
 **Targets:**
-- [x] Extract `TelnetParser` — telnet negotiation state, IAC handling, MCCP
-- [x] Extract `MXPEngine` — MXP parsing, element/entity management
-- [x] Extract `SoundManager` — audio engine, spatial sound, sound buffers
-- [x] Extract `AutomationRegistry` — trigger/alias/timer maps, sorted arrays, evaluation pipeline
-- [x] Extract `ConnectionManager` — socket, connection phases, reconnect logic
+- [x] `src/automation/timer.h:28` — change `int type` to `TimerType type`
+- [x] Convert `TimerType` inner enum to `enum class TimerType : int` (Interval = 0, AtTime = 1)
+- [x] Update all assignment sites to use enum values (15 files, ~60 replacements)
 
-**Acceptance:** Each extracted class is self-contained with a clear interface. WorldDocument delegates to these components. Build + test pass. No functional changes.
+**Acceptance:** `Timer::type` is `TimerType`. Build + test pass.
 
 ---
 
-### P2a — Replace void* placeholders
+### P1 — MXP maps use raw `new`/`qDeleteAll` (not C-interop)
 
-**Agreement:** 5/6 models
-**Risk:** Latent UB from uninitialized void*. Blocks feature completion.
+**Agreement:** 3/6 (Gemini, Sonnet, MiniMax)
+**Risk:** Leak on any exception/early-return path. Manual `delete` in `MXP_CloseTag`. Violates RAII mandate.
 
-20+ `void*` fields in `world_document.h` for incomplete MFC→Qt port:
-- `m_font[16]`, `m_pLinePositions`, `m_ActionList`
-- `m_DisplayFindInfo` and 7 more FindInfo fields
-- `m_BackgroundBitmap`, `m_sockAddr`, `m_hNameLookup`
-- `m_strMapList`, `m_MapFailureRegexp`, `m_Databases`
-- `m_ColourTranslationMap`, `m_OutstandingLines`
+The migration notes mark this as "acceptable — C library interop pattern," but `AtomicElement`, `CustomElement`, `MXPEntity`, and `ActiveTag` are all plain C++ structs with no C-linkage requirement.
 
 **Targets:**
-- [x] Audit all `void*` fields in `src/world/world_document.h`
-- [x] For each: replace with concrete Qt type, or remove if unused, or initialize to `nullptr` with `// TODO` comment
+- [x] `src/world/mxp_engine.h` — replace `QMap<QString, T*>` with `std::map<QString, std::unique_ptr<T>>` for all MXP maps
+- [x] `src/world/mxp_engine.h` — replace `QList<ActiveTag*>` with `std::vector<std::unique_ptr<ActiveTag>>`
+- [x] Remove `qDeleteAll` calls and manual `delete` in `MXP_CloseTag`, `CleanupMXP`
 
-**Acceptance:** Zero `void*` fields remain in world_document.h. Build + test pass.
+**Acceptance:** Zero raw `new`/`delete` in MXP code. Build + test pass.
 
 ---
 
-### P2b — #define constants → constexpr / enum class
+### P2a — Unscoped enums → enum class
 
-**Agreement:** 5/6 models
-**Risk:** No type safety, namespace pollution, naming collisions.
-
-70+ `#define` macros in `world_document.h` for Telnet opcodes, ANSI codes, MXP modes, flag bits, connection phases.
+**Agreement:** 3–5/6 per enum (Gemini, Sonnet, Qwen, MiniMax, Kimi flagged various subsets)
+**Risk:** Namespace pollution (e.g., `NONE` from `Phase`), implicit int conversion, invalid values accepted silently.
 
 **Targets:**
-- [x] `src/world/world_document.h` lines 64-325 — convert to `inline constexpr` or `enum class`
-- [x] `src/automation/trigger.h` — `TRIGGER_COLOUR_CHANGE_*` and `MAX_WILDCARDS`
-- [x] `src/automation/alias.h` — `MAX_WILDCARDS` (duplicate, ODR hazard)
+- [x] `src/world/telnet_parser.h` — `enum Phase` → `enum class Phase` (3/6: Gemini, Sonnet, MiniMax)
+- [x] `src/world/world_document.h` — `enum ActionSource` → `enum class` (3/6: Sonnet, Qwen, Kimi)
+- [x] `src/world/world_document.h` — `enum HistoryStatus` → `enum class` (3/6: Sonnet, Qwen, Kimi)
+- [x] `src/world/world_document.h` — `enum ScriptReloadOption` → `enum class` (2/6: Sonnet, Qwen)
+- [x] `src/world/world_document.h` — anonymous `enum { eNoAutoConnect... }` → `enum class AutoConnect` (3/6: Sonnet, Qwen, MiniMax)
+- [x] `src/world/world_document.h` — anonymous `enum { eMXP_Off... }` → `enum class MXPMode` (3/6: Sonnet, Qwen, MiniMax)
 
-**Acceptance:** Zero `#define` for numeric/flag constants in these headers (excluding include guards). Shared constants in a single header. Build + test pass.
+**Acceptance:** Zero unscoped enums in world_document.h and telnet_parser.h. Build + test pass.
 
 ---
 
-### P3a — WorldSocket ownership
+### P2b — Weak typing: `send_to`, `match_type`, `colour_change_type`
 
-**Agreement:** 3/6 models
-**Risk:** Ownership violation — `new WorldSocket(this, this)` stored as raw pointer.
+**Agreement:** 2–3/6 (Gemini, Sonnet, Qwen)
+**Risk:** `quint16` fields that hold enum values accept any integer. `send_to` exists in Trigger, Alias, AND Timer with no type constraint.
 
 **Targets:**
-- [ ] `src/world/world_document.h:416` — `WorldSocket* m_pSocket` → document Qt parent-child ownership or convert to `std::unique_ptr` with custom deleter
+- [x] `src/automation/trigger.h`, `alias.h`, `timer.h` — `quint16 send_to` → `SendTo` enum class
+- [ ] `src/automation/trigger.h` — `quint16 match_type` → `enum class MatchType` (Sonnet found `TRIGGER_MATCH_*` #defined in two separate .cpp files)
+- [x] `src/automation/trigger.h` — `TRIGGER_COLOUR_CHANGE_*` constants → `enum class ColourChangeType`
 
-**Acceptance:** No undocumented raw owning pointer for m_pSocket. Build + test pass.
+**Acceptance:** All automation "type" fields use proper enum class. Build + test pass.
 
 ---
 
-### P3b — Test code RAII
+### P2c — NotepadWidget list / IInputView / IOutputView raw pointers
 
-**Agreement:** 2/6 models (Sonnet found deepest)
-**Risk:** Test leaks hide production leaks; contradicts safety principles; bad example for contributors.
+**Agreement:** 3/6 each (Gemini+Qwen+MiniMax for notepad, Qwen+MiniMax+Kimi for views)
+**Risk:** `QList<NotepadWidget*>` can hold dangling pointers if widgets self-delete (WA_DeleteOnClose). `IInputView*` / `IOutputView*` have no lifetime tracking.
 
 **Targets:**
-- [ ] All `new WorldDocument()` in test fixtures → `std::make_unique`
-- [ ] All `new Trigger()` / `new Line()` in tests → `std::make_unique`
-- [ ] Remove manual `delete` calls
-- [ ] Fix Timer memory leaks in `test_timer_fire_calculation_gtest.cpp`
+- [x] `src/world/world_document.h` — `QList<NotepadWidget*>` → `QList<QPointer<NotepadWidget>>`
+- [x] `src/world/world_document.h` — `IInputView*` / `IOutputView*` → documented non-owning contract (not QObject-derived, QPointer N/A)
 
-**Acceptance:** No raw `new`/`delete` in test code (except documented Qt parent-child). ASan clean.
+**Acceptance:** No undocumented raw non-owning pointers for UI objects. Build + test pass.
 
 ---
 
-### P4a — Database error sentinels → enum class
+### P2d — LuaDatabase holds raw `sqlite3*` without RAII
 
-**Agreement:** 2/6 models
-**Risk:** Low — localized to database module. Integer sentinel values (-1 to -7) are the last non-typed error pattern.
+**Agreement:** 3/6 (Gemini, Qwen, Kimi)
+**Risk:** Default copy/move can double-free. Destructor handles cleanup but no move-safety.
 
 **Targets:**
-- [ ] `src/world/world_document.h` lines 95-101 — convert `const qint32` sentinels to `enum class DatabaseErrorType`
+- [x] `src/world/world_document.h` — delete copy/move on `LuaDatabase` (owns sqlite3* handle)
 
-**Acceptance:** Database operations use `std::expected<T, DatabaseError>`. Build + test pass.
+**Acceptance:** `LuaDatabase` is non-copyable/non-movable or uses RAII handle. Build + test pass.
 
 ---
 
-### P4b — std::meta reflection for serialization
+### P2e — zlib stream RAII gap in TelnetParser
 
-**Agreement:** 4/6 models (aspirational — no compiler support yet)
-**Risk:** None immediate. This is the long-term goal stated in CLAUDE.md.
+**Agreement:** 3/6 (Gemini, Qwen, MiniMax)
+**Risk:** `initZlib()`/`cleanupZlib()` manually called. If parser partially destroyed, `inflateEnd` may not be called.
 
 **Targets:**
-- [ ] Monitor Clang std::meta implementation status
-- [ ] When available: replace manual XML serialization for Trigger, Alias, Timer
+- [x] `src/world/telnet_parser.h` — wrap `z_stream` in RAII `ZlibStream` guard struct with constructor/destructor
 
-**Acceptance:** Deferred until compiler support lands.
+**Acceptance:** zlib cleanup guaranteed by RAII. Build + test pass.
 
 ---
 
-## Additional Findings (non-priority)
+### P2f — Subsystem coupling via back-reference
+
+**Agreement:** 4/6 (Gemini, Qwen, MiniMax, Kimi)
+**Risk:** All 5 extracted subsystems hold `WorldDocument&` back-references and access public members directly. Makes isolation testing impossible.
+
+**Targets:**
+- [ ] Define interface (e.g., `IWorldContext`) that exposes only necessary services
+- [ ] Inject into subsystems instead of full `WorldDocument&`
+
+**Acceptance:** Subsystems depend on abstract interface, not concrete WorldDocument. Aspirational — may require multiple passes.
+
+---
+
+### P3a — SoundManager `m_audioEngine` raw owning pointer
+
+**Agreement:** 2/6 (Gemini, Sonnet)
+**Risk:** Manual `new`/`delete` in `initialize()`/`cleanup()`. Two `delete` sites.
+
+**Targets:**
+- [x] `src/world/sound_manager.h` — `QAudioEngine*` → `std::unique_ptr<QAudioEngine>`
+
+**Acceptance:** No manual `delete` in SoundManager. Build + test pass.
+
+---
+
+### P3b — `m_timerCheckTimer` / `m_acceleratorManager` / `m_scriptFileWatcher` raw pointers
+
+**Agreement:** 3/6 for timerCheckTimer (Sonnet, MiniMax, Kimi), 2/6 for acceleratorManager (Qwen, MiniMax), 1/6 for scriptFileWatcher (Sonnet — found double-delete risk)
+
+**Risk:** Qt parent-child ownership but manual `delete` in destructor risks double-free. `m_scriptFileWatcher` has two separate `delete` sites.
+
+**Targets:**
+- [x] `src/world/world_document.h` — `QTimer* m_timerCheckTimer` → removed manual `delete` (Qt parent-child)
+- [x] `src/world/world_document.h` — `AcceleratorManager*` → documented as Qt parent-child
+- [x] `src/world/world_document.h` — `QFileSystemWatcher* m_scriptFileWatcher` → fixed double-free (removed Qt parent, sole manual ownership)
+
+**Acceptance:** No double-delete risk. Build + test pass.
+
+---
+
+### P3c — SoundManager async lambda use-after-free (GPT-exclusive finding)
+
+**Agreement:** 1/6 (GPT — deepest analysis, unique find)
+**Risk:** MSP download lambdas in `sound_manager.cpp:481-525` capture `this` (SoundManager). During `~WorldDocument`, SoundManager is cleaned up before QNetworkReply objects (parented to document). If a download completes after cleanup, the lambda fires on a freed SoundManager → UAF.
+
+**Targets:**
+- [x] `src/world/sound_manager.cpp` — added `shared_ptr<bool>` alive guard in async lambdas (UAF fix)
+
+**Acceptance:** No UAF risk from async network callbacks during destruction. Build + test pass.
+
+---
+
+### P3d — Timer offset calculation bug (GPT-exclusive finding)
+
+**Agreement:** 1/6 (GPT — unique, potentially a real bug)
+**Risk:** `automation_registry.cpp:654-660` calculates `fire_time = now + (intervalSecs - offsetSecs)`. The offset is supposed to align firings to a phase within the interval, but subtraction shortens the interval. If offset > interval, the duration goes negative and the timer retriggers every tick.
+
+Additionally, fractional seconds (`every_second`, `offset_second` are `double`) are truncated to `qint64`, so sub-second timers degenerate to 1 Hz.
+
+**Targets:**
+- [x] `src/world/automation_registry.cpp` — clamped offset >= interval to prevent busy-loop; preserved interval-offset formula
+- [x] `src/world/automation_registry.cpp` — all timer arithmetic now in milliseconds (sub-second timers work correctly)
+
+**Acceptance:** Timer offsets align to phase. Sub-second timers work correctly. Build + test pass.
+
+---
+
+### P3e — Remaining `#define` constants
+
+**Agreement:** 1–2/6 (Sonnet found multiple)
+**Risk:** Namespace pollution, ODR hazard, no type safety.
+
+**Targets:**
+- [x] `src/world/config_options.h` — `OPT_*` defines → `inline constexpr`
+- [x] `src/world/mxp_types.h` — `TAG_*` defines → `inline constexpr`
+- [x] `src/world/config_options.cpp` — `#define RGB(r,g,b)` → `constexpr makeRgb()` function
+- [x] `src/world/automation_registry.cpp` + `world_serialization.cpp` — `TRIGGER_MATCH_*` already moved to trigger.h by P2b
+
+**Acceptance:** Zero `#define` for numeric constants outside third-party code. Build + test pass.
+
+---
+
+### P3f — `executeLua` takes `long&` but fields are `qint32`
+
+**Agreement:** 1/6 (Sonnet — unique find)
+**Risk:** On LP64 (macOS/Linux), `long` is 64-bit but `qint32` is 32-bit. Assigning `long` back to `qint32` field silently truncates on overflow.
+
+**Targets:**
+- [x] `src/world/script_engine.h` — changed `long& invocation_count` to `qint32&`
+- [x] Updated all 10 call sites
+
+**Acceptance:** No narrowing conversions. Build + test pass.
+
+---
+
+### P3g — `qint32` error codes in internal C++ APIs
+
+**Agreement:** 3/6 (Gemini, Sonnet, MiniMax)
+**Risk:** `queue()`, `discardQueue()`, and various WorldDocument methods return raw `qint32` error codes instead of `std::expected`.
+
+Note: Lua API boundary functions intentionally return integers (Lua convention). Only internal C++ APIs should be converted.
+
+**Targets:**
+- [x] `src/world/connection_manager.h` — `queue()` → `std::expected<void, WorldError>` (`discardQueue()` returns count, not error — kept as `qint32`)
+- [ ] Audit remaining `qint32`-returning internal methods for conversion
+
+**Acceptance:** Internal C++ APIs use `std::expected`. Lua API wrappers may continue returning integers. Build + test pass.
+
+---
+
+### P4a — WorldDocument remains ~600-field god class
+
+**Agreement:** 2/6 (Sonnet, Qwen)
+**Risk:** Despite decomposition into 5 subsystems, WorldDocument still owns ~100+ direct fields (display, logging, scripting, UI state, flags, serialization). Constructor is ~650 lines.
+
+**Targets:**
+- [ ] Group related fields into config structs (`DisplayConfig`, `ScriptConfig`, `LoggingConfig`, etc.)
+- [ ] Long-term: further decomposition (ScriptEngine manager, UI state manager)
+
+**Acceptance:** Aspirational. No immediate action required.
+
+---
+
+### P4b — `std::shared_ptr<Action>` — only shared_ptr in codebase
+
+**Agreement:** 1/6 (MiniMax)
+**Risk:** Suspicious — should likely be `unique_ptr`. Multiple styles share the same action, so shared ownership may be intentional.
+
+**Targets:**
+- [ ] Audit `std::shared_ptr<Action>` usage to confirm shared ownership is required
+
+**Acceptance:** Either document why shared ownership is needed, or convert to `unique_ptr`.
+
+---
+
+### P4c — Volume/pan clamping logic (GPT-exclusive finding)
+
+**Agreement:** 1/6 (GPT)
+**Risk:** `sound_manager.cpp:245-251` collapses any out-of-range volume to 0 (full blast) instead of clamping to nearest valid value. Passing `-200` (should be muted) plays at full volume.
+
+**Targets:**
+- [ ] `src/world/sound_manager.cpp` — fix clamping to saturate at bounds instead of resetting to 0
+
+**Acceptance:** Invalid volume/pan values clamp to nearest legal value. Build + test pass.
+
+---
+
+## Additional Findings (single-model, non-priority)
 
 | Finding | Source | Notes |
 |---|---|---|
-| `long invocation_count` output param anti-pattern (8 sites) | Sonnet | Should return value instead of pointer-to-long |
-| `std::shared_ptr<Action>` — only shared_ptr in codebase | Sonnet | Suspicious — likely should be unique_ptr |
-| `MAX_WILDCARDS` defined in both trigger.h and alias.h | Sonnet | ODR hazard — move to shared constants header |
-| `compileRegexp()` failure silently dropped in world_trigger_matching.cpp | Sonnet | Error string from std::expected discarded |
-| `packFlags()`/`unpackFlags()` bitset sync pattern is brittle | Gemini | Flag bits can desync from bool members |
-| Timer `int type` should be `enum class TimerType` | Sonnet, Kimi, Qwen | Field declared as `int` but enum exists |
-| `QVector`/`QMap` used where `std::vector`/`std::map` would be cleaner | Qwen, MiniMax | Cosmetic — Qt 6 aliases to std containers |
-| Missing network-layer tests | Sonnet | No test_network_* files despite module marked complete |
+| `void* pAction = nullptr` dead code in world_protocol.cpp:454,753 | Sonnet | Delete dead `void*` locals |
+| `AddStyle()` returns raw `Style*` into styleList — dangling risk | Sonnet | Return nothing or document lifetime |
+| `void*` Qt item data payloads in plugin_dialog, plugin_wizard, activity_window | Sonnet | Use `QVariant::fromValue<T*>` directly |
+| `Timer::next_create_sequence` non-atomic mutable static | Sonnet | Use `std::atomic<quint32>` |
+| `Line::INITIAL_BUFFER_SIZE` is `static const` not `constexpr` | Sonnet | Change to `static constexpr` |
+| Line flags are `const int` globals, not `inline constexpr` | Sonnet, MiniMax | Change to `inline constexpr` |
+| `m_recentLines` holds non-owning `Line*` that could dangle | Sonnet | Document invariant or use indices |
+| `QMap<Timer*, QString>` uses pointer as key — implicit stability | Sonnet | Document or use opaque ID |
+| MCCP decompression on UI thread | Gemini | Move to worker thread (aspirational) |
+| BGR color space mismatch with Qt's QRgb (ARGB) | Gemini | Ensure all render sites convert correctly |
+| `std::deque<QString> m_recentLines` no mutex | MiniMax | Document single-thread model |
+| `Timer::dispid` is QVariant, inconsistent with Trigger/Alias qint32 | Kimi | Unify dispatch ID type |
+
+---
+
+## Reviewer Notes
+
+| Model | Tool | Issues Found | Unique Contributions |
+|---|---|---|---|
+| Gemini Pro 3.1 | gemini-cli (direct) | 16 | BGR color mismatch, MCCP threading |
+| Claude Sonnet 4.6 | Task(sonnet) | 23 | scriptFileWatcher double-delete, executeLua narrowing, void* Qt data, config_options #defines |
+| Qwen 3.5 397B | OpenRouter | 28 | Broadest coverage; FLAGS1/FLAGS2 enum suggestion |
+| MiniMax m2.5 | OpenRouter | ~30 | shared_ptr<Action> audit, std::observer_ptr suggestions |
+| GPT o4-mini | Codex CLI | 4 | SoundManager async UAF (deepest single find), timer offset bug, fractional seconds, volume clamp |
+| Kimi K2.5 | OpenRouter | 13 | QVariant dispid inconsistency |
+| Claude Opus 4.6 | Orchestrator | — | Synthesis and consensus ranking |

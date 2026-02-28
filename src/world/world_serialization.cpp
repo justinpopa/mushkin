@@ -43,13 +43,7 @@
 #define BLINK 0x0004 // italic
 #define INVERSE 0x0008
 
-// Trigger match bit masks (from original MUSHclient OtherTypes.h)
-#define TRIGGER_MATCH_TEXT 0x0080 // high order of text nibble
-#define TRIGGER_MATCH_BACK 0x0800 // high order of back nibble
-#define TRIGGER_MATCH_HILITE 0x1000
-#define TRIGGER_MATCH_UNDERLINE 0x2000
-#define TRIGGER_MATCH_BLINK 0x4000 // italic
-#define TRIGGER_MATCH_INVERSE 0x8000
+// TRIGGER_MATCH_* constants are defined as inline constexpr in trigger.h
 
 // Helper function to convert BGR color to hex name (#RRGGBB for XML)
 // Internal colors are stored in BGR format (MUSHclient COLORREF)
@@ -101,7 +95,7 @@ void WorldDocument::saveTriggersToXml(QXmlStreamWriter& xml)
         xml.writeAttribute("name", trigger->label);
         xml.writeAttribute("enabled", trigger->enabled ? "y" : "n");
         xml.writeAttribute("match", trigger->trigger);
-        xml.writeAttribute("send_to", QString::number(trigger->send_to));
+        xml.writeAttribute("send_to", QString::number(static_cast<quint16>(trigger->send_to)));
         xml.writeAttribute("sequence", QString::number(trigger->sequence));
         xml.writeAttribute("script", trigger->procedure);
         xml.writeAttribute("group", trigger->group);
@@ -167,7 +161,8 @@ void WorldDocument::saveTriggersToXml(QXmlStreamWriter& xml)
         if (trigger->colour != SAMECOLOUR)
             xml.writeAttribute("custom_colour", QString::number(trigger->colour + 1));
 
-        xml.writeAttribute("colour_change_type", QString::number(trigger->colour_change_type));
+        xml.writeAttribute("colour_change_type",
+                           QString::number(static_cast<quint16>(trigger->colour_change_type)));
 
         // RGB colors as names
         if (trigger->other_foreground != 0)
@@ -237,7 +232,7 @@ void WorldDocument::loadTriggersFromXml(QXmlStreamReader& xml, Plugin* plugin)
             }
             trigger->enabled = attrs.value("enabled").toString() == "y";
             trigger->trigger = attrs.value("match").toString();
-            trigger->send_to = attrs.value("send_to").toInt();
+            trigger->send_to = static_cast<SendTo>(attrs.value("send_to").toInt());
             trigger->sequence = attrs.value("sequence").toInt();
             trigger->procedure = attrs.value("script").toString();
             trigger->group = attrs.value("group").toString();
@@ -319,7 +314,8 @@ void WorldDocument::loadTriggersFromXml(QXmlStreamReader& xml, Plugin* plugin)
             }
 
             if (attrs.hasAttribute("colour_change_type"))
-                trigger->colour_change_type = attrs.value("colour_change_type").toInt();
+                trigger->colour_change_type =
+                    static_cast<ColourChangeType>(attrs.value("colour_change_type").toInt());
 
             // RGB colors from names
             if (attrs.hasAttribute("other_text_colour"))
@@ -406,7 +402,7 @@ void WorldDocument::saveAliasesToXml(QXmlStreamWriter& xml)
         xml.writeAttribute("name", alias->label);
         xml.writeAttribute("enabled", alias->enabled ? "y" : "n");
         xml.writeAttribute("match", alias->name);
-        xml.writeAttribute("send_to", QString::number(alias->send_to));
+        xml.writeAttribute("send_to", QString::number(static_cast<quint16>(alias->send_to)));
         xml.writeAttribute("sequence", QString::number(alias->sequence));
         xml.writeAttribute("script", alias->procedure);
         xml.writeAttribute("group", alias->group);
@@ -478,7 +474,7 @@ void WorldDocument::loadAliasesFromXml(QXmlStreamReader& xml, Plugin* plugin)
             aliasCount++;
             alias->enabled = attrs.value("enabled").toString() == "y";
             alias->name = attrs.value("match").toString();
-            alias->send_to = attrs.value("send_to").toInt();
+            alias->send_to = static_cast<SendTo>(attrs.value("send_to").toInt());
             alias->sequence = attrs.value("sequence").toInt();
             alias->procedure = attrs.value("script").toString();
             alias->group = attrs.value("group").toString();
@@ -576,7 +572,7 @@ void WorldDocument::saveTimersToXml(QXmlStreamWriter& xml)
         // Write basic attributes
         xml.writeAttribute("name", timer->label);
         xml.writeAttribute("enabled", timer->enabled ? "y" : "n");
-        xml.writeAttribute("send_to", QString::number(timer->send_to));
+        xml.writeAttribute("send_to", QString::number(static_cast<quint16>(timer->send_to)));
         xml.writeAttribute("script", timer->procedure);
         xml.writeAttribute("group", timer->group);
         xml.writeAttribute("variable", timer->variable);
@@ -584,7 +580,7 @@ void WorldDocument::saveTimersToXml(QXmlStreamWriter& xml)
         // Timing configuration - use original MUSHclient format for compatibility
         // Original format uses at_time="y"/"n" instead of type="0"/"1"
         // and uses hour/minute/second (picking from at_* or every_* based on type)
-        bool isAtTime = (timer->type == Timer::eAtTime);
+        bool isAtTime = (timer->type == Timer::TimerType::AtTime);
         xml.writeAttribute("at_time", isAtTime ? "y" : "n");
 
         // Write hour/minute/second from either at_* or every_* fields based on type
@@ -665,7 +661,7 @@ void WorldDocument::loadTimersFromXml(QXmlStreamReader& xml, Plugin* plugin)
             }
 
             timer->enabled = attrs.value("enabled").toString() == "y";
-            timer->send_to = attrs.value("send_to").toInt();
+            timer->send_to = static_cast<SendTo>(attrs.value("send_to").toInt());
             timer->procedure = attrs.value("script").toString();
             timer->group = attrs.value("group").toString();
             timer->variable = attrs.value("variable").toString();
@@ -674,13 +670,14 @@ void WorldDocument::loadTimersFromXml(QXmlStreamReader& xml, Plugin* plugin)
             // Check for type attribute first (mushclient-qt format), then at_time (original format)
             bool isAtTime;
             if (attrs.hasAttribute("type")) {
-                // New format: type="0" (eAtTime) or type="1" (eInterval)
-                isAtTime = (attrs.value("type").toInt() == Timer::eAtTime);
+                // New format: type="0" (AtTime) or type="1" (Interval)
+                isAtTime =
+                    (attrs.value("type").toInt() == static_cast<int>(Timer::TimerType::AtTime));
             } else {
                 // Original format: at_time="y" or "n"
                 isAtTime = (attrs.value("at_time").toString() == "y");
             }
-            timer->type = isAtTime ? Timer::eAtTime : Timer::eInterval;
+            timer->type = isAtTime ? Timer::TimerType::AtTime : Timer::TimerType::Interval;
 
             // Read hour/minute/second from either simple names or specific names
             int hour = attrs.value("hour").toInt();
@@ -1102,14 +1099,14 @@ void WorldDocument::Save_One_Timer_XML(QTextStream& out, Timer* timer)
         out << QString("   variable=\"%1\"\n").arg(escapeXml(timer->variable));
 
     // Timing configuration
-    out << QString("   type=\"%1\"\n").arg(timer->type);
+    out << QString("   type=\"%1\"\n").arg(static_cast<int>(timer->type));
 
-    // At-time fields (for eAtTime timers)
+    // At-time fields (for AtTime timers)
     out << QString("   at_hour=\"%1\"\n").arg(timer->at_hour);
     out << QString("   at_minute=\"%1\"\n").arg(timer->at_minute);
     out << QString("   at_second=\"%1\"\n").arg(timer->at_second, 0, 'f', 4);
 
-    // Interval fields (for eInterval timers)
+    // Interval fields (for Interval timers)
     out << QString("   every_hour=\"%1\"\n").arg(timer->every_hour);
     out << QString("   every_minute=\"%1\"\n").arg(timer->every_minute);
     out << QString("   every_second=\"%1\"\n").arg(timer->every_second, 0, 'f', 4);

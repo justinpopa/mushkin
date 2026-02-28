@@ -28,7 +28,6 @@
 
 TelnetParser::TelnetParser(WorldDocument& doc) : m_doc(doc)
 {
-    memset(&m_zCompress, 0, sizeof(m_zCompress));
     m_bClient_sent_IAC_DO.fill(false);
     m_bClient_sent_IAC_DONT.fill(false);
     m_bClient_sent_IAC_WILL.fill(false);
@@ -41,14 +40,16 @@ TelnetParser::TelnetParser(WorldDocument& doc) : m_doc(doc)
 
 TelnetParser::~TelnetParser()
 {
-    cleanupZlib();
+    // m_zlibStream destructor calls inflateEnd() automatically.
+    m_CompressOutput.clear();
+    m_CompressInput.clear();
 }
 
 // ========== Reset ==========
 
 void TelnetParser::reset()
 {
-    m_phase = NONE;
+    m_phase = Phase::NONE;
     m_bClient_sent_IAC_DO.fill(false);
     m_bClient_sent_IAC_DONT.fill(false);
     m_bClient_sent_IAC_WILL.fill(false);
@@ -62,36 +63,21 @@ void TelnetParser::reset()
     m_IAC_subnegotiation_data.clear();
 }
 
-// ========== zlib lifecycle ==========
+// ========== zlib lifecycle (internal helper) ==========
+// Returns true on success. On failure, logs the error and returns false.
+// Callers use this result to set m_bCompress guards before agreeing to MCCP.
 
-std::expected<void, WorldError> TelnetParser::initZlib()
+static bool initZlibStream(ZlibStream& zs)
 {
-    m_zCompress.zalloc = Z_NULL;
-    m_zCompress.zfree = Z_NULL;
-    m_zCompress.opaque = Z_NULL;
-    m_zCompress.avail_in = 0;
-    m_zCompress.next_in = Z_NULL;
-
-    int izError = inflateInit(&m_zCompress);
-    if (izError == Z_OK) {
+    const int rc = zs.init();
+    if (rc == Z_OK) {
         qCDebug(lcWorld) << "zlib initialized successfully for MCCP";
-        return {};
-    } else {
-        QString msg = m_zCompress.msg ? QString::fromLatin1(m_zCompress.msg)
-                                      : QString("zlib error code %1").arg(izError);
-        qCDebug(lcWorld) << "zlib init failed with error:" << izError;
-        return std::unexpected(WorldError{WorldErrorType::InitFailed, msg});
+        return true;
     }
-}
-
-void TelnetParser::cleanupZlib()
-{
-    if (m_bCompressInitOK) {
-        inflateEnd(&m_zCompress);
-        m_bCompressInitOK = false;
-    }
-    m_CompressOutput.clear();
-    m_CompressInput.clear();
+    const QString msg =
+        zs.stream.msg ? QString::fromLatin1(zs.stream.msg) : QString("zlib error code %1").arg(rc);
+    qCDebug(lcWorld) << "zlib init failed with error:" << msg;
+    return false;
 }
 
 // ========== Phase Handlers ==========
@@ -102,10 +88,10 @@ void TelnetParser::cleanupZlib()
 void TelnetParser::Phase_ESC(unsigned char c)
 {
     if (c == '[') {
-        m_phase = DOING_CODE;
+        m_phase = Phase::DOING_CODE;
         m_doc.m_code = 0;
     } else {
-        m_phase = NONE;
+        m_phase = Phase::NONE;
     }
 }
 
@@ -119,15 +105,15 @@ void TelnetParser::Phase_ANSI(unsigned char c)
         m_doc.m_code += c - '0';
     } else if (c == 'm') {
         // End of ANSI sequence
-        if (m_phase != DOING_CODE) {
+        if (m_phase != Phase::DOING_CODE) {
             m_doc.Interpret256ANSIcode(m_doc.m_code);
         } else {
             m_doc.InterpretANSIcode(m_doc.m_code);
         }
-        m_phase = NONE;
+        m_phase = Phase::NONE;
     } else if (c == ';' || c == ':') {
         // Separator - process current code
-        if (m_phase != DOING_CODE) {
+        if (m_phase != Phase::DOING_CODE) {
             m_doc.Interpret256ANSIcode(m_doc.m_code);
         } else {
             m_doc.InterpretANSIcode(m_doc.m_code);
@@ -140,9 +126,9 @@ void TelnetParser::Phase_ANSI(unsigned char c)
         } else {
             m_doc.MXP_mode_change(m_doc.m_code);
         }
-        m_phase = NONE;
+        m_phase = Phase::NONE;
     } else {
-        m_phase = NONE;
+        m_phase = Phase::NONE;
     }
 }
 
@@ -155,7 +141,7 @@ void TelnetParser::Phase_IAC(unsigned char& c)
 
     switch (c) {
         case EOR:
-            m_phase = NONE;
+            m_phase = Phase::NONE;
             if (m_doc.m_bConvertGAtoNewline) {
                 new_c = '\n';
             }
@@ -164,7 +150,7 @@ void TelnetParser::Phase_IAC(unsigned char& c)
             break;
 
         case GO_AHEAD:
-            m_phase = NONE;
+            m_phase = Phase::NONE;
             if (m_doc.m_bConvertGAtoNewline) {
                 new_c = '\n';
             }
@@ -181,37 +167,37 @@ void TelnetParser::Phase_IAC(unsigned char& c)
         case ARE_YOU_THERE:
         case ERASE_CHARACTER:
         case ERASE_LINE:
-            m_phase = NONE;
+            m_phase = Phase::NONE;
             break;
 
         case SB:
-            m_phase = HAVE_SB;
+            m_phase = Phase::HAVE_SB;
             break;
 
         case WILL:
-            m_phase = HAVE_WILL;
+            m_phase = Phase::HAVE_WILL;
             break;
 
         case WONT:
-            m_phase = HAVE_WONT;
+            m_phase = Phase::HAVE_WONT;
             break;
 
         case DO:
-            m_phase = HAVE_DO;
+            m_phase = Phase::HAVE_DO;
             break;
 
         case DONT:
-            m_phase = HAVE_DONT;
+            m_phase = Phase::HAVE_DONT;
             break;
 
         case IAC:
             // Escaped IAC - treat as data
-            m_phase = NONE;
+            m_phase = Phase::NONE;
             new_c = IAC;
             break;
 
         default:
-            m_phase = NONE;
+            m_phase = Phase::NONE;
             break;
     }
 
@@ -284,7 +270,7 @@ void TelnetParser::Send_IAC_WONT(unsigned char c)
  */
 void TelnetParser::Phase_WILL(unsigned char c)
 {
-    m_phase = NONE;
+    m_phase = Phase::NONE;
     m_nCount_IAC_WILL++;
     m_bClient_got_IAC_WILL[c] = true;
 
@@ -292,10 +278,10 @@ void TelnetParser::Phase_WILL(unsigned char c)
         case TELOPT_COMPRESS2:
         case TELOPT_COMPRESS:
             // MCCP compression handling - must allocate buffers BEFORE agreeing
-            if (!m_bCompressInitOK && !m_bCompress) {
-                m_bCompressInitOK = initZlib().has_value();
+            if (!m_zlibStream.initialized && !m_bCompress) {
+                initZlibStream(m_zlibStream);
             }
-            if (m_bCompressInitOK && !m_doc.m_bDisableCompression) {
+            if (m_zlibStream.initialized && !m_doc.m_bDisableCompression) {
                 // Allocate BOTH buffers before agreeing to compression
                 if (m_CompressOutput.empty()) {
                     m_CompressOutput.assign(COMPRESS_BUFFER_LENGTH, 0);
@@ -338,11 +324,11 @@ void TelnetParser::Phase_WILL(unsigned char c)
             break;
 
         case TELOPT_MXP:
-            if (m_doc.m_iUseMXP == eMXP_Off) {
+            if (m_doc.m_iUseMXP == MXPMode::eMXP_Off) {
                 Send_IAC_DONT(c);
             } else {
                 Send_IAC_DO(c);
-                if (m_doc.m_iUseMXP == eMXP_Query) {
+                if (m_doc.m_iUseMXP == MXPMode::eMXP_Query) {
                     m_doc.MXP_On();
                 }
             }
@@ -404,7 +390,7 @@ void TelnetParser::Phase_WILL(unsigned char c)
  */
 void TelnetParser::Phase_WONT(unsigned char c)
 {
-    m_phase = NONE;
+    m_phase = Phase::NONE;
     m_nCount_IAC_WONT++;
     m_bClient_got_IAC_WONT[c] = true;
 
@@ -427,7 +413,7 @@ void TelnetParser::Phase_WONT(unsigned char c)
  */
 void TelnetParser::Phase_DO(unsigned char c)
 {
-    m_phase = NONE;
+    m_phase = Phase::NONE;
     m_nCount_IAC_DO++;
     m_bClient_got_IAC_DO[c] = true;
 
@@ -454,11 +440,11 @@ void TelnetParser::Phase_DO(unsigned char c)
             break;
 
         case TELOPT_MXP:
-            if (m_doc.m_iUseMXP == eMXP_Off) {
+            if (m_doc.m_iUseMXP == MXPMode::eMXP_Off) {
                 Send_IAC_WONT(c);
             } else {
                 Send_IAC_WILL(c);
-                if (m_doc.m_iUseMXP == eMXP_Query) {
+                if (m_doc.m_iUseMXP == MXPMode::eMXP_Query) {
                     m_doc.MXP_On();
                 }
             }
@@ -480,7 +466,7 @@ void TelnetParser::Phase_DO(unsigned char c)
  */
 void TelnetParser::Phase_DONT(unsigned char c)
 {
-    m_phase = NONE;
+    m_phase = Phase::NONE;
     Send_IAC_WONT(c);
 
     m_nCount_IAC_DONT++;
@@ -509,11 +495,11 @@ void TelnetParser::Phase_SB(unsigned char c)
 {
     // Special case: TELOPT_COMPRESS (MCCP v1) doesn't use standard subnegotiation
     if (c == TELOPT_COMPRESS) {
-        m_phase = HAVE_COMPRESS;
+        m_phase = Phase::HAVE_COMPRESS;
     } else {
         m_subnegotiation_type = c;
         m_IAC_subnegotiation_data.clear();
-        m_phase = HAVE_SUBNEGOTIATION;
+        m_phase = Phase::HAVE_SUBNEGOTIATION;
     }
 }
 
@@ -523,7 +509,7 @@ void TelnetParser::Phase_SB(unsigned char c)
 void TelnetParser::Phase_SUBNEGOTIATION(unsigned char c)
 {
     if (c == IAC) {
-        m_phase = HAVE_SUBNEGOTIATION_IAC;
+        m_phase = Phase::HAVE_SUBNEGOTIATION_IAC;
     } else {
         m_IAC_subnegotiation_data.append(c);
     }
@@ -537,12 +523,12 @@ void TelnetParser::Phase_SUBNEGOTIATION_IAC(unsigned char c)
     if (c == IAC) {
         // IAC IAC inside subnegotiation = escaped IAC (store single IAC)
         m_IAC_subnegotiation_data.append(c);
-        m_phase = HAVE_SUBNEGOTIATION;
+        m_phase = Phase::HAVE_SUBNEGOTIATION;
         return;
     }
 
     // Anything else (especially SE) ends the subnegotiation
-    m_phase = NONE;
+    m_phase = Phase::NONE;
     m_nCount_IAC_SB++;
 
     // Dispatch to appropriate handler based on subnegotiation type
@@ -634,7 +620,7 @@ void TelnetParser::Phase_UTF8(unsigned char c)
 
     // Valid - add to line
     m_doc.AddToLine(reinterpret_cast<const char*>(m_doc.m_UTF8Sequence.data()), i + 1);
-    m_phase = NONE;
+    m_phase = Phase::NONE;
 }
 
 /**
@@ -643,9 +629,9 @@ void TelnetParser::Phase_UTF8(unsigned char c)
 void TelnetParser::Phase_COMPRESS(unsigned char c)
 {
     if (c == WILL) {
-        m_phase = HAVE_COMPRESS_WILL;
+        m_phase = Phase::HAVE_COMPRESS_WILL;
     } else {
-        m_phase = NONE; // Error
+        m_phase = Phase::NONE; // Error
     }
 }
 
@@ -659,8 +645,8 @@ void TelnetParser::Phase_COMPRESS_WILL(unsigned char c)
         m_iMCCP_type = 1;
 
         // Initialize zlib if not already done
-        if (!m_bCompressInitOK && !m_bCompress) {
-            m_bCompressInitOK = initZlib().has_value();
+        if (!m_zlibStream.initialized && !m_bCompress) {
+            initZlibStream(m_zlibStream);
         }
 
         // Allocate BOTH buffers if needed
@@ -673,27 +659,27 @@ void TelnetParser::Phase_COMPRESS_WILL(unsigned char c)
         }
 
         // Check if we can compress (need BOTH buffers)
-        if (!(m_bCompressInitOK && !m_CompressOutput.empty() && !m_CompressInput.empty())) {
+        if (!(m_zlibStream.initialized && !m_CompressOutput.empty() && !m_CompressInput.empty())) {
             qCDebug(lcWorld) << "Cannot process compressed output (MCCP v1) - closing connection";
             m_doc.OnConnectionDisconnect();
-            m_phase = NONE;
+            m_phase = Phase::NONE;
             return;
         }
 
         // Reset the decompression stream
-        int izError = inflateReset(&m_zCompress);
+        int izError = inflateReset(&m_zlibStream.stream);
         if (izError == Z_OK) {
             m_bCompress = true;
             qCDebug(lcWorld) << "MCCP v1 compression enabled";
         } else {
             qCDebug(lcWorld) << "Could not reset zlib for MCCP v1, error:" << izError;
-            if (m_zCompress.msg) {
-                qCDebug(lcWorld) << "  zlib message:" << m_zCompress.msg;
+            if (m_zlibStream.stream.msg) {
+                qCDebug(lcWorld) << "  zlib message:" << m_zlibStream.stream.msg;
             }
             m_doc.OnConnectionDisconnect();
         }
     }
-    m_phase = NONE;
+    m_phase = Phase::NONE;
 }
 
 // ========== Support Methods ==========
@@ -727,8 +713,8 @@ void TelnetParser::Handle_TELOPT_COMPRESS2()
     m_iMCCP_type = 2;
 
     // Initialize zlib if not already done
-    if (!m_bCompressInitOK && !m_bCompress) {
-        m_bCompressInitOK = initZlib().has_value();
+    if (!m_zlibStream.initialized && !m_bCompress) {
+        initZlibStream(m_zlibStream);
     }
 
     // Allocate BOTH buffers if needed
@@ -741,14 +727,14 @@ void TelnetParser::Handle_TELOPT_COMPRESS2()
     }
 
     // Check if we can compress (need BOTH buffers)
-    if (!(m_bCompressInitOK && !m_CompressOutput.empty() && !m_CompressInput.empty())) {
+    if (!(m_zlibStream.initialized && !m_CompressOutput.empty() && !m_CompressInput.empty())) {
         qCDebug(lcWorld) << "Cannot process compressed output (MCCP v2) - closing connection";
         m_doc.OnConnectionDisconnect();
         return;
     }
 
     // Reset the decompression stream
-    int izError = inflateReset(&m_zCompress);
+    int izError = inflateReset(&m_zlibStream.stream);
     if (izError == Z_OK) {
         m_bCompress = true;
         qCDebug(lcWorld) << "MCCP v2 compression enabled";
@@ -757,8 +743,8 @@ void TelnetParser::Handle_TELOPT_COMPRESS2()
 
     // Error resetting zlib
     qCDebug(lcWorld) << "Could not reset zlib, error:" << izError;
-    if (m_zCompress.msg) {
-        qCDebug(lcWorld) << "  zlib message:" << m_zCompress.msg;
+    if (m_zlibStream.stream.msg) {
+        qCDebug(lcWorld) << "  zlib message:" << m_zlibStream.stream.msg;
     }
     m_doc.OnConnectionDisconnect();
 }
@@ -768,7 +754,7 @@ void TelnetParser::Handle_TELOPT_COMPRESS2()
  */
 void TelnetParser::Handle_TELOPT_MXP()
 {
-    if (m_doc.m_iUseMXP == eMXP_On) {
+    if (m_doc.m_iUseMXP == MXPMode::eMXP_On) {
         m_doc.MXP_On();
     }
 }

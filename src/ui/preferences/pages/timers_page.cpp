@@ -55,7 +55,7 @@ void TimersPage::setItemEnabled(const QString& name, bool enabled)
 
 QString TimersPage::formatTimerTiming(Timer* timer) const
 {
-    if (timer->type == Timer::eAtTime) {
+    if (timer->type == Timer::TimerType::AtTime) {
         return QString("At %1:%2:%3")
             .arg(timer->at_hour, 2, 10, QChar('0'))
             .arg(timer->at_minute, 2, 10, QChar('0'))
@@ -80,7 +80,8 @@ void TimersPage::populateRow(int row, const QString& name)
 
     setCheckboxItem(row, COL_ENABLED, timer->enabled, name);
     setReadOnlyItem(row, COL_LABEL, timer->label);
-    setReadOnlyItem(row, COL_TYPE, timer->type == Timer::eAtTime ? tr("At Time") : tr("Interval"));
+    setReadOnlyItem(row, COL_TYPE,
+                    timer->type == Timer::TimerType::AtTime ? tr("At Time") : tr("Interval"));
     setReadOnlyItem(row, COL_TIMING, formatTimerTiming(timer));
     setReadOnlyItem(row, COL_GROUP, timer->group);
     setReadOnlyItem(row, COL_SENDTO, sendToDisplayName(timer->send_to));

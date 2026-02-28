@@ -14,6 +14,7 @@
 #include "../src/world/world_document.h"
 #include <QCoreApplication>
 #include <gtest/gtest.h>
+#include <memory>
 
 extern "C" {
 #include <lauxlib.h>
@@ -26,7 +27,7 @@ class SoundApiTest : public ::testing::Test {
   protected:
     void SetUp() override
     {
-        doc = new WorldDocument();
+        doc = std::make_unique<WorldDocument>();
 
         // Get Lua state
         ASSERT_NE(doc->m_ScriptEngine, nullptr) << "ScriptEngine should exist";
@@ -36,7 +37,6 @@ class SoundApiTest : public ::testing::Test {
 
     void TearDown() override
     {
-        delete doc;
     }
 
     // Helper to execute Lua code
@@ -55,8 +55,8 @@ class SoundApiTest : public ::testing::Test {
         return result;
     }
 
-    WorldDocument* doc;
-    lua_State* L;
+    std::unique_ptr<WorldDocument> doc;
+    lua_State* L = nullptr;
 };
 
 /**

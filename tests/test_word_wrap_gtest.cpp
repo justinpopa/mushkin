@@ -17,13 +17,14 @@
 #include "../src/world/world_document.h"
 #include <QCoreApplication>
 #include <gtest/gtest.h>
+#include <memory>
 
 // Test fixture for word wrap tests
 class WordWrapTest : public ::testing::Test {
   protected:
     void SetUp() override
     {
-        doc = new WorldDocument();
+        doc = std::make_unique<WorldDocument>();
         // Set a small wrap column for easier testing
         doc->m_nWrapColumn = 20;
         // Enable word wrap by default
@@ -50,7 +51,6 @@ class WordWrapTest : public ::testing::Test {
 
     void TearDown() override
     {
-        delete doc;
     }
 
     // Helper to get the current line text
@@ -79,7 +79,7 @@ class WordWrapTest : public ::testing::Test {
         return QString();
     }
 
-    WorldDocument* doc = nullptr;
+    std::unique_ptr<WorldDocument> doc;
 };
 
 /**

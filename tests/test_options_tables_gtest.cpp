@@ -12,6 +12,7 @@
 #include <QSet>
 #include <QString>
 #include <gtest/gtest.h>
+#include <memory>
 
 // Test fixture for OptionsTable tests
 class OptionsTableTest : public ::testing::Test {
@@ -28,16 +29,15 @@ class AlphaOptionsTableTest : public ::testing::Test {
 // Test fixture for WorldDocument integration tests
 class OptionsWorldDocumentTest : public ::testing::Test {
   protected:
-    WorldDocument* doc;
+    std::unique_ptr<WorldDocument> doc;
 
     void SetUp() override
     {
-        doc = new WorldDocument();
+        doc = std::make_unique<WorldDocument>();
     }
 
     void TearDown() override
     {
-        delete doc;
     }
 };
 

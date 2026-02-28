@@ -332,12 +332,12 @@ bool Plugin::ExecutePluginScript(const QString& callbackName)
     QString strReason = QString("Executing plugin %1 sub %2").arg(m_strName, callbackName);
 
     // Call Lua
-    long invocation_count = 0;
+    qint32 invocation_count = 0;
     bool result = true; // Default: continue propagation
 
     bool bError =
-        m_ScriptEngine->executeLua(dispid, callbackName, eDontChangeAction, strType, strReason,
-                                   nparams, sparams, invocation_count, &result);
+        m_ScriptEngine->executeLua(dispid, callbackName, ActionSource::eDontChangeAction, strType,
+                                   strReason, nparams, sparams, invocation_count, &result);
 
     // If error, mark callback as invalid and continue
     if (bError) {
@@ -377,12 +377,12 @@ bool Plugin::ExecutePluginScript(const QString& callbackName, const QString& arg
     QString strReason = QString("Executing plugin %1 sub %2").arg(m_strName, callbackName);
 
     // Call Lua
-    long invocation_count = 0;
+    qint32 invocation_count = 0;
     bool result = true; // Default: continue propagation
 
     bool bError =
-        m_ScriptEngine->executeLua(dispid, callbackName, eDontChangeAction, strType, strReason,
-                                   nparams, sparams, invocation_count, &result);
+        m_ScriptEngine->executeLua(dispid, callbackName, ActionSource::eDontChangeAction, strType,
+                                   strReason, nparams, sparams, invocation_count, &result);
 
     // If error, mark callback as invalid and continue
     if (bError) {
@@ -428,12 +428,12 @@ bool Plugin::ExecutePluginScript(const QString& callbackName, qint32 arg1, const
     QString strReason = QString("Executing plugin %1 sub %2").arg(m_strName, callbackName);
 
     // Call Lua
-    long invocation_count = 0;
+    qint32 invocation_count = 0;
     bool result = true; // Default: continue propagation
 
     bool bError =
-        m_ScriptEngine->executeLua(dispid, callbackName, eDontChangeAction, strType, strReason,
-                                   nparams, sparams, invocation_count, &result);
+        m_ScriptEngine->executeLua(dispid, callbackName, ActionSource::eDontChangeAction, strType,
+                                   strReason, nparams, sparams, invocation_count, &result);
 
     // If error, mark callback as invalid and continue
     if (bError) {
@@ -479,12 +479,12 @@ bool Plugin::ExecutePluginScript(const QString& callbackName, qint32 arg1, qint3
     QString strReason = QString("Executing plugin %1 sub %2").arg(m_strName, callbackName);
 
     // Call Lua
-    long invocation_count = 0;
+    qint32 invocation_count = 0;
     bool result = true; // Default: continue propagation
 
     bool bError =
-        m_ScriptEngine->executeLua(dispid, callbackName, eDontChangeAction, strType, strReason,
-                                   nparams, sparams, invocation_count, &result);
+        m_ScriptEngine->executeLua(dispid, callbackName, ActionSource::eDontChangeAction, strType,
+                                   strReason, nparams, sparams, invocation_count, &result);
 
     // If error, mark callback as invalid and continue
     if (bError) {
@@ -535,12 +535,12 @@ bool Plugin::ExecutePluginScript(const QString& callbackName, qint32 arg1, const
     QString strReason = QString("Executing plugin %1 sub %2").arg(m_strName, callbackName);
 
     // Call Lua
-    long invocation_count = 0;
+    qint32 invocation_count = 0;
     bool result = true; // Default: continue propagation
 
     bool bError =
-        m_ScriptEngine->executeLua(dispid, callbackName, eDontChangeAction, strType, strReason,
-                                   nparams, sparams, invocation_count, &result);
+        m_ScriptEngine->executeLua(dispid, callbackName, ActionSource::eDontChangeAction, strType,
+                                   strReason, nparams, sparams, invocation_count, &result);
 
     // If error, mark callback as invalid and continue
     if (bError) {

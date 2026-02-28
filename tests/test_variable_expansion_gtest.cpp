@@ -15,6 +15,7 @@
 #include "../src/world/world_document.h"
 #include <QCoreApplication>
 #include <gtest/gtest.h>
+#include <memory>
 
 // Test fixture for variable expansion tests
 // Provides a fresh WorldDocument for each test
@@ -22,15 +23,14 @@ class VariableExpansionTest : public ::testing::Test {
   protected:
     void SetUp() override
     {
-        doc = new WorldDocument();
+        doc = std::make_unique<WorldDocument>();
     }
 
     void TearDown() override
     {
-        delete doc;
     }
 
-    WorldDocument* doc = nullptr;
+    std::unique_ptr<WorldDocument> doc;
 };
 
 // Test 1: Basic Variable Expansion

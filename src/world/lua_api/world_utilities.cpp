@@ -4703,10 +4703,10 @@ int L_Save(lua_State* L)
     if (!pDoc->m_strWorldSave.isEmpty() && pDoc->m_ScriptEngine) {
         QList<double> nparams;
         QList<QString> sparams;
-        long invocation_count = 0;
+        qint32 invocation_count = 0;
         pDoc->m_ScriptEngine->executeLua(pDoc->m_dispidWorldSave, pDoc->m_strWorldSave,
-                                         eWorldAction, "world", "world save", nparams, sparams,
-                                         invocation_count);
+                                         ActionSource::eWorldAction, "world", "world save", nparams,
+                                         sparams, invocation_count);
     }
 
     // Notify plugins via ON_PLUGIN_WORLD_SAVE callback

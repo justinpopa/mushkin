@@ -3,6 +3,7 @@
 
 #include "constants.h"
 #include "script_language.h"
+#include "sendto.h"
 #include <QDateTime>
 #include <QMap>
 #include <QObject>
@@ -56,7 +57,7 @@ class Alias : public QObject {
     QString contents;              // What to send when matched
     QString procedure;             // Script procedure to execute
     ScriptLanguage scriptLanguage; // Script language (Lua or YueScript)
-    quint16 send_to;               // Where alias is sent (see SendTo enum)
+    SendTo send_to;                // Where alias is sent (see SendTo enum)
     QString variable;              // Which variable to set (for send to variable)
     bool expand_variables;         // Expand variables (e.g., @food)
 

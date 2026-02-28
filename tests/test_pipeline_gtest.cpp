@@ -13,6 +13,7 @@
 #include "../src/world/world_document.h"
 #include <QCoreApplication>
 #include <gtest/gtest.h>
+#include <memory>
 
 // Test fixture for pipeline tests
 // Provides common setup/teardown and helper methods
@@ -21,10 +22,10 @@ class PipelineTest : public ::testing::Test {
     void SetUp() override
     {
         // Create world document
-        doc = new WorldDocument();
+        doc = std::make_unique<WorldDocument>();
 
         // Initialize connection state (normally done by OnConnect)
-        doc->m_telnetParser->m_phase = NONE;
+        doc->m_telnetParser->m_phase = Phase::NONE;
         doc->m_bUTF_8 = false; // ASCII mode for simplicity
 
         // Initialize document style state
@@ -45,7 +46,6 @@ class PipelineTest : public ::testing::Test {
 
     void TearDown() override
     {
-        delete doc;
     }
 
     // Helper method to process a string byte by byte
@@ -74,7 +74,7 @@ class PipelineTest : public ::testing::Test {
         return QString::fromUtf8(line->text().data(), line->text().size());
     }
 
-    WorldDocument* doc = nullptr;
+    std::unique_ptr<WorldDocument> doc;
 };
 
 // Test 1: Simple ASCII text processing

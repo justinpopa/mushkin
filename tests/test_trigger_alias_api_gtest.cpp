@@ -12,6 +12,7 @@
 #include "../src/world/world_document.h"
 #include <QCoreApplication>
 #include <gtest/gtest.h>
+#include <memory>
 
 extern "C" {
 #include <lauxlib.h>
@@ -24,7 +25,7 @@ class TriggerAliasAPITest : public ::testing::Test {
   protected:
     void SetUp() override
     {
-        doc = new WorldDocument();
+        doc = std::make_unique<WorldDocument>();
         L = doc->m_ScriptEngine->L;
 
         // Load test script file (relative to build/tests directory)
@@ -37,10 +38,9 @@ class TriggerAliasAPITest : public ::testing::Test {
 
     void TearDown() override
     {
-        delete doc;
     }
 
-    WorldDocument* doc = nullptr;
+    std::unique_ptr<WorldDocument> doc;
     lua_State* L = nullptr;
 };
 

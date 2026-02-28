@@ -45,10 +45,9 @@
  * @param variable Variable name (for eSendToVariable)
  * @param strOutput [OUT] Accumulated output text (for eSendToOutput)
  */
-void WorldDocument::sendTo(quint16 iWhere, const QString& strSendText, bool omit_from_output,
+void WorldDocument::sendTo(SendTo iWhere, const QString& strSendText, bool omit_from_output,
                            bool omit_from_log, const QString& strDescription,
-                           const QString& variable, QString& strOutput,
-                           ScriptLanguage scriptLang)
+                           const QString& variable, QString& strOutput, ScriptLanguage scriptLang)
 {
     // Empty send text does nothing for most destinations
     // Original: doc.cpp

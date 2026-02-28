@@ -12,7 +12,13 @@
  * QAudioEngine owns QAudioListener and each QSpatialSound via Qt parent-child.
  * SoundManager stores raw pointers but does NOT own those objects; the engine
  * destructor handles their cleanup.  SoundManager DOES own the engine itself
- * (allocated with `new QAudioEngine` and deleted in cleanup()).
+ * via std::unique_ptr<QAudioEngine> (no Qt parent — unique_ptr is sole owner).
+ *
+ * UAF GUARD
+ * =========
+ * m_alive is a shared_ptr<bool> set to false in cleanup().  MSP download lambdas
+ * capture a weak_ptr copy; they check lock() before touching SoundManager state,
+ * preventing use-after-free if a QNetworkReply fires after cleanup().
  *
  * BUFFER INDEXING (matches original MUSHclient)
  * =============================================
@@ -26,6 +32,7 @@
 #include <QString>
 #include <array>
 #include <cstdint>
+#include <memory>
 
 class QAudioEngine;
 class QAudioListener;
@@ -74,9 +81,12 @@ class SoundManager {
   private:
     WorldDocument& m_doc;
 
+    // UAF guard: set to false in cleanup(); MSP lambdas weak_ptr-check before use.
+    std::shared_ptr<bool> m_alive{std::make_shared<bool>(true)};
+
     // Qt Spatial Audio objects — owned by the engine via Qt parent-child
-    // EXCEPT m_audioEngine itself, which is allocated/deleted in initialize()/cleanup().
-    QAudioEngine* m_audioEngine = nullptr;
+    // EXCEPT m_audioEngine itself, which is owned by unique_ptr (no Qt parent).
+    std::unique_ptr<QAudioEngine> m_audioEngine;
     QAudioListener* m_audioListener = nullptr; // Non-owning; owned by m_audioEngine
     std::array<SoundBuffer, MAX_SOUND_BUFFERS> m_soundBuffers{};
 };

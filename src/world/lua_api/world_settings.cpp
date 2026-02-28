@@ -1181,7 +1181,7 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 239: // Current action source (trigger/alias/timer/etc)
-            lua_pushinteger(L, pDoc->m_iCurrentActionSource);
+            lua_pushinteger(L, static_cast<quint32>(pDoc->m_iCurrentActionSource));
             break;
 
         case 240: // Average character width

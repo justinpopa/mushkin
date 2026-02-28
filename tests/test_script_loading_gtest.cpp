@@ -20,6 +20,7 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <gtest/gtest.h>
+#include <memory>
 
 extern "C" {
 #include <lauxlib.h>
@@ -32,7 +33,7 @@ class ScriptLoadingTest : public ::testing::Test {
   protected:
     void SetUp() override
     {
-        doc = new WorldDocument();
+        doc = std::make_unique<WorldDocument>();
 
         // Initialize basic state
         doc->m_mush_name = "Test World";
@@ -80,7 +81,6 @@ class ScriptLoadingTest : public ::testing::Test {
 
     void TearDown() override
     {
-        delete doc;
     }
 
     // Helper method to reset Lua state between tests
@@ -90,7 +90,7 @@ class ScriptLoadingTest : public ::testing::Test {
         doc->m_ScriptEngine->openLua();
     }
 
-    WorldDocument* doc = nullptr;
+    std::unique_ptr<WorldDocument> doc;
     QString testDir;
 };
 

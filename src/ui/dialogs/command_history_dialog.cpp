@@ -244,7 +244,7 @@ void CommandHistoryDialog::clearAll()
     if (reply == QMessageBox::Yes) {
         m_doc->m_commandHistory.clear();
         m_doc->m_historyPosition = 0;
-        m_doc->m_iHistoryStatus = eAtBottom;
+        m_doc->m_iHistoryStatus = HistoryStatus::eAtBottom;
 
         // Refresh list
         populateList();

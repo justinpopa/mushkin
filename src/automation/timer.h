@@ -2,12 +2,13 @@
 // Timer Data Structure
 //
 // Port of CTimer from OtherTypes.h
-// Timers execute actions at specific times (eAtTime) or intervals (eInterval)
+// Timers execute actions at specific times (AtTime) or intervals (Interval)
 
 #ifndef TIMER_H
 #define TIMER_H
 
 #include "script_language.h"
+#include "sendto.h"
 #include <QDateTime>
 #include <QString>
 #include <QVariant>
@@ -15,9 +16,9 @@
 class Timer {
   public:
     // Timer types
-    enum TimerType {
-        eInterval = 0, // Fire every N hours/minutes/seconds
-        eAtTime = 1    // Fire at specific time of day (e.g., 3 PM)
+    enum class TimerType : int {
+        Interval = 0, // Fire every N hours/minutes/seconds
+        AtTime = 1,   // Fire at specific time of day (e.g., 3 PM)
     };
 
     Timer(); // Constructor with defaults
@@ -25,7 +26,7 @@ class Timer {
 
     // ========== Timing Configuration ==========
 
-    int type; // eInterval or eAtTime
+    TimerType type = TimerType::Interval; // Interval or AtTime
 
     // At-time timing: fire at specific time each day
     qint16 at_hour;   // 0-23
@@ -46,21 +47,21 @@ class Timer {
 
     // ========== Actions ==========
 
-    QString contents;           // Text to send when timer fires
-    quint16 send_to;               // Where to send (eSendToWorld, eSendToScript, etc.)
+    QString contents;              // Text to send when timer fires
+    SendTo send_to;                // Where to send (eSendToWorld, eSendToScript, etc.)
     QString procedure;             // Script function to call
     ScriptLanguage scriptLanguage; // Script language (Lua or YueScript)
     QString variable;              // Variable name (for eSendToVariable)
 
     // ========== Behavior Flags ==========
 
-    bool enabled;           // Is timer active?
-    bool one_shot;          // Delete after first fire?
-    bool temporary;         // Don't save to file?
+    bool enabled;            // Is timer active?
+    bool one_shot;           // Delete after first fire?
+    bool temporary;          // Don't save to file?
     bool active_when_closed; // Fire even when disconnected from MUD?
-    bool omit_from_output;  // Don't echo to output window?
+    bool omit_from_output;   // Don't echo to output window?
     bool omit_from_log;      // Don't write to log file?
-    bool executing_script;  // Currently executing (prevents deletion)?
+    bool executing_script;   // Currently executing (prevents deletion)?
 
     // ========== Metadata ==========
 

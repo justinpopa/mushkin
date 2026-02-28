@@ -614,6 +614,7 @@ target_link_libraries(test-database-gtest PRIVATE
 
 gtest_discover_tests(test-database-gtest
     DISCOVERY_TIMEOUT 30
+    PROPERTIES RESOURCE_LOCK database_singleton
 )
 
 # Lua Database API test (GoogleTest version)

@@ -6,7 +6,7 @@
  * Tests the enhanced command history features:
  * - Consecutive duplicate filtering (m_last_command)
  * - History size limit (m_nHistoryLines)
- * - History status tracking (eAtTop, eInMiddle, eAtBottom)
+ * - History status tracking (HistoryStatus::eAtTop, HistoryStatus::eInMiddle, HistoryStatus::eAtBottom)
  * - clearCommandHistory() method
  * - XML persistence
  *
@@ -19,6 +19,7 @@
 #include <QCoreApplication>
 #include <QFile>
 #include <gtest/gtest.h>
+#include <memory>
 
 // Test fixture for command history navigation tests
 // Provides common setup/teardown and helper methods
@@ -26,12 +27,11 @@ class CommandHistoryNavigationTest : public ::testing::Test {
   protected:
     void SetUp() override
     {
-        doc = new WorldDocument();
+        doc = std::make_unique<WorldDocument>();
     }
 
     void TearDown() override
     {
-        delete doc;
     }
 
     // Helper to delete test file
@@ -42,7 +42,7 @@ class CommandHistoryNavigationTest : public ::testing::Test {
         }
     }
 
-    WorldDocument* doc = nullptr;
+    std::unique_ptr<WorldDocument> doc;
 };
 
 /**
@@ -125,24 +125,24 @@ TEST_F(CommandHistoryNavigationTest, HistorySizeLimit)
  * Test 3: History Status Tracking
  *
  * Verifies that m_iHistoryStatus is set correctly:
- * - eAtBottom when adding commands
- * - eAtBottom after clearing history
+ * - HistoryStatus::eAtBottom when adding commands
+ * - HistoryStatus::eAtBottom after clearing history
  *
- * Based on sendvw.cpp:2430: m_iHistoryStatus = eAtBottom
+ * Based on sendvw.cpp:2430: m_iHistoryStatus = HistoryStatus::eAtBottom
  */
 TEST_F(CommandHistoryNavigationTest, HistoryStatusTracking)
 {
-    // Initial status should be eAtBottom
-    EXPECT_EQ(doc->m_iHistoryStatus, eAtBottom);
+    // Initial status should be HistoryStatus::eAtBottom
+    EXPECT_EQ(doc->m_iHistoryStatus, HistoryStatus::eAtBottom);
 
-    // Add command - status should be eAtBottom
+    // Add command - status should be HistoryStatus::eAtBottom
     doc->addToCommandHistory("north");
-    EXPECT_EQ(doc->m_iHistoryStatus, eAtBottom);
+    EXPECT_EQ(doc->m_iHistoryStatus, HistoryStatus::eAtBottom);
     EXPECT_EQ(doc->m_historyPosition, 1) << "At end after adding";
 
-    // Add another - still eAtBottom
+    // Add another - still HistoryStatus::eAtBottom
     doc->addToCommandHistory("south");
-    EXPECT_EQ(doc->m_iHistoryStatus, eAtBottom);
+    EXPECT_EQ(doc->m_iHistoryStatus, HistoryStatus::eAtBottom);
     EXPECT_EQ(doc->m_historyPosition, 2);
 }
 
@@ -171,7 +171,7 @@ TEST_F(CommandHistoryNavigationTest, ClearHistory)
     EXPECT_TRUE(doc->m_commandHistory.isEmpty()) << "History should be empty";
     EXPECT_TRUE(doc->m_last_command.isEmpty()) << "Last command should be empty";
     EXPECT_EQ(doc->m_historyPosition, 0) << "Position should be 0";
-    EXPECT_EQ(doc->m_iHistoryStatus, eAtBottom) << "Status should be eAtBottom";
+    EXPECT_EQ(doc->m_iHistoryStatus, HistoryStatus::eAtBottom) << "Status should be HistoryStatus::eAtBottom";
 
     // Should be able to add commands again
     doc->addToCommandHistory("west");
@@ -251,7 +251,7 @@ TEST_F(CommandHistoryNavigationTest, XmlSerialization)
 
         // Verify position and status reset
         EXPECT_EQ(doc2.m_historyPosition, 4) << "Position should be at end";
-        EXPECT_EQ(doc2.m_iHistoryStatus, eAtBottom) << "Status should be eAtBottom";
+        EXPECT_EQ(doc2.m_iHistoryStatus, HistoryStatus::eAtBottom) << "Status should be HistoryStatus::eAtBottom";
     }
 
     deleteFile(testFile);

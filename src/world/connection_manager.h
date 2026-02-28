@@ -1,9 +1,11 @@
 #pragma once
 
+#include "world_error.h"
 #include <QDateTime>
 #include <QString>
 #include <QStringList>
 #include <cstdint>
+#include <expected>
 
 class WorldDocument;
 class WorldSocket;
@@ -51,12 +53,18 @@ class ConnectionManager {
 
     // ========== Command queue ==========
     [[nodiscard]] QStringList getCommandQueue() const;
-    qint32 queue(const QString& message, bool echo);
+    [[nodiscard]] std::expected<void, WorldError> queue(const QString& message, bool echo);
     qint32 discardQueue();
 
     // ========== Public state (companion-object pattern: callers access directly) ==========
 
-    // Socket — non-owning; created in WorldDocument ctor with WorldDocument as QObject parent.
+    // Socket — non-owning observer pointer.
+    // Ownership: Qt parent-child. WorldSocket is constructed as
+    //   new WorldSocket(docPtr, /*QObject* parent=*/ docPtr)
+    // so Qt deletes it automatically when WorldDocument (the parent QObject) is destroyed.
+    // ConnectionManager does NOT own this pointer and must NOT delete it.
+    // WorldDocument::~WorldDocument() nulls this field before ConnectionManager is
+    // destroyed, preventing any dangling-pointer use in ConnectionManager's dtor.
     WorldSocket* m_pSocket = nullptr;
 
     // Connection phase

@@ -63,7 +63,7 @@ void Trigger::initializeDefaults()
     colour = 0; // Custom color 1
     other_foreground = 0;
     other_background = 0;
-    colour_change_type = TRIGGER_COLOUR_CHANGE_BOTH;
+    colour_change_type = ColourChangeType::Both;
 
     // Metadata
     user_option = 0;

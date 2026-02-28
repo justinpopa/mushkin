@@ -17,6 +17,7 @@
 #include <QTextStream>
 #include <cstring>
 #include <gtest/gtest.h>
+#include <memory>
 
 // Test fixture for retrospective logging tests
 // Provides common setup/teardown and helper methods
@@ -25,7 +26,7 @@ class RetrospectiveLoggingTest : public ::testing::Test {
     void SetUp() override
     {
         // Create world document
-        doc = new WorldDocument();
+        doc = std::make_unique<WorldDocument>();
     }
 
     void TearDown() override
@@ -35,8 +36,6 @@ class RetrospectiveLoggingTest : public ::testing::Test {
             QFile::remove(file);
         }
         tempLogFiles.clear();
-
-        delete doc;
     }
 
     // Helper method to read file contents
@@ -76,7 +75,7 @@ class RetrospectiveLoggingTest : public ::testing::Test {
         return line;
     }
 
-    WorldDocument* doc = nullptr;
+    std::unique_ptr<WorldDocument> doc;
     QStringList tempLogFiles;
 };
 

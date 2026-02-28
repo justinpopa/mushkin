@@ -9,6 +9,7 @@
 #include "../src/world/world_document.h"
 #include <QCoreApplication>
 #include <gtest/gtest.h>
+#include <memory>
 
 extern "C" {
 #include <lauxlib.h>
@@ -21,17 +22,16 @@ class LuaBasicsTest : public ::testing::Test {
   protected:
     void SetUp() override
     {
-        doc = new WorldDocument();
+        doc = std::make_unique<WorldDocument>();
         L = doc->m_ScriptEngine->L;
         ASSERT_NE(L, nullptr) << "Lua state should be available";
     }
 
     void TearDown() override
     {
-        delete doc;
     }
 
-    WorldDocument* doc = nullptr;
+    std::unique_ptr<WorldDocument> doc;
     lua_State* L = nullptr;
 };
 

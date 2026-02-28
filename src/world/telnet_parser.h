@@ -7,6 +7,7 @@
 // This file contains:
 // - Telnet protocol constants (converted from #define to inline constexpr)
 // - Phase enum (parser state machine, moved from WorldDocument)
+// - ZlibStream RAII guard for MCCP decompression state
 // - TelnetParser class declaration
 
 #include <QByteArray>
@@ -15,6 +16,53 @@
 #include <expected>
 #include <vector>
 #include <zlib.h>
+
+// ========== ZlibStream — RAII guard for z_stream lifecycle ==========
+// Ensures inflateEnd() is always called when the stream goes out of scope,
+// even if TelnetParser is partially destroyed or an exception occurs.
+struct ZlibStream {
+    z_stream stream{};
+    bool initialized = false;
+
+    ZlibStream() = default;
+    ~ZlibStream()
+    {
+        cleanup();
+    }
+
+    // Non-copyable, non-movable (owns opaque zlib state)
+    ZlibStream(const ZlibStream&) = delete;
+    ZlibStream& operator=(const ZlibStream&) = delete;
+    ZlibStream(ZlibStream&&) = delete;
+    ZlibStream& operator=(ZlibStream&&) = delete;
+
+    // Returns Z_OK on success, a zlib error code otherwise.
+    // Cleans up any existing stream before re-initializing.
+    int init()
+    {
+        if (initialized) {
+            cleanup();
+        }
+        stream.zalloc = Z_NULL;
+        stream.zfree = Z_NULL;
+        stream.opaque = Z_NULL;
+        stream.avail_in = 0;
+        stream.next_in = Z_NULL;
+        const int rc = inflateInit(&stream);
+        if (rc == Z_OK) {
+            initialized = true;
+        }
+        return rc;
+    }
+
+    void cleanup()
+    {
+        if (initialized) {
+            inflateEnd(&stream);
+            initialized = false;
+        }
+    }
+};
 
 class WorldDocument; // forward declaration
 class WorldError;    // forward declaration
@@ -66,7 +114,7 @@ inline constexpr int TELNET_COMPRESS_BUFFER_LENGTH = 20000;
 // Moved from WorldDocument (was: enum Phase in world_document.h).
 // The EXACT values are preserved to maintain binary compatibility with any
 // serialized state and to make grep-based verification straightforward.
-enum Phase {
+enum class Phase : int {
     NONE = 0,                // Normal text
     HAVE_ESC,                // Just received ESC (0x1B)
     DOING_CODE,              // Processing ANSI escape sequence ESC[...m
@@ -128,7 +176,7 @@ class TelnetParser {
     // ========== Phase access ==========
     // ProcessIncomingByte and MXP phase handlers on WorldDocument read/write m_phase directly
     // via the public member (same pattern as original — direct access through companion pointer).
-    Phase m_phase = NONE;
+    Phase m_phase = Phase::NONE;
 
     // ========== Parser state ==========
     qint32 m_ttype_sequence = 0; // MTTS terminal type sequence counter
@@ -148,9 +196,8 @@ class TelnetParser {
     std::array<bool, 256> m_bClient_got_IAC_WONT{};
 
     // ========== MCCP Compression ==========
-    z_stream m_zCompress{};
+    ZlibStream m_zlibStream; // RAII guard — owns the z_stream and its inflateEnd lifecycle
     bool m_bCompress = false;
-    bool m_bCompressInitOK = false;
     std::vector<unsigned char> m_CompressInput;
     std::vector<unsigned char> m_CompressOutput;
     qint64 m_nTotalUncompressed = 0;
@@ -180,10 +227,6 @@ class TelnetParser {
 
     // ========== Public API called from WorldDocument ==========
     void sendWindowSizes(int width);
-
-    // zlib lifecycle — called from WorldDocument constructor/destructor
-    std::expected<void, WorldError> initZlib();
-    void cleanupZlib();
 
     // ========== Phase handlers — called from WorldDocument::ProcessIncomingByte ==========
     void Phase_ESC(unsigned char c);

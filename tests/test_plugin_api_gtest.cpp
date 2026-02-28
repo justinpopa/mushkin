@@ -20,6 +20,7 @@
 #include <QFile>
 #include <QTemporaryDir>
 #include <gtest/gtest.h>
+#include <memory>
 
 extern "C" {
 #include <lauxlib.h>
@@ -97,7 +98,7 @@ class PluginApiTest : public ::testing::Test {
         ASSERT_TRUE(tempDir->isValid()) << "Could not create temp directory";
 
         // Create world document
-        doc = new WorldDocument();
+        doc = std::make_unique<WorldDocument>();
         doc->m_mush_name = "Test World";
         doc->m_server = "localhost";
         doc->m_port = 4000;
@@ -167,12 +168,11 @@ end
 
     void TearDown() override
     {
-        delete doc;
         delete tempDir;
     }
 
     QTemporaryDir* tempDir = nullptr;
-    WorldDocument* doc = nullptr;
+    std::unique_ptr<WorldDocument> doc;
     Plugin* plugin1 = nullptr;
     Plugin* plugin2 = nullptr;
     QString plugin1Path;

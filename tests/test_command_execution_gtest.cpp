@@ -20,6 +20,7 @@
 #include <QCoreApplication>
 #include <QFile>
 #include <gtest/gtest.h>
+#include <memory>
 
 // Test fixture for command execution tests
 // Provides common setup/teardown and helper methods
@@ -27,12 +28,11 @@ class CommandExecutionTest : public ::testing::Test {
   protected:
     void SetUp() override
     {
-        doc = new WorldDocument();
+        doc = std::make_unique<WorldDocument>();
     }
 
     void TearDown() override
     {
-        delete doc;
     }
 
     // Helper to delete test file
@@ -43,7 +43,7 @@ class CommandExecutionTest : public ::testing::Test {
         }
     }
 
-    WorldDocument* doc = nullptr;
+    std::unique_ptr<WorldDocument> doc;
 };
 
 /**
@@ -61,10 +61,14 @@ TEST_F(CommandExecutionTest, SendMsgMultilineSplitting)
     doc->SendMsg(multiline, true, true, false);
 
     // Should have 3 items in queue
-    ASSERT_EQ(doc->m_connectionManager->m_CommandQueue.count(), 3) << "Should have 3 commands in queue";
-    EXPECT_TRUE(doc->m_connectionManager->m_CommandQueue[0].endsWith("north")) << "First command should be 'north'";
-    EXPECT_TRUE(doc->m_connectionManager->m_CommandQueue[1].endsWith("south")) << "Second command should be 'south'";
-    EXPECT_TRUE(doc->m_connectionManager->m_CommandQueue[2].endsWith("east")) << "Third command should be 'east'";
+    ASSERT_EQ(doc->m_connectionManager->m_CommandQueue.count(), 3)
+        << "Should have 3 commands in queue";
+    EXPECT_TRUE(doc->m_connectionManager->m_CommandQueue[0].endsWith("north"))
+        << "First command should be 'north'";
+    EXPECT_TRUE(doc->m_connectionManager->m_CommandQueue[1].endsWith("south"))
+        << "Second command should be 'south'";
+    EXPECT_TRUE(doc->m_connectionManager->m_CommandQueue[2].endsWith("east"))
+        << "Third command should be 'east'";
 }
 
 /**
@@ -103,7 +107,8 @@ TEST_F(CommandExecutionTest, CommandQueueEncoding)
     doc->m_connectionManager->m_CommandQueue.clear();
     doc->SendMsg("test3", true, true, false);
     ASSERT_EQ(doc->m_connectionManager->m_CommandQueue.count(), 1);
-    EXPECT_TRUE(doc->m_connectionManager->m_CommandQueue[0].startsWith("q")) << "Should have lowercase prefix (no log)";
+    EXPECT_TRUE(doc->m_connectionManager->m_CommandQueue[0].startsWith("q"))
+        << "Should have lowercase prefix (no log)";
     EXPECT_EQ(doc->m_connectionManager->m_CommandQueue[0], "qtest3");
 
     // Test 4: Immediate with echo and log (forced to queue because queue not empty)
@@ -165,20 +170,24 @@ TEST_F(CommandExecutionTest, CommandStripping)
     doc->m_connectionManager->m_CommandQueue.clear();
     doc->SendMsg("test1\r\n", true, true, false);
     ASSERT_EQ(doc->m_connectionManager->m_CommandQueue.count(), 1);
-    EXPECT_FALSE(doc->m_connectionManager->m_CommandQueue[0].contains("\r")) << "Should not contain \\r";
-    EXPECT_FALSE(doc->m_connectionManager->m_CommandQueue[0].contains("\n")) << "Should not contain \\n";
+    EXPECT_FALSE(doc->m_connectionManager->m_CommandQueue[0].contains("\r"))
+        << "Should not contain \\r";
+    EXPECT_FALSE(doc->m_connectionManager->m_CommandQueue[0].contains("\n"))
+        << "Should not contain \\n";
 
     // Test trailing \n
     doc->m_connectionManager->m_CommandQueue.clear();
     doc->SendMsg("test2\n", true, true, false);
     ASSERT_EQ(doc->m_connectionManager->m_CommandQueue.count(), 1);
-    EXPECT_FALSE(doc->m_connectionManager->m_CommandQueue[0].contains("\n")) << "Should not contain \\n";
+    EXPECT_FALSE(doc->m_connectionManager->m_CommandQueue[0].contains("\n"))
+        << "Should not contain \\n";
 
     // Test no trailing newline
     doc->m_connectionManager->m_CommandQueue.clear();
     doc->SendMsg("test3", true, true, false);
     ASSERT_EQ(doc->m_connectionManager->m_CommandQueue.count(), 1);
-    EXPECT_TRUE(doc->m_connectionManager->m_CommandQueue[0].endsWith("test3")) << "Should end with 'test3'";
+    EXPECT_TRUE(doc->m_connectionManager->m_CommandQueue[0].endsWith("test3"))
+        << "Should end with 'test3'";
 }
 
 /**
@@ -194,7 +203,8 @@ TEST_F(CommandExecutionTest, EmptyCommandHandling)
     doc->m_connectionManager->m_CommandQueue.clear();
     doc->SendMsg("", true, true, false);
     // Empty string should create one empty item
-    EXPECT_EQ(doc->m_connectionManager->m_CommandQueue.count(), 1) << "Empty command should create one queue item";
+    EXPECT_EQ(doc->m_connectionManager->m_CommandQueue.count(), 1)
+        << "Empty command should create one queue item";
 }
 
 /**
@@ -205,8 +215,10 @@ TEST_F(CommandExecutionTest, EmptyCommandHandling)
 TEST_F(CommandExecutionTest, QueueInitialState)
 {
     // Queue should be empty initially
-    EXPECT_TRUE(doc->m_connectionManager->m_CommandQueue.isEmpty()) << "Queue should be empty initially";
-    EXPECT_EQ(doc->m_connectionManager->m_CommandQueue.count(), 0) << "Queue count should be 0 initially";
+    EXPECT_TRUE(doc->m_connectionManager->m_CommandQueue.isEmpty())
+        << "Queue should be empty initially";
+    EXPECT_EQ(doc->m_connectionManager->m_CommandQueue.count(), 0)
+        << "Queue count should be 0 initially";
 }
 
 /**

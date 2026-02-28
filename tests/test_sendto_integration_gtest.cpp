@@ -14,21 +14,21 @@
 #include <QFile>
 #include <QTemporaryDir>
 #include <gtest/gtest.h>
+#include <memory>
 
 class SendToIntegrationTest : public ::testing::Test {
   protected:
     void SetUp() override
     {
-        doc = new WorldDocument();
+        doc = std::make_unique<WorldDocument>();
         doc->setWorldName("TestWorld");
     }
 
     void TearDown() override
     {
-        delete doc;
     }
 
-    WorldDocument* doc;
+    std::unique_ptr<WorldDocument> doc;
 };
 
 /**
@@ -77,8 +77,8 @@ TEST_F(SendToIntegrationTest, SendToExecuteTriggersAliases)
     auto alias = std::make_unique<Alias>();
     alias->label = "test_alias";
     alias->name = "testalias";
-    alias->contents = "dummy";              // Send something to world
-    alias->send_to = eSendToVariable;       // Send to variable instead
+    alias->contents = "dummy";           // Send something to world
+    alias->send_to = eSendToVariable;    // Send to variable instead
     alias->variable = "alias_triggered"; // Variable name
     alias->enabled = true;
     alias->sequence = 100;

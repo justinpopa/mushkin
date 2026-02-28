@@ -154,13 +154,13 @@ int L_AddTimer(lua_State* L)
     // Set timer type and timing fields
     if (flags & eTimerAtTime) {
         // At-time timer: fire at specific time each day
-        timer->type = Timer::eAtTime;
+        timer->type = Timer::TimerType::AtTime;
         timer->at_hour = hour;
         timer->at_minute = minute;
         timer->at_second = second;
     } else {
         // Interval timer: fire every N time
-        timer->type = Timer::eInterval;
+        timer->type = Timer::TimerType::Interval;
         timer->every_hour = hour;
         timer->every_minute = minute;
         timer->every_second = second;
@@ -181,7 +181,7 @@ int L_AddTimer(lua_State* L)
         QDateTime now = QDateTime::currentDateTime();
         timer->when_fired = now;
 
-        if (timer->type == Timer::eAtTime) {
+        if (timer->type == Timer::TimerType::AtTime) {
             // At-time timer: set to today at the specified time
             QDate today = now.date();
             QTime targetTime(timer->at_hour, timer->at_minute, (int)timer->at_second,
@@ -408,7 +408,7 @@ int L_GetTimer(lua_State* L)
     // Get time values (depends on timer type)
     int hour, minute;
     double second;
-    if (timer->type == Timer::eAtTime) {
+    if (timer->type == Timer::TimerType::AtTime) {
         hour = timer->at_hour;
         minute = timer->at_minute;
         second = timer->at_second;
@@ -516,21 +516,21 @@ int L_GetTimerInfo(lua_State* L)
 
     switch (info_type) {
         case 1: // hour (at-time hour or interval hour)
-            if (timer->type == Timer::eAtTime) {
+            if (timer->type == Timer::TimerType::AtTime) {
                 lua_pushnumber(L, timer->at_hour);
             } else {
                 lua_pushnumber(L, timer->every_hour);
             }
             break;
         case 2: // minute
-            if (timer->type == Timer::eAtTime) {
+            if (timer->type == Timer::TimerType::AtTime) {
                 lua_pushnumber(L, timer->at_minute);
             } else {
                 lua_pushnumber(L, timer->every_minute);
             }
             break;
         case 3: // second
-            if (timer->type == Timer::eAtTime) {
+            if (timer->type == Timer::TimerType::AtTime) {
                 lua_pushnumber(L, timer->at_second);
             } else {
                 lua_pushnumber(L, timer->every_second);
@@ -553,7 +553,7 @@ int L_GetTimerInfo(lua_State* L)
             lua_pushboolean(L, timer->enabled);
             break;
         case 8: // bAtTime
-            lua_pushboolean(L, timer->type == Timer::eAtTime);
+            lua_pushboolean(L, timer->type == Timer::TimerType::AtTime);
             break;
         case 9: // one_shot
             lua_pushboolean(L, timer->one_shot);
@@ -562,21 +562,21 @@ int L_GetTimerInfo(lua_State* L)
             lua_pushboolean(L, timer->temporary);
             break;
         case 11: // interval hour (0 for at-time timers)
-            if (timer->type == Timer::eInterval) {
+            if (timer->type == Timer::TimerType::Interval) {
                 lua_pushnumber(L, timer->every_hour);
             } else {
                 lua_pushnumber(L, 0);
             }
             break;
         case 12: // interval minute
-            if (timer->type == Timer::eInterval) {
+            if (timer->type == Timer::TimerType::Interval) {
                 lua_pushnumber(L, timer->every_minute);
             } else {
                 lua_pushnumber(L, 0);
             }
             break;
         case 13: // interval second
-            if (timer->type == Timer::eInterval) {
+            if (timer->type == Timer::TimerType::Interval) {
                 lua_pushnumber(L, timer->every_second);
             } else {
                 lua_pushnumber(L, 0.0);
@@ -618,7 +618,7 @@ int L_GetTimerInfo(lua_State* L)
             }
             break;
         case 23: // send_to
-            lua_pushnumber(L, timer->send_to);
+            lua_pushnumber(L, static_cast<int>(timer->send_to));
             break;
         case 24: // active_when_closed
             lua_pushboolean(L, timer->active_when_closed);
@@ -632,7 +632,7 @@ int L_GetTimerInfo(lua_State* L)
             }
             break;
         case 26: // at_time_string (formatted time)
-            if (timer->type == Timer::eAtTime) {
+            if (timer->type == Timer::TimerType::AtTime) {
                 QString timeStr = QString("%1:%2:%3")
                                       .arg(timer->at_hour, 2, 10, QChar('0'))
                                       .arg(timer->at_minute, 2, 10, QChar('0'))
@@ -801,7 +801,7 @@ int L_DoAfter(lua_State* L)
     // Create temporary one-shot interval timer
     auto timer = std::make_unique<Timer>();
     timer->label = name;
-    timer->type = Timer::eInterval;
+    timer->type = Timer::TimerType::Interval;
     timer->every_hour = 0;
     timer->every_minute = 0;
     timer->every_second = seconds;
@@ -880,7 +880,7 @@ int L_DoAfterSpecial(lua_State* L)
     // Create temporary one-shot interval timer
     auto timer = std::make_unique<Timer>();
     timer->label = name;
-    timer->type = Timer::eInterval;
+    timer->type = Timer::TimerType::Interval;
     timer->every_hour = 0;
     timer->every_minute = 0;
     timer->every_second = seconds;
@@ -889,7 +889,7 @@ int L_DoAfterSpecial(lua_State* L)
     timer->one_shot = true; // Delete after firing
     timer->temporary = true;
     timer->active_when_closed = true;
-    timer->send_to = sendto;
+    timer->send_to = static_cast<SendTo>(sendto);
 
     // Add to appropriate timer map (plugin or world)
     // When called from plugin with eSendToScript, timer must execute in plugin's Lua state
@@ -947,7 +947,7 @@ int L_DoAfterNote(lua_State* L)
     // Create temporary one-shot interval timer
     auto timer = std::make_unique<Timer>();
     timer->label = name;
-    timer->type = Timer::eInterval;
+    timer->type = Timer::TimerType::Interval;
     timer->every_hour = 0;
     timer->every_minute = 0;
     timer->every_second = seconds;
@@ -1002,7 +1002,7 @@ int L_DoAfterSpeedWalk(lua_State* L)
     // Create temporary one-shot interval timer
     auto timer = std::make_unique<Timer>();
     timer->label = name;
-    timer->type = Timer::eInterval;
+    timer->type = Timer::TimerType::Interval;
     timer->every_hour = 0;
     timer->every_minute = 0;
     timer->every_second = seconds;
@@ -1192,19 +1192,19 @@ int L_GetTimerOption(lua_State* L)
 
     // Map option names to values
     if (qOption == "hour") {
-        if (timer->type == Timer::eAtTime) {
+        if (timer->type == Timer::TimerType::AtTime) {
             lua_pushnumber(L, timer->at_hour);
         } else {
             lua_pushnumber(L, timer->every_hour);
         }
     } else if (qOption == "minute") {
-        if (timer->type == Timer::eAtTime) {
+        if (timer->type == Timer::TimerType::AtTime) {
             lua_pushnumber(L, timer->at_minute);
         } else {
             lua_pushnumber(L, timer->every_minute);
         }
     } else if (qOption == "second") {
-        if (timer->type == Timer::eAtTime) {
+        if (timer->type == Timer::TimerType::AtTime) {
             lua_pushnumber(L, timer->at_second);
         } else {
             lua_pushnumber(L, timer->every_second);
@@ -1212,7 +1212,7 @@ int L_GetTimerOption(lua_State* L)
     } else if (qOption == "enabled") {
         lua_pushboolean(L, timer->enabled);
     } else if (qOption == "at_time") {
-        lua_pushboolean(L, timer->type == Timer::eAtTime);
+        lua_pushboolean(L, timer->type == Timer::TimerType::AtTime);
     } else if (qOption == "one_shot") {
         lua_pushboolean(L, timer->one_shot);
     } else if (qOption == "temporary") {
@@ -1220,7 +1220,7 @@ int L_GetTimerOption(lua_State* L)
     } else if (qOption == "active_when_closed") {
         lua_pushboolean(L, timer->active_when_closed);
     } else if (qOption == "send_to") {
-        lua_pushnumber(L, timer->send_to);
+        lua_pushnumber(L, static_cast<int>(timer->send_to));
     } else if (qOption == "script") {
         QByteArray ba = timer->procedure.toUtf8();
         lua_pushlstring(L, ba.constData(), ba.length());
@@ -1315,7 +1315,7 @@ int L_SetTimerOption(lua_State* L)
         if (value < 0 || value > 23) {
             return luaReturnError(L, eTimeInvalid);
         }
-        if (timer->type == Timer::eAtTime) {
+        if (timer->type == Timer::TimerType::AtTime) {
             timer->at_hour = value;
         } else {
             timer->every_hour = value;
@@ -1326,7 +1326,7 @@ int L_SetTimerOption(lua_State* L)
         if (value < 0 || value > 59) {
             return luaReturnError(L, eTimeInvalid);
         }
-        if (timer->type == Timer::eAtTime) {
+        if (timer->type == Timer::TimerType::AtTime) {
             timer->at_minute = value;
         } else {
             timer->every_minute = value;
@@ -1337,7 +1337,7 @@ int L_SetTimerOption(lua_State* L)
         if (value < 0.0 || value >= 60.0) {
             return luaReturnError(L, eTimeInvalid);
         }
-        if (timer->type == Timer::eAtTime) {
+        if (timer->type == Timer::TimerType::AtTime) {
             timer->at_second = value;
         } else {
             timer->every_second = value;
@@ -1347,7 +1347,7 @@ int L_SetTimerOption(lua_State* L)
         timer->enabled = lua_toboolean(L, 3);
     } else if (qOption == "at_time") {
         bool isAtTime = lua_toboolean(L, 3);
-        timer->type = isAtTime ? Timer::eAtTime : Timer::eInterval;
+        timer->type = isAtTime ? Timer::TimerType::AtTime : Timer::TimerType::Interval;
         pDoc->calculateNextFireTime(timer);
     } else if (qOption == "one_shot") {
         timer->one_shot = lua_toboolean(L, 3);
@@ -1356,7 +1356,7 @@ int L_SetTimerOption(lua_State* L)
     } else if (qOption == "active_when_closed") {
         timer->active_when_closed = lua_toboolean(L, 3);
     } else if (qOption == "send_to") {
-        timer->send_to = luaL_checkinteger(L, 3);
+        timer->send_to = static_cast<SendTo>(luaL_checkinteger(L, 3));
     } else if (qOption == "script") {
         const char* value = luaL_checkstring(L, 3);
         timer->procedure = QString::fromUtf8(value);
@@ -1496,21 +1496,21 @@ int L_GetPluginTimerInfo(lua_State* L)
     // Return timer info using same cases as GetTimerInfo
     switch (infoType) {
         case 1: // hour (at-time hour or interval hour)
-            if (timer->type == Timer::eAtTime) {
+            if (timer->type == Timer::TimerType::AtTime) {
                 lua_pushnumber(L, timer->at_hour);
             } else {
                 lua_pushnumber(L, timer->every_hour);
             }
             break;
         case 2: // minute
-            if (timer->type == Timer::eAtTime) {
+            if (timer->type == Timer::TimerType::AtTime) {
                 lua_pushnumber(L, timer->at_minute);
             } else {
                 lua_pushnumber(L, timer->every_minute);
             }
             break;
         case 3: // second
-            if (timer->type == Timer::eAtTime) {
+            if (timer->type == Timer::TimerType::AtTime) {
                 lua_pushnumber(L, timer->at_second);
             } else {
                 lua_pushnumber(L, timer->every_second);
@@ -1533,7 +1533,7 @@ int L_GetPluginTimerInfo(lua_State* L)
             lua_pushboolean(L, timer->enabled);
             break;
         case 8: // bAtTime
-            lua_pushboolean(L, timer->type == Timer::eAtTime);
+            lua_pushboolean(L, timer->type == Timer::TimerType::AtTime);
             break;
         case 9: // one_shot
             lua_pushboolean(L, timer->one_shot);
@@ -1542,21 +1542,21 @@ int L_GetPluginTimerInfo(lua_State* L)
             lua_pushboolean(L, timer->temporary);
             break;
         case 11: // interval hour (0 for at-time timers)
-            if (timer->type == Timer::eInterval) {
+            if (timer->type == Timer::TimerType::Interval) {
                 lua_pushnumber(L, timer->every_hour);
             } else {
                 lua_pushnumber(L, 0);
             }
             break;
         case 12: // interval minute
-            if (timer->type == Timer::eInterval) {
+            if (timer->type == Timer::TimerType::Interval) {
                 lua_pushnumber(L, timer->every_minute);
             } else {
                 lua_pushnumber(L, 0);
             }
             break;
         case 13: // interval second
-            if (timer->type == Timer::eInterval) {
+            if (timer->type == Timer::TimerType::Interval) {
                 lua_pushnumber(L, timer->every_second);
             } else {
                 lua_pushnumber(L, 0.0);
@@ -1598,7 +1598,7 @@ int L_GetPluginTimerInfo(lua_State* L)
             }
             break;
         case 23: // send_to
-            lua_pushnumber(L, timer->send_to);
+            lua_pushnumber(L, static_cast<int>(timer->send_to));
             break;
         case 24: // active_when_closed
             lua_pushboolean(L, timer->active_when_closed);
@@ -1612,7 +1612,7 @@ int L_GetPluginTimerInfo(lua_State* L)
             }
             break;
         case 26: // at_time_string (formatted time)
-            if (timer->type == Timer::eAtTime) {
+            if (timer->type == Timer::TimerType::AtTime) {
                 QString timeStr = QString("%1:%2:%3")
                                       .arg(timer->at_hour, 2, 10, QChar('0'))
                                       .arg(timer->at_minute, 2, 10, QChar('0'))
@@ -1684,7 +1684,7 @@ int L_GetPluginTimerOption(lua_State* L)
         if (option == "enabled") {
             lua_pushboolean(L, timer->enabled);
         } else if (option == "at_time") {
-            lua_pushboolean(L, timer->type == Timer::eAtTime);
+            lua_pushboolean(L, timer->type == Timer::TimerType::AtTime);
         } else if (option == "one_shot") {
             lua_pushboolean(L, timer->one_shot);
         } else {

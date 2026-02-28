@@ -16,6 +16,7 @@
 #include <QFile>
 #include <QTemporaryFile>
 #include <gtest/gtest.h>
+#include <memory>
 
 extern "C" {
 #include <lauxlib.h>
@@ -29,7 +30,7 @@ class PluginCallbacksTest : public ::testing::Test {
     void SetUp() override
     {
         // Create world document
-        doc = new WorldDocument();
+        doc = std::make_unique<WorldDocument>();
 
         // Create test plugin XML file
         pluginFile = new QTemporaryFile();
@@ -114,10 +115,9 @@ end
     void TearDown() override
     {
         delete pluginFile;
-        delete doc;
     }
 
-    WorldDocument* doc = nullptr;
+    std::unique_ptr<WorldDocument> doc;
     Plugin* plugin = nullptr;
     QTemporaryFile* pluginFile = nullptr;
     lua_State* L = nullptr;

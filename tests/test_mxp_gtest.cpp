@@ -17,13 +17,14 @@
 #include "../src/world/world_document.h"
 #include <QApplication>
 #include <gtest/gtest.h>
+#include <memory>
 
 // Test fixture for MXP tests
 class MXPTest : public ::testing::Test {
   protected:
     void SetUp() override
     {
-        doc = new WorldDocument();
+        doc = std::make_unique<WorldDocument>();
 
         // Initialize basic state
         doc->m_mush_name = "Test World";
@@ -37,10 +38,9 @@ class MXPTest : public ::testing::Test {
 
     void TearDown() override
     {
-        delete doc;
     }
 
-    WorldDocument* doc = nullptr;
+    std::unique_ptr<WorldDocument> doc;
 };
 
 // ========== Story 1: Element Collection and Parsing ==========
@@ -199,9 +199,7 @@ TEST_F(MXPTest, AllElementsHaveValidActions)
     EXPECT_GE(doc->m_mxpEngine->m_atomicElementMap.size(), 50);
 
     // Verify each element has a valid action
-    for (auto it = doc->m_mxpEngine->m_atomicElementMap.constBegin(); it != doc->m_mxpEngine->m_atomicElementMap.constEnd();
-         ++it) {
-        AtomicElement* elem = it.value();
+    for (const auto& [key, elem] : doc->m_mxpEngine->m_atomicElementMap) {
         ASSERT_NE(elem, nullptr);
         EXPECT_FALSE(elem->strName.isEmpty());
         EXPECT_GE(elem->iAction, 0);
@@ -748,7 +746,8 @@ TEST_F(MXPTest, SecurityModeAllowsOpenTagsInOpenMode)
     doc->m_mxpEngine->MXP_collected_element();
 
     // Should be added to active tag list
-    EXPECT_GE(doc->m_mxpEngine->m_activeTagList.size(), 0); // May or may not add depending on implementation
+    EXPECT_GE(doc->m_mxpEngine->m_activeTagList.size(),
+              0); // May or may not add depending on implementation
 }
 
 // Test 53: Custom element with bOpen flag enforces open mode
@@ -868,8 +867,8 @@ TEST_F(MXPTest, SecurityFlagsStoredOnActiveTags)
     doc->m_mxpEngine->MXP_collected_element();
 
     // Check if active tags exist and have security info
-    if (!doc->m_mxpEngine->m_activeTagList.isEmpty()) {
-        ActiveTag* tag = doc->m_mxpEngine->m_activeTagList.last();
+    if (!doc->m_mxpEngine->m_activeTagList.empty()) {
+        ActiveTag* tag = doc->m_mxpEngine->m_activeTagList.back().get();
         ASSERT_NE(tag, nullptr);
         // Tag should have stored the mode it was created in
         // (exact field depends on ActiveTag structure)

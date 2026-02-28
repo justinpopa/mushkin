@@ -162,7 +162,7 @@ int L_AddTrigger(lua_State* L)
     trigger->colour = color;
     trigger->sound_to_play = QString::fromUtf8(sound_file);
     trigger->procedure = QString::fromUtf8(script);
-    trigger->send_to = send_to;
+    trigger->send_to = static_cast<SendTo>(send_to);
     trigger->sequence = sequence;
 
     // Add to appropriate trigger map (plugin or world)
@@ -490,7 +490,7 @@ int L_GetTriggerInfo(lua_State* L)
             lua_pushnumber(L, trigger->clipboard_arg);
             break;
         case 15: // send_to
-            lua_pushnumber(L, trigger->send_to);
+            lua_pushnumber(L, static_cast<int>(trigger->send_to));
             break;
         case 16: // sequence
             lua_pushnumber(L, trigger->sequence);
@@ -788,7 +788,7 @@ int L_GetPluginTriggerInfo(lua_State* L)
             lua_pushnumber(L, trigger->clipboard_arg);
             break;
         case 15: // send_to
-            lua_pushnumber(L, trigger->send_to);
+            lua_pushnumber(L, static_cast<int>(trigger->send_to));
             break;
         case 16: // sequence
             lua_pushnumber(L, trigger->sequence);
@@ -1128,7 +1128,7 @@ int L_GetTriggerOption(lua_State* L)
     if (qOption == "clipboard_arg") {
         lua_pushnumber(L, trigger->clipboard_arg);
     } else if (qOption == "colour_change_type") {
-        lua_pushnumber(L, trigger->colour_change_type);
+        lua_pushnumber(L, static_cast<int>(trigger->colour_change_type));
     } else if (qOption == "custom_colour") {
         lua_pushnumber(L, trigger->colour);
     } else if (qOption == "lines_to_match") {
@@ -1142,7 +1142,7 @@ int L_GetTriggerOption(lua_State* L)
     } else if (qOption == "other_back_colour") {
         lua_pushnumber(L, trigger->other_background);
     } else if (qOption == "send_to") {
-        lua_pushnumber(L, trigger->send_to);
+        lua_pushnumber(L, static_cast<int>(trigger->send_to));
     } else if (qOption == "sequence") {
         lua_pushnumber(L, trigger->sequence);
     } else if (qOption == "user") {
@@ -1264,13 +1264,13 @@ int L_SetTriggerOption(lua_State* L)
         if (qOption == "clipboard_arg") {
             trigger->clipboard_arg = value;
         } else if (qOption == "colour_change_type") {
-            trigger->colour_change_type = value;
+            trigger->colour_change_type = static_cast<ColourChangeType>(value);
         } else if (qOption == "custom_colour") {
             trigger->colour = value;
         } else if (qOption == "lines_to_match") {
             trigger->lines_to_match = value;
         } else if (qOption == "match_style") {
-            trigger->match_type = value;
+            trigger->match_type = static_cast<quint16>(value);
         } else if (qOption == "new_style") {
             trigger->style = value;
         } else if (qOption == "other_text_colour") {
@@ -1278,7 +1278,7 @@ int L_SetTriggerOption(lua_State* L)
         } else if (qOption == "other_back_colour") {
             trigger->other_background = value;
         } else if (qOption == "send_to") {
-            trigger->send_to = value;
+            trigger->send_to = static_cast<SendTo>(value);
         } else if (qOption == "sequence") {
             trigger->sequence = value;
             // TODO: Re-sort triggers
@@ -1483,7 +1483,7 @@ int L_AddTriggerEx(lua_State* L)
     trigger->clipboard_arg = wildcard;
     trigger->sound_to_play = QString::fromUtf8(sound_file);
     trigger->procedure = QString::fromUtf8(script);
-    trigger->send_to = send_to;
+    trigger->send_to = static_cast<SendTo>(send_to);
     trigger->sequence = sequence;
     trigger->variable = qName; // kludge from original
 

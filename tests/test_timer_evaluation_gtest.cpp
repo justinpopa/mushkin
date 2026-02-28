@@ -25,13 +25,14 @@
 #include <QDateTime>
 #include <QThread>
 #include <gtest/gtest.h>
+#include <memory>
 
 // Test fixture for timer evaluation tests
 class TimerEvaluationTest : public ::testing::Test {
   protected:
     void SetUp() override
     {
-        doc = new WorldDocument();
+        doc = std::make_unique<WorldDocument>();
         doc->m_bEnableTimers = true;
         doc->m_connectionManager->m_iConnectPhase = eConnectConnectedToMud;
     }
@@ -40,22 +41,21 @@ class TimerEvaluationTest : public ::testing::Test {
     {
         // Clean up any timers left in the map (unique_ptr handles deletion automatically)
         doc->m_automationRegistry->m_TimerMap.clear();
-        delete doc;
     }
 
-    WorldDocument* doc = nullptr;
+    std::unique_ptr<WorldDocument> doc;
 };
 
 // Test 1: Timers don't fire when m_bEnableTimers = false
 TEST_F(TimerEvaluationTest, TimersDisabledCheck)
 {
-    Timer* timer = new Timer();
-    timer->enabled = true;
-    timer->type = Timer::eInterval;
-    timer->every_minute = 1;
-    timer->every_second = 0.0;
-    timer->fire_time = QDateTime::currentDateTime().addSecs(-60); // Fire time in past
-    doc->m_automationRegistry->m_TimerMap["test1"] = std::unique_ptr<Timer>(timer);
+    auto timerOwned = std::make_unique<Timer>();
+    timerOwned->enabled = true;
+    timerOwned->type = Timer::TimerType::Interval;
+    timerOwned->every_minute = 1;
+    timerOwned->every_second = 0.0;
+    timerOwned->fire_time = QDateTime::currentDateTime().addSecs(-60); // Fire time in past
+    doc->m_automationRegistry->m_TimerMap["test1"] = std::move(timerOwned);
 
     doc->m_bEnableTimers = false; // Disable timers
     int beforeCount = doc->m_automationRegistry->m_iTimersFiredCount;
@@ -72,13 +72,13 @@ TEST_F(TimerEvaluationTest, TimersDisabledCheck)
 // Test 2: Disabled timer is skipped
 TEST_F(TimerEvaluationTest, DisabledTimerSkipped)
 {
-    Timer* timer = new Timer();
-    timer->enabled = false; // DISABLED
-    timer->type = Timer::eInterval;
-    timer->every_minute = 1;
-    timer->every_second = 0.0;
-    timer->fire_time = QDateTime::currentDateTime().addSecs(-60); // Fire time in past
-    doc->m_automationRegistry->m_TimerMap["test2"] = std::unique_ptr<Timer>(timer);
+    auto timerOwned = std::make_unique<Timer>();
+    timerOwned->enabled = false; // DISABLED
+    timerOwned->type = Timer::TimerType::Interval;
+    timerOwned->every_minute = 1;
+    timerOwned->every_second = 0.0;
+    timerOwned->fire_time = QDateTime::currentDateTime().addSecs(-60); // Fire time in past
+    doc->m_automationRegistry->m_TimerMap["test2"] = std::move(timerOwned);
 
     int beforeCount = doc->m_automationRegistry->m_iTimersFiredCount;
     doc->checkTimerList();
@@ -90,14 +90,14 @@ TEST_F(TimerEvaluationTest, DisabledTimerSkipped)
 // Test 3: active_when_closed=false skips when disconnected
 TEST_F(TimerEvaluationTest, ActiveWhenClosedRespectsConnectionState)
 {
-    Timer* timer = new Timer();
-    timer->enabled = true;
-    timer->active_when_closed = false; // Requires connection
-    timer->type = Timer::eInterval;
-    timer->every_minute = 1;
-    timer->every_second = 0.0;
-    timer->fire_time = QDateTime::currentDateTime().addSecs(-60); // Fire time in past
-    doc->m_automationRegistry->m_TimerMap["test3"] = std::unique_ptr<Timer>(timer);
+    auto timerOwned = std::make_unique<Timer>();
+    timerOwned->enabled = true;
+    timerOwned->active_when_closed = false; // Requires connection
+    timerOwned->type = Timer::TimerType::Interval;
+    timerOwned->every_minute = 1;
+    timerOwned->every_second = 0.0;
+    timerOwned->fire_time = QDateTime::currentDateTime().addSecs(-60); // Fire time in past
+    doc->m_automationRegistry->m_TimerMap["test3"] = std::move(timerOwned);
 
     doc->m_connectionManager->m_iConnectPhase = eConnectNotConnected; // Disconnected
 
@@ -114,15 +114,16 @@ TEST_F(TimerEvaluationTest, ActiveWhenClosedRespectsConnectionState)
 // Test 4: Timer fires when fire_time <= now
 TEST_F(TimerEvaluationTest, TimerFiresWhenReady)
 {
-    Timer* timer = new Timer();
-    timer->enabled = true;
-    timer->active_when_closed = true;
-    timer->type = Timer::eInterval;
-    timer->every_minute = 5;
-    timer->every_second = 0.0;
-    timer->fire_time = QDateTime::currentDateTime().addSecs(-10); // Fire time 10 seconds ago
-    timer->matched = 0;
-    doc->m_automationRegistry->m_TimerMap["test4"] = std::unique_ptr<Timer>(timer);
+    auto timerOwned = std::make_unique<Timer>();
+    timerOwned->enabled = true;
+    timerOwned->active_when_closed = true;
+    timerOwned->type = Timer::TimerType::Interval;
+    timerOwned->every_minute = 5;
+    timerOwned->every_second = 0.0;
+    timerOwned->fire_time = QDateTime::currentDateTime().addSecs(-10); // Fire time 10 seconds ago
+    timerOwned->matched = 0;
+    Timer* timer = timerOwned.get();
+    doc->m_automationRegistry->m_TimerMap["test4"] = std::move(timerOwned);
 
     int beforeCount = doc->m_automationRegistry->m_iTimersFiredCount;
 
@@ -138,16 +139,17 @@ TEST_F(TimerEvaluationTest, TimerFiresWhenReady)
 // Test 5: Interval timer fire time updates correctly
 TEST_F(TimerEvaluationTest, IntervalTimerFireTimeUpdate)
 {
-    Timer* timer = new Timer();
-    timer->enabled = true;
-    timer->active_when_closed = true;
-    timer->type = Timer::eInterval;
-    timer->every_minute = 3; // 3 minutes
-    timer->every_second = 0.0;
+    auto timerOwned = std::make_unique<Timer>();
+    timerOwned->enabled = true;
+    timerOwned->active_when_closed = true;
+    timerOwned->type = Timer::TimerType::Interval;
+    timerOwned->every_minute = 3; // 3 minutes
+    timerOwned->every_second = 0.0;
 
     QDateTime initialFireTime = QDateTime::currentDateTime().addSecs(-5); // 5 seconds ago
-    timer->fire_time = initialFireTime;
-    doc->m_automationRegistry->m_TimerMap["test5"] = std::unique_ptr<Timer>(timer);
+    timerOwned->fire_time = initialFireTime;
+    Timer* timer = timerOwned.get();
+    doc->m_automationRegistry->m_TimerMap["test5"] = std::move(timerOwned);
 
     doc->checkTimerList();
 
@@ -162,17 +164,18 @@ TEST_F(TimerEvaluationTest, IntervalTimerFireTimeUpdate)
 // Test 6: At-time timer fire time updates correctly (adds 1 day)
 TEST_F(TimerEvaluationTest, AtTimeTimerFireTimeUpdate)
 {
-    Timer* timer = new Timer();
-    timer->enabled = true;
-    timer->active_when_closed = true;
-    timer->type = Timer::eAtTime;
-    timer->at_hour = 10;
-    timer->at_minute = 30;
-    timer->at_second = 0.0;
+    auto timerOwned = std::make_unique<Timer>();
+    timerOwned->enabled = true;
+    timerOwned->active_when_closed = true;
+    timerOwned->type = Timer::TimerType::AtTime;
+    timerOwned->at_hour = 10;
+    timerOwned->at_minute = 30;
+    timerOwned->at_second = 0.0;
 
     QDateTime initialFireTime = QDateTime::currentDateTime().addSecs(-60); // 1 minute ago
-    timer->fire_time = initialFireTime;
-    doc->m_automationRegistry->m_TimerMap["test6"] = std::unique_ptr<Timer>(timer);
+    timerOwned->fire_time = initialFireTime;
+    Timer* timer = timerOwned.get();
+    doc->m_automationRegistry->m_TimerMap["test6"] = std::move(timerOwned);
 
     doc->checkTimerList();
 
@@ -187,20 +190,21 @@ TEST_F(TimerEvaluationTest, AtTimeTimerFireTimeUpdate)
 // Test 7: One-shot timer is disabled and deleted after execution
 TEST_F(TimerEvaluationTest, OneShotTimerDeleted)
 {
-    Timer* timer = new Timer();
-    timer->enabled = true;
-    timer->active_when_closed = true;
-    timer->one_shot = true; // ONE-SHOT
-    timer->type = Timer::eInterval;
-    timer->every_minute = 1;
-    timer->every_second = 0.0;
-    timer->fire_time = QDateTime::currentDateTime().addSecs(-10); // Fire time in past
-    doc->m_automationRegistry->m_TimerMap["test7"] = std::unique_ptr<Timer>(timer);
+    auto timerOwned = std::make_unique<Timer>();
+    timerOwned->enabled = true;
+    timerOwned->active_when_closed = true;
+    timerOwned->one_shot = true; // ONE-SHOT
+    timerOwned->type = Timer::TimerType::Interval;
+    timerOwned->every_minute = 1;
+    timerOwned->every_second = 0.0;
+    timerOwned->fire_time = QDateTime::currentDateTime().addSecs(-10); // Fire time in past
+    doc->m_automationRegistry->m_TimerMap["test7"] = std::move(timerOwned);
 
     doc->checkTimerList();
 
     // Timer should no longer exist (deleted after execution)
-    EXPECT_FALSE(doc->m_automationRegistry->m_TimerMap.find("test7") != doc->m_automationRegistry->m_TimerMap.end())
+    EXPECT_FALSE(doc->m_automationRegistry->m_TimerMap.find("test7") !=
+                 doc->m_automationRegistry->m_TimerMap.end())
         << "One-shot timer should be deleted after execution";
     // Note: timer pointer is now invalid, don't access it
 }
@@ -208,15 +212,17 @@ TEST_F(TimerEvaluationTest, OneShotTimerDeleted)
 // Test 8: Timer doesn't fire if fire_time > now
 TEST_F(TimerEvaluationTest, TimerDoesNotFireWhenNotReady)
 {
-    Timer* timer = new Timer();
-    timer->enabled = true;
-    timer->active_when_closed = true;
-    timer->type = Timer::eInterval;
-    timer->every_minute = 5;
-    timer->every_second = 0.0;
-    timer->fire_time = QDateTime::currentDateTime().addSecs(300); // Fire time 5 minutes in future
-    timer->matched = 0;
-    doc->m_automationRegistry->m_TimerMap["test8"] = std::unique_ptr<Timer>(timer);
+    auto timerOwned = std::make_unique<Timer>();
+    timerOwned->enabled = true;
+    timerOwned->active_when_closed = true;
+    timerOwned->type = Timer::TimerType::Interval;
+    timerOwned->every_minute = 5;
+    timerOwned->every_second = 0.0;
+    timerOwned->fire_time =
+        QDateTime::currentDateTime().addSecs(300); // Fire time 5 minutes in future
+    timerOwned->matched = 0;
+    Timer* timer = timerOwned.get();
+    doc->m_automationRegistry->m_TimerMap["test8"] = std::move(timerOwned);
 
     int beforeCount = doc->m_automationRegistry->m_iTimersFiredCount;
 
@@ -231,16 +237,17 @@ TEST_F(TimerEvaluationTest, TimerDoesNotFireWhenNotReady)
 // Test 9: Clock change handling (fire time still in past)
 TEST_F(TimerEvaluationTest, ClockChangeHandling)
 {
-    Timer* timer = new Timer();
-    timer->enabled = true;
-    timer->active_when_closed = true;
-    timer->type = Timer::eInterval;
-    timer->every_minute = 0;
-    timer->every_second = 1.0; // 1 second interval
+    auto timerOwned = std::make_unique<Timer>();
+    timerOwned->enabled = true;
+    timerOwned->active_when_closed = true;
+    timerOwned->type = Timer::TimerType::Interval;
+    timerOwned->every_minute = 0;
+    timerOwned->every_second = 1.0; // 1 second interval
 
     // Set fire time way in the past (simulating clock change)
-    timer->fire_time = QDateTime::currentDateTime().addSecs(-3600); // 1 hour ago
-    doc->m_automationRegistry->m_TimerMap["test9"] = std::unique_ptr<Timer>(timer);
+    timerOwned->fire_time = QDateTime::currentDateTime().addSecs(-3600); // 1 hour ago
+    Timer* timer = timerOwned.get();
+    doc->m_automationRegistry->m_TimerMap["test9"] = std::move(timerOwned);
 
     doc->checkTimerList();
 
@@ -254,36 +261,39 @@ TEST_F(TimerEvaluationTest, ClockChangeHandling)
 // Test 10: Multiple timers fire in order
 TEST_F(TimerEvaluationTest, MultipleTimersFireCorrectly)
 {
-    Timer* timer1 = new Timer();
-    timer1->enabled = true;
-    timer1->active_when_closed = true;
-    timer1->type = Timer::eInterval;
-    timer1->every_minute = 1;
-    timer1->every_second = 0.0;
-    timer1->fire_time = QDateTime::currentDateTime().addSecs(-10);
-    timer1->matched = 0;
+    auto timer1Owned = std::make_unique<Timer>();
+    timer1Owned->enabled = true;
+    timer1Owned->active_when_closed = true;
+    timer1Owned->type = Timer::TimerType::Interval;
+    timer1Owned->every_minute = 1;
+    timer1Owned->every_second = 0.0;
+    timer1Owned->fire_time = QDateTime::currentDateTime().addSecs(-10);
+    timer1Owned->matched = 0;
 
-    Timer* timer2 = new Timer();
-    timer2->enabled = true;
-    timer2->active_when_closed = true;
-    timer2->type = Timer::eInterval;
-    timer2->every_minute = 2;
-    timer2->every_second = 0.0;
-    timer2->fire_time = QDateTime::currentDateTime().addSecs(-5);
-    timer2->matched = 0;
+    auto timer2Owned = std::make_unique<Timer>();
+    timer2Owned->enabled = true;
+    timer2Owned->active_when_closed = true;
+    timer2Owned->type = Timer::TimerType::Interval;
+    timer2Owned->every_minute = 2;
+    timer2Owned->every_second = 0.0;
+    timer2Owned->fire_time = QDateTime::currentDateTime().addSecs(-5);
+    timer2Owned->matched = 0;
 
-    Timer* timer3 = new Timer();
-    timer3->enabled = true;
-    timer3->active_when_closed = true;
-    timer3->type = Timer::eInterval;
-    timer3->every_minute = 3;
-    timer3->every_second = 0.0;
-    timer3->fire_time = QDateTime::currentDateTime().addSecs(300); // Future
-    timer3->matched = 0;
+    auto timer3Owned = std::make_unique<Timer>();
+    timer3Owned->enabled = true;
+    timer3Owned->active_when_closed = true;
+    timer3Owned->type = Timer::TimerType::Interval;
+    timer3Owned->every_minute = 3;
+    timer3Owned->every_second = 0.0;
+    timer3Owned->fire_time = QDateTime::currentDateTime().addSecs(300); // Future
+    timer3Owned->matched = 0;
 
-    doc->m_automationRegistry->m_TimerMap["timer1"] = std::unique_ptr<Timer>(timer1);
-    doc->m_automationRegistry->m_TimerMap["timer2"] = std::unique_ptr<Timer>(timer2);
-    doc->m_automationRegistry->m_TimerMap["timer3"] = std::unique_ptr<Timer>(timer3);
+    Timer* timer1 = timer1Owned.get();
+    Timer* timer2 = timer2Owned.get();
+    Timer* timer3 = timer3Owned.get();
+    doc->m_automationRegistry->m_TimerMap["timer1"] = std::move(timer1Owned);
+    doc->m_automationRegistry->m_TimerMap["timer2"] = std::move(timer2Owned);
+    doc->m_automationRegistry->m_TimerMap["timer3"] = std::move(timer3Owned);
 
     int beforeCount = doc->m_automationRegistry->m_iTimersFiredCount;
 

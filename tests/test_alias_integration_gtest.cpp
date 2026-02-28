@@ -12,18 +12,18 @@
 #include "../src/world/world_document.h"
 #include <QCoreApplication>
 #include <gtest/gtest.h>
+#include <memory>
 
 // Test fixture for alias integration tests
 class AliasIntegrationTest : public ::testing::Test {
   protected:
     void SetUp() override
     {
-        doc = new WorldDocument();
+        doc = std::make_unique<WorldDocument>();
     }
 
     void TearDown() override
     {
-        delete doc;
     }
 
     // Helper to add and enable an alias
@@ -33,7 +33,7 @@ class AliasIntegrationTest : public ::testing::Test {
         alias->name = pattern;
         alias->enabled = true;
         alias->label = label;
-        alias->send_to = 0; // eSendToWorld
+        alias->send_to = eSendToWorld;
         alias->sequence = 100;
 
         Alias* aliasPtr = alias.get();
@@ -42,7 +42,7 @@ class AliasIntegrationTest : public ::testing::Test {
         return aliasPtr;
     }
 
-    WorldDocument* doc = nullptr;
+    std::unique_ptr<WorldDocument> doc;
 };
 
 // Test 1: Alias Intercepts Command (Prevents MUD Send)

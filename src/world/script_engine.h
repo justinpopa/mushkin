@@ -4,10 +4,15 @@
 #include "../automation/script_language.h"
 #include <QObject>
 #include <QString>
+#include <QtGlobal> // quint32
 
 // Forward declarations
 class WorldDocument;
 struct lua_State;
+
+// Forward-declare ActionSource (enum class with explicit underlying type allows
+// forward-declaration)
+enum class ActionSource : quint32;
 
 /**
  * ScriptEngine - Lua scripting engine wrapper
@@ -191,13 +196,13 @@ class ScriptEngine : public QObject {
      * @param szReason Description (e.g., "world connect")
      * @param nparams List of number parameters
      * @param sparams List of string parameters
-     * @param invocation_count IN/OUT: Invocation counter
+     * @param invocation_count IN/OUT: Invocation counter (qint32 to match Timer/Trigger field type)
      * @param result OUT: Boolean result from function (optional)
      * @return true on error, false on success
      */
-    bool executeLua(qint32& dispid, const QString& szProcedure, unsigned short iReason,
+    bool executeLua(qint32& dispid, const QString& szProcedure, ActionSource iReason,
                     const QString& szType, const QString& szReason, QList<double>& nparams,
-                    QList<QString>& sparams, long& invocation_count, bool* result = nullptr);
+                    QList<QString>& sparams, qint32& invocation_count, bool* result = nullptr);
 
     // Public Lua state (accessed by API functions)
     lua_State* L;

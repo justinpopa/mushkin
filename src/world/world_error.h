@@ -15,6 +15,8 @@ enum class WorldErrorType {
     ScriptExecuting, // Cannot mutate item while its script is executing
     InitFailed,      // Low-level initialisation failed (e.g. zlib)
     NotepadNotFound, // No notepad window with that title exists
+    NotConnected,    // World is not currently connected to the MUD
+    ItemInUse,       // Item is locked because a plugin is processing sent text
 };
 
 struct WorldError {

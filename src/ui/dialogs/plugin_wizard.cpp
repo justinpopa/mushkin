@@ -531,7 +531,7 @@ void PluginWizardPage5::initializePage()
 
         // Format time string
         QString timeStr;
-        if (timer->type == 0) { // Interval timer
+        if (timer->type == Timer::TimerType::Interval) { // Interval timer
             timeStr = QString("Every %1:%2:%3")
                           .arg(timer->every_hour, 2, 10, QChar('0'))
                           .arg(timer->every_minute, 2, 10, QChar('0'))

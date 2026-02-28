@@ -29,14 +29,14 @@ void WorldDocument::executeTimer(Timer* timer, const QString& name)
     QString strExtraOutput;
 
     timer->executing_script = true;
-    m_iCurrentActionSource = eTimerAction;
+    m_iCurrentActionSource = ActionSource::eTimerAction;
 
     QString strDescription = QString("Timer: %1").arg(timer->label.isEmpty() ? name : timer->label);
 
     sendTo(timer->send_to, timer->contents, timer->omit_from_output, timer->omit_from_log,
            strDescription, timer->variable, strExtraOutput, timer->scriptLanguage);
 
-    m_iCurrentActionSource = eUnknownActionSource;
+    m_iCurrentActionSource = ActionSource::eUnknownActionSource;
     timer->executing_script = false;
 
     if (!strExtraOutput.isEmpty()) {
@@ -76,10 +76,10 @@ void WorldDocument::executeTimerScript(Timer* timer, const QString& name)
 
     QString strType = "timer";
     QString strReason = QString("processing timer \"%1\"").arg(timerName);
-    long invocationCount = timer->invocation_count;
+    qint32 invocationCount = timer->invocation_count;
 
-    bool error = m_ScriptEngine->executeLua(dispid, timer->procedure, eTimerAction, strType,
-                                            strReason, nparams, sparams, invocationCount);
+    bool error = m_ScriptEngine->executeLua(dispid, timer->procedure, ActionSource::eTimerAction,
+                                            strType, strReason, nparams, sparams, invocationCount);
 
     timer->dispid = dispid;
     timer->invocation_count = invocationCount;
@@ -102,14 +102,14 @@ void WorldDocument::executePluginTimer(Plugin* plugin, Timer* timer, const QStri
     timer->executing_script = true;
     Plugin* savedPlugin = m_CurrentPlugin;
     m_CurrentPlugin = plugin;
-    m_iCurrentActionSource = eTimerAction;
+    m_iCurrentActionSource = ActionSource::eTimerAction;
 
     QString strDescription = QString("Timer: %1").arg(timer->label.isEmpty() ? name : timer->label);
 
     sendTo(timer->send_to, timer->contents, timer->omit_from_output, timer->omit_from_log,
            strDescription, timer->variable, strExtraOutput, timer->scriptLanguage);
 
-    m_iCurrentActionSource = eUnknownActionSource;
+    m_iCurrentActionSource = ActionSource::eUnknownActionSource;
     m_CurrentPlugin = savedPlugin;
     timer->executing_script = false;
 
@@ -152,10 +152,10 @@ void WorldDocument::executePluginTimerScript(Plugin* plugin, Timer* timer, const
 
     QString strType = "timer";
     QString strReason = QString("processing timer \"%1\"").arg(timerName);
-    long invocationCount = timer->invocation_count;
+    qint32 invocationCount = timer->invocation_count;
 
-    bool error = scriptEngine->executeLua(dispid, timer->procedure, eTimerAction, strType,
-                                          strReason, nparams, sparams, invocationCount);
+    bool error = scriptEngine->executeLua(dispid, timer->procedure, ActionSource::eTimerAction,
+                                          strType, strReason, nparams, sparams, invocationCount);
 
     timer->dispid = dispid;
     timer->invocation_count = invocationCount;

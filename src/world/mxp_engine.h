@@ -10,10 +10,9 @@
 
 #include "mxp_types.h"
 #include <QColor>
-#include <QList>
-#include <QMap>
 #include <QString>
 #include <cstdint>
+#include <map>
 
 class WorldDocument; // forward declaration
 
@@ -157,7 +156,7 @@ class MXPEngine {
     QString m_strMXPtagcontents;    // Stuff inside tag
     char m_cMXPquoteTerminator = 0; // ' or "
 
-    // MXP data structures (raw pointer maps — C library interop pattern, freed via qDeleteAll)
+    // MXP data structures (unique_ptr ownership — destruction is automatic)
     AtomicElementMap m_atomicElementMap; // Built-in MXP elements
     CustomElementMap m_customElementMap; // User-defined elements
     MXPEntityMap m_entityMap;            // Standard HTML entities

@@ -111,7 +111,7 @@ void WorldDocument::changeLineColors(Trigger* trigger, Line* line)
     // TODO: Only modify style runs in matched portion (iStartCol to iEndCol)
     for (const auto& style : line->styleList) {
         switch (trigger->colour_change_type) {
-            case TRIGGER_COLOUR_CHANGE_BOTH:
+            case ColourChangeType::Both:
                 if (trigger->other_foreground != 0) {
                     style->iForeColour = trigger->other_foreground;
                 }
@@ -120,13 +120,13 @@ void WorldDocument::changeLineColors(Trigger* trigger, Line* line)
                 }
                 break;
 
-            case TRIGGER_COLOUR_CHANGE_FOREGROUND:
+            case ColourChangeType::Foreground:
                 if (trigger->other_foreground != 0) {
                     style->iForeColour = trigger->other_foreground;
                 }
                 break;
 
-            case TRIGGER_COLOUR_CHANGE_BACKGROUND:
+            case ColourChangeType::Background:
                 if (trigger->other_background != 0) {
                     style->iBackColour = trigger->other_background;
                 }

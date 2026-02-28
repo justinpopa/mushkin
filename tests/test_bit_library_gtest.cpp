@@ -13,6 +13,7 @@
 #include "../src/world/world_document.h"
 #include <QApplication>
 #include <gtest/gtest.h>
+#include <memory>
 
 extern "C" {
 #include <lauxlib.h>
@@ -25,13 +26,12 @@ class BitLibraryTest : public ::testing::Test {
   protected:
     void SetUp() override
     {
-        doc = new WorldDocument();
+        doc = std::make_unique<WorldDocument>();
         L = doc->m_ScriptEngine->L;
     }
 
     void TearDown() override
     {
-        delete doc;
     }
 
     // Helper to check if a function exists
@@ -48,7 +48,7 @@ class BitLibraryTest : public ::testing::Test {
         return exists;
     }
 
-    WorldDocument* doc = nullptr;
+    std::unique_ptr<WorldDocument> doc;
     lua_State* L = nullptr;
 };
 

@@ -231,12 +231,7 @@ static QRegularExpression wildcardToRegex(const QString& pattern, bool ignoreCas
     return QRegularExpression(fullPattern, options);
 }
 
-#define TRIGGER_MATCH_TEXT 0x0080
-#define TRIGGER_MATCH_BACK 0x0800
-#define TRIGGER_MATCH_HILITE 0x1000
-#define TRIGGER_MATCH_UNDERLINE 0x2000
-#define TRIGGER_MATCH_BLINK 0x4000
-#define TRIGGER_MATCH_INVERSE 0x8000
+// TRIGGER_MATCH_* constants are defined as inline constexpr in trigger.h
 
 static bool matchStyle(Trigger* trigger, Line* line)
 {
@@ -642,7 +637,7 @@ void AutomationRegistry::resetOneTimer(Timer* timer)
     QDateTime now = QDateTime::currentDateTime();
     timer->when_fired = now;
 
-    if (timer->type == Timer::eAtTime) {
+    if (timer->type == Timer::TimerType::AtTime) {
         int seconds = static_cast<int>(timer->at_second);
         int milliseconds = static_cast<int>((timer->at_second - seconds) * 1000);
         QTime fireTime(timer->at_hour, timer->at_minute, seconds, milliseconds);
@@ -651,13 +646,24 @@ void AutomationRegistry::resetOneTimer(Timer* timer)
             timer->fire_time = timer->fire_time.addDays(1);
         }
     } else {
-        qint64 intervalSecs = static_cast<qint64>(timer->every_hour) * 3600 +
-                              static_cast<qint64>(timer->every_minute) * 60 +
-                              static_cast<qint64>(timer->every_second);
-        qint64 offsetSecs = static_cast<qint64>(timer->offset_hour) * 3600 +
-                            static_cast<qint64>(timer->offset_minute) * 60 +
-                            static_cast<qint64>(timer->offset_second);
-        timer->fire_time = now.addSecs(intervalSecs - offsetSecs);
+        // Compute interval and offset in milliseconds to preserve fractional seconds.
+        // every_second / offset_second are double (e.g. 0.5 = 500 ms); truncating them
+        // to qint64 before multiplying would silently drop sub-second precision.
+        qint64 intervalMs = static_cast<qint64>(timer->every_hour) * 3600000LL +
+                            static_cast<qint64>(timer->every_minute) * 60000LL +
+                            static_cast<qint64>(timer->every_second * 1000.0);
+        qint64 offsetMs = static_cast<qint64>(timer->offset_hour) * 3600000LL +
+                          static_cast<qint64>(timer->offset_minute) * 60000LL +
+                          static_cast<qint64>(timer->offset_second * 1000.0);
+        // The offset shortens the initial delay so that subsequent firings land on the
+        // phase (offset mod interval) within each period.  Guard against a mis-configured
+        // offset that equals or exceeds the interval: clamp to at least 1 ms so we never
+        // schedule a fire in the past (which would cause a busy-loop on every tick).
+        qint64 delayMs = intervalMs - offsetMs;
+        if (delayMs < 1) {
+            delayMs = intervalMs > 0 ? intervalMs : 1000LL;
+        }
+        timer->fire_time = now.addMSecs(delayMs);
     }
 }
 
@@ -731,13 +737,16 @@ void AutomationRegistry::checkTimerList()
         m_iTimersFiredCount++;
         m_iTimersFiredThisSessionCount++;
 
-        if (timer->type == Timer::eAtTime) {
+        if (timer->type == Timer::TimerType::AtTime) {
             timer->fire_time = timer->fire_time.addDays(1);
         } else {
-            qint64 intervalSecs = static_cast<qint64>(timer->every_hour) * 3600 +
-                                  static_cast<qint64>(timer->every_minute) * 60 +
-                                  static_cast<qint64>(timer->every_second);
-            timer->fire_time = timer->fire_time.addSecs(intervalSecs);
+            qint64 intervalMs = static_cast<qint64>(timer->every_hour) * 3600000LL +
+                                static_cast<qint64>(timer->every_minute) * 60000LL +
+                                static_cast<qint64>(timer->every_second * 1000.0);
+            if (intervalMs < 1) {
+                intervalMs = 1000LL; // guard: degenerate 0-interval treated as 1 s
+            }
+            timer->fire_time = timer->fire_time.addMSecs(intervalMs);
         }
 
         if (timer->fire_time <= now) {
@@ -796,13 +805,16 @@ void AutomationRegistry::checkPluginTimerList(Plugin* plugin)
         m_iTimersFiredCount++;
         m_iTimersFiredThisSessionCount++;
 
-        if (timer->type == Timer::eAtTime) {
+        if (timer->type == Timer::TimerType::AtTime) {
             timer->fire_time = timer->fire_time.addDays(1);
         } else {
-            qint64 intervalSecs = static_cast<qint64>(timer->every_hour) * 3600 +
-                                  static_cast<qint64>(timer->every_minute) * 60 +
-                                  static_cast<qint64>(timer->every_second);
-            timer->fire_time = timer->fire_time.addSecs(intervalSecs);
+            qint64 intervalMs = static_cast<qint64>(timer->every_hour) * 3600000LL +
+                                static_cast<qint64>(timer->every_minute) * 60000LL +
+                                static_cast<qint64>(timer->every_second * 1000.0);
+            if (intervalMs < 1) {
+                intervalMs = 1000LL; // guard: degenerate 0-interval treated as 1 s
+            }
+            timer->fire_time = timer->fire_time.addMSecs(intervalMs);
         }
 
         if (timer->fire_time <= now) {

@@ -16,16 +16,17 @@
 #include "../src/world/world_document.h"
 #include <QCoreApplication>
 #include <gtest/gtest.h>
+#include <memory>
 
 // Test fixture for note methods tests
 class NoteMethodsTest : public ::testing::Test {
   protected:
     void SetUp() override
     {
-        doc = new WorldDocument();
+        doc = std::make_unique<WorldDocument>();
 
         // Initialize basic state
-        doc->m_telnetParser->m_phase = NONE;
+        doc->m_telnetParser->m_phase = Phase::NONE;
         doc->m_bUTF_8 = true; // UTF-8 mode
         doc->m_bNotesInRGB = true;
         doc->m_iNoteColourFore = qRgb(255, 255, 255); // White
@@ -51,10 +52,9 @@ class NoteMethodsTest : public ::testing::Test {
 
     void TearDown() override
     {
-        delete doc;
     }
 
-    WorldDocument* doc = nullptr;
+    std::unique_ptr<WorldDocument> doc;
 };
 
 // Test 1: Basic note() functionality

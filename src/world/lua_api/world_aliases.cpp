@@ -482,7 +482,7 @@ int L_GetAliasInfo(lua_State* L)
             lua_pushlstring(L, ba.constData(), ba.length());
         } break;
         case 18: // send_to
-            lua_pushnumber(L, alias->send_to);
+            lua_pushnumber(L, static_cast<int>(alias->send_to));
             break;
         case 19: // keep_evaluating
             lua_pushboolean(L, alias->keep_evaluating);
@@ -756,7 +756,7 @@ int L_GetPluginAliasInfo(lua_State* L)
             lua_pushlstring(L, ba.constData(), ba.length());
         } break;
         case 18: // send_to
-            lua_pushnumber(L, alias->send_to);
+            lua_pushnumber(L, static_cast<int>(alias->send_to));
             break;
         case 19: // keep_evaluating
             lua_pushboolean(L, alias->keep_evaluating);
@@ -949,7 +949,7 @@ int L_GetAliasOption(lua_State* L)
 
     // Numeric options
     if (qOption == "send_to") {
-        lua_pushnumber(L, alias->send_to);
+        lua_pushnumber(L, static_cast<int>(alias->send_to));
     } else if (qOption == "sequence") {
         lua_pushnumber(L, alias->sequence);
     } else if (qOption == "user") {
@@ -1058,7 +1058,7 @@ int L_SetAliasOption(lua_State* L)
         long value = luaL_checknumber(L, 3);
 
         if (qOption == "send_to") {
-            alias->send_to = value;
+            alias->send_to = static_cast<SendTo>(value);
         } else if (qOption == "sequence") {
             alias->sequence = value;
             // TODO: Re-sort aliases

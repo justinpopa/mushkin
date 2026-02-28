@@ -18,6 +18,7 @@
 #include <QCoreApplication>
 #include <cstring>
 #include <gtest/gtest.h>
+#include <memory>
 
 // Lua headers for script execution tests
 extern "C" {
@@ -31,23 +32,22 @@ class TriggerExecutionTest : public ::testing::Test {
   protected:
     void SetUp() override
     {
-        doc = new WorldDocument();
+        doc = std::make_unique<WorldDocument>();
     }
 
     void TearDown() override
     {
-        delete doc;
     }
 
     // Helper to create a test line with text
-    Line* createTestLine(const char* text, qint32 lineNum = 1)
+    std::unique_ptr<Line> createTestLine(const char* text, qint32 lineNum = 1)
     {
-        Line* line = new Line(lineNum,             // line number
-                              80,                  // wrap column
-                              0,                   // line flags (normal MUD output)
-                              qRgb(255, 255, 255), // foreground (white)
-                              qRgb(0, 0, 0),       // background (black)
-                              true                 // UTF-8 mode
+        auto line = std::make_unique<Line>(lineNum,             // line number
+                                           80,                  // wrap column
+                                           0,                   // line flags (normal MUD output)
+                                           qRgb(255, 255, 255), // foreground (white)
+                                           qRgb(0, 0, 0),       // background (black)
+                                           true                 // UTF-8 mode
         );
 
         // Set the text
@@ -55,7 +55,6 @@ class TriggerExecutionTest : public ::testing::Test {
         line->textBuffer.resize(len);
         memcpy(line->textBuffer.data(), text, len);
         line->textBuffer.push_back('\0');
-        // memcpy already done above
 
         // Add a default style covering the entire line
         auto style = std::make_unique<Style>();
@@ -72,19 +71,20 @@ class TriggerExecutionTest : public ::testing::Test {
     // Helper to add and enable a trigger
     Trigger* addTrigger(const QString& label, const QString& pattern)
     {
-        Trigger* trigger = new Trigger();
+        auto trigger = std::make_unique<Trigger>();
         trigger->trigger = pattern;
         trigger->enabled = true;
         trigger->label = label;
         trigger->internal_name = label;
+        Trigger* raw = trigger.get();
 
-        doc->addTrigger(label, std::unique_ptr<Trigger>(trigger));
+        doc->addTrigger(label, std::move(trigger));
         doc->rebuildTriggerArray();
 
-        return trigger;
+        return raw;
     }
 
-    WorldDocument* doc = nullptr;
+    std::unique_ptr<WorldDocument> doc;
 };
 
 // Test 1: Wildcard replacement in trigger contents
@@ -93,14 +93,14 @@ TEST_F(TriggerExecutionTest, WildcardReplacementInContents)
     // Create a trigger that sends text with wildcards
     Trigger* t = addTrigger("gold_notify", "You have * gold");
     t->contents = "Gold amount: %1 pieces"; // Will replace %1 with captured wildcard
-    t->send_to = 2;                         // eSendToOutput (note)
+    t->send_to = eSendToOutput;
     t->sequence = 100;
 
     // Create a line that matches
-    Line* line = createTestLine("You have 500 gold");
+    auto line = createTestLine("You have 500 gold");
 
     // Evaluate triggers (should execute and replace %1 with "500")
-    doc->evaluateTriggers(line);
+    doc->evaluateTriggers(line.get());
 
     // Verify trigger executed
     EXPECT_EQ(t->matched, 1) << "Trigger should have executed once";
@@ -108,9 +108,6 @@ TEST_F(TriggerExecutionTest, WildcardReplacementInContents)
     // Verify wildcards were captured
     ASSERT_GT(t->wildcards.size(), 1) << "Should have captured wildcards";
     EXPECT_EQ(t->wildcards[1], "500") << "Wildcard %1 should be '500'";
-
-    // Cleanup
-    delete line;
 }
 
 // Test 2: Color changing
@@ -119,21 +116,18 @@ TEST_F(TriggerExecutionTest, ColorChanging)
     // Create a trigger that changes line color
     Trigger* t = addTrigger("warning_color", "Warning: *");
     t->other_foreground = qRgb(255, 0, 0); // Red foreground
-    t->colour_change_type = 1;              // TRIGGER_COLOUR_CHANGE_FOREGROUND
+    t->colour_change_type = ColourChangeType::Foreground;
     t->sequence = 200;
 
-    Line* line = createTestLine("Warning: Low health");
+    auto line = createTestLine("Warning: Low health");
 
     // Evaluate trigger
-    doc->evaluateTriggers(line);
+    doc->evaluateTriggers(line.get());
 
     // Verify color was changed
     ASSERT_GT(line->styleList.size(), 0) << "Line should have style";
     Style* style = line->styleList[0].get();
     EXPECT_EQ(style->iForeColour, qRgb(255, 0, 0)) << "Line color should be red";
-
-    // Cleanup
-    delete line;
 }
 
 // Test 3: One-shot trigger (deletes after first match)
@@ -147,17 +141,14 @@ TEST_F(TriggerExecutionTest, OneShotTrigger)
     // Verify trigger exists
     ASSERT_NE(doc->getTrigger("level_up"), nullptr) << "One-shot trigger should be created";
 
-    Line* line = createTestLine("You level up!");
+    auto line = createTestLine("You level up!");
 
     // Evaluate triggers (should execute and delete)
-    doc->evaluateTriggers(line);
+    doc->evaluateTriggers(line.get());
 
     // Verify trigger was deleted
     EXPECT_EQ(doc->getTrigger("level_up"), nullptr)
         << "One-shot trigger should be deleted after firing";
-
-    // Cleanup
-    delete line;
 }
 
 // Test 4: Multiple wildcards in contents
@@ -166,20 +157,17 @@ TEST_F(TriggerExecutionTest, MultipleWildcardsInContents)
     // Create a trigger that captures multiple wildcards
     Trigger* t = addTrigger("tell_format", "* tells you: *");
     t->contents = "Message from %1: %2";
-    t->send_to = 2; // eSendToOutput
+    t->send_to = eSendToOutput;
     t->sequence = 400;
 
-    Line* line = createTestLine("Alice tells you: Hello!");
+    auto line = createTestLine("Alice tells you: Hello!");
 
-    doc->evaluateTriggers(line);
+    doc->evaluateTriggers(line.get());
 
     // Verify multiple wildcards were captured
     ASSERT_GT(t->wildcards.size(), 2) << "Should have captured 2 wildcards";
     EXPECT_EQ(t->wildcards[1], "Alice") << "First wildcard should be 'Alice'";
     EXPECT_EQ(t->wildcards[2], "Hello!") << "Second wildcard should be 'Hello!'";
-
-    // Cleanup
-    delete line;
 }
 
 // Test 5: Script execution (Lua callbacks with wildcards)
@@ -223,13 +211,13 @@ end
     // Create a trigger that calls the Lua function
     Trigger* t = addTrigger("health_trigger", "Your health is *%");
     t->procedure = "on_health_trigger"; // Lua function to call
-    t->send_to = 12;                       // eSendToScript
+    t->send_to = eSendToScript;
     t->sequence = 500;
 
-    Line* line = createTestLine("Your health is 75%");
+    auto line = createTestLine("Your health is 75%");
 
     // Evaluate triggers (should call Lua function)
-    doc->evaluateTriggers(line);
+    doc->evaluateTriggers(line.get());
 
     // Verify the Lua function was called by checking global variables
     ASSERT_NE(doc->m_ScriptEngine, nullptr) << "Script engine should be available";
@@ -268,9 +256,6 @@ end
 
     // Verify invocation count incremented
     EXPECT_EQ(t->invocation_count, 1) << "Invocation count should be incremented";
-
-    // Cleanup
-    delete line;
 }
 
 // Main function required for GoogleTest

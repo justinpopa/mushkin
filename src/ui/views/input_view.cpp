@@ -414,7 +414,7 @@ void InputView::recallPartialPrevious()
             QTextCursor cursor = textCursor();
             cursor.movePosition(QTextCursor::End);
             setTextCursor(cursor);
-            m_doc->m_iHistoryStatus = (searchPos == 0) ? eAtTop : eInMiddle;
+            m_doc->m_iHistoryStatus = (searchPos == 0) ? HistoryStatus::eAtTop : HistoryStatus::eInMiddle;
             qCDebug(lcUI) << "Found partial match:" << strText << "(pos" << searchPos << ")";
             return;
         }
@@ -425,7 +425,7 @@ void InputView::recallPartialPrevious()
     setPlainText("");
     m_strPartialCommand.clear();
     m_doc->m_historyPosition = -1;
-    m_doc->m_iHistoryStatus = eAtTop;
+    m_doc->m_iHistoryStatus = HistoryStatus::eAtTop;
     qCDebug(lcUI) << "Reached top, cleared partial command";
 }
 
@@ -479,7 +479,7 @@ void InputView::recallPartialNext()
             cursor.movePosition(QTextCursor::End);
             setTextCursor(cursor);
             m_doc->m_iHistoryStatus =
-                (searchPos == m_doc->m_commandHistory.count() - 1) ? eAtBottom : eInMiddle;
+                (searchPos == m_doc->m_commandHistory.count() - 1) ? HistoryStatus::eAtBottom : HistoryStatus::eInMiddle;
             qCDebug(lcUI) << "Found partial match:" << strText << "(pos" << searchPos << ")";
             return;
         }
@@ -490,7 +490,7 @@ void InputView::recallPartialNext()
     setPlainText("");
     m_strPartialCommand.clear();
     m_doc->m_historyPosition = m_doc->m_commandHistory.count();
-    m_doc->m_iHistoryStatus = eAtBottom;
+    m_doc->m_iHistoryStatus = HistoryStatus::eAtBottom;
     qCDebug(lcUI) << "Reached bottom, cleared partial command";
 }
 
@@ -508,7 +508,7 @@ void InputView::recallFirstCommand()
     QTextCursor cursor = textCursor();
     cursor.movePosition(QTextCursor::End);
     setTextCursor(cursor);
-    m_doc->m_iHistoryStatus = eAtTop;
+    m_doc->m_iHistoryStatus = HistoryStatus::eAtTop;
     m_strPartialCommand.clear();
     qCDebug(lcUI) << "Jumped to first command:" << m_doc->m_commandHistory[0];
 }
@@ -527,7 +527,7 @@ void InputView::recallLastCommand()
     QTextCursor cursor = textCursor();
     cursor.movePosition(QTextCursor::End);
     setTextCursor(cursor);
-    m_doc->m_iHistoryStatus = eAtBottom;
+    m_doc->m_iHistoryStatus = HistoryStatus::eAtBottom;
     m_strPartialCommand.clear();
     qCDebug(lcUI) << "Jumped to last command:" << m_doc->m_commandHistory[m_doc->m_historyPosition];
 }

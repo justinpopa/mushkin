@@ -22,29 +22,29 @@
 #include <QCoreApplication>
 #include <cstring>
 #include <gtest/gtest.h>
+#include <memory>
 
 // Test fixture for trigger matching tests
 class TriggerMatchingTest : public ::testing::Test {
   protected:
     void SetUp() override
     {
-        doc = new WorldDocument();
+        doc = std::make_unique<WorldDocument>();
     }
 
     void TearDown() override
     {
-        delete doc;
     }
 
     // Helper to create a test line with text
-    Line* createTestLine(const char* text, qint32 lineNum = 1)
+    std::unique_ptr<Line> createTestLine(const char* text, qint32 lineNum = 1)
     {
-        Line* line = new Line(lineNum,             // line number
-                              80,                  // wrap column
-                              0,                   // line flags (normal MUD output)
-                              qRgb(255, 255, 255), // foreground (white)
-                              qRgb(0, 0, 0),       // background (black)
-                              true                 // UTF-8 mode
+        auto line = std::make_unique<Line>(lineNum,             // line number
+                                           80,                  // wrap column
+                                           0,                   // line flags (normal MUD output)
+                                           qRgb(255, 255, 255), // foreground (white)
+                                           qRgb(0, 0, 0),       // background (black)
+                                           true                 // UTF-8 mode
         );
 
         // Set the text
@@ -68,19 +68,20 @@ class TriggerMatchingTest : public ::testing::Test {
     // Helper to add and enable a trigger
     Trigger* addTrigger(const QString& label, const QString& pattern)
     {
-        Trigger* trigger = new Trigger();
+        auto trigger = std::make_unique<Trigger>();
         trigger->trigger = pattern;
         trigger->enabled = true;
         trigger->label = label;
         trigger->internal_name = label;
+        Trigger* raw = trigger.get();
 
-        doc->addTrigger(label, std::unique_ptr<Trigger>(trigger));
+        doc->addTrigger(label, std::move(trigger));
         doc->rebuildTriggerArray();
 
-        return trigger;
+        return raw;
     }
 
-    WorldDocument* doc = nullptr;
+    std::unique_ptr<WorldDocument> doc;
 };
 
 // Test 1: Basic Wildcard Matching
@@ -92,11 +93,11 @@ TEST_F(TriggerMatchingTest, BasicWildcardMatching)
     t1->keep_evaluating = true; // Allow other triggers to match too
 
     // Create a line that matches
-    Line* line1 = createTestLine("You have 500 gold");
+    auto line1 = createTestLine("You have 500 gold");
 
     // Evaluate triggers
     int matchedBefore = doc->m_automationRegistry->m_iTriggersMatchedCount;
-    doc->evaluateTriggers(line1);
+    doc->evaluateTriggers(line1.get());
     int matchedAfter = doc->m_automationRegistry->m_iTriggersMatchedCount;
 
     // Verify pattern matched
@@ -112,9 +113,6 @@ TEST_F(TriggerMatchingTest, BasicWildcardMatching)
     // Verify wildcard %1 captured the wildcard value
     ASSERT_GT(t1->wildcards.size(), 1) << "Should have captured wildcard %1";
     EXPECT_EQ(t1->wildcards[1], "500") << "Wildcard %1 should be '500'";
-
-    // Cleanup
-    delete line1;
 }
 
 // Test 2: Case-Insensitive Matching
@@ -126,17 +124,14 @@ TEST_F(TriggerMatchingTest, CaseInsensitiveMatching)
     t2->sequence = 200;
     t2->keep_evaluating = true;
 
-    Line* line2 = createTestLine("YOU ARE HUNGRY");
+    auto line2 = createTestLine("YOU ARE HUNGRY");
 
     int matchedBefore = doc->m_automationRegistry->m_iTriggersMatchedCount;
-    doc->evaluateTriggers(line2);
+    doc->evaluateTriggers(line2.get());
     int matchedAfter = doc->m_automationRegistry->m_iTriggersMatchedCount;
 
     EXPECT_EQ(matchedAfter, matchedBefore + 1) << "Case-insensitive pattern should match";
     EXPECT_EQ(t2->matched, 1) << "Match count should be 1";
-
-    // Cleanup
-    delete line2;
 }
 
 // Test 3: Regular Expression Matching
@@ -147,10 +142,10 @@ TEST_F(TriggerMatchingTest, RegularExpressionMatching)
     t3->use_regexp = true;
     t3->sequence = 300;
 
-    Line* line3 = createTestLine("You have 1234 gold");
+    auto line3 = createTestLine("You have 1234 gold");
 
     int matchedBefore = doc->m_automationRegistry->m_iTriggersMatchedCount;
-    doc->evaluateTriggers(line3);
+    doc->evaluateTriggers(line3.get());
     int matchedAfter = doc->m_automationRegistry->m_iTriggersMatchedCount;
 
     // Verify regex matched
@@ -159,9 +154,6 @@ TEST_F(TriggerMatchingTest, RegularExpressionMatching)
     // Verify capture group
     ASSERT_GT(t3->wildcards.size(), 1) << "Should have captured regex group";
     EXPECT_EQ(t3->wildcards[1], "1234") << "Capture group %1 should be '1234'";
-
-    // Cleanup
-    delete line3;
 }
 
 // Test 4: Multiple Wildcards
@@ -171,10 +163,10 @@ TEST_F(TriggerMatchingTest, MultipleWildcards)
     Trigger* t4 = addTrigger("tell_trigger", "* tells you: *");
     t4->sequence = 400;
 
-    Line* line4 = createTestLine("Bob tells you: Hello!");
+    auto line4 = createTestLine("Bob tells you: Hello!");
 
     int matchedBefore = doc->m_automationRegistry->m_iTriggersMatchedCount;
-    doc->evaluateTriggers(line4);
+    doc->evaluateTriggers(line4.get());
     int matchedAfter = doc->m_automationRegistry->m_iTriggersMatchedCount;
 
     EXPECT_EQ(matchedAfter, matchedBefore + 1) << "Multiple wildcard pattern should match";
@@ -186,9 +178,6 @@ TEST_F(TriggerMatchingTest, MultipleWildcards)
     // Verify second wildcard
     ASSERT_GT(t4->wildcards.size(), 2) << "Should have captured second wildcard";
     EXPECT_EQ(t4->wildcards[2], "Hello!") << "Second wildcard should be 'Hello!'";
-
-    // Cleanup
-    delete line4;
 }
 
 // Test 5: Non-matching Pattern
@@ -197,16 +186,13 @@ TEST_F(TriggerMatchingTest, NonMatchingPattern)
     // Add a trigger
     addTrigger("test_trigger", "This will not match");
 
-    Line* line5 = createTestLine("This line doesn't match any trigger");
+    auto line5 = createTestLine("This line doesn't match any trigger");
 
     int matchedBefore = doc->m_automationRegistry->m_iTriggersMatchedCount;
-    doc->evaluateTriggers(line5);
+    doc->evaluateTriggers(line5.get());
     int matchedAfter = doc->m_automationRegistry->m_iTriggersMatchedCount;
 
     EXPECT_EQ(matchedAfter, matchedBefore) << "Non-matching line should not trigger any matches";
-
-    // Cleanup
-    delete line5;
 }
 
 // Test 6: Sequence-Based Evaluation Order
@@ -226,9 +212,12 @@ TEST_F(TriggerMatchingTest, SequenceBasedEvaluationOrder)
 
     // Verify array order
     ASSERT_GE(doc->m_automationRegistry->m_TriggerArray.size(), 3) << "Should have 3 triggers";
-    EXPECT_EQ(doc->m_automationRegistry->m_TriggerArray[0]->sequence, 100) << "First trigger should have sequence 100";
-    EXPECT_EQ(doc->m_automationRegistry->m_TriggerArray[1]->sequence, 200) << "Second trigger should have sequence 200";
-    EXPECT_EQ(doc->m_automationRegistry->m_TriggerArray[2]->sequence, 300) << "Third trigger should have sequence 300";
+    EXPECT_EQ(doc->m_automationRegistry->m_TriggerArray[0]->sequence, 100)
+        << "First trigger should have sequence 100";
+    EXPECT_EQ(doc->m_automationRegistry->m_TriggerArray[1]->sequence, 200)
+        << "Second trigger should have sequence 200";
+    EXPECT_EQ(doc->m_automationRegistry->m_TriggerArray[2]->sequence, 300)
+        << "Third trigger should have sequence 300";
 }
 
 // Test 7: Lowercase Wildcard Conversion
@@ -239,16 +228,13 @@ TEST_F(TriggerMatchingTest, LowercaseWildcardConversion)
     t7->lowercase_wildcard = true;
     t7->sequence = 500;
 
-    Line* line7 = createTestLine("You see DRAGON");
+    auto line7 = createTestLine("You see DRAGON");
 
-    doc->evaluateTriggers(line7);
+    doc->evaluateTriggers(line7.get());
 
     // Verify wildcard was lowercased
     ASSERT_GT(t7->wildcards.size(), 1) << "Should have captured wildcard";
     EXPECT_EQ(t7->wildcards[1], "dragon") << "Wildcard should be lowercased to 'dragon'";
-
-    // Cleanup
-    delete line7;
 }
 
 // Test 8: Disabled Trigger
@@ -261,17 +247,14 @@ TEST_F(TriggerMatchingTest, DisabledTrigger)
 
     doc->rebuildTriggerArray();
 
-    Line* line8 = createTestLine("test pattern");
+    auto line8 = createTestLine("test pattern");
 
     int disabledMatchedBefore = doc->m_automationRegistry->m_iTriggersMatchedCount;
-    doc->evaluateTriggers(line8);
+    doc->evaluateTriggers(line8.get());
     int disabledMatchedAfter = doc->m_automationRegistry->m_iTriggersMatchedCount;
 
     EXPECT_EQ(disabledMatchedAfter, disabledMatchedBefore) << "Disabled trigger should not match";
     EXPECT_EQ(t8->matched, 0) << "Disabled trigger match count should be 0";
-
-    // Cleanup
-    delete line8;
 }
 
 // Main function required for GoogleTest

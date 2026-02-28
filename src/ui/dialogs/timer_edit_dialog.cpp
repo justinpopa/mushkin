@@ -276,7 +276,7 @@ void TimerEditDialog::loadTimerData()
     m_groupEdit->setText(timer->group);
 
     // Timer type
-    if (timer->type == Timer::eAtTime) {
+    if (timer->type == Timer::TimerType::AtTime) {
         m_atTimeRadio->setChecked(true);
         m_atHourSpin->setValue(timer->at_hour);
         m_atMinuteSpin->setValue(timer->at_minute);
@@ -296,7 +296,7 @@ void TimerEditDialog::loadTimerData()
     m_scriptEdit->setText(timer->procedure);
 
     // Set send-to combo
-    int index = m_sendToCombo->findData(timer->send_to);
+    int index = m_sendToCombo->findData(static_cast<int>(timer->send_to));
     if (index >= 0) {
         m_sendToCombo->setCurrentIndex(index);
     }
@@ -356,12 +356,12 @@ bool TimerEditDialog::saveTimer()
 
         // Timer type and timing
         if (m_atTimeRadio->isChecked()) {
-            timer->type = Timer::eAtTime;
+            timer->type = Timer::TimerType::AtTime;
             timer->at_hour = m_atHourSpin->value();
             timer->at_minute = m_atMinuteSpin->value();
             timer->at_second = m_atSecondSpin->value();
         } else {
-            timer->type = Timer::eInterval;
+            timer->type = Timer::TimerType::Interval;
             timer->every_hour = m_everyHourSpin->value();
             timer->every_minute = m_everyMinuteSpin->value();
             timer->every_second = m_everySecondSpin->value();
@@ -373,7 +373,7 @@ bool TimerEditDialog::saveTimer()
         // Response
         timer->contents = m_sendTextEdit->toPlainText();
         timer->procedure = m_scriptEdit->text().trimmed();
-        timer->send_to = m_sendToCombo->currentData().toInt();
+        timer->send_to = static_cast<SendTo>(m_sendToCombo->currentData().toInt());
         timer->scriptLanguage =
             static_cast<ScriptLanguage>(m_scriptLanguageCombo->currentData().toInt());
 
@@ -396,12 +396,12 @@ bool TimerEditDialog::saveTimer()
 
         // Timer type and timing
         if (m_atTimeRadio->isChecked()) {
-            timerPtr->type = Timer::eAtTime;
+            timerPtr->type = Timer::TimerType::AtTime;
             timerPtr->at_hour = m_atHourSpin->value();
             timerPtr->at_minute = m_atMinuteSpin->value();
             timerPtr->at_second = m_atSecondSpin->value();
         } else {
-            timerPtr->type = Timer::eInterval;
+            timerPtr->type = Timer::TimerType::Interval;
             timerPtr->every_hour = m_everyHourSpin->value();
             timerPtr->every_minute = m_everyMinuteSpin->value();
             timerPtr->every_second = m_everySecondSpin->value();
@@ -413,7 +413,7 @@ bool TimerEditDialog::saveTimer()
         // Response
         timerPtr->contents = m_sendTextEdit->toPlainText();
         timerPtr->procedure = m_scriptEdit->text().trimmed();
-        timerPtr->send_to = m_sendToCombo->currentData().toInt();
+        timerPtr->send_to = static_cast<SendTo>(m_sendToCombo->currentData().toInt());
         timerPtr->scriptLanguage =
             static_cast<ScriptLanguage>(m_scriptLanguageCombo->currentData().toInt());
 

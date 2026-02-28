@@ -114,8 +114,8 @@ void ScriptingPage::loadSettings()
     if (langIndex >= 0)
         m_languageCombo->setCurrentIndex(langIndex);
 
-    // m_nReloadOption: 0=Never, 1=OnFileChange, 2=OnConnect
-    m_autoReloadCheck->setChecked(m_doc->m_nReloadOption != 0);
+    // m_nReloadOption: eReloadConfirm=0, eReloadAlways=1, eReloadNever=2
+    m_autoReloadCheck->setChecked(m_doc->m_nReloadOption != ScriptReloadOption::eReloadConfirm);
     m_warnIfNoHandlerCheck->setChecked(m_doc->m_bWarnIfScriptingInactive != 0);
 
     // Unblock signals
@@ -136,7 +136,8 @@ void ScriptingPage::saveSettings()
     m_doc->m_bEnableScripts = m_enableScriptCheck->isChecked();
     m_doc->m_strScriptFilename = m_scriptFileEdit->text();
     // Script language is determined by file extension, not stored separately
-    m_doc->m_nReloadOption = m_autoReloadCheck->isChecked() ? 1 : 0; // 1 = OnFileChange
+    m_doc->m_nReloadOption = m_autoReloadCheck->isChecked() ? ScriptReloadOption::eReloadAlways
+                                                            : ScriptReloadOption::eReloadConfirm;
     m_doc->m_bWarnIfScriptingInactive = m_warnIfNoHandlerCheck->isChecked() ? 1 : 0;
 
     m_doc->setModified(true);

@@ -17,6 +17,7 @@
 #include "../src/world/world_document.h"
 #include <QCoreApplication>
 #include <gtest/gtest.h>
+#include <memory>
 
 // Lua headers for script execution tests
 extern "C" {
@@ -30,12 +31,11 @@ class AliasExecutionTest : public ::testing::Test {
   protected:
     void SetUp() override
     {
-        doc = new WorldDocument();
+        doc = std::make_unique<WorldDocument>();
     }
 
     void TearDown() override
     {
-        delete doc;
     }
 
     // Helper to add and enable an alias
@@ -53,7 +53,7 @@ class AliasExecutionTest : public ::testing::Test {
         return aliasPtr;
     }
 
-    WorldDocument* doc = nullptr;
+    std::unique_ptr<WorldDocument> doc;
 };
 
 // Test 1: Wildcard Pattern Matching - "n*" matches "north"
@@ -136,7 +136,7 @@ TEST_F(AliasExecutionTest, SendToWorld)
 {
     Alias* a = addAlias("n_alias", "n");
     a->contents = "north";
-    a->send_to = 0; // eSendToWorld
+    a->send_to = eSendToWorld;
     a->sequence = 100;
 
     // Evaluate alias
@@ -153,7 +153,7 @@ TEST_F(AliasExecutionTest, OneShotAlias)
 {
     Alias* a = addAlias("quickheal_alias", "quickheal");
     a->contents = "cast heal self";
-    a->send_to = 0;     // eSendToWorld
+    a->send_to = eSendToWorld;
     a->one_shot = true; // Delete after first use
 
     // Verify alias exists
@@ -173,14 +173,14 @@ TEST_F(AliasExecutionTest, KeepEvaluatingTrue)
     // First alias: matches "go north" but keeps evaluating
     Alias* a1 = addAlias("go_walk", "go *");
     a1->contents = "walk %1";
-    a1->send_to = 0;
+    a1->send_to = eSendToWorld;
     a1->keep_evaluating = true; // Keep evaluating other aliases
     a1->sequence = 100;
 
     // Second alias: also matches "go north", lower priority (higher sequence)
     Alias* a2 = addAlias("go_north_shortcut", "go north");
     a2->contents = "north";
-    a2->send_to = 0;
+    a2->send_to = eSendToWorld;
     a2->keep_evaluating = false; // Stop after this one
     a2->sequence = 200;
 
@@ -196,13 +196,13 @@ TEST_F(AliasExecutionTest, KeepEvaluatingFalse)
 {
     Alias* a1 = addAlias("test_first", "test *");
     a1->contents = "first %1";
-    a1->send_to = 0;
+    a1->send_to = eSendToWorld;
     a1->keep_evaluating = false; // Stop after this one
     a1->sequence = 100;
 
     Alias* a2 = addAlias("test_second", "test command");
     a2->contents = "second";
-    a2->send_to = 0;
+    a2->send_to = eSendToWorld;
     a2->keep_evaluating = false;
     a2->sequence = 200;
 
@@ -272,7 +272,7 @@ end
     // Create an alias that calls the Lua function
     Alias* a = addAlias("speedwalk_alias", "run *");
     a->procedure = "on_speedwalk_alias"; // Lua function to call
-    a->send_to = 12;                        // eSendToScript
+    a->send_to = eSendToScript;
 
     // Execute alias (should call Lua function)
     doc->evaluateAliases("run 3n2e");

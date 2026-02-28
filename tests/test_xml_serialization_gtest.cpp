@@ -15,6 +15,7 @@
 #include <QTemporaryFile>
 #include <QUuid>
 #include <gtest/gtest.h>
+#include <memory>
 
 // Helper to clean up all files related to SaveWorldXML atomic save
 // (main file, .tmp, and .bak files)
@@ -110,7 +111,7 @@ TEST_F(XmlSerializationTest, IsArchiveXMLDetectsUTF8BOM)
 
 TEST_F(XmlSerializationTest, BasicWorldPropertiesRoundTrip)
 {
-    WorldDocument* doc1 = new WorldDocument();
+    auto doc1 = std::make_unique<WorldDocument>();
     doc1->m_mush_name = "Test World";
     doc1->m_server = "test.example.com";
     doc1->m_port = 4000;
@@ -122,11 +123,11 @@ TEST_F(XmlSerializationTest, BasicWorldPropertiesRoundTrip)
     // Generate unique filename (avoids Windows file locking with QTemporaryFile)
     QString filename = generateTempFilename("basic_roundtrip");
 
-    ASSERT_TRUE(XmlSerialization::SaveWorldXML(doc1, filename)) << "SaveWorldXML failed";
+    ASSERT_TRUE(XmlSerialization::SaveWorldXML(doc1.get(), filename)) << "SaveWorldXML failed";
 
     // Load into new document
-    WorldDocument* doc2 = new WorldDocument();
-    ASSERT_TRUE(XmlSerialization::LoadWorldXML(doc2, filename)) << "LoadWorldXML failed";
+    auto doc2 = std::make_unique<WorldDocument>();
+    ASSERT_TRUE(XmlSerialization::LoadWorldXML(doc2.get(), filename)) << "LoadWorldXML failed";
 
     // Verify fields match
     EXPECT_EQ(doc2->m_mush_name, doc1->m_mush_name) << "m_mush_name should match";
@@ -137,21 +138,19 @@ TEST_F(XmlSerializationTest, BasicWorldPropertiesRoundTrip)
     EXPECT_EQ(doc2->m_wrap, doc1->m_wrap) << "m_wrap should match";
     EXPECT_EQ(doc2->m_nWrapColumn, doc1->m_nWrapColumn) << "m_nWrapColumn should match";
 
-    delete doc1;
-    delete doc2;
     cleanupSaveFiles(filename);
 }
 
 TEST_F(XmlSerializationTest, PasswordEncodingDecoding)
 {
-    WorldDocument* doc1 = new WorldDocument();
+    auto doc1 = std::make_unique<WorldDocument>();
     doc1->m_mush_name = "Password Test";
     doc1->m_password = "Complex!P@ssw0rd#123";
 
     // Generate unique filename (avoids Windows file locking with QTemporaryFile)
     QString filename = generateTempFilename("password");
 
-    ASSERT_TRUE(XmlSerialization::SaveWorldXML(doc1, filename)) << "SaveWorldXML failed";
+    ASSERT_TRUE(XmlSerialization::SaveWorldXML(doc1.get(), filename)) << "SaveWorldXML failed";
 
     // Verify password is base64 encoded in file
     QFile file(filename);
@@ -164,18 +163,16 @@ TEST_F(XmlSerializationTest, PasswordEncodingDecoding)
         << "Password should not appear in plain text";
 
     // Load and verify decoding works
-    WorldDocument* doc2 = new WorldDocument();
-    ASSERT_TRUE(XmlSerialization::LoadWorldXML(doc2, filename)) << "LoadWorldXML failed";
+    auto doc2 = std::make_unique<WorldDocument>();
+    ASSERT_TRUE(XmlSerialization::LoadWorldXML(doc2.get(), filename)) << "LoadWorldXML failed";
     EXPECT_EQ(doc2->m_password, "Complex!P@ssw0rd#123") << "Password should be decoded correctly";
 
-    delete doc1;
-    delete doc2;
     cleanupSaveFiles(filename);
 }
 
 TEST_F(XmlSerializationTest, BooleanValuesSerializeCorrectly)
 {
-    WorldDocument* doc1 = new WorldDocument();
+    auto doc1 = std::make_unique<WorldDocument>();
     doc1->m_wrap = true;
     doc1->m_enable_triggers = true;
     doc1->m_enable_aliases = false;
@@ -183,17 +180,15 @@ TEST_F(XmlSerializationTest, BooleanValuesSerializeCorrectly)
     // Generate unique filename (avoids Windows file locking with QTemporaryFile)
     QString filename = generateTempFilename("booleans");
 
-    ASSERT_TRUE(XmlSerialization::SaveWorldXML(doc1, filename)) << "SaveWorldXML failed";
+    ASSERT_TRUE(XmlSerialization::SaveWorldXML(doc1.get(), filename)) << "SaveWorldXML failed";
 
-    WorldDocument* doc2 = new WorldDocument();
-    ASSERT_TRUE(XmlSerialization::LoadWorldXML(doc2, filename)) << "LoadWorldXML failed";
+    auto doc2 = std::make_unique<WorldDocument>();
+    ASSERT_TRUE(XmlSerialization::LoadWorldXML(doc2.get(), filename)) << "LoadWorldXML failed";
 
     EXPECT_EQ(doc2->m_wrap, true) << "m_wrap should be true";
     EXPECT_EQ(doc2->m_enable_triggers, true) << "m_enable_triggers should be true";
     EXPECT_EQ(doc2->m_enable_aliases, false) << "m_enable_aliases should be false";
 
-    delete doc1;
-    delete doc2;
     cleanupSaveFiles(filename);
 }
 
@@ -201,12 +196,11 @@ TEST_F(XmlSerializationTest, BooleanValuesSerializeCorrectly)
 
 TEST_F(XmlSerializationTest, LoadRealAardwolfFile)
 {
-    WorldDocument* doc = new WorldDocument();
+    auto doc = std::make_unique<WorldDocument>();
 
     // Try multiple possible paths relative to build directory
     QStringList possiblePaths = {"../../tests/fixtures/Aardwolf.mcl",
-                                 "../tests/fixtures/Aardwolf.mcl",
-                                 "tests/fixtures/Aardwolf.mcl",
+                                 "../tests/fixtures/Aardwolf.mcl", "tests/fixtures/Aardwolf.mcl",
                                  "./fixtures/Aardwolf.mcl"};
 
     QString filename;
@@ -218,11 +212,10 @@ TEST_F(XmlSerializationTest, LoadRealAardwolfFile)
     }
 
     if (filename.isEmpty()) {
-        delete doc;
         GTEST_SKIP() << "Aardwolf.mcl fixture not found (tried multiple paths)";
     }
 
-    ASSERT_TRUE(XmlSerialization::LoadWorldXML(doc, filename))
+    ASSERT_TRUE(XmlSerialization::LoadWorldXML(doc.get(), filename))
         << "LoadWorldXML failed for Aardwolf.mcl";
 
     // Verify key properties from real file
@@ -242,15 +235,13 @@ TEST_F(XmlSerializationTest, LoadRealAardwolfFile)
     EXPECT_EQ(doc->m_input_font_name, "Fira Code") << "m_input_font_name should be 'Fira Code'";
     EXPECT_EQ(doc->m_strTerminalIdentification, "MUSHclient-Aard")
         << "m_strTerminalIdentification should be 'MUSHclient-Aard'";
-
-    delete doc;
 }
 
 // Tests for SaveWorldXML XML structure validation
 
 TEST_F(XmlSerializationTest, SaveWorldXMLCreatesValidXMLStructure)
 {
-    WorldDocument* doc = new WorldDocument();
+    auto doc = std::make_unique<WorldDocument>();
     doc->m_mush_name = "Structure Test";
     doc->m_server = "test.example.com";
     doc->m_port = 4001; // Use non-default port so it appears in XML (4000 is default, skipped)
@@ -258,7 +249,7 @@ TEST_F(XmlSerializationTest, SaveWorldXMLCreatesValidXMLStructure)
     // Generate unique filename (avoids Windows file locking with QTemporaryFile)
     QString filename = generateTempFilename("structure");
 
-    ASSERT_TRUE(XmlSerialization::SaveWorldXML(doc, filename)) << "SaveWorldXML failed";
+    ASSERT_TRUE(XmlSerialization::SaveWorldXML(doc.get(), filename)) << "SaveWorldXML failed";
 
     // Read file and verify XML structure
     QFile file(filename);
@@ -277,7 +268,6 @@ TEST_F(XmlSerializationTest, SaveWorldXMLCreatesValidXMLStructure)
     EXPECT_TRUE(content.contains("site=\"test.example.com\"")) << "Should contain server address";
     EXPECT_TRUE(content.contains("port=\"4001\"")) << "Should contain port number";
 
-    delete doc;
     cleanupSaveFiles(filename);
 }
 
@@ -285,33 +275,33 @@ TEST_F(XmlSerializationTest, SaveWorldXMLCreatesValidXMLStructure)
 
 TEST_F(XmlSerializationTest, TriggersSaveAndLoadCorrectly)
 {
-    WorldDocument* doc1 = new WorldDocument();
+    auto doc1 = std::make_unique<WorldDocument>();
     doc1->m_mush_name = "Trigger Test";
 
     // Create a trigger
-    Trigger* trigger = new Trigger();
-    trigger->label = "test_trigger";
-    trigger->internal_name = "test_trigger";
-    trigger->trigger = "You have * gold";
-    trigger->contents = "say I have %1 gold!";
-    trigger->procedure = "on_gold";
-    trigger->enabled = true;
-    trigger->send_to = 0; // SendToWorld
-    trigger->sequence = 100;
-    trigger->ignore_case = false;
-    trigger->use_regexp = false;
-    trigger->keep_evaluating = true;
-    trigger->omit_from_output = false;
-    trigger->omit_from_log = false;
-    trigger->expand_variables = true;
-    trigger->group = "Combat";
+    auto triggerOwned = std::make_unique<Trigger>();
+    triggerOwned->label = "test_trigger";
+    triggerOwned->internal_name = "test_trigger";
+    triggerOwned->trigger = "You have * gold";
+    triggerOwned->contents = "say I have %1 gold!";
+    triggerOwned->procedure = "on_gold";
+    triggerOwned->enabled = true;
+    triggerOwned->send_to = eSendToWorld;
+    triggerOwned->sequence = 100;
+    triggerOwned->ignore_case = false;
+    triggerOwned->use_regexp = false;
+    triggerOwned->keep_evaluating = true;
+    triggerOwned->omit_from_output = false;
+    triggerOwned->omit_from_log = false;
+    triggerOwned->expand_variables = true;
+    triggerOwned->group = "Combat";
 
-    doc1->addTrigger("test_trigger", std::unique_ptr<Trigger>(trigger));
+    doc1->addTrigger("test_trigger", std::move(triggerOwned));
 
     // Generate unique filename (avoids Windows file locking with QTemporaryFile)
     QString filename = generateTempFilename("triggers");
 
-    ASSERT_TRUE(XmlSerialization::SaveWorldXML(doc1, filename)) << "SaveWorldXML failed";
+    ASSERT_TRUE(XmlSerialization::SaveWorldXML(doc1.get(), filename)) << "SaveWorldXML failed";
 
     // Verify XML contains trigger
     QFile file(filename);
@@ -328,8 +318,8 @@ TEST_F(XmlSerializationTest, TriggersSaveAndLoadCorrectly)
         << "Should contain trigger send text";
 
     // Load into new document
-    WorldDocument* doc2 = new WorldDocument();
-    ASSERT_TRUE(XmlSerialization::LoadWorldXML(doc2, filename)) << "LoadWorldXML failed";
+    auto doc2 = std::make_unique<WorldDocument>();
+    ASSERT_TRUE(XmlSerialization::LoadWorldXML(doc2.get(), filename)) << "LoadWorldXML failed";
 
     // Verify trigger was loaded
     Trigger* loaded = doc2->getTrigger("test_trigger");
@@ -339,20 +329,18 @@ TEST_F(XmlSerializationTest, TriggersSaveAndLoadCorrectly)
     EXPECT_EQ(loaded->contents, "say I have %1 gold!") << "contents should match";
     EXPECT_EQ(loaded->procedure, "on_gold") << "procedure should match";
     EXPECT_EQ(loaded->enabled, true) << "enabled should match";
-    EXPECT_EQ(loaded->send_to, 0) << "send_to should match";
+    EXPECT_EQ(loaded->send_to, eSendToWorld) << "send_to should match";
     EXPECT_EQ(loaded->sequence, 100) << "sequence should match";
     EXPECT_EQ(loaded->ignore_case, false) << "ignore_case should match";
     EXPECT_EQ(loaded->keep_evaluating, true) << "keep_evaluating should match";
     EXPECT_EQ(loaded->group, "Combat") << "group should match";
 
-    delete doc1;
-    delete doc2;
     cleanupSaveFiles(filename);
 }
 
 TEST_F(XmlSerializationTest, AliasesSaveAndLoadCorrectly)
 {
-    WorldDocument* doc1 = new WorldDocument();
+    auto doc1 = std::make_unique<WorldDocument>();
     doc1->m_mush_name = "Alias Test";
 
     // Create an alias
@@ -363,7 +351,7 @@ TEST_F(XmlSerializationTest, AliasesSaveAndLoadCorrectly)
     alias->contents = "north";
     alias->procedure = "on_north";
     alias->enabled = true;
-    alias->send_to = 0; // SendToWorld
+    alias->send_to = eSendToWorld;
     alias->sequence = 100;
     alias->ignore_case = true;
     alias->use_regexp = false;
@@ -377,7 +365,7 @@ TEST_F(XmlSerializationTest, AliasesSaveAndLoadCorrectly)
     // Generate unique filename (avoids Windows file locking with QTemporaryFile)
     QString filename = generateTempFilename("aliases");
 
-    ASSERT_TRUE(XmlSerialization::SaveWorldXML(doc1, filename)) << "SaveWorldXML failed";
+    ASSERT_TRUE(XmlSerialization::SaveWorldXML(doc1.get(), filename)) << "SaveWorldXML failed";
 
     // Verify XML contains alias
     QFile file(filename);
@@ -394,8 +382,8 @@ TEST_F(XmlSerializationTest, AliasesSaveAndLoadCorrectly)
         << "Should contain alias send text";
 
     // Load into new document
-    WorldDocument* doc2 = new WorldDocument();
-    ASSERT_TRUE(XmlSerialization::LoadWorldXML(doc2, filename)) << "LoadWorldXML failed";
+    auto doc2 = std::make_unique<WorldDocument>();
+    ASSERT_TRUE(XmlSerialization::LoadWorldXML(doc2.get(), filename)) << "LoadWorldXML failed";
 
     // Verify alias was loaded
     Alias* loaded = doc2->getAlias("test_alias");
@@ -405,32 +393,31 @@ TEST_F(XmlSerializationTest, AliasesSaveAndLoadCorrectly)
     EXPECT_EQ(loaded->contents, "north") << "contents should match";
     EXPECT_EQ(loaded->procedure, "on_north") << "procedure should match";
     EXPECT_EQ(loaded->enabled, true) << "enabled should match";
-    EXPECT_EQ(loaded->send_to, 0) << "send_to should match";
+    EXPECT_EQ(loaded->send_to, eSendToWorld) << "send_to should match";
     EXPECT_EQ(loaded->sequence, 100) << "sequence should match";
     EXPECT_EQ(loaded->ignore_case, true) << "ignore_case should match";
     EXPECT_EQ(loaded->echo_alias, true) << "echo_alias should match";
     EXPECT_EQ(loaded->group, "Movement") << "group should match";
 
-    delete doc1;
-    delete doc2;
     cleanupSaveFiles(filename);
 }
 
 TEST_F(XmlSerializationTest, MultipleTriggersAndAliases)
 {
-    WorldDocument* doc1 = new WorldDocument();
+    auto doc1 = std::make_unique<WorldDocument>();
     doc1->m_mush_name = "Multi Test";
 
     // Create multiple triggers
     for (int i = 0; i < 3; i++) {
-        Trigger* trigger = new Trigger();
+        auto trigger = std::make_unique<Trigger>();
         trigger->label = QString("trigger_%1").arg(i);
         trigger->internal_name = trigger->label;
         trigger->trigger = QString("Pattern %1").arg(i);
         trigger->contents = QString("Response %1").arg(i);
         trigger->enabled = true;
         trigger->sequence = 100 + i;
-        doc1->addTrigger(trigger->label, std::unique_ptr<Trigger>(trigger));
+        QString label = trigger->label;
+        doc1->addTrigger(label, std::move(trigger));
     }
 
     // Create multiple aliases
@@ -449,11 +436,11 @@ TEST_F(XmlSerializationTest, MultipleTriggersAndAliases)
     // Generate unique filename (avoids Windows file locking with QTemporaryFile)
     QString filename = generateTempFilename("multi");
 
-    ASSERT_TRUE(XmlSerialization::SaveWorldXML(doc1, filename)) << "SaveWorldXML failed";
+    ASSERT_TRUE(XmlSerialization::SaveWorldXML(doc1.get(), filename)) << "SaveWorldXML failed";
 
     // Load into new document
-    WorldDocument* doc2 = new WorldDocument();
-    ASSERT_TRUE(XmlSerialization::LoadWorldXML(doc2, filename)) << "LoadWorldXML failed";
+    auto doc2 = std::make_unique<WorldDocument>();
+    ASSERT_TRUE(XmlSerialization::LoadWorldXML(doc2.get(), filename)) << "LoadWorldXML failed";
 
     // Verify all triggers loaded
     for (int i = 0; i < 3; i++) {
@@ -477,8 +464,6 @@ TEST_F(XmlSerializationTest, MultipleTriggersAndAliases)
             << "Alias sequence should match for " << name.toStdString();
     }
 
-    delete doc1;
-    delete doc2;
     cleanupSaveFiles(filename);
 }
 

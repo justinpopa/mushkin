@@ -49,8 +49,7 @@ MXPEngine::~MXPEngine()
  */
 void MXPEngine::InitializeMXPElements()
 {
-    // Clear any existing elements
-    qDeleteAll(m_atomicElementMap);
+    // Clear any existing elements (unique_ptr handles deletion)
     m_atomicElementMap.clear();
 
     // Define built-in MXP elements
@@ -156,13 +155,14 @@ void MXPEngine::InitializeMXPElements()
 
     // Load elements into map
     for (int i = 0; elements[i].name; i++) {
-        AtomicElement* elem = new AtomicElement();
+        auto elem = std::make_unique<AtomicElement>();
         elem->strName = QString::fromLatin1(elements[i].name);
         elem->iFlags = elements[i].flags;
         elem->iAction = elements[i].action;
         elem->strArgs = QString::fromLatin1(elements[i].args);
 
-        m_atomicElementMap.insert(elem->strName.toLower(), elem);
+        QString key = elem->strName.toLower();
+        m_atomicElementMap.emplace(key, std::move(elem));
     }
 
     qCDebug(lcMXP) << "Initialized" << m_atomicElementMap.size() << "MXP elements";
@@ -177,8 +177,7 @@ void MXPEngine::InitializeMXPElements()
  */
 void MXPEngine::InitializeMXPEntities()
 {
-    // Clear any existing entities
-    qDeleteAll(m_entityMap);
+    // Clear any existing entities (unique_ptr handles deletion)
     m_entityMap.clear();
 
     struct MXP_EntityDef {
@@ -230,11 +229,12 @@ void MXPEngine::InitializeMXPEntities()
 
     // Load entities into map
     for (int i = 0; entities[i].name; i++) {
-        MXPEntity* entity = new MXPEntity();
+        auto entity = std::make_unique<MXPEntity>();
         entity->strName = QString::fromLatin1(entities[i].name);
         entity->iCodepoint = entities[i].codepoint;
 
-        m_entityMap.insert(entity->strName, entity);
+        QString key = entity->strName;
+        m_entityMap.emplace(key, std::move(entity));
     }
 
     qCDebug(lcMXP) << "Initialized" << m_entityMap.size() << "MXP entities";
@@ -244,27 +244,15 @@ void MXPEngine::InitializeMXPEntities()
  * CleanupMXP - Free all MXP resources
  *
  * Called when world is closed or MXP is turned off.
- * Uses qDeleteAll for raw pointer maps (C library interop pattern — kept as-is).
+ * unique_ptr maps/lists handle deletion automatically on clear().
  */
 void MXPEngine::CleanupMXP()
 {
-    // Clean up atomic elements
-    qDeleteAll(m_atomicElementMap);
+    // Clearing unique_ptr containers destroys all owned objects automatically
     m_atomicElementMap.clear();
-
-    // Clean up custom elements
-    qDeleteAll(m_customElementMap);
     m_customElementMap.clear();
-
-    // Clean up entities
-    qDeleteAll(m_entityMap);
     m_entityMap.clear();
-
-    qDeleteAll(m_customEntityMap);
     m_customEntityMap.clear();
-
-    // Clean up active tags
-    qDeleteAll(m_activeTagList);
     m_activeTagList.clear();
 
     qCDebug(lcMXP) << "Cleaned up MXP resources";
@@ -343,16 +331,16 @@ void MXPEngine::MXP_Off(bool force)
         // Change back to open mode
         MXP_mode_change(eMXP_open);
 
-        // If in MXP collection phase, reset to NONE
-        if (m_doc.m_telnetParser->m_phase == HAVE_MXP_ELEMENT ||
-            m_doc.m_telnetParser->m_phase == HAVE_MXP_COMMENT ||
-            m_doc.m_telnetParser->m_phase == HAVE_MXP_QUOTE ||
-            m_doc.m_telnetParser->m_phase == HAVE_MXP_ENTITY ||
-            m_doc.m_telnetParser->m_phase == HAVE_MXP_ROOM_NAME ||
-            m_doc.m_telnetParser->m_phase == HAVE_MXP_ROOM_DESCRIPTION ||
-            m_doc.m_telnetParser->m_phase == HAVE_MXP_ROOM_EXITS ||
-            m_doc.m_telnetParser->m_phase == HAVE_MXP_WELCOME) {
-            m_doc.m_telnetParser->m_phase = NONE;
+        // If in MXP collection phase, reset to Phase::NONE
+        if (m_doc.m_telnetParser->m_phase == Phase::HAVE_MXP_ELEMENT ||
+            m_doc.m_telnetParser->m_phase == Phase::HAVE_MXP_COMMENT ||
+            m_doc.m_telnetParser->m_phase == Phase::HAVE_MXP_QUOTE ||
+            m_doc.m_telnetParser->m_phase == Phase::HAVE_MXP_ENTITY ||
+            m_doc.m_telnetParser->m_phase == Phase::HAVE_MXP_ROOM_NAME ||
+            m_doc.m_telnetParser->m_phase == Phase::HAVE_MXP_ROOM_DESCRIPTION ||
+            m_doc.m_telnetParser->m_phase == Phase::HAVE_MXP_ROOM_EXITS ||
+            m_doc.m_telnetParser->m_phase == Phase::HAVE_MXP_WELCOME) {
+            m_doc.m_telnetParser->m_phase = Phase::NONE;
         }
 
         if (m_bPuebloActive) {
@@ -453,7 +441,7 @@ void MXPEngine::Phase_MXP_ELEMENT(unsigned char c)
         case '>':
             // End of element - process it
             MXP_collected_element();
-            m_doc.m_telnetParser->m_phase = NONE;
+            m_doc.m_telnetParser->m_phase = Phase::NONE;
             break;
 
         case '<':
@@ -466,7 +454,7 @@ void MXPEngine::Phase_MXP_ELEMENT(unsigned char c)
         case '\"':
             // Quote inside element - switch to quote mode
             m_cMXPquoteTerminator = c;
-            m_doc.m_telnetParser->m_phase = HAVE_MXP_QUOTE;
+            m_doc.m_telnetParser->m_phase = Phase::HAVE_MXP_QUOTE;
             m_strMXPstring += static_cast<char>(c); // Collect this character
             break;
 
@@ -474,7 +462,7 @@ void MXPEngine::Phase_MXP_ELEMENT(unsigned char c)
             // May be a comment? Check for <!--
             m_strMXPstring += static_cast<char>(c); // Collect this character
             if (m_strMXPstring.left(3) == "!--") {
-                m_doc.m_telnetParser->m_phase = HAVE_MXP_COMMENT;
+                m_doc.m_telnetParser->m_phase = Phase::HAVE_MXP_COMMENT;
             }
             break;
 
@@ -499,7 +487,7 @@ void MXPEngine::Phase_MXP_COMMENT(unsigned char c)
             // End of comment if preceded by --
             if (m_strMXPstring.right(2) == "--") {
                 // Discard comment, switch phase back to none
-                m_doc.m_telnetParser->m_phase = NONE;
+                m_doc.m_telnetParser->m_phase = Phase::NONE;
                 break;
             }
             // If > is not preceded by -- then just collect it
@@ -523,7 +511,7 @@ void MXPEngine::Phase_MXP_QUOTE(unsigned char c)
 {
     // Closing quote? Change phase back to element collection
     if (c == m_cMXPquoteTerminator) {
-        m_doc.m_telnetParser->m_phase = HAVE_MXP_ELEMENT;
+        m_doc.m_telnetParser->m_phase = Phase::HAVE_MXP_ELEMENT;
     }
 
     m_strMXPstring += static_cast<char>(c); // Collect this character
@@ -541,7 +529,7 @@ void MXPEngine::Phase_MXP_ENTITY(unsigned char c)
     switch (c) {
         case ';':
             // End of entity - process it
-            m_doc.m_telnetParser->m_phase = NONE;
+            m_doc.m_telnetParser->m_phase = Phase::NONE;
             MXP_collected_entity();
             break;
 
@@ -554,7 +542,7 @@ void MXPEngine::Phase_MXP_ENTITY(unsigned char c)
         case '<':
             // Shouldn't have < inside &, but we are now collecting an element
             qCWarning(lcMXP) << "Got \"<\" inside \"&\" - switching to element collection";
-            m_doc.m_telnetParser->m_phase = HAVE_MXP_ELEMENT;
+            m_doc.m_telnetParser->m_phase = Phase::HAVE_MXP_ELEMENT;
             m_strMXPstring.clear(); // Start again
             break;
 
@@ -577,7 +565,8 @@ void MXPEngine::Phase_MXP_ENTITY(unsigned char c)
  */
 AtomicElement* MXPEngine::MXP_FindAtomicElement(const QString& name)
 {
-    return m_atomicElementMap.value(name.toLower(), nullptr);
+    auto it = m_atomicElementMap.find(name.toLower());
+    return it != m_atomicElementMap.end() ? it->second.get() : nullptr;
 }
 
 /**
@@ -588,7 +577,8 @@ AtomicElement* MXPEngine::MXP_FindAtomicElement(const QString& name)
  */
 CustomElement* MXPEngine::MXP_FindCustomElement(const QString& name)
 {
-    return m_customElementMap.value(name.toLower(), nullptr);
+    auto it = m_customElementMap.find(name.toLower());
+    return it != m_customElementMap.end() ? it->second.get() : nullptr;
 }
 
 // ========================================================================
@@ -937,20 +927,26 @@ QString MXPEngine::MXP_GetEntity(const QString& entityName)
     }
 
     // Check custom entities first (they can override)
-    MXPEntity* entity = m_customEntityMap.value(entityName, nullptr);
-    if (entity) {
-        // Custom entities use strValue (can be multi-character)
-        if (!entity->strValue.isEmpty()) {
-            return entity->strValue;
+    {
+        auto it = m_customEntityMap.find(entityName);
+        if (it != m_customEntityMap.end()) {
+            const MXPEntity* entity = it->second.get();
+            // Custom entities use strValue (can be multi-character)
+            if (!entity->strValue.isEmpty()) {
+                return entity->strValue;
+            }
+            // Fallback to iCodepoint for backward compatibility
+            return QString::fromUcs4(reinterpret_cast<const char32_t*>(&entity->iCodepoint), 1);
         }
-        // Fallback to iCodepoint for backward compatibility
-        return QString::fromUcs4(reinterpret_cast<const char32_t*>(&entity->iCodepoint), 1);
     }
 
     // Check standard entities (these always use iCodepoint)
-    entity = m_entityMap.value(entityName, nullptr);
-    if (entity) {
-        return QString::fromUcs4(reinterpret_cast<const char32_t*>(&entity->iCodepoint), 1);
+    {
+        auto it = m_entityMap.find(entityName);
+        if (it != m_entityMap.end()) {
+            const MXPEntity* entity = it->second.get();
+            return QString::fromUcs4(reinterpret_cast<const char32_t*>(&entity->iCodepoint), 1);
+        }
     }
 
     qCDebug(lcMXP) << "Unknown entity:" << entityName;
@@ -1061,12 +1057,12 @@ void MXPEngine::MXP_StartTag(const QString& tagString)
 
     // Track non-command tags in active tag list
     if (!bCommand) {
-        ActiveTag* pTag = new ActiveTag();
-        pTag->strName = tagName;
-        pTag->bSecure = bSecure;
-        pTag->bNoReset = bNoReset;
-        pTag->iAction = pAtomicElement ? pAtomicElement->iAction : MXP_ACTION_NONE;
-        m_activeTagList.append(pTag);
+        auto tag = std::make_unique<ActiveTag>();
+        tag->strName = tagName;
+        tag->bSecure = bSecure;
+        tag->bNoReset = bNoReset;
+        tag->iAction = pAtomicElement ? pAtomicElement->iAction : MXP_ACTION_NONE;
+        m_activeTagList.push_back(std::move(tag));
 
         // Warn if too many outstanding tags
         if (m_activeTagList.size() % 100 == 0) {
@@ -1163,11 +1159,11 @@ void MXPEngine::MXP_EndTag(const QString& tagString)
 
     // Find the matching opening tag in active tag list
     // Search backwards (most recent first)
-    ActiveTag* pMatchingTag = nullptr;
+    const ActiveTag* pMatchingTag = nullptr;
     int matchIndex = -1;
 
     for (int i = m_activeTagList.size() - 1; i >= 0; i--) {
-        ActiveTag* pTag = m_activeTagList[i];
+        const ActiveTag* pTag = m_activeTagList[i].get();
 
         if (pTag->strName == strName) {
             pMatchingTag = pTag;
@@ -1196,18 +1192,19 @@ void MXPEngine::MXP_EndTag(const QString& tagString)
 
     // Close all tags from the end up to and including the matching tag
     // This handles improperly nested tags: <b><i></b></i> - </b> also closes <i>
-    while (m_activeTagList.size() > matchIndex) {
-        ActiveTag* pTag = m_activeTagList.takeLast();
-        QString closingName = pTag->strName;
+    while (static_cast<int>(m_activeTagList.size()) > matchIndex) {
+        // Move last element out and pop; unique_ptr destructor cleans up at end of scope
+        auto owned = std::move(m_activeTagList.back());
+        m_activeTagList.pop_back();
+        QString closingName = owned->strName;
 
         if (closingName != strName) {
             qCDebug(lcMXP) << "Closing out-of-sequence tag:" << closingName;
         }
 
         // Execute end action for this tag
-        MXP_EndAction(pTag->iAction);
-
-        delete pTag;
+        MXP_EndAction(owned->iAction);
+        // owned goes out of scope here — ActiveTag is destroyed automatically
 
         if (closingName == strName) {
             break; // Found the tag we're supposed to close
@@ -1268,15 +1265,12 @@ void MXPEngine::MXP_DefineElement(const QString& defString)
         }
     }
 
-    // Delete old element if it exists
-    CustomElement* oldElement = m_customElementMap.value(strName, nullptr);
-    if (oldElement) {
+    // Delete old element if it exists (unique_ptr destructor handles cleanup)
+    if (m_customElementMap.count(strName) > 0) {
         if (!bDelete) {
             qCDebug(lcMXP) << "Replacing custom element:" << strName;
         }
-        // Note: CustomElement destructor handles cleanup of elementItemList and attributeList
-        delete oldElement;
-        m_customElementMap.remove(strName);
+        m_customElementMap.erase(strName);
     }
 
     if (bDelete) {
@@ -1448,10 +1442,11 @@ void MXPEngine::MXP_DefineElement(const QString& defString)
         pElement->strFlag = flagValue;
     }
 
-    // Add to custom element map (release ownership from unique_ptr to map)
-    m_customElementMap.insert(strName, pElementOwned.release());
-    qCDebug(lcMXP) << "Defined custom element:" << strName << "with"
-                   << pElement->elementItemList.size() << "atomic elements";
+    // Add to custom element map (transfer ownership via unique_ptr)
+    std::size_t elementCount = pElement->elementItemList.size();
+    m_customElementMap.emplace(strName, std::move(pElementOwned));
+    qCDebug(lcMXP) << "Defined custom element:" << strName << "with" << elementCount
+                   << "atomic elements";
     // args cleared automatically by unique_ptr
 }
 
@@ -1478,7 +1473,7 @@ void MXPEngine::MXP_DefineEntity(const QString& defString)
     remaining = remaining.mid(spacePos + 1).trimmed();
 
     // Check if trying to redefine built-in entity
-    if (m_entityMap.contains(strName)) {
+    if (m_entityMap.count(strName) > 0) {
         qCWarning(lcMXP) << "Cannot redefine built-in entity:" << strName;
         m_iMXPerrors++;
         return;
@@ -1486,11 +1481,8 @@ void MXPEngine::MXP_DefineEntity(const QString& defString)
 
     // Check for DELETE keyword
     if (remaining.startsWith("DELETE", Qt::CaseInsensitive)) {
-        // Remove custom entity
-        MXPEntity* entity = m_customEntityMap.value(strName, nullptr);
-        if (entity) {
-            delete entity;
-            m_customEntityMap.remove(strName);
+        // Remove custom entity (unique_ptr destructor handles cleanup)
+        if (m_customEntityMap.erase(strName) > 0) {
             qCDebug(lcMXP) << "Deleted custom entity:" << strName;
         }
         return;
@@ -1540,15 +1532,13 @@ void MXPEngine::MXP_DefineEntity(const QString& defString)
         }
     }
 
-    // Delete old entity if it exists
-    MXPEntity* oldEntity = m_customEntityMap.value(strName, nullptr);
-    if (oldEntity) {
-        delete oldEntity;
+    // Delete old entity if it exists (unique_ptr destructor handles cleanup)
+    if (m_customEntityMap.count(strName) > 0) {
         qCDebug(lcMXP) << "Replacing custom entity:" << strName;
     }
 
     // Create new entity
-    MXPEntity* entity = new MXPEntity();
+    auto entity = std::make_unique<MXPEntity>();
     entity->strName = strName;
     entity->strValue = strFixedValue;
 
@@ -1559,7 +1549,7 @@ void MXPEngine::MXP_DefineEntity(const QString& defString)
         entity->iCodepoint = 0; // Multi-character entity
     }
 
-    m_customEntityMap.insert(strName, entity);
+    m_customEntityMap.emplace(strName, std::move(entity));
     qCDebug(lcMXP) << "Defined custom entity:" << strName << "=" << strFixedValue;
 
     // TODO: Plugin callback (ON_PLUGIN_MXP_SETENTITY)
@@ -2285,15 +2275,16 @@ void MXPEngine::MXP_CloseOpenTags()
     qCDebug(lcMXP) << "Closing" << m_activeTagList.size() << "open tags";
 
     // Close tags in reverse order (most recent first)
-    while (!m_activeTagList.isEmpty()) {
-        ActiveTag* pTag = m_activeTagList.takeLast();
+    while (!m_activeTagList.empty()) {
+        // Move last element out and pop; unique_ptr destructor cleans up at end of scope
+        auto owned = std::move(m_activeTagList.back());
+        m_activeTagList.pop_back();
 
         // Execute end action
-        if (!pTag->bNoReset) {
-            MXP_EndAction(pTag->iAction);
+        if (!owned->bNoReset) {
+            MXP_EndAction(owned->iAction);
         }
-
-        delete pTag;
+        // owned goes out of scope here — ActiveTag is destroyed automatically
     }
 }
 

@@ -61,7 +61,7 @@ void TimerListDialog::setItemEnabled(const QString& name, bool enabled)
 
 QString TimerListDialog::formatTimerTiming(Timer* timer) const
 {
-    if (timer->type == Timer::eAtTime) {
+    if (timer->type == Timer::TimerType::AtTime) {
         return QString("At %1:%2:%3")
             .arg(timer->at_hour, 2, 10, QChar('0'))
             .arg(timer->at_minute, 2, 10, QChar('0'))
@@ -86,7 +86,8 @@ void TimerListDialog::populateRow(int row, const QString& name)
 
     setCheckboxItem(row, COL_ENABLED, timer->enabled, name);
     setReadOnlyItem(row, COL_LABEL, timer->label);
-    setReadOnlyItem(row, COL_TYPE, timer->type == Timer::eAtTime ? "At Time" : "Interval");
+    setReadOnlyItem(row, COL_TYPE,
+                    timer->type == Timer::TimerType::AtTime ? "At Time" : "Interval");
     setReadOnlyItem(row, COL_TIMING, formatTimerTiming(timer));
     setReadOnlyItem(row, COL_GROUP, timer->group);
     setReadOnlyItem(row, COL_SENDTO, sendToDisplayName(timer->send_to));

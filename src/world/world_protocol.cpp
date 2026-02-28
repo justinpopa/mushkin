@@ -120,24 +120,24 @@ void WorldDocument::ProcessIncomingByte(unsigned char c)
     Phase& phase = tp.m_phase;
 
     // Special case: UTF-8 multibyte start in normal mode
-    if (m_bUTF_8 && phase == NONE && (c & 0x80)) {
+    if (m_bUTF_8 && phase == Phase::NONE && (c & 0x80)) {
         if ((c & 0xE0) == 0xC0) {
             m_UTF8Sequence[0] = c;
             m_UTF8Sequence[1] = 0;
             m_iUTF8BytesLeft = 1;
-            phase = HAVE_UTF8_CHARACTER;
+            phase = Phase::HAVE_UTF8_CHARACTER;
             return;
         } else if ((c & 0xF0) == 0xE0) {
             m_UTF8Sequence[0] = c;
             m_UTF8Sequence[1] = 0;
             m_iUTF8BytesLeft = 2;
-            phase = HAVE_UTF8_CHARACTER;
+            phase = Phase::HAVE_UTF8_CHARACTER;
             return;
         } else if ((c & 0xF8) == 0xF0) {
             m_UTF8Sequence[0] = c;
             m_UTF8Sequence[1] = 0;
             m_iUTF8BytesLeft = 3;
-            phase = HAVE_UTF8_CHARACTER;
+            phase = Phase::HAVE_UTF8_CHARACTER;
             return;
         }
         // Invalid UTF-8 start byte - fall through to process as normal
@@ -145,17 +145,17 @@ void WorldDocument::ProcessIncomingByte(unsigned char c)
 
     // Dispatch based on current phase
     switch (phase) {
-        case NONE:
+        case Phase::NONE:
             if (c == IAC) {
-                phase = HAVE_IAC;
+                phase = Phase::HAVE_IAC;
             } else if (c == 0x1B) { // ESC
-                phase = HAVE_ESC;
+                phase = Phase::HAVE_ESC;
             } else if (c == '<' && m_mxpEngine->m_bMXP && (MXP_Open() || MXP_Secure())) {
                 m_mxpEngine->m_strMXPstring.clear();
-                phase = HAVE_MXP_ELEMENT;
+                phase = Phase::HAVE_MXP_ELEMENT;
             } else if (c == '&' && m_mxpEngine->m_bMXP && (MXP_Open() || MXP_Secure())) {
                 m_mxpEngine->m_strMXPstring.clear();
-                phase = HAVE_MXP_ENTITY;
+                phase = Phase::HAVE_MXP_ENTITY;
             } else if (c == '\n') {
                 StartNewLine(true, 0);
             } else if (c == '\r') {
@@ -165,27 +165,27 @@ void WorldDocument::ProcessIncomingByte(unsigned char c)
             }
             break;
 
-        case HAVE_ESC:
+        case Phase::HAVE_ESC:
             tp.Phase_ESC(c);
             break;
 
-        case DOING_CODE:
-        case HAVE_FOREGROUND_256_START:
-        case HAVE_FOREGROUND_256_FINISH:
-        case HAVE_BACKGROUND_256_START:
-        case HAVE_BACKGROUND_256_FINISH:
-        case HAVE_FOREGROUND_24B_FINISH:
-        case HAVE_FOREGROUND_24BR_FINISH:
-        case HAVE_FOREGROUND_24BG_FINISH:
-        case HAVE_FOREGROUND_24BB_FINISH:
-        case HAVE_BACKGROUND_24B_FINISH:
-        case HAVE_BACKGROUND_24BR_FINISH:
-        case HAVE_BACKGROUND_24BG_FINISH:
-        case HAVE_BACKGROUND_24BB_FINISH:
+        case Phase::DOING_CODE:
+        case Phase::HAVE_FOREGROUND_256_START:
+        case Phase::HAVE_FOREGROUND_256_FINISH:
+        case Phase::HAVE_BACKGROUND_256_START:
+        case Phase::HAVE_BACKGROUND_256_FINISH:
+        case Phase::HAVE_FOREGROUND_24B_FINISH:
+        case Phase::HAVE_FOREGROUND_24BR_FINISH:
+        case Phase::HAVE_FOREGROUND_24BG_FINISH:
+        case Phase::HAVE_FOREGROUND_24BB_FINISH:
+        case Phase::HAVE_BACKGROUND_24B_FINISH:
+        case Phase::HAVE_BACKGROUND_24BR_FINISH:
+        case Phase::HAVE_BACKGROUND_24BG_FINISH:
+        case Phase::HAVE_BACKGROUND_24BB_FINISH:
             tp.Phase_ANSI(c);
             break;
 
-        case HAVE_IAC:
+        case Phase::HAVE_IAC:
             tp.Phase_IAC(c);
             // Phase_IAC may zero-out c (returning new_c=0 signals no further processing)
             if (c != 0) {
@@ -193,65 +193,65 @@ void WorldDocument::ProcessIncomingByte(unsigned char c)
             }
             return;
 
-        case HAVE_WILL:
+        case Phase::HAVE_WILL:
             tp.Phase_WILL(c);
             break;
 
-        case HAVE_WONT:
+        case Phase::HAVE_WONT:
             tp.Phase_WONT(c);
             break;
 
-        case HAVE_DO:
+        case Phase::HAVE_DO:
             tp.Phase_DO(c);
             break;
 
-        case HAVE_DONT:
+        case Phase::HAVE_DONT:
             tp.Phase_DONT(c);
             break;
 
-        case HAVE_SB:
+        case Phase::HAVE_SB:
             tp.Phase_SB(c);
             break;
 
-        case HAVE_SUBNEGOTIATION:
+        case Phase::HAVE_SUBNEGOTIATION:
             tp.Phase_SUBNEGOTIATION(c);
             break;
 
-        case HAVE_SUBNEGOTIATION_IAC:
+        case Phase::HAVE_SUBNEGOTIATION_IAC:
             tp.Phase_SUBNEGOTIATION_IAC(c);
             break;
 
-        case HAVE_UTF8_CHARACTER:
+        case Phase::HAVE_UTF8_CHARACTER:
             tp.Phase_UTF8(c);
             break;
 
-        case HAVE_COMPRESS:
+        case Phase::HAVE_COMPRESS:
             tp.Phase_COMPRESS(c);
             break;
 
-        case HAVE_COMPRESS_WILL:
+        case Phase::HAVE_COMPRESS_WILL:
             tp.Phase_COMPRESS_WILL(c);
             break;
 
-        case HAVE_MXP_ELEMENT:
+        case Phase::HAVE_MXP_ELEMENT:
             Phase_MXP_ELEMENT(c);
             break;
 
-        case HAVE_MXP_COMMENT:
+        case Phase::HAVE_MXP_COMMENT:
             Phase_MXP_COMMENT(c);
             break;
 
-        case HAVE_MXP_QUOTE:
+        case Phase::HAVE_MXP_QUOTE:
             Phase_MXP_QUOTE(c);
             break;
 
-        case HAVE_MXP_ENTITY:
+        case Phase::HAVE_MXP_ENTITY:
             Phase_MXP_ENTITY(c);
             break;
 
         default:
-            qCDebug(lcWorld) << "Unknown telnet phase:" << phase;
-            phase = NONE;
+            qCDebug(lcWorld) << "Unknown telnet phase:" << static_cast<int>(phase);
+            phase = Phase::NONE;
             break;
     }
 }
@@ -311,7 +311,7 @@ void WorldDocument::OutputBadUTF8characters()
         m_cLastChar = m_UTF8Sequence[i];
     }
 
-    m_telnetParser->m_phase = NONE;
+    m_telnetParser->m_phase = Phase::NONE;
 }
 
 /**
@@ -436,10 +436,10 @@ void WorldDocument::InterpretANSIcode(const int iCode)
     // Handle 256-color/24-bit extended sequences first
     switch (iCode) {
         case ANSI_TEXT_256_COLOUR:
-            m_telnetParser->m_phase = HAVE_FOREGROUND_256_START;
+            m_telnetParser->m_phase = Phase::HAVE_FOREGROUND_256_START;
             return;
         case ANSI_BACK_256_COLOUR:
-            m_telnetParser->m_phase = HAVE_BACKGROUND_256_START;
+            m_telnetParser->m_phase = Phase::HAVE_BACKGROUND_256_START;
             return;
     }
 
@@ -711,27 +711,27 @@ void WorldDocument::Interpret256ANSIcode(const int iCode)
 {
     // Handle phase transitions for 256-color and 24-bit
     switch (m_telnetParser->m_phase) {
-        case HAVE_FOREGROUND_256_START: // Got ESC[38;
-            if (iCode == 5) {           // 8-bit color (256-color)
+        case Phase::HAVE_FOREGROUND_256_START: // Got ESC[38;
+            if (iCode == 5) {                  // 8-bit color (256-color)
                 m_code = 0;
-                m_telnetParser->m_phase = HAVE_FOREGROUND_256_FINISH;
+                m_telnetParser->m_phase = Phase::HAVE_FOREGROUND_256_FINISH;
             } else if (iCode == 2) { // 24-bit RGB
                 m_code = 0;
-                m_telnetParser->m_phase = HAVE_FOREGROUND_24B_FINISH;
+                m_telnetParser->m_phase = Phase::HAVE_FOREGROUND_24B_FINISH;
             } else {
-                m_telnetParser->m_phase = NONE;
+                m_telnetParser->m_phase = Phase::NONE;
             }
             return;
 
-        case HAVE_BACKGROUND_256_START: // Got ESC[48;
-            if (iCode == 5) {           // 8-bit color (256-color)
+        case Phase::HAVE_BACKGROUND_256_START: // Got ESC[48;
+            if (iCode == 5) {                  // 8-bit color (256-color)
                 m_code = 0;
-                m_telnetParser->m_phase = HAVE_BACKGROUND_256_FINISH;
+                m_telnetParser->m_phase = Phase::HAVE_BACKGROUND_256_FINISH;
             } else if (iCode == 2) { // 24-bit RGB
                 m_code = 0;
-                m_telnetParser->m_phase = HAVE_BACKGROUND_24B_FINISH;
+                m_telnetParser->m_phase = Phase::HAVE_BACKGROUND_24B_FINISH;
             } else {
-                m_telnetParser->m_phase = NONE;
+                m_telnetParser->m_phase = Phase::NONE;
             }
             return;
 
@@ -742,7 +742,7 @@ void WorldDocument::Interpret256ANSIcode(const int iCode)
 
     // Validate color index (0-255)
     if (iCode < 0 || iCode > 255) {
-        m_telnetParser->m_phase = DOING_CODE;
+        m_telnetParser->m_phase = Phase::DOING_CODE;
         return;
     }
 
@@ -760,10 +760,10 @@ void WorldDocument::Interpret256ANSIcode(const int iCode)
     }
 
     // Determine if we're setting foreground or background
-    bool iForegroundMode = (m_telnetParser->m_phase == HAVE_FOREGROUND_24B_FINISH ||
-                            m_telnetParser->m_phase == HAVE_FOREGROUND_24BR_FINISH ||
-                            m_telnetParser->m_phase == HAVE_FOREGROUND_24BG_FINISH ||
-                            m_telnetParser->m_phase == HAVE_FOREGROUND_24BB_FINISH);
+    bool iForegroundMode = (m_telnetParser->m_phase == Phase::HAVE_FOREGROUND_24B_FINISH ||
+                            m_telnetParser->m_phase == Phase::HAVE_FOREGROUND_24BR_FINISH ||
+                            m_telnetParser->m_phase == Phase::HAVE_FOREGROUND_24BG_FINISH ||
+                            m_telnetParser->m_phase == Phase::HAVE_FOREGROUND_24BB_FINISH);
 
     // Build RGB color for 24-bit mode
     QRgb workingColor;
@@ -774,38 +774,38 @@ void WorldDocument::Interpret256ANSIcode(const int iCode)
 
     // Handle 24-bit true color R,G,B components
     switch (m_telnetParser->m_phase) {
-        case HAVE_FOREGROUND_24B_FINISH: // Got ESC[38;2; - waiting for R
+        case Phase::HAVE_FOREGROUND_24B_FINISH: // Got ESC[38;2; - waiting for R
             iFlags &= ~COLOURTYPE;
             iFlags |= COLOUR_RGB;
             workingColor = qRgb(iCode, 0, 0); // Set Red
-            m_telnetParser->m_phase = HAVE_FOREGROUND_24BR_FINISH;
+            m_telnetParser->m_phase = Phase::HAVE_FOREGROUND_24BR_FINISH;
             break;
 
-        case HAVE_FOREGROUND_24BR_FINISH:                      // Got ESC[38;2;<r>; - waiting for G
+        case Phase::HAVE_FOREGROUND_24BR_FINISH:               // Got ESC[38;2;<r>; - waiting for G
             workingColor = qRgb(qRed(workingColor), iCode, 0); // Set Green
-            m_telnetParser->m_phase = HAVE_FOREGROUND_24BG_FINISH;
+            m_telnetParser->m_phase = Phase::HAVE_FOREGROUND_24BG_FINISH;
             break;
 
-        case HAVE_FOREGROUND_24BG_FINISH: // Got ESC[38;2;<r>;<g>; - waiting for B
+        case Phase::HAVE_FOREGROUND_24BG_FINISH: // Got ESC[38;2;<r>;<g>; - waiting for B
             workingColor = qRgb(qRed(workingColor), qGreen(workingColor), iCode); // Set Blue
-            m_telnetParser->m_phase = HAVE_FOREGROUND_24BB_FINISH;
+            m_telnetParser->m_phase = Phase::HAVE_FOREGROUND_24BB_FINISH;
             break;
 
-        case HAVE_BACKGROUND_24B_FINISH: // Got ESC[48;2; - waiting for R
+        case Phase::HAVE_BACKGROUND_24B_FINISH: // Got ESC[48;2; - waiting for R
             iFlags &= ~COLOURTYPE;
             iFlags |= COLOUR_RGB;
             workingColor = qRgb(iCode, 0, 0); // Set Red
-            m_telnetParser->m_phase = HAVE_BACKGROUND_24BR_FINISH;
+            m_telnetParser->m_phase = Phase::HAVE_BACKGROUND_24BR_FINISH;
             break;
 
-        case HAVE_BACKGROUND_24BR_FINISH:                      // Got ESC[48;2;<r>; - waiting for G
+        case Phase::HAVE_BACKGROUND_24BR_FINISH:               // Got ESC[48;2;<r>; - waiting for G
             workingColor = qRgb(qRed(workingColor), iCode, 0); // Set Green
-            m_telnetParser->m_phase = HAVE_BACKGROUND_24BG_FINISH;
+            m_telnetParser->m_phase = Phase::HAVE_BACKGROUND_24BG_FINISH;
             break;
 
-        case HAVE_BACKGROUND_24BG_FINISH: // Got ESC[48;2;<r>;<g>; - waiting for B
+        case Phase::HAVE_BACKGROUND_24BG_FINISH: // Got ESC[48;2;<r>;<g>; - waiting for B
             workingColor = qRgb(qRed(workingColor), qGreen(workingColor), iCode); // Set Blue
-            m_telnetParser->m_phase = HAVE_BACKGROUND_24BB_FINISH;
+            m_telnetParser->m_phase = Phase::HAVE_BACKGROUND_24BB_FINISH;
             break;
 
         default:
@@ -820,22 +820,22 @@ void WorldDocument::Interpret256ANSIcode(const int iCode)
         iForeColour = workingColor;
 
     // Handle 256-color palette lookups - always convert to RGB
-    if (m_telnetParser->m_phase == HAVE_FOREGROUND_256_FINISH ||
-        m_telnetParser->m_phase == HAVE_BACKGROUND_256_FINISH) {
+    if (m_telnetParser->m_phase == Phase::HAVE_FOREGROUND_256_FINISH ||
+        m_telnetParser->m_phase == Phase::HAVE_BACKGROUND_256_FINISH) {
         // Set COLOUR_RGB mode for 256-color sequences
         iFlags &= ~COLOURTYPE;
         iFlags |= COLOUR_RGB;
 
         // Look up the RGB value from the xterm 256-color palette
         switch (m_telnetParser->m_phase) {
-            case HAVE_FOREGROUND_256_FINISH:
+            case Phase::HAVE_FOREGROUND_256_FINISH:
                 if (iFlags & INVERSE)
                     iBackColour = xterm_256_colours[iCode];
                 else
                     iForeColour = xterm_256_colours[iCode];
                 break;
 
-            case HAVE_BACKGROUND_256_FINISH:
+            case Phase::HAVE_BACKGROUND_256_FINISH:
                 if (iFlags & INVERSE)
                     iForeColour = xterm_256_colours[iCode];
                 else
@@ -849,11 +849,11 @@ void WorldDocument::Interpret256ANSIcode(const int iCode)
     }
 
     // Check if we've completed a color sequence
-    if (m_telnetParser->m_phase == HAVE_BACKGROUND_256_FINISH ||
-        m_telnetParser->m_phase == HAVE_FOREGROUND_256_FINISH ||
-        m_telnetParser->m_phase == HAVE_FOREGROUND_24BB_FINISH ||
-        m_telnetParser->m_phase == HAVE_BACKGROUND_24BB_FINISH) {
-        m_telnetParser->m_phase = DOING_CODE; // Ready for more ANSI codes
+    if (m_telnetParser->m_phase == Phase::HAVE_BACKGROUND_256_FINISH ||
+        m_telnetParser->m_phase == Phase::HAVE_FOREGROUND_256_FINISH ||
+        m_telnetParser->m_phase == Phase::HAVE_FOREGROUND_24BB_FINISH ||
+        m_telnetParser->m_phase == Phase::HAVE_BACKGROUND_24BB_FINISH) {
+        m_telnetParser->m_phase = Phase::DOING_CODE; // Ready for more ANSI codes
     }
 
     // If nothing changed, don't create new style
@@ -867,12 +867,12 @@ void WorldDocument::Interpret256ANSIcode(const int iCode)
     tempStyle.iBackColour = iBackColour;
     RememberStyle(&tempStyle);
 
-    qCDebug(lcWorld) << "256/24bit code" << iCode << "phase" << m_telnetParser->m_phase
-                     << "- flags:" << Qt::hex << iFlags << "fore:" << iForeColour
-                     << "back:" << iBackColour;
+    qCDebug(lcWorld) << "256/24bit code" << iCode << "phase"
+                     << static_cast<int>(m_telnetParser->m_phase) << "- flags:" << Qt::hex << iFlags
+                     << "fore:" << iForeColour << "back:" << iBackColour;
 }
 
 
-// InitZlib — moved to TelnetParser::initZlib() (telnet_parser.cpp)
+// InitZlib — moved to ZlibStream::init() in TelnetParser (telnet_parser.h/cpp)
 // SendWindowSizes — moved to TelnetParser::sendWindowSizes(int width) (telnet_parser.cpp)
 // MXP_On, MXP_Off, MXP_mode_change, Phase_MXP_* — moved to mxp_engine.cpp

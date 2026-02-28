@@ -16,6 +16,7 @@
 #include <QFile>
 #include <QTemporaryDir>
 #include <gtest/gtest.h>
+#include <memory>
 
 // Error codes from methods_plugins.cpp
 #define eOK 0
@@ -39,7 +40,7 @@ class PluginErrorTest : public ::testing::Test {
         ASSERT_TRUE(tempDir->isValid()) << "Could not create temp directory";
 
         // Create world document
-        doc = new WorldDocument();
+        doc = std::make_unique<WorldDocument>();
         doc->m_mush_name = "Test World";
         doc->m_server = "localhost";
         doc->m_port = 4000;
@@ -51,12 +52,11 @@ class PluginErrorTest : public ::testing::Test {
 
     void TearDown() override
     {
-        delete doc;
         delete tempDir;
     }
 
     QTemporaryDir* tempDir = nullptr;
-    WorldDocument* doc = nullptr;
+    std::unique_ptr<WorldDocument> doc;
 };
 
 // Test 1: LoadPlugin - File Not Found

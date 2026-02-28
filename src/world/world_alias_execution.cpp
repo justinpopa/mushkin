@@ -222,8 +222,8 @@ void WorldDocument::executeAliasScript(Alias* alias, const QString& command)
     }
 
     // Save old action source
-    unsigned short oldActionSource = m_iCurrentActionSource;
-    m_iCurrentActionSource = eAliasAction;
+    ActionSource oldActionSource = m_iCurrentActionSource;
+    m_iCurrentActionSource = ActionSource::eAliasAction;
 
     // Call function with 3 parameters (name, line, wildcards)
     int error = lua_pcall(L, 3, 0, 0);

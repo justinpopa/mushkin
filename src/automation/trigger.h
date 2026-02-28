@@ -3,6 +3,7 @@
 
 #include "constants.h"
 #include "script_language.h"
+#include "sendto.h"
 #include <QColor> // for QRgb typedef
 #include <QDateTime>
 #include <QMap>
@@ -32,12 +33,32 @@ class Plugin;
  * - Runtime state (DISPID, wildcards, statistics)
  */
 
-// Trigger color change types (OtherTypes.h)
-// Stored as quint16; used directly in Lua API (lua_pushnumber), XML serialization,
-// and UI combo box integer values — so inline constexpr rather than enum class.
-inline constexpr quint16 TRIGGER_COLOUR_CHANGE_BOTH = 0;
-inline constexpr quint16 TRIGGER_COLOUR_CHANGE_FOREGROUND = 1;
-inline constexpr quint16 TRIGGER_COLOUR_CHANGE_BACKGROUND = 2;
+// Trigger match bit masks (from original MUSHclient OtherTypes.h)
+// match_type is a bitmask that packs multiple values:
+//   Bits [7:4]  — ANSI text colour index (0-15)
+//   Bits [11:8] — ANSI back colour index (0-15)
+//   Bit  12     — Match bold (hilite)
+//   Bit  13     — Match underline
+//   Bit  14     — Match italic (blink)
+//   Bit  15     — Match inverse
+//   Bit  7      — Match text colour (high order of text nibble)
+//   Bit  11     — Match back colour (high order of back nibble)
+// Because this is a compound bitmask (not a closed set of named values),
+// it stays as quint16 with named bit-mask constants rather than enum class.
+inline constexpr quint16 TRIGGER_MATCH_TEXT = 0x0080; // high order of text nibble
+inline constexpr quint16 TRIGGER_MATCH_BACK = 0x0800; // high order of back nibble
+inline constexpr quint16 TRIGGER_MATCH_HILITE = 0x1000;
+inline constexpr quint16 TRIGGER_MATCH_UNDERLINE = 0x2000;
+inline constexpr quint16 TRIGGER_MATCH_BLINK = 0x4000; // italic
+inline constexpr quint16 TRIGGER_MATCH_INVERSE = 0x8000;
+
+// Trigger color change types (from original MUSHclient OtherTypes.h)
+// At XML/Lua boundaries, cast quint16 to/from this enum.
+enum class ColourChangeType : quint16 {
+    Both = 0,       // Change both foreground and background
+    Foreground = 1, // Change foreground only
+    Background = 2, // Change background only
+};
 
 class Trigger : public QObject {
     Q_OBJECT
@@ -74,7 +95,7 @@ class Trigger : public QObject {
     QString sound_to_play;         // Sound file to play
     QString procedure;             // Script procedure to execute
     ScriptLanguage scriptLanguage; // Script language (Lua or YueScript)
-    quint16 send_to;               // Where trigger is sent (see SendTo enum)
+    SendTo send_to;                // Where trigger is sent (see SendTo enum)
     QString variable;              // Which variable to set (for send to variable)
     quint16 clipboard_arg;         // If non-zero, copy matching wildcard to clipboard
 
@@ -88,12 +109,12 @@ class Trigger : public QObject {
 
     // ========== Display Fields ==========
 
-    quint16 colour;             // User color to display in
-    bool omit_from_log;         // If true, do not log triggered line
-    bool omit_from_output;      // If true, do not put triggered line in output
-    QRgb other_foreground;      // "Other" foreground color
-    QRgb other_background;      // "Other" background color
-    quint16 colour_change_type; // Color change type (see TRIGGER_COLOUR_CHANGE_* constants)
+    quint16 colour;                      // User color to display in
+    bool omit_from_log;                  // If true, do not log triggered line
+    bool omit_from_output;               // If true, do not put triggered line in output
+    QRgb other_foreground;               // "Other" foreground color
+    QRgb other_background;               // "Other" background color
+    ColourChangeType colour_change_type; // Color change type
 
     // ========== Metadata Fields ==========
 

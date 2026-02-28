@@ -759,7 +759,7 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
 
                         // Reset history position to end
                         doc->m_historyPosition = doc->m_commandHistory.count();
-                        doc->m_iHistoryStatus = eAtBottom;
+                        doc->m_iHistoryStatus = HistoryStatus::eAtBottom;
 
                         qCDebug(lcWorld)
                             << "Loaded" << doc->m_commandHistory.count() << "commands from history";

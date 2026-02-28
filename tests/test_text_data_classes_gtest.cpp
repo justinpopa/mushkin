@@ -11,6 +11,7 @@
 #include "../src/text/style.h"
 #include <QCoreApplication>
 #include <gtest/gtest.h>
+#include <memory>
 
 // Test fixture for Action tests
 class ActionTest : public ::testing::Test {
@@ -114,21 +115,19 @@ class LineTest : public ::testing::Test {
 // Test 7: Basic line creation
 TEST_F(LineTest, BasicCreation)
 {
-    Line* testLine = new Line(1, 80, 0, qRgb(255, 255, 255), qRgb(0, 0, 0), false);
+    auto testLine = std::make_unique<Line>(1, 80, 0, qRgb(255, 255, 255), qRgb(0, 0, 0), false);
 
     EXPECT_NE(testLine, nullptr);
     EXPECT_EQ(testLine->m_nLineNumber, 1);
     EXPECT_GT(testLine->iMemoryAllocated(), 0);
     EXPECT_EQ(testLine->len(), 0); // Empty line (len() doesn't count null terminator)
     EXPECT_EQ(testLine->styleList.size(), 0);
-
-    delete testLine;
 }
 
 // Test 8: Line with text and styles
 TEST_F(LineTest, LineWithTextAndStyles)
 {
-    Line* testLine = new Line(1, 80, 0, qRgb(255, 255, 255), qRgb(0, 0, 0), false);
+    auto testLine = std::make_unique<Line>(1, 80, 0, qRgb(255, 255, 255), qRgb(0, 0, 0), false);
 
     auto normalStyle = std::make_unique<Style>();
     normalStyle->iLength = 11;
@@ -157,14 +156,12 @@ TEST_F(LineTest, LineWithTextAndStyles)
 
     EXPECT_EQ(testLine->len(), textLen); // Text length (len() doesn't count null terminator)
     EXPECT_STREQ(testLine->text().data(), "Hello world bold!");
-
-    delete testLine;
 }
 
 // Test 9: Action lifecycle with Line
 TEST_F(LineTest, ActionLifecycleWithLine)
 {
-    Line* testLine = new Line(1, 80, 0, qRgb(255, 255, 255), qRgb(0, 0, 0), false);
+    auto testLine = std::make_unique<Line>(1, 80, 0, qRgb(255, 255, 255), qRgb(0, 0, 0), false);
 
     auto testAction =
         std::make_shared<Action>("look at sword", "Click to examine sword", "", nullptr);
@@ -197,7 +194,7 @@ TEST_F(LineTest, ActionLifecycleWithLine)
 
     EXPECT_EQ(testLine->styleList.size(), 2);
 
-    delete testLine;
+    testLine.reset();
 
     // After line deletion, action ref count should be back to 1
     EXPECT_EQ(testAction.use_count(), 1);

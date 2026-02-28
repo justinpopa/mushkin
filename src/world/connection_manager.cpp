@@ -224,21 +224,23 @@ QStringList ConnectionManager::getCommandQueue() const
  *
  * @param message Command to queue.
  * @param echo    Whether to echo the command when sent.
- * @return Error code: 0=success, 30002=not connected, 30063=plugin processing.
+ * @return std::expected<void, WorldError>: success, or a WorldError describing the failure.
+ *         Lua boundary: WorldDocument::Queue() converts this back to a qint32 error code.
  */
-qint32 ConnectionManager::queue(const QString& message, bool echo)
+std::expected<void, WorldError> ConnectionManager::queue(const QString& message, bool echo)
 {
     if (m_iConnectPhase != CONNECT_CONNECTED_TO_MUD) {
-        return 30002; // eWorldClosed
+        return std::unexpected(WorldError{WorldErrorType::NotConnected, "World is not connected"});
     }
 
     if (m_doc.m_bPluginProcessingSent) {
-        return 30063; // eItemInUse
+        return std::unexpected(
+            WorldError{WorldErrorType::ItemInUse, "Plugin is processing sent text"});
     }
 
     // Delegate to WorldDocument::SendMsg (queue=true).
     m_doc.SendMsg(message, echo, true, false);
-    return 0; // eOK
+    return {};
 }
 
 /**
@@ -278,12 +280,12 @@ void ConnectionManager::onWorldConnect()
 
     QList<double> nparams;
     QList<QString> sparams;
-    long invocation_count = 0;
+    qint32 invocation_count = 0;
     bool result = false;
 
-    bool error = m_doc.m_ScriptEngine->executeLua(m_doc.m_dispidWorldConnect, "OnWorldConnect",
-                                                  eWorldAction, "world", "world connect", nparams,
-                                                  sparams, invocation_count, &result);
+    bool error = m_doc.m_ScriptEngine->executeLua(
+        m_doc.m_dispidWorldConnect, "OnWorldConnect", ActionSource::eWorldAction, "world",
+        "world connect", nparams, sparams, invocation_count, &result);
     if (error) {
         qCDebug(lcWorld) << "Error calling OnWorldConnect callback";
     } else {
@@ -312,11 +314,11 @@ void ConnectionManager::onWorldDisconnect()
 
     QList<double> nparams;
     QList<QString> sparams;
-    long invocation_count = 0;
+    qint32 invocation_count = 0;
     bool result = false;
 
     bool error = m_doc.m_ScriptEngine->executeLua(
-        m_doc.m_dispidWorldDisconnect, "OnWorldDisconnect", eWorldAction, "world",
+        m_doc.m_dispidWorldDisconnect, "OnWorldDisconnect", ActionSource::eWorldAction, "world",
         "world disconnect", nparams, sparams, invocation_count, &result);
     if (error) {
         qCDebug(lcWorld) << "Error calling OnWorldDisconnect callback";

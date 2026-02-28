@@ -140,9 +140,9 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_commandHistory.clear();
     m_maxCommandHistory = 20; // Default: 20 commands (matches original)
     m_historyPosition = 0;
-    m_bFilterDuplicates = false;  // Don't filter duplicates by default
-    m_last_command = QString();   // No previous command yet
-    m_iHistoryStatus = eAtBottom; // Start at bottom (ready for new commands)
+    m_bFilterDuplicates = false;                 // Don't filter duplicates by default
+    m_last_command = QString();                  // No previous command yet
+    m_iHistoryStatus = HistoryStatus::eAtBottom; // Start at bottom (ready for new commands)
 
     // ========== Initialize sound ==========
     m_enable_beeps = true;
@@ -206,7 +206,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_strWorldLoseFocus = QString();
 
     // ========== Initialize MXP ==========
-    m_iUseMXP = 2; // eOnCommandMXP - Default: on command (like original MUSHclient)
+    m_iUseMXP = MXPMode::eMXP_On; // eOnCommandMXP - Default: on command (like original MUSHclient)
     m_iMXPdebugLevel = 0;
     m_strOnMXP_Start = QString();
     m_strOnMXP_Stop = QString();
@@ -303,7 +303,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_nFileDelayPerLines = 1;
 
     // ========== Initialize miscellaneous options ==========
-    m_nReloadOption = 0; // eReloadConfirm
+    m_nReloadOption = ScriptReloadOption::eReloadConfirm;
     m_bUseDefaultOutputFont = 0;
     m_bSaveDeletedCommand = 0;
     m_bTranslateBackslashSequences = 0;
@@ -355,7 +355,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_iLineSpacing = 0;
     m_bUTF_8 = false;
     m_bConvertGAtoNewline = false;
-    m_iCurrentActionSource = 0; // eUnknownActionSource
+    m_iCurrentActionSource = ActionSource::eUnknownActionSource;
 
     // ========== Initialize filters ==========
     m_strTriggersFilter = QString();
@@ -725,13 +725,13 @@ WorldDocument::~WorldDocument()
     // For now, just basic cleanup
 
     // ========== FIRST: Stop all timers to prevent callbacks during cleanup ==========
-    // This must happen before any other cleanup to avoid race conditions
+    // This must happen before any other cleanup to avoid race conditions.
+    // m_timerCheckTimer is Qt parent-child owned (parent = this); Qt deletes it automatically.
+    // We only disconnect and stop it here to prevent stray callbacks during teardown.
     if (m_timerCheckTimer) {
-        // Disconnect all signals first to prevent any pending callbacks
         m_timerCheckTimer->disconnect();
         m_timerCheckTimer->stop();
-        delete m_timerCheckTimer;
-        m_timerCheckTimer = nullptr;
+        // Do NOT delete: Qt parent-child ownership handles deletion.
     }
 
     // Process pending events multiple times to ensure all queued callbacks are drained
@@ -774,10 +774,10 @@ WorldDocument::~WorldDocument()
     }
 
     // ========== Script File Watcher Cleanup ==========
-    if (m_scriptFileWatcher) {
-        delete m_scriptFileWatcher;
-        m_scriptFileWatcher = nullptr;
-    }
+    // m_scriptFileWatcher is NOT Qt parent-child owned (created without parent in
+    // setupScriptFileWatcher). Manual delete is the sole owner.
+    delete m_scriptFileWatcher;
+    m_scriptFileWatcher = nullptr;
 
     // ========== Log File Cleanup ==========
     // Close log file if open
@@ -786,7 +786,7 @@ WorldDocument::~WorldDocument()
     }
 
     // ========== MCCP Compression Cleanup ==========
-    // Handled by TelnetParser destructor (cleanupZlib()).
+    // Handled by ZlibStream destructor inside TelnetParser (calls inflateEnd automatically).
     // m_telnetParser (unique_ptr) is destroyed automatically after this destructor body.
 
     // ========== Line Buffer Cleanup ==========
@@ -939,33 +939,34 @@ void WorldDocument::ReceiveMsg()
     if (tp.m_bCompress) {
         // MCCP decompression with staging buffer
         // Check if we have space in the input buffer for the new data
-        if ((TELNET_COMPRESS_BUFFER_LENGTH - tp.m_zCompress.avail_in) < static_cast<uInt>(nRead)) {
+        z_stream& zs = tp.m_zlibStream.stream;
+        if ((TELNET_COMPRESS_BUFFER_LENGTH - zs.avail_in) < static_cast<uInt>(nRead)) {
             qCDebug(lcWorld) << "Insufficient space in compression input buffer";
             OnConnectionDisconnect();
             return;
         }
 
         // Shuffle any remaining unconsumed data to the start of the vector
-        if (tp.m_zCompress.avail_in > 0) {
-            memmove(tp.m_CompressInput.data(), tp.m_zCompress.next_in, tp.m_zCompress.avail_in);
+        if (zs.avail_in > 0) {
+            memmove(tp.m_CompressInput.data(), zs.next_in, zs.avail_in);
         }
-        tp.m_zCompress.next_in = tp.m_CompressInput.data();
+        zs.next_in = tp.m_CompressInput.data();
 
         // Append new compressed data to the staging buffer
-        memcpy(tp.m_CompressInput.data() + tp.m_zCompress.avail_in, buffer.data(), nRead);
-        tp.m_zCompress.avail_in += static_cast<uInt>(nRead);
+        memcpy(tp.m_CompressInput.data() + zs.avail_in, buffer.data(), nRead);
+        zs.avail_in += static_cast<uInt>(nRead);
         tp.m_nTotalCompressed += nRead;
 
         // Keep decompressing until all input is consumed
         do {
             // Set up output buffer — z_stream.next_out points into the vector's storage
-            tp.m_zCompress.next_out = tp.m_CompressOutput.data();
-            tp.m_zCompress.avail_out = static_cast<uInt>(tp.m_CompressOutput.size());
+            zs.next_out = tp.m_CompressOutput.data();
+            zs.avail_out = static_cast<uInt>(tp.m_CompressOutput.size());
 
             // Decompress
             QElapsedTimer timer;
             timer.start();
-            int izError = inflate(&tp.m_zCompress, Z_SYNC_FLUSH);
+            int izError = inflate(&zs, Z_SYNC_FLUSH);
             tp.m_iCompressionTimeTaken += timer.elapsed();
 
             // Handle Z_BUF_ERROR by growing the output buffer
@@ -974,18 +975,18 @@ void WorldDocument::ReceiveMsg()
                 tp.m_CompressOutput.resize(newSize);
                 qCDebug(lcWorld) << "Grew compression output buffer to" << newSize << "bytes";
 
-                tp.m_zCompress.next_out = tp.m_CompressOutput.data();
-                tp.m_zCompress.avail_out = static_cast<uInt>(newSize);
+                zs.next_out = tp.m_CompressOutput.data();
+                zs.avail_out = static_cast<uInt>(newSize);
 
                 timer.start();
-                izError = inflate(&tp.m_zCompress, Z_SYNC_FLUSH);
+                izError = inflate(&zs, Z_SYNC_FLUSH);
                 tp.m_iCompressionTimeTaken += timer.elapsed();
             }
 
             if (izError != Z_OK && izError != Z_STREAM_END) {
                 qCDebug(lcWorld) << "MCCP decompression error:" << izError;
-                if (tp.m_zCompress.msg) {
-                    qCDebug(lcWorld) << "  zlib message:" << tp.m_zCompress.msg;
+                if (zs.msg) {
+                    qCDebug(lcWorld) << "  zlib message:" << zs.msg;
                 }
                 tp.m_bCompress = false;
                 OnConnectionDisconnect();
@@ -994,7 +995,7 @@ void WorldDocument::ReceiveMsg()
 
             // Calculate how many bytes were decompressed
             const qint64 nDecompressed =
-                static_cast<qint64>(tp.m_CompressOutput.size()) - tp.m_zCompress.avail_out;
+                static_cast<qint64>(tp.m_CompressOutput.size()) - zs.avail_out;
             tp.m_nTotalUncompressed += nDecompressed;
 
             // Process each decompressed byte through the telnet state machine
@@ -1009,7 +1010,7 @@ void WorldDocument::ReceiveMsg()
                 break;
             }
 
-        } while (tp.m_zCompress.avail_in > 0);
+        } while (zs.avail_in > 0);
     } else {
         // No compression - process each byte directly through the telnet state machine
         for (qint64 i = 0; i < nRead; i++) {
@@ -2997,7 +2998,7 @@ void WorldDocument::addToCommandHistory(const QString& command)
     m_historyPosition = m_commandHistory.count();
 
     // Set history status to bottom (sendvw.cpp)
-    m_iHistoryStatus = eAtBottom;
+    m_iHistoryStatus = HistoryStatus::eAtBottom;
 
     qCDebug(lcWorld) << "Command history: added" << command
                      << "- history size:" << m_commandHistory.count()
@@ -3022,7 +3023,7 @@ void WorldDocument::clearCommandHistory()
     m_historyPosition = 0;
 
     // Reset history status
-    m_iHistoryStatus = eAtBottom;
+    m_iHistoryStatus = HistoryStatus::eAtBottom;
 
     // Clear last command (for consecutive duplicate check)
     m_last_command.clear();
@@ -3350,7 +3351,7 @@ void WorldDocument::setupScriptFileWatcher()
         return;
     }
 
-    if (m_nReloadOption == eReloadNever) {
+    if (m_nReloadOption == ScriptReloadOption::eReloadNever) {
         qCDebug(lcWorld) << "setupScriptFileWatcher: Reload option is 'never', not watching";
         return;
     }
@@ -3363,8 +3364,11 @@ void WorldDocument::setupScriptFileWatcher()
         return;
     }
 
-    // Create file watcher
-    m_scriptFileWatcher = new QFileSystemWatcher(this);
+    // Create file watcher without Qt parent-child ownership.
+    // Manual delete in setupScriptFileWatcher (reset) and ~WorldDocument (final cleanup)
+    // are the sole owners. Passing 'this' as parent would cause double-free: Qt would
+    // delete the watcher again after ~WorldDocument already did.
+    m_scriptFileWatcher = new QFileSystemWatcher();
     m_scriptFileWatcher->addPath(m_strScriptFilename);
 
     // Connect file change signal
@@ -3382,9 +3386,9 @@ void WorldDocument::setupScriptFileWatcher()
  *
  * Called when QFileSystemWatcher detects the script file has changed.
  * Behavior depends on m_nReloadOption:
- * - eReloadConfirm (0): Show dialog asking user
- * - eReloadAlways (1): Automatically reload
- * - eReloadNever (2): Ignore (but shouldn't get here since watcher not set up)
+ * - ScriptReloadOption::eReloadConfirm (0): Show dialog asking user
+ * - ScriptReloadOption::eReloadAlways (1): Automatically reload
+ * - ScriptReloadOption::eReloadNever (2): Ignore (but shouldn't get here since watcher not set up)
  *
  * Based on CMUSHclientDoc::OnScriptFileChange() in scripting.cpp
  *
@@ -3420,7 +3424,7 @@ void WorldDocument::onScriptFileChanged(const QString& path)
 
     // Handle based on reload option
     switch (m_nReloadOption) {
-        case eReloadAlways:
+        case ScriptReloadOption::eReloadAlways:
             // Automatically reload
             qCDebug(lcWorld) << "onScriptFileChanged: Auto-reloading script";
             note(QString("Script file changed, reloading: %1")
@@ -3428,7 +3432,7 @@ void WorldDocument::onScriptFileChanged(const QString& path)
             loadScriptFile();
             break;
 
-        case eReloadConfirm: {
+        case ScriptReloadOption::eReloadConfirm: {
             // Show confirmation dialog
             QString filename = QFileInfo(m_strScriptFilename).fileName();
             int result = QMessageBox::question(
@@ -3449,7 +3453,7 @@ void WorldDocument::onScriptFileChanged(const QString& path)
             break;
         }
 
-        case eReloadNever:
+        case ScriptReloadOption::eReloadNever:
         default:
             // Ignore changes
             qCDebug(lcWorld) << "onScriptFileChanged: Ignoring (reload option is 'never')";
