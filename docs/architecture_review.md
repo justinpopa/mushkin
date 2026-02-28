@@ -213,7 +213,7 @@ Note: Lua API boundary functions intentionally return integers (Lua convention).
 
 **Targets:**
 - [x] `src/world/connection_manager.h` — `queue()` → `std::expected<void, WorldError>` (`discardQueue()` returns count, not error — kept as `qint32`)
-- [ ] Audit remaining `qint32`-returning internal methods for conversion
+- [x] Audit remaining `qint32`-returning internal methods for conversion — **Result:** All 72 error-code-returning methods are Lua API boundaries (called from `lua_api/` wrappers). No purely internal C++ methods return `qint32` error codes. No further conversions needed.
 
 **Acceptance:** Internal C++ APIs use `std::expected`. Lua API wrappers may continue returning integers. Build + test pass.
 
