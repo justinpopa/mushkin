@@ -1398,6 +1398,145 @@ int L_ShowInfoBar(lua_State* L)
     return 0;
 }
 
+// ========== MXP / XML Entity Functions ==========
+
+/**
+ * world.GetEntity(name)
+ *
+ * Returns the value of a custom MXP entity defined with SetEntity() or
+ * via a <!ENTITY> definition received from the MUD server. Only custom
+ * entities (not the built-in HTML entities) are accessible through this
+ * function; use GetXMLEntity() for standard HTML entities.
+ *
+ * @param name (string) Entity name (without & and ; delimiters)
+ *
+ * @return (string) Entity value, or empty string if not found
+ *
+ * @example
+ * -- After MUD sends: <!ENTITY hp "150">
+ * local hp = GetEntity("hp")
+ * Note("Current HP: " .. hp)
+ *
+ * @see SetEntity, GetXMLEntity
+ */
+int L_GetEntity(lua_State* L)
+{
+    WorldDocument* pDoc = doc(L);
+    const char* name = luaL_checkstring(L, 1);
+    QString entityName = QString::fromUtf8(name).toLower();
+
+    // Look up in the custom entity map only (built-in entities via GetXMLEntity)
+    auto& customMap = pDoc->m_mxpEngine->m_customEntityMap;
+    auto it = customMap.find(entityName);
+    if (it != customMap.end()) {
+        const MXPEntity* entity = it->second.get();
+        QString value =
+            entity->strValue.isEmpty()
+                ? QString::fromUcs4(reinterpret_cast<const char32_t*>(&entity->iCodepoint), 1)
+                : entity->strValue;
+        QByteArray ba = value.toUtf8();
+        lua_pushlstring(L, ba.constData(), ba.length());
+        return 1;
+    }
+
+    // Not found — return empty string (original MUSHclient returns "")
+    lua_pushlstring(L, "", 0);
+    return 1;
+}
+
+/**
+ * world.GetXMLEntity(entity)
+ *
+ * Returns the resolved character for a standard XML/HTML entity name.
+ * Handles the built-in named entities (&amp;, &lt;, &gt;, &apos;, &quot;)
+ * as well as numeric entities (&#65; = "A", &#x41; = "A").
+ *
+ * @param entity (string) Entity name without & and ; (e.g., "amp", "lt", "#65", "#x41")
+ *
+ * @return (string) Resolved character(s), or empty string if unknown
+ *
+ * @example
+ * local lt = GetXMLEntity("lt")       -- Returns "<"
+ * local amp = GetXMLEntity("amp")     -- Returns "&"
+ * local A = GetXMLEntity("#65")       -- Returns "A" (decimal)
+ * local B = GetXMLEntity("#x42")      -- Returns "B" (hex)
+ *
+ * @see GetEntity, SetEntity
+ */
+int L_GetXMLEntity(lua_State* L)
+{
+    WorldDocument* pDoc = doc(L);
+    const char* entity = luaL_checkstring(L, 1);
+    QString entityName = QString::fromUtf8(entity);
+
+    // Delegate to the MXP engine's entity resolver which handles
+    // both numeric (&#65;, &#x41;) and named standard entities.
+    QString resolved = pDoc->m_mxpEngine->MXP_GetEntity(entityName);
+
+    QByteArray ba = resolved.toUtf8();
+    lua_pushlstring(L, ba.constData(), ba.length());
+    return 1;
+}
+
+/**
+ * world.SetEntity(name, value)
+ *
+ * Defines or updates a custom MXP entity. The entity can then be used by
+ * the MXP engine or retrieved with GetEntity(). Passing an empty string as
+ * value removes the entity.
+ *
+ * @param name (string) Entity name (without & and ; delimiters)
+ * @param value (string) Entity value (empty string to delete the entity)
+ *
+ * @return Nothing
+ *
+ * @example
+ * -- Define a custom entity
+ * SetEntity("myname", "Gandalf")
+ * local name = GetEntity("myname")  -- Returns "Gandalf"
+ *
+ * -- Delete the entity
+ * SetEntity("myname", "")
+ *
+ * @see GetEntity, GetXMLEntity
+ */
+int L_SetEntity(lua_State* L)
+{
+    WorldDocument* pDoc = doc(L);
+    const char* name = luaL_checkstring(L, 1);
+    const char* value = luaL_optstring(L, 2, "");
+
+    QString entityName = QString::fromUtf8(name).toLower();
+    QString entityValue = QString::fromUtf8(value);
+
+    auto& customMap = pDoc->m_mxpEngine->m_customEntityMap;
+
+    if (entityValue.isEmpty()) {
+        // Delete the entity
+        customMap.erase(entityName);
+        return 0;
+    }
+
+    // Cannot redefine built-in HTML entities
+    auto& stdMap = pDoc->m_mxpEngine->m_entityMap;
+    if (stdMap.count(entityName) > 0) {
+        return 0; // Silently ignore — matches original MUSHclient behaviour
+    }
+
+    // Upsert the custom entity
+    auto entity = std::make_unique<MXPEntity>();
+    entity->strName = entityName;
+    entity->strValue = entityValue;
+    if (entityValue.length() == 1) {
+        entity->iCodepoint = entityValue[0].unicode();
+    } else {
+        entity->iCodepoint = 0;
+    }
+    customMap[entityName] = std::move(entity);
+
+    return 0;
+}
+
 // ========== Registration ==========
 
 void register_world_output_functions(luaL_Reg*& ptr)

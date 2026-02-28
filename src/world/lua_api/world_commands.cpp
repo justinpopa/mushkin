@@ -667,6 +667,32 @@ int L_GetInternalCommandsList(lua_State* L)
     return 1;
 }
 
+/**
+ * world.Help(topic)
+ *
+ * Show help for a topic. In the original MUSHclient this opened the help
+ * viewer window to a specific topic page. Mushkin is a cross-platform
+ * rewrite without a compiled help file, so this function is a stub that
+ * returns eOK immediately.
+ *
+ * @param topic (string) Help topic to display (ignored in this implementation)
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Success (always)
+ *
+ * @example
+ * Help("triggers")
+ *
+ * @see DoCommand, GetInternalCommandsList
+ */
+int L_Help(lua_State* L)
+{
+    // Stub: mushkin has no compiled help file. Accept the topic argument
+    // silently and return eOK for plugin compatibility.
+    (void)L;
+    return luaReturnOK(L);
+}
+
 // ========== Registration ==========
 
 void register_world_command_functions(luaL_Reg*& ptr)
@@ -675,4 +701,5 @@ void register_world_command_functions(luaL_Reg*& ptr)
     *ptr++ = {"DiscardQueue", L_DiscardQueue};
     *ptr++ = {"DoCommand", L_DoCommand};
     *ptr++ = {"GetInternalCommandsList", L_GetInternalCommandsList};
+    *ptr++ = {"Help", L_Help};
 }

@@ -14,7 +14,8 @@
  * messages for later review.
  *
  * @param filename (string) Path to the log file (optional, uses default if omitted)
- * @param append (boolean) If true, append to existing file; if false, overwrite (optional, defaults to false)
+ * @param append (boolean) If true, append to existing file; if false, overwrite (optional, defaults
+ * to false)
  *
  * @return (number) Error code:
  *   - eOK (0): Success
@@ -30,7 +31,8 @@
  *
  * @see CloseLog, WriteLog, IsLogOpen
  */
-int L_OpenLog(lua_State* L) {
+int L_OpenLog(lua_State* L)
+{
     WorldDocument* pDoc = doc(L);
 
     QString filename;
@@ -64,7 +66,8 @@ int L_OpenLog(lua_State* L) {
  *
  * @see OpenLog, FlushLog, IsLogOpen
  */
-int L_CloseLog(lua_State* L) {
+int L_CloseLog(lua_State* L)
+{
     WorldDocument* pDoc = doc(L);
 
     qint32 result = pDoc->CloseLog();
@@ -92,7 +95,8 @@ int L_CloseLog(lua_State* L) {
  *
  * @see OpenLog, FlushLog, CloseLog
  */
-int L_WriteLog(lua_State* L) {
+int L_WriteLog(lua_State* L)
+{
     WorldDocument* pDoc = doc(L);
 
     QString message = QString::fromUtf8(luaL_checkstring(L, 1));
@@ -121,7 +125,8 @@ int L_WriteLog(lua_State* L) {
  *
  * @see OpenLog, WriteLog, CloseLog
  */
-int L_FlushLog(lua_State* L) {
+int L_FlushLog(lua_State* L)
+{
     WorldDocument* pDoc = doc(L);
 
     qint32 result = pDoc->FlushLog();
@@ -145,7 +150,8 @@ int L_FlushLog(lua_State* L) {
  *
  * @see OpenLog, CloseLog
  */
-int L_IsLogOpen(lua_State* L) {
+int L_IsLogOpen(lua_State* L)
+{
     WorldDocument* pDoc = doc(L);
 
     bool isOpen = pDoc->IsLogOpen();
@@ -154,12 +160,43 @@ int L_IsLogOpen(lua_State* L) {
     return 1;
 }
 
+/**
+ * world.OmitFromLogFile()
+ *
+ * Excludes the current line from the log file. When called from within a
+ * trigger script, the line that fired the trigger will not be written to
+ * the log even if logging is active. The flag is reset automatically after
+ * the line is processed.
+ *
+ * This is equivalent to setting the omit_from_log flag on a trigger, but
+ * allows the decision to be made dynamically at script run time.
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Always succeeds
+ *
+ * @example
+ * -- Called from a trigger script to suppress logging of a password line
+ * function OnPassword()
+ *     OmitFromLogFile()
+ * end
+ *
+ * @see OpenLog, WriteLog, CloseLog
+ */
+int L_OmitFromLogFile(lua_State* L)
+{
+    WorldDocument* pDoc = doc(L);
+    pDoc->m_bOmitCurrentLineFromLog = true;
+    return luaReturnOK(L);
+}
+
 // ========== Registration ==========
 
-void register_world_logging_functions(luaL_Reg* &ptr) {
+void register_world_logging_functions(luaL_Reg*& ptr)
+{
     *ptr++ = {"OpenLog", L_OpenLog};
     *ptr++ = {"CloseLog", L_CloseLog};
     *ptr++ = {"WriteLog", L_WriteLog};
     *ptr++ = {"FlushLog", L_FlushLog};
     *ptr++ = {"IsLogOpen", L_IsLogOpen};
+    *ptr++ = {"OmitFromLogFile", L_OmitFromLogFile};
 }

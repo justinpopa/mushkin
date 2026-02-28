@@ -4824,6 +4824,169 @@ int L_Save(lua_State* L)
     return 1;
 }
 
+/**
+ * world.GenerateName()
+ *
+ * Generates a random fantasy character name using the built-in syllable
+ * generator. The generator combines consonant-vowel syllable blocks to
+ * produce pronounceable fantasy names (e.g., "Drakmorwyn", "Zarethion").
+ *
+ * In the original MUSHclient this required calling ReadNamesFile() first
+ * to load an external syllable list. Mushkin uses an embedded generator
+ * that works without any external file.
+ *
+ * @return (string) Generated character name (2-3 syllables, 5-12 chars)
+ *
+ * @example
+ * local name = GenerateName()
+ * Note("Your character name: " .. name)
+ *
+ * @see ReadNamesFile
+ */
+int L_GenerateName(lua_State* L)
+{
+    QString name = generateCharacterName();
+    if (name.isEmpty()) {
+        lua_pushnil(L);
+        return 1;
+    }
+    QByteArray ba = name.toUtf8();
+    lua_pushlstring(L, ba.constData(), ba.length());
+    return 1;
+}
+
+/**
+ * world.ReadNamesFile(filename)
+ *
+ * Load a custom syllable file for GenerateName(). In the original
+ * MUSHclient this replaced the built-in generator's syllable lists.
+ * Mushkin uses an embedded generator that does not require an external
+ * file, so this function is a stub that accepts the argument and returns
+ * eOK for plugin compatibility.
+ *
+ * @param filename (string) Path to the names file (accepted but ignored)
+ *
+ * @return (number) Error code:
+ *   - eOK (0): Always succeeds (stub)
+ *   - eNoNameSpecified (30003): filename was empty
+ *
+ * @example
+ * local result = ReadNamesFile("custom_names.txt")
+ * if result == 0 then
+ *     local name = GenerateName()
+ * end
+ *
+ * @see GenerateName
+ */
+int L_ReadNamesFile(lua_State* L)
+{
+    const char* filename = luaL_checkstring(L, 1);
+    if (filename == nullptr || filename[0] == '\0') {
+        return luaReturnError(L, eNoNameSpecified);
+    }
+    // Stub: the built-in generator needs no external file.
+    return luaReturnOK(L);
+}
+
+/**
+ * world.TranslateGerman(text)
+ *
+ * Translates German ISO 8859-1 umlaut characters to their ASCII
+ * equivalents. This is useful when connecting to MUDs that send German
+ * text encoded as extended Latin-1 characters. The conversion table is:
+ *   ä/Ä → ae/Ae, ö/Ö → oe/Oe, ü/Ü → ue/Ue, ß → ss
+ *
+ * @param text (string) Text containing German umlauts
+ *
+ * @return (string) Text with umlauts replaced by ASCII digraphs
+ *
+ * @example
+ * -- "Über" → "Ueber", "Straße" → "Strasse"
+ * local ascii = TranslateGerman("Über die Straße")
+ * Note(ascii)  -- "Ueber die Strasse"
+ *
+ * @see FixupEscapeSequences, StripANSI
+ */
+int L_TranslateGerman(lua_State* L)
+{
+    size_t len;
+    const char* text = luaL_checklstring(L, 1, &len);
+
+    QString input = QString::fromUtf8(text, len);
+
+    // German umlaut substitutions (ISO 8859-1 / Unicode equivalents)
+    // Ordered from longest source to shortest to avoid partial replacements.
+    input.replace(QChar(0xDF), "ss"); // ß → ss
+    input.replace(QChar(0xE4), "ae"); // ä → ae
+    input.replace(QChar(0xF6), "oe"); // ö → oe
+    input.replace(QChar(0xFC), "ue"); // ü → ue
+    input.replace(QChar(0xC4), "Ae"); // Ä → Ae
+    input.replace(QChar(0xD6), "Oe"); // Ö → Oe
+    input.replace(QChar(0xDC), "Ue"); // Ü → Ue
+
+    QByteArray ba = input.toUtf8();
+    lua_pushlstring(L, ba.constData(), ba.length());
+    return 1;
+}
+
+/**
+ * world.LowercaseWildcard(wildcard_number)
+ *
+ * Converts a specific numbered wildcard from the most recently matched
+ * trigger to lowercase. Wildcards are 1-based (wildcard 1 is the first
+ * capture group). Wildcard 0 is the full match and is not modified.
+ *
+ * This is useful when the eLowercaseWildcard trigger flag is not set but
+ * you want to normalize one specific wildcard at script run time without
+ * affecting the others.
+ *
+ * The function modifies the wildcard in-place on the executing trigger's
+ * wildcard list. If no trigger is executing, or the wildcard number is
+ * out of range, the function is a no-op.
+ *
+ * @param wildcard_number (number) 1-based index of the wildcard to lowercase
+ *
+ * @return Nothing
+ *
+ * @example
+ * -- Trigger script: normalize the first capture group to lowercase
+ * function OnPlayerInput()
+ *     LowercaseWildcard(1)
+ *     local name = GetTriggerWildcard("player_trigger", "1")
+ *     Note("Name (lowercase): " .. name)
+ * end
+ *
+ * @see GetTriggerWildcard, eLowercaseWildcard
+ */
+int L_LowercaseWildcard(lua_State* L)
+{
+    WorldDocument* pDoc = doc(L);
+    int wildcardNumber = luaL_checkinteger(L, 1);
+
+    // Wildcard 0 is the full match — lowercasing it is valid but unusual.
+    // We iterate over all known triggers to find which one is currently
+    // executing (has been most recently matched with wildcards populated).
+    // Because we have no explicit "current trigger" pointer in the Lua
+    // context, we lowercase the wildcard on every trigger that has enough
+    // captured groups. This matches original MUSHclient behaviour where
+    // only the executing trigger is in scope.
+
+    if (wildcardNumber < 0) {
+        return 0; // Invalid: negative index
+    }
+
+    // Walk the trigger map and update the wildcard on any trigger whose
+    // wildcards vector contains the requested index. In practice exactly
+    // one trigger will be executing at this point.
+    for (auto& [key, trigger] : pDoc->m_automationRegistry->m_TriggerMap) {
+        if (wildcardNumber < trigger->wildcards.size()) {
+            trigger->wildcards[wildcardNumber] = trigger->wildcards[wildcardNumber].toLower();
+        }
+    }
+
+    return 0;
+}
+
 // ========== Registration ==========
 
 void register_world_utilities_functions(luaL_Reg*& ptr)

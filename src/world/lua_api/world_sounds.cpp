@@ -111,6 +111,45 @@ int L_Sound(lua_State* L)
 }
 
 /**
+ * world.PlaySoundMemory(buffer, data, loop, volume, pan)
+ *
+ * Play a sound from an in-memory buffer. In the original MUSHclient this
+ * passed raw PCM/WAV data directly to the sound driver. Mushkin uses
+ * Qt Multimedia which requires a file path or a QMediaContent source and
+ * does not support raw memory buffers in a cross-platform way.
+ *
+ * This function is a stub that returns eCannotPlaySound to inform the
+ * caller that memory-buffer playback is not supported. Use PlaySound()
+ * with a file path instead.
+ *
+ * @param buffer (number) Buffer slot number (1-10)
+ * @param data (string) Raw audio data (binary — ignored in this implementation)
+ * @param loop (boolean) Whether to loop (optional)
+ * @param volume (number) Volume -100..0 (optional)
+ * @param pan (number) Stereo panning -100..100 (optional)
+ *
+ * @return (number) Error code:
+ *   - eCannotPlaySound (30004): Memory-buffer playback not supported
+ *
+ * @example
+ * -- This will always fail; use PlaySound with a file path instead
+ * local result = PlaySoundMemory(1, audio_data)
+ * if result ~= 0 then
+ *     Note("Memory sound not supported, using file")
+ *     PlaySound(1, "sounds/alert.wav", false, 0, 0)
+ * end
+ *
+ * @see PlaySound, Sound, StopSound
+ */
+int L_PlaySoundMemory(lua_State* L)
+{
+    // Memory-buffer sound playback is not supported in the Qt Multimedia
+    // backend. Return eCannotPlaySound so callers can fall back gracefully.
+    (void)L;
+    return luaReturnError(L, eCannotPlaySound);
+}
+
+/**
  * world.GetSoundStatus(buffer)
  *
  * Query the status of a sound buffer.

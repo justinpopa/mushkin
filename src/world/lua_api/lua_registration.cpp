@@ -38,6 +38,10 @@ extern int L_ANSI(lua_State* L);
 extern int L_AnsiNote(lua_State* L);
 extern int L_Hyperlink(lua_State* L);
 extern int L_Simulate(lua_State* L);
+// MXP / XML entity functions (also in world_output.cpp)
+extern int L_GetEntity(lua_State* L);
+extern int L_GetXMLEntity(lua_State* L);
+extern int L_SetEntity(lua_State* L);
 
 // Info bar functions
 extern int L_Info(lua_State* L);
@@ -108,6 +112,7 @@ extern int L_Queue(lua_State* L);
 extern int L_DiscardQueue(lua_State* L);
 extern int L_DoCommand(lua_State* L);
 extern int L_GetInternalCommandsList(lua_State* L);
+extern int L_Help(lua_State* L);
 
 // Color functions
 extern int L_GetNormalColour(lua_State* L);
@@ -119,6 +124,7 @@ extern int L_GetCustomColourBackground(lua_State* L);
 extern int L_SetCustomColourText(lua_State* L);
 extern int L_SetCustomColourBackground(lua_State* L);
 extern int L_SetCustomColourName(lua_State* L);
+extern int L_GetCustomColourName(lua_State* L);
 extern int L_PickColour(lua_State* L);
 extern int L_AdjustColour(lua_State* L);
 extern int L_ColourNameToRGB(lua_State* L);
@@ -197,6 +203,10 @@ extern int L_SetTimerOption(lua_State* L);
 extern int L_Hash(lua_State* L);
 extern int L_Base64Encode(lua_State* L);
 extern int L_Base64Decode(lua_State* L);
+extern int L_GenerateName(lua_State* L);
+extern int L_ReadNamesFile(lua_State* L);
+extern int L_TranslateGerman(lua_State* L);
+extern int L_LowercaseWildcard(lua_State* L);
 extern int L_StripANSI(lua_State* L);
 extern int L_FixupEscapeSequences(lua_State* L);
 extern int L_FixupHTML(lua_State* L);
@@ -283,6 +293,7 @@ extern int L_CloseLog(lua_State* L);
 extern int L_WriteLog(lua_State* L);
 extern int L_FlushLog(lua_State* L);
 extern int L_IsLogOpen(lua_State* L);
+extern int L_OmitFromLogFile(lua_State* L);
 extern int L_GetLogInput(lua_State* L);
 extern int L_SetLogInput(lua_State* L);
 extern int L_GetLogNotes(lua_State* L);
@@ -360,6 +371,7 @@ extern int L_PlaySound(lua_State* L);
 extern int L_StopSound(lua_State* L);
 extern int L_Sound(lua_State* L);
 extern int L_GetSoundStatus(lua_State* L);
+extern int L_PlaySoundMemory(lua_State* L);
 
 // Notepad functions
 extern int L_SendToNotepad(lua_State* L);
@@ -581,6 +593,7 @@ int RegisterLuaRoutines(lua_State* L)
         {"DiscardQueue", L_DiscardQueue},
         {"DoCommand", L_DoCommand},
         {"GetInternalCommandsList", L_GetInternalCommandsList},
+        {"Help", L_Help},
 
         // Color functions
         {"GetNormalColour", L_GetNormalColour},
@@ -592,6 +605,7 @@ int RegisterLuaRoutines(lua_State* L)
         {"SetCustomColourText", L_SetCustomColourText},
         {"SetCustomColourBackground", L_SetCustomColourBackground},
         {"SetCustomColourName", L_SetCustomColourName},
+        {"GetCustomColourName", L_GetCustomColourName},
         {"PickColour", L_PickColour},
         {"AdjustColour", L_AdjustColour},
         // Bare-name compatibility aliases (dual get/set dispatch)
@@ -670,6 +684,10 @@ int RegisterLuaRoutines(lua_State* L)
         {"Hash", L_Hash},
         {"Base64Encode", L_Base64Encode},
         {"Base64Decode", L_Base64Decode},
+        {"GenerateName", L_GenerateName},
+        {"ReadNamesFile", L_ReadNamesFile},
+        {"TranslateGerman", L_TranslateGerman},
+        {"LowercaseWildcard", L_LowercaseWildcard},
         {"Trim", L_Trim},
         {"GetUniqueNumber", L_GetUniqueNumber},
         {"GetUniqueID", L_GetUniqueID},
@@ -759,6 +777,7 @@ int RegisterLuaRoutines(lua_State* L)
         {"WriteLog", L_WriteLog},
         {"FlushLog", L_FlushLog},
         {"IsLogOpen", L_IsLogOpen},
+        {"OmitFromLogFile", L_OmitFromLogFile},
         {"GetLogInput", L_GetLogInput},
         {"SetLogInput", L_SetLogInput},
         {"GetLogNotes", L_GetLogNotes},
@@ -919,6 +938,7 @@ int RegisterLuaRoutines(lua_State* L)
         {"StopSound", L_StopSound},
         {"Sound", L_Sound},
         {"GetSoundStatus", L_GetSoundStatus},
+        {"PlaySoundMemory", L_PlaySoundMemory},
 
         // Notepad functions
         {"SendToNotepad", L_SendToNotepad},
@@ -936,6 +956,11 @@ int RegisterLuaRoutines(lua_State* L)
         {"NotepadSaveMethod", L_NotepadSaveMethod},
         {"MoveNotepadWindow", L_MoveNotepadWindow},
         {"GetNotepadWindowPosition", L_GetNotepadWindowPosition},
+
+        // MXP / XML entity functions
+        {"GetEntity", L_GetEntity},
+        {"GetXMLEntity", L_GetXMLEntity},
+        {"SetEntity", L_SetEntity},
 
         // Mapper functions
         {"AddToMapper", L_AddToMapper},

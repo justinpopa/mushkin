@@ -776,6 +776,44 @@ int L_CustomColourBackground(lua_State* L)
     return L_GetCustomColourBackground(L);
 }
 
+/**
+ * world.GetCustomColourName(which)
+ *
+ * Returns the display name assigned to a custom color slot. Custom color
+ * names are set with SetCustomColourName() and appear in the configuration
+ * UI to help identify each slot's purpose. Returns an empty string if the
+ * slot has no name set or if the index is out of range.
+ *
+ * @param which (number) Custom color index 1-16
+ *
+ * @return (string) Name of the custom color slot, or empty string if not set
+ *
+ * @example
+ * local name = GetCustomColourName(1)
+ * if name ~= "" then
+ *     Note("Custom color 1 is named: " .. name)
+ * else
+ *     Note("Custom color 1 has no name")
+ * end
+ *
+ * @see SetCustomColourName, GetCustomColourText, GetCustomColourBackground
+ */
+int L_GetCustomColourName(lua_State* L)
+{
+    WorldDocument* pDoc = doc(L);
+    int which = luaL_checknumber(L, 1);
+
+    if (which < 1 || which > MAX_CUSTOM) {
+        lua_pushlstring(L, "", 0);
+        return 1;
+    }
+
+    const QString& name = pDoc->m_strCustomColourName[which - 1];
+    QByteArray ba = name.toUtf8();
+    lua_pushlstring(L, ba.constData(), ba.length());
+    return 1;
+}
+
 // ========== Registration ==========
 
 void register_world_colors_functions(luaL_Reg*& ptr)
