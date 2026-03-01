@@ -160,7 +160,7 @@ This is **by design** (mirrors MUSHclient original), but the remote client has i
 | S5 | MEDIUM | MXP DoS | Needs fix |
 | S6 | MEDIUM | Plugin XML DoS | Low priority (local files) |
 | S7 | LOW | Timing attack | Low priority (attempt limit) |
-| S8 | MEDIUM | Remote access | By design — document |
+| S8 | MEDIUM | Remote access | **Mitigated** — script prefix blocked for remote clients |
 | S9 | LOW | Credential storage | By design — document |
 
 ## Recommended Priority

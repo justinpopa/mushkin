@@ -1263,7 +1263,7 @@ void WorldDocument::logCommand(const QString& text)
  *
  * @param command - User-entered command (may contain multiple commands)
  */
-void WorldDocument::Execute(const QString& command)
+void WorldDocument::Execute(const QString& command, bool allowScriptPrefix)
 {
     QString strFixedCommand = command;
 
@@ -1296,7 +1296,7 @@ void WorldDocument::Execute(const QString& command)
     // Check for script prefix to execute Lua code directly
     // Based on methods_commands.cpp
 
-    if (m_scripting.enabled && !m_scripting.prefix.isEmpty() &&
+    if (allowScriptPrefix && m_scripting.enabled && !m_scripting.prefix.isEmpty() &&
         strFixedCommand.startsWith(m_scripting.prefix)) {
         // Remove prefix and get script command
         QString strCommand = strFixedCommand.mid(m_scripting.prefix.length());

@@ -181,8 +181,10 @@ void RemoteAccessServer::onClientCommand(const QString& command)
 {
     // Route command through WorldDocument's Execute() for full processing
     // (aliases, speedwalk, command stacking, etc.)
+    // Security: disable script prefix so remote clients cannot execute
+    // arbitrary Lua code. Aliases (including plugin-defined ones) still work.
     if (m_pDoc) {
-        m_pDoc->Execute(command);
+        m_pDoc->Execute(command, /*allowScriptPrefix=*/false);
     }
 }
 
