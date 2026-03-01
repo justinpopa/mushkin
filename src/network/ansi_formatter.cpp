@@ -214,7 +214,7 @@ QByteArray AnsiFormatter::colorToAnsi(QRgb color, quint16 colorType, bool isFore
         case COLOUR_CUSTOM: {
             if (m_pDoc) {
                 int index = color & 0x0F;
-                QRgb rgb = isForeground ? m_pDoc->m_customtext[index] : m_pDoc->m_customback[index];
+                QRgb rgb = isForeground ? m_pDoc->m_colors.custom_text[index] : m_pDoc->m_colors.custom_back[index];
                 result.append(CSI.data(), static_cast<qsizetype>(CSI.size()));
                 result.append(extCode);
                 result.append(";2;");

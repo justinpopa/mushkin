@@ -3,12 +3,12 @@
  *
  * Tests for word-wrap behavior matching original MUSHclient.
  *
- * The m_wrap setting controls whether lines wrap at word boundaries (spaces)
+ * The m_display.wrap setting controls whether lines wrap at word boundaries (spaces)
  * or at the exact column boundary:
- * - m_wrap = true (enabled): Break at last space before wrap column
- * - m_wrap = false (disabled): Hard break at wrap column
+ * - m_display.wrap = true (enabled): Break at last space before wrap column
+ * - m_display.wrap = false (disabled): Hard break at wrap column
  *
- * m_nWrapColumn controls the column width at which wrapping occurs.
+ * m_display.wrap_column controls the column width at which wrapping occurs.
  */
 
 #include "../src/text/line.h"
@@ -26,14 +26,14 @@ class WordWrapTest : public ::testing::Test {
     {
         doc = std::make_unique<WorldDocument>();
         // Set a small wrap column for easier testing
-        doc->m_nWrapColumn = 20;
+        doc->m_display.wrap_column = 20;
         // Enable word wrap by default
-        doc->m_wrap = true;
+        doc->m_display.wrap = true;
 
         // Create initial line for AddToLine to work
         // (normally done when connecting to a MUD)
         doc->m_currentLine = std::make_unique<Line>(1,                   // line number
-                                                    doc->m_nWrapColumn,  // wrap column
+                                                    doc->m_display.wrap_column,  // wrap column
                                                     0,                   // flags
                                                     qRgb(255, 255, 255), // foreground (white)
                                                     qRgb(0, 0, 0),       // background (black)
@@ -84,12 +84,12 @@ class WordWrapTest : public ::testing::Test {
 
 /**
  * Test 1: Word wrap breaks at last space
- * With m_wrap=true, text should break at the last space before wrap column
+ * With m_display.wrap=true, text should break at the last space before wrap column
  */
 TEST_F(WordWrapTest, WordWrapBreaksAtSpace)
 {
-    doc->m_wrap = true;
-    doc->m_nWrapColumn = 20;
+    doc->m_display.wrap = true;
+    doc->m_display.wrap_column = 20;
 
     // Add text with spaces: "Hello world this is a test"
     // At column 20, should break at a space
@@ -113,12 +113,12 @@ TEST_F(WordWrapTest, WordWrapBreaksAtSpace)
 
 /**
  * Test 2: Hard wrap when word-wrap disabled
- * With m_wrap=false, text should break exactly at wrap column
+ * With m_display.wrap=false, text should break exactly at wrap column
  */
 TEST_F(WordWrapTest, HardWrapWhenDisabled)
 {
-    doc->m_wrap = false; // Disable word wrap
-    doc->m_nWrapColumn = 20;
+    doc->m_display.wrap = false; // Disable word wrap
+    doc->m_display.wrap_column = 20;
 
     // Add text longer than wrap column
     const char* text = "ThisIsAVeryLongWordWithNoSpaces";
@@ -138,8 +138,8 @@ TEST_F(WordWrapTest, HardWrapWhenDisabled)
  */
 TEST_F(WordWrapTest, NoWrapWhenTextFits)
 {
-    doc->m_wrap = true;
-    doc->m_nWrapColumn = 80;
+    doc->m_display.wrap = true;
+    doc->m_display.wrap_column = 80;
 
     const char* text = "Short text";
     doc->AddToLine(text, strlen(text));
@@ -156,8 +156,8 @@ TEST_F(WordWrapTest, NoWrapWhenTextFits)
  */
 TEST_F(WordWrapTest, MultipleWraps)
 {
-    doc->m_wrap = true;
-    doc->m_nWrapColumn = 20;
+    doc->m_display.wrap = true;
+    doc->m_display.wrap_column = 20;
 
     // Text that will wrap multiple times
     const char* text = "The quick brown fox jumps over the lazy dog and keeps running";
@@ -169,12 +169,12 @@ TEST_F(WordWrapTest, MultipleWraps)
 
 /**
  * Test 5: Wrap column 0 means no wrapping
- * Setting m_nWrapColumn to 0 should disable wrapping entirely
+ * Setting m_display.wrap_column to 0 should disable wrapping entirely
  */
 TEST_F(WordWrapTest, WrapColumnZeroDisablesWrap)
 {
-    doc->m_wrap = true;
-    doc->m_nWrapColumn = 0; // Disable wrapping
+    doc->m_display.wrap = true;
+    doc->m_display.wrap_column = 0; // Disable wrapping
 
     const char* text = "This is a very long line that would normally wrap but should not because "
                        "wrap column is zero";
@@ -192,8 +192,8 @@ TEST_F(WordWrapTest, WrapColumnZeroDisablesWrap)
  */
 TEST_F(WordWrapTest, SoftWrapHasHardReturnFalse)
 {
-    doc->m_wrap = true;
-    doc->m_nWrapColumn = 20;
+    doc->m_display.wrap = true;
+    doc->m_display.wrap_column = 20;
 
     const char* text = "Hello world this is a wrapped line";
     doc->AddToLine(text, strlen(text));
@@ -211,8 +211,8 @@ TEST_F(WordWrapTest, SoftWrapHasHardReturnFalse)
  */
 TEST_F(WordWrapTest, SpaceAtWrapBoundary)
 {
-    doc->m_wrap = true;
-    doc->m_nWrapColumn = 10;
+    doc->m_display.wrap = true;
+    doc->m_display.wrap_column = 10;
 
     // "1234567890 text" - space at position 10
     const char* text = "1234567890 text";
@@ -228,8 +228,8 @@ TEST_F(WordWrapTest, SpaceAtWrapBoundary)
  */
 TEST_F(WordWrapTest, NoSpacesFallsBackToHardWrap)
 {
-    doc->m_wrap = true;
-    doc->m_nWrapColumn = 20;
+    doc->m_display.wrap = true;
+    doc->m_display.wrap_column = 20;
 
     // No spaces - should hard wrap even with word wrap enabled
     const char* text = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -246,11 +246,11 @@ TEST_F(WordWrapTest, NoSpacesFallsBackToHardWrap)
 TEST_F(WordWrapTest, GetSetOptionWrap)
 {
     // Set wrap via direct assignment
-    doc->m_wrap = false;
-    EXPECT_FALSE(doc->m_wrap) << "m_wrap should be false";
+    doc->m_display.wrap = false;
+    EXPECT_FALSE(doc->m_display.wrap) << "m_display.wrap should be false";
 
-    doc->m_wrap = true;
-    EXPECT_TRUE(doc->m_wrap) << "m_wrap should be true";
+    doc->m_display.wrap = true;
+    EXPECT_TRUE(doc->m_display.wrap) << "m_display.wrap should be true";
 }
 
 /**
@@ -261,8 +261,8 @@ TEST_F(WordWrapTest, GetSetOptionWrap)
  */
 TEST_F(WordWrapTest, TrailingSpacePreserved)
 {
-    doc->m_wrap = true;
-    doc->m_nWrapColumn = 15;
+    doc->m_display.wrap = true;
+    doc->m_display.wrap_column = 15;
 
     // "Hello world test" - space after "world" at position 11
     // After wrap at position 15, first line should be "Hello world " (with trailing space)
@@ -297,8 +297,8 @@ TEST_F(WordWrapTest, TrailingSpacePreserved)
  */
 TEST_F(WordWrapTest, MultipleSpacesHandled)
 {
-    doc->m_wrap = true;
-    doc->m_nWrapColumn = 15;
+    doc->m_display.wrap = true;
+    doc->m_display.wrap_column = 15;
 
     // Text with multiple spaces
     const char* text = "aa  bb  cc  dd  ee";

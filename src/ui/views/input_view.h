@@ -246,9 +246,9 @@ class InputView : public QPlainTextEdit, public IInputView {
      * Based on CSendView auto-resize from sendvw.cpp
      *
      * Resizes height based on:
-     * - m_bAutoResizeCommandWindow (enabled?)
-     * - m_iAutoResizeMinimumLines (minimum height)
-     * - m_iAutoResizeMaximumLines (maximum height)
+     * - m_command_window.auto_resize (enabled?)
+     * - m_command_window.minimum_lines (minimum height)
+     * - m_command_window.maximum_lines (maximum height)
      * - Current line count
      */
     void updateHeight();

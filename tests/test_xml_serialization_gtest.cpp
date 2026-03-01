@@ -117,8 +117,8 @@ TEST_F(XmlSerializationTest, BasicWorldPropertiesRoundTrip)
     doc1->m_port = 4000;
     doc1->m_name = "TestPlayer";
     doc1->m_password = "SecretPassword";
-    doc1->m_wrap = true;
-    doc1->m_nWrapColumn = 80;
+    doc1->m_display.wrap = true;
+    doc1->m_display.wrap_column = 80;
 
     // Generate unique filename (avoids Windows file locking with QTemporaryFile)
     QString filename = generateTempFilename("basic_roundtrip");
@@ -135,8 +135,9 @@ TEST_F(XmlSerializationTest, BasicWorldPropertiesRoundTrip)
     EXPECT_EQ(doc2->m_port, doc1->m_port) << "m_port should match";
     EXPECT_EQ(doc2->m_name, doc1->m_name) << "m_name should match";
     EXPECT_EQ(doc2->m_password, doc1->m_password) << "m_password should match";
-    EXPECT_EQ(doc2->m_wrap, doc1->m_wrap) << "m_wrap should match";
-    EXPECT_EQ(doc2->m_nWrapColumn, doc1->m_nWrapColumn) << "m_nWrapColumn should match";
+    EXPECT_EQ(doc2->m_display.wrap, doc1->m_display.wrap) << "m_display.wrap should match";
+    EXPECT_EQ(doc2->m_display.wrap_column, doc1->m_display.wrap_column)
+        << "m_display.wrap_column should match";
 
     cleanupSaveFiles(filename);
 }
@@ -173,7 +174,7 @@ TEST_F(XmlSerializationTest, PasswordEncodingDecoding)
 TEST_F(XmlSerializationTest, BooleanValuesSerializeCorrectly)
 {
     auto doc1 = std::make_unique<WorldDocument>();
-    doc1->m_wrap = true;
+    doc1->m_display.wrap = true;
     doc1->m_enable_triggers = true;
     doc1->m_enable_aliases = false;
 
@@ -185,7 +186,7 @@ TEST_F(XmlSerializationTest, BooleanValuesSerializeCorrectly)
     auto doc2 = std::make_unique<WorldDocument>();
     ASSERT_TRUE(XmlSerialization::LoadWorldXML(doc2.get(), filename)) << "LoadWorldXML failed";
 
-    EXPECT_EQ(doc2->m_wrap, true) << "m_wrap should be true";
+    EXPECT_EQ(doc2->m_display.wrap, true) << "m_display.wrap should be true";
     EXPECT_EQ(doc2->m_enable_triggers, true) << "m_enable_triggers should be true";
     EXPECT_EQ(doc2->m_enable_aliases, false) << "m_enable_aliases should be false";
 
@@ -225,14 +226,14 @@ TEST_F(XmlSerializationTest, LoadRealAardwolfFile)
     EXPECT_EQ(doc->m_name, "TestPlayer") << "m_name should be 'TestPlayer'";
     EXPECT_EQ(doc->m_password, "TestPassword123") << "m_password should be 'TestPassword123'";
     EXPECT_EQ(doc->m_strWorldID, "e0eb198d8d5698e3b2f61483") << "m_strWorldID should match";
-    EXPECT_EQ(doc->m_strLanguage, "Lua") << "m_strLanguage should be 'Lua'";
-    EXPECT_EQ(doc->m_bUTF_8, true) << "m_bUTF_8 should be true";
-    EXPECT_EQ(doc->m_wrap, true) << "m_wrap should be true";
-    EXPECT_EQ(doc->m_nWrapColumn, 124) << "m_nWrapColumn should be 124";
+    EXPECT_EQ(doc->m_scripting.language, "Lua") << "m_scripting.language should be 'Lua'";
+    EXPECT_EQ(doc->m_display.utf8, true) << "m_display.utf8 should be true";
+    EXPECT_EQ(doc->m_display.wrap, true) << "m_display.wrap should be true";
+    EXPECT_EQ(doc->m_display.wrap_column, 124) << "m_display.wrap_column should be 124";
     EXPECT_EQ(doc->m_enable_triggers, true) << "m_enable_triggers should be true";
     EXPECT_EQ(doc->m_enable_aliases, true) << "m_enable_aliases should be true";
-    EXPECT_EQ(doc->m_font_name, "Fira Code") << "m_font_name should be 'Fira Code'";
-    EXPECT_EQ(doc->m_input_font_name, "Fira Code") << "m_input_font_name should be 'Fira Code'";
+    EXPECT_EQ(doc->m_output.font_name, "Fira Code") << "m_output.font_name should be 'Fira Code'";
+    EXPECT_EQ(doc->m_input.font_name, "Fira Code") << "m_input.font_name should be 'Fira Code'";
     EXPECT_EQ(doc->m_strTerminalIdentification, "MUSHclient-Aard")
         << "m_strTerminalIdentification should be 'MUSHclient-Aard'";
 }

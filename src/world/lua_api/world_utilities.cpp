@@ -2318,10 +2318,10 @@ int L_ShiftTabCompleteItem(lua_State* L)
         pDoc->m_ExtraShiftTabCompleteItems.clear();
     } else if (strcmp(item, "<functions>") == 0) {
         // Enable function display
-        pDoc->m_bTabCompleteFunctions = true;
+        pDoc->m_scripting.tab_complete_functions = true;
     } else if (strcmp(item, "<nofunctions>") == 0) {
         // Disable function display
-        pDoc->m_bTabCompleteFunctions = false;
+        pDoc->m_scripting.tab_complete_functions = false;
     } else {
         // Validate name (alphanumeric, dot, hyphen, underscore, starts with letter)
         if (!isValidCompletionName(item)) {
@@ -2643,7 +2643,7 @@ int L_SetEchoInput(lua_State* L)
 int L_GetSpeedWalkDelay(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    lua_pushinteger(L, pDoc->m_iSpeedWalkDelay);
+    lua_pushinteger(L, pDoc->m_speedwalk.delay);
     return 1;
 }
 
@@ -2673,7 +2673,7 @@ int L_SetSpeedWalkDelay(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
     int delay = luaL_checkinteger(L, 1);
-    pDoc->m_iSpeedWalkDelay = delay;
+    pDoc->m_speedwalk.delay = delay;
     // Not applicable: Windows MFC timer list window refresh. Timer changes take effect on next
     // check.
     return 0;
@@ -3949,8 +3949,8 @@ int L_SetOutputFont(lua_State* L)
     const char* fontName = luaL_checkstring(L, 1);
     int pointSize = luaL_checkinteger(L, 2);
 
-    pDoc->m_font_name = QString::fromUtf8(fontName);
-    pDoc->m_font_height = pointSize; // Store as provided
+    pDoc->m_output.font_name = QString::fromUtf8(fontName);
+    pDoc->m_output.font_height = pointSize; // Store as provided
     emit pDoc->outputSettingsChanged();
     return 0;
 }
@@ -3975,10 +3975,10 @@ int L_SetInputFont(lua_State* L)
     int weight = luaL_checkinteger(L, 3);
     int italic = luaL_optinteger(L, 4, 0);
 
-    pDoc->m_input_font_name = QString::fromUtf8(fontName);
-    pDoc->m_input_font_height = pointSize;
-    pDoc->m_input_font_weight = weight;
-    pDoc->m_input_font_italic = italic ? 1 : 0;
+    pDoc->m_input.font_name = QString::fromUtf8(fontName);
+    pDoc->m_input.font_height = pointSize;
+    pDoc->m_input.font_weight = weight;
+    pDoc->m_input.font_italic = italic ? 1 : 0;
     emit pDoc->inputSettingsChanged();
     return 0;
 }
@@ -4915,11 +4915,11 @@ int L_Save(lua_State* L)
     }
 
     // Execute "save" script handler if configured
-    if (!pDoc->m_strWorldSave.isEmpty() && pDoc->m_ScriptEngine) {
+    if (!pDoc->m_scripting.on_world_save.isEmpty() && pDoc->m_ScriptEngine) {
         QList<double> nparams;
         QList<QString> sparams;
         qint32 invocation_count = 0;
-        pDoc->m_ScriptEngine->executeLua(pDoc->m_dispidWorldSave, pDoc->m_strWorldSave,
+        pDoc->m_ScriptEngine->executeLua(pDoc->m_dispidWorldSave, pDoc->m_scripting.on_world_save,
                                          ActionSource::eWorldAction, "world", "world save", nparams,
                                          sparams, invocation_count);
     }

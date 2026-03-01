@@ -104,8 +104,8 @@ void ConnectionManager::onConnect(int errorCode)
         // Create initial line if needed.
         if (!m_doc.m_currentLine) {
             m_doc.m_currentLine =
-                std::make_unique<Line>(1, m_doc.m_nWrapColumn, m_doc.m_iFlags, m_doc.m_iForeColour,
-                                       m_doc.m_iBackColour, m_doc.m_bUTF_8);
+                std::make_unique<Line>(1, m_doc.m_display.wrap_column, m_doc.m_iFlags, m_doc.m_iForeColour,
+                                       m_doc.m_iBackColour, m_doc.m_display.utf8);
 
             auto initial_style = std::make_unique<Style>();
             initial_style->iLength = 0;

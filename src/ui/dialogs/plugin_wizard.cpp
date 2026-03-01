@@ -769,8 +769,8 @@ PluginWizardPage7::PluginWizardPage7(WorldDocument* doc, QWidget* parent)
 void PluginWizardPage7::initializePage()
 {
     // Load world's script file if it exists and script is empty
-    if (m_scriptEdit->toPlainText().isEmpty() && !m_doc->m_strScriptFilename.isEmpty()) {
-        QFile file(m_doc->m_strScriptFilename);
+    if (m_scriptEdit->toPlainText().isEmpty() && !m_doc->m_scripting.filename.isEmpty()) {
+        QFile file(m_doc->m_scripting.filename);
         if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
             QTextStream in(&file);
             m_scriptEdit->setPlainText(in.readAll());

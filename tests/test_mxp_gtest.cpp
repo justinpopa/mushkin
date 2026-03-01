@@ -30,7 +30,7 @@ class MXPTest : public ::testing::Test {
         doc->m_mush_name = "Test World";
         doc->m_server = "test.mud.com";
         doc->m_port = 4000;
-        doc->m_bUTF_8 = true;
+        doc->m_display.utf8 = true;
 
         // Enable MXP - this triggers initialization
         doc->MXP_On();

@@ -93,12 +93,12 @@ void AutoSayPage::loadSettings()
     m_excludeNonAlphaCheck->blockSignals(true);
     m_reEvaluateCheck->blockSignals(true);
 
-    m_enableCheck->setChecked(m_doc->m_bEnableAutoSay);
-    m_sayStringEdit->setText(m_doc->m_strAutoSayString);
-    m_overridePrefixEdit->setText(m_doc->m_strOverridePrefix);
-    m_excludeMacrosCheck->setChecked(m_doc->m_bExcludeMacros);
-    m_excludeNonAlphaCheck->setChecked(m_doc->m_bExcludeNonAlpha);
-    m_reEvaluateCheck->setChecked(m_doc->m_bReEvaluateAutoSay);
+    m_enableCheck->setChecked(m_doc->m_auto_say.enabled);
+    m_sayStringEdit->setText(m_doc->m_auto_say.say_string);
+    m_overridePrefixEdit->setText(m_doc->m_auto_say.override_prefix);
+    m_excludeMacrosCheck->setChecked(m_doc->m_auto_say.exclude_macros);
+    m_excludeNonAlphaCheck->setChecked(m_doc->m_auto_say.exclude_non_alpha);
+    m_reEvaluateCheck->setChecked(m_doc->m_auto_say.re_evaluate);
 
     // Unblock signals
     m_enableCheck->blockSignals(false);
@@ -116,12 +116,12 @@ void AutoSayPage::saveSettings()
     if (!m_doc)
         return;
 
-    m_doc->m_bEnableAutoSay = m_enableCheck->isChecked();
-    m_doc->m_strAutoSayString = m_sayStringEdit->text();
-    m_doc->m_strOverridePrefix = m_overridePrefixEdit->text();
-    m_doc->m_bExcludeMacros = m_excludeMacrosCheck->isChecked();
-    m_doc->m_bExcludeNonAlpha = m_excludeNonAlphaCheck->isChecked();
-    m_doc->m_bReEvaluateAutoSay = m_reEvaluateCheck->isChecked();
+    m_doc->m_auto_say.enabled = m_enableCheck->isChecked();
+    m_doc->m_auto_say.say_string = m_sayStringEdit->text();
+    m_doc->m_auto_say.override_prefix = m_overridePrefixEdit->text();
+    m_doc->m_auto_say.exclude_macros = m_excludeMacrosCheck->isChecked();
+    m_doc->m_auto_say.exclude_non_alpha = m_excludeNonAlphaCheck->isChecked();
+    m_doc->m_auto_say.re_evaluate = m_reEvaluateCheck->isChecked();
 
     m_doc->setModified(true);
     m_hasChanges = false;

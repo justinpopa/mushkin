@@ -142,7 +142,7 @@ void TelnetParser::Phase_IAC(unsigned char& c)
     switch (c) {
         case EOR:
             m_phase = Phase::NONE;
-            if (m_doc.m_bConvertGAtoNewline) {
+            if (m_doc.m_spam.convert_ga_to_newline) {
                 new_c = '\n';
             }
             m_doc.m_last_line_with_IAC_GA = m_doc.m_total_lines;
@@ -151,7 +151,7 @@ void TelnetParser::Phase_IAC(unsigned char& c)
 
         case GO_AHEAD:
             m_phase = Phase::NONE;
-            if (m_doc.m_bConvertGAtoNewline) {
+            if (m_doc.m_spam.convert_ga_to_newline) {
                 new_c = '\n';
             }
             m_doc.m_last_line_with_IAC_GA = m_doc.m_total_lines;
@@ -315,7 +315,7 @@ void TelnetParser::Phase_WILL(unsigned char c)
             break;
 
         case TELOPT_ECHO:
-            if (!m_doc.m_bNoEchoOff) {
+            if (!m_doc.m_input.no_echo_off) {
                 m_bNoEcho = true;
                 Send_IAC_DO(c);
             } else {
@@ -335,7 +335,7 @@ void TelnetParser::Phase_WILL(unsigned char c)
             break;
 
         case WILL_END_OF_RECORD: // EOR
-            if (m_doc.m_bConvertGAtoNewline) {
+            if (m_doc.m_spam.convert_ga_to_newline) {
                 Send_IAC_DO(c);
             } else {
                 Send_IAC_DONT(c);
@@ -365,7 +365,7 @@ void TelnetParser::Phase_WILL(unsigned char c)
             break;
 
         case TELOPT_MSP:
-            if (m_doc.m_bUseMSP) {
+            if (m_doc.m_sound.use_msp) {
                 Send_IAC_DO(c);
                 m_bMSP = true;
             } else {
@@ -396,7 +396,7 @@ void TelnetParser::Phase_WONT(unsigned char c)
 
     switch (c) {
         case TELOPT_ECHO:
-            if (!m_doc.m_bNoEchoOff) {
+            if (!m_doc.m_input.no_echo_off) {
                 m_bNoEcho = false;
             }
             Send_IAC_DONT(c);
@@ -433,7 +433,7 @@ void TelnetParser::Phase_DO(unsigned char c)
             if (m_doc.m_bNAWS) {
                 Send_IAC_WILL(c);
                 m_bNAWS_wanted = true;
-                sendWindowSizes(m_doc.m_nWrapColumn);
+                sendWindowSizes(m_doc.m_display.wrap_column);
             } else {
                 Send_IAC_WONT(c);
             }
@@ -786,7 +786,7 @@ void TelnetParser::Handle_TELOPT_CHARSET()
     QList<QByteArray> charsets = m_IAC_subnegotiation_data.mid(2).split(delim);
 
     QByteArray strCharset = "US-ASCII"; // default
-    if (m_doc.m_bUTF_8) {
+    if (m_doc.m_display.utf8) {
         strCharset = "UTF-8";
     }
 
@@ -852,7 +852,7 @@ void TelnetParser::Handle_TELOPT_TERMINAL_TYPE()
             break;
 
         case 2:
-            if (m_doc.m_bUTF_8) {
+            if (m_doc.m_display.utf8) {
                 strTemp = "MTTS 269"; // ANSI=1, UTF-8=4, 256=8, TRUECOLOR=256
             } else {
                 strTemp = "MTTS 265"; // ANSI=1, 256=8, TRUECOLOR=256

@@ -120,7 +120,7 @@ void WorldDocument::ProcessIncomingByte(unsigned char c)
     Phase& phase = tp.m_phase;
 
     // Special case: UTF-8 multibyte start in normal mode
-    if (m_bUTF_8 && phase == Phase::NONE && (c & 0x80)) {
+    if (m_display.utf8 && phase == Phase::NONE && (c & 0x80)) {
         if ((c & 0xE0) == 0xC0) {
             m_UTF8Sequence[0] = c;
             m_UTF8Sequence[1] = 0;
@@ -347,7 +347,7 @@ void WorldDocument::RememberStyle(const Style* pStyle)
  * Style Tracking
  *
  * This converts color values from ANSI indices (0-7) to actual RGB colors
- * using the lookup tables (m_normalcolour[], m_boldcolour[]). If already
+ * using the lookup tables (m_colors.normal_colour[], m_colors.bold_colour[]). If already
  * in RGB mode, returns colors as-is.
  *
  * @param pOldStyle Style to get colors from (nullptr = use current style)
@@ -380,7 +380,7 @@ void WorldDocument::GetStyleRGB(const Style* pOldStyle, QRgb& iForeColour, QRgb&
         if (foreIndex < 8) {
             // Use bold table if HILITE flag set, otherwise normal table
             bool bold = (flags & HILITE) != 0;
-            iForeColour = bold ? m_boldcolour[foreIndex] : m_normalcolour[foreIndex];
+            iForeColour = bold ? m_colors.bold_colour[foreIndex] : m_colors.normal_colour[foreIndex];
         } else {
             // Invalid index, use as-is
             iForeColour = fore;
@@ -388,7 +388,7 @@ void WorldDocument::GetStyleRGB(const Style* pOldStyle, QRgb& iForeColour, QRgb&
 
         if (backIndex < 8) {
             // Background always uses normal table (never bold)
-            iBackColour = m_normalcolour[backIndex];
+            iBackColour = m_colors.normal_colour[backIndex];
         } else {
             // Invalid index, use as-is
             iBackColour = back;
@@ -399,13 +399,13 @@ void WorldDocument::GetStyleRGB(const Style* pOldStyle, QRgb& iForeColour, QRgb&
         int backIndex = back & 0xFF;
 
         if (foreIndex < MAX_CUSTOM) {
-            iForeColour = m_customtext[foreIndex];
+            iForeColour = m_colors.custom_text[foreIndex];
         } else {
             iForeColour = fore;
         }
 
         if (backIndex < MAX_CUSTOM) {
-            iBackColour = m_customback[backIndex];
+            iBackColour = m_colors.custom_back[backIndex];
         } else {
             iBackColour = back;
         }
@@ -481,21 +481,21 @@ void WorldDocument::InterpretANSIcode(const int iCode)
                 // Inverse: foreground code affects background
                 if (m_bAlternativeInverse) {
                     if (iFlags & HILITE)
-                        iBackColour = m_boldcolour[i];
+                        iBackColour = m_colors.bold_colour[i];
                     else
-                        iBackColour = m_normalcolour[i];
+                        iBackColour = m_colors.normal_colour[i];
                 } else {
-                    iBackColour = m_normalcolour[i];
+                    iBackColour = m_colors.normal_colour[i];
                 }
             } else {
                 // Normal: foreground code affects foreground
                 if (m_bCustom16isDefaultColour && (iCode == ANSI_SET_FOREGROUND_DEFAULT))
-                    iForeColour = m_customtext[15];
+                    iForeColour = m_colors.custom_text[15];
                 else {
                     if (iFlags & HILITE)
-                        iForeColour = m_boldcolour[i];
+                        iForeColour = m_colors.bold_colour[i];
                     else
-                        iForeColour = m_normalcolour[i];
+                        iForeColour = m_colors.normal_colour[i];
                 }
             }
         }
@@ -511,18 +511,18 @@ void WorldDocument::InterpretANSIcode(const int iCode)
                 // Inverse: background code affects foreground
                 if (m_bAlternativeInverse) {
                     if (iFlags & HILITE)
-                        iForeColour = m_boldcolour[i];
+                        iForeColour = m_colors.bold_colour[i];
                     else
-                        iForeColour = m_normalcolour[i];
+                        iForeColour = m_colors.normal_colour[i];
                 } else {
-                    iForeColour = m_normalcolour[i];
+                    iForeColour = m_colors.normal_colour[i];
                 }
             } else {
                 // Normal: background code affects background
                 if (m_bCustom16isDefaultColour && (iCode == ANSI_SET_BACKGROUND_DEFAULT))
-                    iBackColour = m_customback[15];
+                    iBackColour = m_colors.custom_back[15];
                 else
-                    iBackColour = m_normalcolour[i];
+                    iBackColour = m_colors.normal_colour[i];
             }
         }
     } else {
@@ -617,8 +617,8 @@ void WorldDocument::InterpretANSIcode(const int iCode)
             if (m_bCustom16isDefaultColour && (iFlags & COLOURTYPE) == COLOUR_RGB &&
                 !(iFlags & HILITE)) {
                 for (int i = 0; i < 7; i++) {
-                    if (iForeColour == m_normalcolour[i]) {
-                        iForeColour = m_boldcolour[i];
+                    if (iForeColour == m_colors.normal_colour[i]) {
+                        iForeColour = m_colors.bold_colour[i];
                         break;
                     }
                 }
@@ -651,8 +651,8 @@ void WorldDocument::InterpretANSIcode(const int iCode)
             if (m_bCustom16isDefaultColour && (iFlags & COLOURTYPE) == COLOUR_RGB &&
                 (iFlags & HILITE)) {
                 for (int i = 0; i < 7; i++) {
-                    if (iForeColour == m_boldcolour[i]) {
-                        iForeColour = m_normalcolour[i];
+                    if (iForeColour == m_colors.bold_colour[i]) {
+                        iForeColour = m_colors.normal_colour[i];
                         break;
                     }
                 }

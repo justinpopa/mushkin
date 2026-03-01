@@ -94,31 +94,14 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_connect_now = false;
 
     // ========== Initialize display settings ==========
-    m_font_name = "Courier New";
-    m_font_height = 12;  // matches original MUSHclient default
-    m_font_weight = 400; // FW_NORMAL
-    m_font_charset = 0;  // DEFAULT_CHARSET
-    m_wrap = true;       // wrap enabled (matches original MUSHclient default)
-    m_timestamps = false;
-    m_match_width = false;
+    // m_display uses default member initializers (DisplayConfig)
+    // m_output uses default member initializers (OutputConfig)
 
     // ========== Initialize colors ==========
     initializeColors();
 
-    // ========== Initialize input colors and font ==========
-    // Colors are stored in BGR format (Windows COLORREF: 0x00BBGGRR)
-    m_input_text_colour = BGR(0, 0, 0);             // Black text
-    m_input_background_colour = BGR(255, 255, 255); // White background
-    m_input_font_height = 12;
-    m_input_font_name = "Courier New";
-    m_input_font_italic = 0;
-    m_input_font_weight = 400; // FW_NORMAL
-    m_input_font_charset = 0;
-
-    // ========== Initialize buffer settings ==========
-    m_maxlines = 5000;
-    m_nHistoryLines = 1000;
-    m_nWrapColumn = 80;
+    // ========== Initialize input configuration ==========
+    // (InputConfig m_input uses default member initializers)
 
     // ========== Initialize triggers, aliases, timers - Enable Flags ==========
     m_enable_aliases = true;
@@ -131,10 +114,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
 
     // ========== Initialize input handling ==========
     m_display_my_input = true;
-    m_echo_colour = 65535; // SAMECOLOUR
-    m_bEscapeDeletesInput = false;
-    m_bArrowsChangeHistory = true;
-    m_bConfirmOnPaste = true; // Default: true (like original)
+    // m_output.echo_colour uses default member initializer (65535 = SAMECOLOUR)
 
     // ========== Initialize command history ==========
     m_commandHistory.clear();
@@ -144,11 +124,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_last_command = QString();                  // No previous command yet
     m_iHistoryStatus = HistoryStatus::eAtBottom; // Start at bottom (ready for new commands)
 
-    // ========== Initialize sound ==========
-    m_enable_beeps = true;
-    m_enable_trigger_sounds = true;
-    m_new_activity_sound = QString();
-    m_strBeepSound = QString();
+    // (SoundConfig m_sound uses default member initializers)
 
     // ========== Initialize macros ==========
     m_macros.fill(QString());
@@ -159,50 +135,14 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_keypad.fill(QString());
     m_keypad_enable = false;
 
-    // ========== Initialize speed walking ==========
-    m_enable_speed_walk = false;
-    m_speed_walk_prefix = QString();
-    m_strSpeedWalkFiller = QString();
-    m_iSpeedWalkDelay = 0;
-
-    // ========== Initialize command stack ==========
-    m_enable_command_stack = false;
-    m_strCommandStackCharacter = ";";
-
     // ========== Initialize connection text ==========
     m_connect_text = QString();
-
-    // ========== Initialize file handling ==========
-    m_file_postamble = QString();
-    m_file_preamble = QString();
-    m_line_postamble = QString();
-    m_line_preamble = QString();
-
-    // ========== Initialize paste settings ==========
-    m_paste_postamble = QString();
-    m_paste_preamble = QString();
-    m_pasteline_postamble = QString();
-    m_pasteline_preamble = QString();
 
     // ========== Initialize notes ==========
     m_notes = QString();
 
     // ========== Initialize scripting ==========
-    m_strLanguage = "Lua";
-    m_bEnableScripts = true;
-    m_strScriptFilename = QString();
-    m_strScriptPrefix = "/";
-    m_strScriptEditor = QString();
-    m_strScriptEditorArgument = QString();
-
-    // ========== Initialize script event handlers ==========
-    m_strWorldOpen = QString();
-    m_strWorldClose = QString();
-    m_strWorldSave = QString();
-    m_strWorldConnect = QString();
-    m_strWorldDisconnect = QString();
-    m_strWorldGetFocus = QString();
-    m_strWorldLoseFocus = QString();
+    // (ScriptConfig m_scripting uses default member initializers)
 
     // ========== Initialize MXP ==========
     m_iUseMXP = MXPMode::eMXP_On; // eOnCommandMXP - Default: on command (like original MUSHclient)
@@ -214,25 +154,15 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_strOnMXP_CloseTag = QString();
     m_strOnMXP_SetVariable = QString();
 
-    // ========== Initialize hyperlinks ==========
-    m_iHyperlinkColour = BGR(255, 128, 0); // Light blue - RGB(0, 128, 255) like original
-
     // ========== Initialize misc flags ==========
-    m_indent_paras = true; // Default: true (like original)
     m_bSaveWorldAutomatically = false;
-    m_bLineInformation = true; // Default: true (like original)
     m_bStartPaused = false;
-    m_iNoteTextColour = 4; // Default: 4 (cyan) like original
-    m_bKeepCommandsOnSameLine = false;
+    // m_colors uses default member initializers (ColorConfig)
+    // Array members (normal_colour, bold_colour, custom_text, custom_back, custom_colour_name)
+    // are initialized by initializeColors() called below.
 
     // ========== Initialize auto-say ==========
-    m_strAutoSayString = "say "; // Default: "say " (like original)
-    m_bEnableAutoSay = false;
-    m_bExcludeMacros = false;
-    m_bExcludeNonAlpha = false;
-    m_strOverridePrefix = "-";              // Default: "-" (like original)
-    m_bConfirmBeforeReplacingTyping = true; // Default: true (like original)
-    m_bReEvaluateAutoSay = false;
+    // (defaults provided by AutoSayConfig member initializers)
 
     // ========== Initialize Script Variables Collection ==========
     // m_VariableMap is automatically initialized as empty QMap
@@ -242,72 +172,31 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_nBoldPrintStyle.fill(0);
 
     // ========== Initialize display options (version 9+) ==========
-    m_bShowBold = true;
-    m_bShowItalic = true;
-    m_bShowUnderline = true;
-    m_bAltArrowRecallsPartial = false;
-    m_iPixelOffset = 1;   // Default: 1 (like original)
-    m_bAutoFreeze = true; // Default: true (like original) - auto_pause
-    m_bKeepFreezeAtBottom = false;
+    // m_display uses default member initializers (DisplayConfig)
     m_bAutoRepeat = false;
     m_bDisableCompression = false;
-    m_bLowerCaseTabCompletion = false;
-    m_bDoubleClickInserts = false;
-    m_bDoubleClickSends = false;
     m_bConfirmOnSend = true; // Default: true (like original)
     m_bTranslateGerman = false;
 
-    // ========== Initialize tab completion ==========
-    m_strTabCompletionDefaults = QString();
-    m_iTabCompletionLines = 200;
-    m_bTabCompletionSpace = false;                             // Default: false (like original)
-    m_strWordDelimiters = "-._~!@#$%^&*()+=[]{}\\|;:'\",<>?/"; // Word delimiters
-    m_bTabCompleteFunctions = true; // Show Lua functions in Shift+Tab menu by default
+    // m_command_window uses default member initializers (CommandWindowConfig)
+    // m_scripting.tab_complete_functions = true (default member initializer)
     // m_ExtraShiftTabCompleteItems initialized empty by default
 
     // ========== Initialize auto logging ==========
     // (LoggingConfig m_logging uses default member initializers)
 
-    // ========== Initialize output line preambles ==========
-    // Colors stored in BGR format (Windows COLORREF)
-    m_strOutputLinePreambleOutput = QString();
-    m_strOutputLinePreambleInput = QString();
-    m_strOutputLinePreambleNotes = QString();
-    m_OutputLinePreambleOutputTextColour = BGR(255, 255, 255); // White (like original)
-    m_OutputLinePreambleOutputBackColour = BGR(0, 0, 0);       // Black
-    m_OutputLinePreambleInputTextColour = BGR(0, 0, 128); // Dark red RGB(128,0,0) (like original)
-    m_OutputLinePreambleInputBackColour = BGR(0, 0, 0);   // Black
-    m_OutputLinePreambleNotesTextColour = BGR(255, 0, 0); // Blue RGB(0,0,255) (like original)
-    m_OutputLinePreambleNotesBackColour = BGR(0, 0, 0);   // Black
+    // ========== Initialize output line preambles and recall ==========
+    // m_output uses default member initializers (OutputConfig)
 
-    // ========== Initialize recall window ==========
-    m_strRecallLinePreamble = QString();
-
-    // ========== Initialize paste/file options ==========
-    m_bPasteCommentedSoftcode = false;
-    m_bFileCommentedSoftcode = false;
-    m_bFlashIcon = false; // Off by default (like original MUSHclient)
-    m_bArrowKeysWrap = false;
-    m_bSpellCheckOnSend = false;
-    m_nPasteDelay = 0;
-    m_nFileDelay = 0;
-    m_nPasteDelayPerLines = 1;
-    m_nFileDelayPerLines = 1;
+    // ========== Initialize miscellaneous sending flags ==========
+    // (PasteSendConfig m_paste uses default member initializers)
 
     // ========== Initialize miscellaneous options ==========
-    m_nReloadOption = ScriptReloadOption::eReloadConfirm;
+    // m_scripting.reload_option, edit_with_notepad, warn_if_inactive: default member initializers
     m_bUseDefaultOutputFont = 0;
-    m_bSaveDeletedCommand = 0;
     m_bTranslateBackslashSequences = 0;
-    m_bEditScriptWithNotepad = 1;   // Default: true (like original)
-    m_bWarnIfScriptingInactive = 1; // Default: true (like original)
-
-    // ========== Initialize sending options ==========
-    m_bSendEcho = false;
-    m_bPasteEcho = false;
 
     // ========== Initialize default options ==========
-    m_bUseDefaultColours = false;
     m_bUseDefaultTriggers = false;
     m_bUseDefaultAliases = false;
     m_bUseDefaultMacros = false;
@@ -316,10 +205,6 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
 
     // ========== Initialize terminal settings ==========
     m_strTerminalIdentification = "mushkin"; // Identify as Mushkin
-
-    // ========== Initialize mapping ==========
-    m_strMappingFailure = "Alas, you cannot go that way."; // Default like original
-    m_bMapFailureRegexp = false;
 
     // ========== Initialize flag containers ==========
     m_iFlags1 = 0;
@@ -330,62 +215,25 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
 
     // ========== Initialize more options (version 15+) ==========
     m_bAlwaysRecordCommandHistory = false;
-    m_bCopySelectionToClipboard = false;
-    m_bCarriageReturnClearsLine = false;
     m_bSendMXP_AFK_Response = true;
     m_bMudCanChangeOptions = true;
-    m_bEnableSpamPrevention = false;
-    m_iSpamLineCount = 20;
-    m_strSpamMessage = "look";
-
-    m_bDoNotShowOutstandingLines = false;
-    m_bDoNotTranslateIACtoIACIAC = false;
+    // (m_spam uses default member initializers)
 
     // ========== Initialize clipboard and display ==========
-    m_bAutoCopyInHTML = false;
-    m_iLineSpacing = 0;
-    m_bUTF_8 = false;
-    m_bConvertGAtoNewline = false;
     m_iCurrentActionSource = ActionSource::eUnknownActionSource;
 
     // ========== Initialize filters ==========
-    m_strTriggersFilter = QString();
-    m_strAliasesFilter = QString();
-    m_strTimersFilter = QString();
-    m_strVariablesFilter = QString();
+    // (m_scripting.*_filter use default member initializers)
 
     // ========== Initialize script errors ==========
-    m_bScriptErrorsToOutputWindow = false;
+    // (m_scripting.errors_to_output_window uses default member initializer)
 
-    // ========== Initialize command window auto-resize ==========
-    m_bAutoResizeCommandWindow = false;
+    // ========== Initialize editor window ==========
     m_strEditorWindowName = QString();
-    m_iAutoResizeMinimumLines = 1;
-    m_iAutoResizeMaximumLines = 20;
-    m_bDoNotAddMacrosToCommandHistory = false;
     m_bSendKeepAlives = false;
+    // (CommandWindowConfig m_command_window uses default member initializers)
 
-    // ========== Initialize default trigger settings ==========
-    m_iDefaultTriggerSendTo = 0;
-    m_iDefaultTriggerSequence = 100;
-    m_bDefaultTriggerRegexp = false;
-    m_bDefaultTriggerExpandVariables = false;
-    m_bDefaultTriggerKeepEvaluating = false;
-    m_bDefaultTriggerIgnoreCase = false;
-
-    // ========== Initialize default alias settings ==========
-    m_iDefaultAliasSendTo = 0;
-    m_iDefaultAliasSequence = 100;
-    m_bDefaultAliasRegexp = false;
-    m_bDefaultAliasExpandVariables = false;
-    m_bDefaultAliasKeepEvaluating = false;
-    m_bDefaultAliasIgnoreCase = false;
-
-    // ========== Initialize default timer settings ==========
-    m_iDefaultTimerSendTo = 0;
-
-    // ========== Initialize sound ==========
-    m_bPlaySoundsInBackground = false;
+    // (AutomationDefaultsConfig m_automation_defaults uses default member initializers)
 
     // ========== Initialize HTML logging ==========
     m_bUnpauseOnSend = false;
@@ -396,9 +244,6 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_bTreeviewAliases = true;
     m_bTreeviewTimers = true;
 
-    // ========== Initialize input wrapping ==========
-    m_bAutoWrapInput = false;
-
     // ========== Initialize tooltips ==========
     m_iToolTipVisibleTime = 30000; // 30 seconds
     m_iToolTipStartTime = 500;     // 0.5 seconds
@@ -406,10 +251,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     // ========== Initialize save file options ==========
     m_bOmitSavedDateFromSaveFiles = false;
 
-    // ========== Initialize output buffer fading ==========
-    m_iFadeOutputBufferAfterSeconds = 0;
-    m_FadeOutputOpacityPercent = 20;
-    m_FadeOutputSeconds = 8;
+    // m_output fading fields use default member initializers (OutputConfig)
     m_bCtrlBackspaceDeletesLastWord = false;
 
     // m_remote fields use default member initializers (RemoteAccessConfig struct)
@@ -537,8 +379,8 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
 
     // ========== Scripting Engine ==========
     // Create script engine and initialize Lua
-    m_ScriptEngine = std::make_unique<ScriptEngine>(this, m_strLanguage, this);
-    if (m_bEnableScripts) {
+    m_ScriptEngine = std::make_unique<ScriptEngine>(this, m_scripting.language, this);
+    if (m_scripting.enabled) {
         m_ScriptEngine->createScriptEngine();
         qCDebug(lcWorld) << "Lua scripting initialized for world:" << worldName();
     }
@@ -548,8 +390,8 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_bTrace = false;
     m_bInSendToScript = false;
     m_iScriptTimeTaken = 0;
-    // m_bTabCompleteFunctions and m_ExtraShiftTabCompleteItems initialized in Tab Completion
-    // section
+    // m_scripting.tab_complete_functions and m_ExtraShiftTabCompleteItems initialized in Tab
+    // Completion section
     m_strLastImmediateExpression = QString();
     m_bInScriptFileChanged = false;
     m_timeScriptFileMod = QDateTime();
@@ -583,8 +425,6 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_iUniqueDocumentNumber = 0;
 
     // ========== Mapping ==========
-    m_strSpecialForwards = QString();
-    m_strSpecialBackwards = QString();
     // m_CommandQueue moved to ConnectionManager; initialized empty by ConnectionManager ctor.
     m_bShowingMapperStatus = false;
 
@@ -659,19 +499,16 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_iStopTriggerEvaluation = 0;
 
     // ========== Initialize unpacked flags (these will be set from m_iFlags1/2) ==========
-    m_bArrowRecallsPartial = false;
     m_bCtrlZGoesToEndOfBuffer = false;
     m_bCtrlPGoesToPreviousCommand = false;
     m_bCtrlNGoesToNextCommand = false;
     m_bHyperlinkAddsToCommandHistory = false;
-    m_bEchoHyperlinkInOutputWindow = false;
+    // m_output.echo_hyperlink_in_output_window uses default member initializer (false)
     m_bAutoWrapWindowWidth = false;
     m_bNAWS = false;
     m_bUseZMP = false;
     m_bUseATCP = false;
-    m_bUseMSP = false;
     m_bPueblo = false;
-    m_bNoEchoOff = false;
     m_bUseCustomLinkColour = false;
     m_bMudCanChangeLinkColour = false;
     m_bUnderlineHyperlinks = false;
@@ -785,35 +622,36 @@ void WorldDocument::initializeColors()
 {
     // Initialize ANSI normal colors
     for (int i = 0; i < 8; i++) {
-        m_normalcolour[i] = DEFAULT_NORMAL_COLORS[i];
-        m_boldcolour[i] = DEFAULT_BOLD_COLORS[i];
+        m_colors.normal_colour[i] = DEFAULT_NORMAL_COLORS[i];
+        m_colors.bold_colour[i] = DEFAULT_BOLD_COLORS[i];
     }
 
     // Initialize custom colors
     for (int i = 0; i < MAX_CUSTOM; i++) {
-        m_customtext[i] = qRgb(255, 255, 255); // White
-        m_customback[i] = qRgb(0, 0, 0);       // Black
+        m_colors.custom_text[i] = qRgb(255, 255, 255); // White
+        m_colors.custom_back[i] = qRgb(0, 0, 0);       // Black
     }
 
     // Initialize custom color names
     for (int i = 0; i < 255; i++) {
-        m_strCustomColourName[i] = QString("Custom%1").arg(i + 1);
+        m_colors.custom_colour_name[i] = QString("Custom%1").arg(i + 1);
     }
 }
 
 void WorldDocument::unpackFlags()
 {
     // Unpack m_iFlags1 into individual bool members
-    m_bArrowRecallsPartial = (m_iFlags1 & FLAGS1_ArrowRecallsPartial) != 0;
+    m_input.arrow_recalls_partial = (m_iFlags1 & FLAGS1_ArrowRecallsPartial) != 0;
     m_bCtrlZGoesToEndOfBuffer = (m_iFlags1 & FLAGS1_CtrlZGoesToEndOfBuffer) != 0;
     m_bCtrlPGoesToPreviousCommand = (m_iFlags1 & FLAGS1_CtrlPGoesToPreviousCommand) != 0;
     m_bCtrlNGoesToNextCommand = (m_iFlags1 & FLAGS1_CtrlNGoesToNextCommand) != 0;
     m_bHyperlinkAddsToCommandHistory = (m_iFlags1 & FLAGS1_HyperlinkAddsToCommandHistory) != 0;
-    m_bEchoHyperlinkInOutputWindow = (m_iFlags1 & FLAGS1_EchoHyperlinkInOutputWindow) != 0;
+    m_output.echo_hyperlink_in_output_window =
+        (m_iFlags1 & FLAGS1_EchoHyperlinkInOutputWindow) != 0;
     m_bAutoWrapWindowWidth = (m_iFlags1 & FLAGS1_AutoWrapWindowWidth) != 0;
     m_bNAWS = (m_iFlags1 & FLAGS1_NAWS) != 0;
     m_bPueblo = (m_iFlags1 & FLAGS1_Pueblo) != 0;
-    m_bNoEchoOff = (m_iFlags1 & FLAGS1_NoEchoOff) != 0;
+    m_input.no_echo_off = (m_iFlags1 & FLAGS1_NoEchoOff) != 0;
     m_bUseCustomLinkColour = (m_iFlags1 & FLAGS1_UseCustomLinkColour) != 0;
     m_bMudCanChangeLinkColour = (m_iFlags1 & FLAGS1_MudCanChangeLinkColour) != 0;
     m_bUnderlineHyperlinks = (m_iFlags1 & FLAGS1_UnderlineHyperlinks) != 0;
@@ -830,7 +668,7 @@ void WorldDocument::packFlags()
 {
     // Pack individual bool members back into m_iFlags1
     m_iFlags1 = 0;
-    if (m_bArrowRecallsPartial)
+    if (m_input.arrow_recalls_partial)
         m_iFlags1 |= FLAGS1_ArrowRecallsPartial;
     if (m_bCtrlZGoesToEndOfBuffer)
         m_iFlags1 |= FLAGS1_CtrlZGoesToEndOfBuffer;
@@ -840,7 +678,7 @@ void WorldDocument::packFlags()
         m_iFlags1 |= FLAGS1_CtrlNGoesToNextCommand;
     if (m_bHyperlinkAddsToCommandHistory)
         m_iFlags1 |= FLAGS1_HyperlinkAddsToCommandHistory;
-    if (m_bEchoHyperlinkInOutputWindow)
+    if (m_output.echo_hyperlink_in_output_window)
         m_iFlags1 |= FLAGS1_EchoHyperlinkInOutputWindow;
     if (m_bAutoWrapWindowWidth)
         m_iFlags1 |= FLAGS1_AutoWrapWindowWidth;
@@ -848,7 +686,7 @@ void WorldDocument::packFlags()
         m_iFlags1 |= FLAGS1_NAWS;
     if (m_bPueblo)
         m_iFlags1 |= FLAGS1_Pueblo;
-    if (m_bNoEchoOff)
+    if (m_input.no_echo_off)
         m_iFlags1 |= FLAGS1_NoEchoOff;
     if (m_bUseCustomLinkColour)
         m_iFlags1 |= FLAGS1_UseCustomLinkColour;
@@ -1025,7 +863,7 @@ void WorldDocument::sendToMud(const QString& text)
     }
 
     // Convert to UTF-8 (or Latin-1 if not UTF-8 mode)
-    QByteArray data = m_bUTF_8 ? text.toUtf8() : text.toLatin1();
+    QByteArray data = m_display.utf8 ? text.toUtf8() : text.toLatin1();
 
     // Add newline - most MUDs expect \n, some want \r\n
     // For now, send just \n (Unix style)
@@ -1086,7 +924,7 @@ void WorldDocument::SendMsg(const QString& text, bool bEcho, bool bQueue, bool b
 
     for (const QString& line : lines) {
         // Queue if speedwalk delay active OR already items in queue
-        if (m_iSpeedWalkDelay > 0 && (bQueue || !commandQueue.isEmpty())) {
+        if (m_speedwalk.delay > 0 && (bQueue || !commandQueue.isEmpty())) {
             // Encode echo/log flags in prefix character
             // Original uses: Q = queue+echo, q = queue+no-echo,
             //                I = immediate+echo, i = immediate+no-echo
@@ -1294,11 +1132,11 @@ void WorldDocument::DoSendMsg(const QString& text, bool bEcho, bool bLog)
     }
 
     // If spam prevention enabled and we've exceeded threshold, send spam message
-    if (m_bEnableSpamPrevention && m_iSpamLineCount > 2 && !m_strSpamMessage.isEmpty() &&
-        m_iLastCommandCount > m_iSpamLineCount) {
+    if (m_spam.enabled && m_spam.line_count > 2 && !m_spam.message.isEmpty() &&
+        m_iLastCommandCount > m_spam.line_count) {
         // Reset counter and send spam message
         m_iLastCommandCount = 0;
-        DoSendMsg(m_strSpamMessage, m_display_my_input, m_logging.log_input);
+        DoSendMsg(m_spam.message, m_display_my_input, m_logging.log_input);
 
         // Reset tracking for current command
         m_strLastCommandSent = str;
@@ -1310,8 +1148,8 @@ void WorldDocument::DoSendMsg(const QString& text, bool bEcho, bool bLog)
     // Don't echo if m_bNoEcho is set (MUD requested echo suppression for password entry)
     if (bEcho && m_display_my_input && !m_telnetParser->m_bNoEcho) {
         // Display as colored note with input colors
-        QRgb inputFore = m_normalcolour[m_echo_colour % 8]; // Ensure valid index 0-7
-        QRgb inputBack = m_normalcolour[0];                 // Black background (index 0)
+        QRgb inputFore = m_colors.normal_colour[m_output.echo_colour % 8]; // Ensure valid index 0-7
+        QRgb inputBack = m_colors.normal_colour[0]; // Black background (index 0)
 
         // Use colourNote to display in output window
         colourNote(inputFore, inputBack, str);
@@ -1325,9 +1163,9 @@ void WorldDocument::DoSendMsg(const QString& text, bool bEcho, bool bLog)
 
     // ========== IAC Doubling ==========
     // Double IAC (0xFF) to IAC IAC for telnet protocol (unless disabled)
-    if (!m_bDoNotTranslateIACtoIACIAC) {
+    if (!m_spam.do_not_translate_iac) {
         // Replace all 0xFF with 0xFF 0xFF
-        QByteArray data = m_bUTF_8 ? str.toUtf8() : str.toLatin1();
+        QByteArray data = m_display.utf8 ? str.toUtf8() : str.toLatin1();
         QByteArray doubled;
         for (unsigned char c : data) {
             doubled.append(c);
@@ -1428,34 +1266,34 @@ void WorldDocument::Execute(const QString& command)
     // Based on sendvw.cpp
     // When auto-say is enabled, commands are prepended with "say " unless overridden
 
-    bool bAutoSay = m_bEnableAutoSay;
+    bool bAutoSay = m_auto_say.enabled;
 
     // Check for override prefix to disable auto-say for this command
-    if (bAutoSay && !m_strOverridePrefix.isEmpty() &&
-        strFixedCommand.startsWith(m_strOverridePrefix)) {
+    if (bAutoSay && !m_auto_say.override_prefix.isEmpty() &&
+        strFixedCommand.startsWith(m_auto_say.override_prefix)) {
         bAutoSay = false;
-        strFixedCommand = strFixedCommand.mid(m_strOverridePrefix.length()); // Strip prefix
+        strFixedCommand = strFixedCommand.mid(m_auto_say.override_prefix.length()); // Strip prefix
     }
 
     // Exclude auto-say string itself (prevent "say say hello")
-    if (bAutoSay && !m_strAutoSayString.isEmpty() &&
-        strFixedCommand.startsWith(m_strAutoSayString)) {
+    if (bAutoSay && !m_auto_say.say_string.isEmpty() &&
+        strFixedCommand.startsWith(m_auto_say.say_string)) {
         bAutoSay = false;
     }
 
     // If auto-say is still enabled, prepend the auto-say string
-    if (bAutoSay && !m_strAutoSayString.isEmpty()) {
-        strFixedCommand = m_strAutoSayString + strFixedCommand;
+    if (bAutoSay && !m_auto_say.say_string.isEmpty()) {
+        strFixedCommand = m_auto_say.say_string + strFixedCommand;
     }
 
     // ========== Script Prefix ==========
     // Check for script prefix to execute Lua code directly
     // Based on methods_commands.cpp
 
-    if (m_bEnableScripts && !m_strScriptPrefix.isEmpty() &&
-        strFixedCommand.startsWith(m_strScriptPrefix)) {
+    if (m_scripting.enabled && !m_scripting.prefix.isEmpty() &&
+        strFixedCommand.startsWith(m_scripting.prefix)) {
         // Remove prefix and get script command
-        QString strCommand = strFixedCommand.mid(m_strScriptPrefix.length());
+        QString strCommand = strFixedCommand.mid(m_scripting.prefix.length());
 
         // Execute the script if scripting engine is available
         if (m_ScriptEngine) {
@@ -1471,10 +1309,10 @@ void WorldDocument::Execute(const QString& command)
     // Check for speedwalk prefix BEFORE command stacking
     // Based on evaluate.cpp
 
-    if (m_enable_speed_walk && !m_speed_walk_prefix.isEmpty() &&
-        strFixedCommand.startsWith(m_speed_walk_prefix)) {
+    if (m_speedwalk.enabled && !m_speedwalk.prefix.isEmpty() &&
+        strFixedCommand.startsWith(m_speedwalk.prefix)) {
         // Remove prefix and evaluate speedwalk
-        QString speedwalkInput = strFixedCommand.mid(m_speed_walk_prefix.length());
+        QString speedwalkInput = strFixedCommand.mid(m_speedwalk.prefix.length());
         QString expandedSpeedwalk = DoEvaluateSpeedwalk(speedwalkInput);
 
         if (!expandedSpeedwalk.isEmpty()) {
@@ -1495,24 +1333,25 @@ void WorldDocument::Execute(const QString& command)
     // ========== Command Stacking ==========
     // Based on methods_commands.cpp
 
-    if (m_enable_command_stack && !m_strCommandStackCharacter.isEmpty()) {
+    if (m_input.enable_command_stack && !m_input.command_stack_character.isEmpty()) {
         // NEW in version 3.74 - command stack character at start of line disables command stacking
-        if (!strFixedCommand.isEmpty() && strFixedCommand[0] == m_strCommandStackCharacter[0]) {
+        if (!strFixedCommand.isEmpty() &&
+            strFixedCommand[0] == m_input.command_stack_character[0]) {
             // Remove leading delimiter - this line won't be stacked
             strFixedCommand = strFixedCommand.mid(1);
         } else {
             // Still want command stacking
             QString strTwoStacks =
-                QString(m_strCommandStackCharacter[0]) + m_strCommandStackCharacter[0];
+                QString(m_input.command_stack_character[0]) + m_input.command_stack_character[0];
 
             // Convert two command stacks in a row to 0x01 (e.g., ;; → \x01)
             strFixedCommand.replace(strTwoStacks, "\x01");
 
             // Convert any remaining command stacks to \r\n
-            strFixedCommand.replace(m_strCommandStackCharacter[0], '\n');
+            strFixedCommand.replace(m_input.command_stack_character[0], '\n');
 
             // Replace any 0x01 with one command stack character (restore escaped delimiters)
-            strFixedCommand.replace('\x01', m_strCommandStackCharacter[0]);
+            strFixedCommand.replace('\x01', m_input.command_stack_character[0]);
         }
     }
 
@@ -1749,12 +1588,12 @@ qint32 WorldDocument::SetCustomColourName(qint16 whichColour, const QString& nam
     }
 
     // Check if changed and mark document modified (matches original ordering)
-    if (m_strCustomColourName[whichColour - 1] != name) {
+    if (m_colors.custom_colour_name[whichColour - 1] != name) {
         m_bModified = true; // Mark document as modified
     }
 
     // Set the name (convert to 0-based index)
-    m_strCustomColourName[whichColour - 1] = name;
+    m_colors.custom_colour_name[whichColour - 1] = name;
 
     return 0; // eOK
 }
@@ -1773,7 +1612,7 @@ qint32 WorldDocument::SetCustomColourName(qint16 whichColour, const QString& nam
  * - [count]direction: e.g., "3n" = north;north;north (count 1-99)
  * - Directions: N, S, E, W, U, D (case insensitive)
  * - Actions: O=open, C=close, L=lock, K=unlock (must be followed by direction)
- * - Filler: F = spam prevention filler (m_strSpeedWalkFiller)
+ * - Filler: F = spam prevention filler (m_speedwalk.filler)
  * - Custom: (text/reverse) = custom direction (only "text" is used)
  * - Comments: {comment} = ignored
  *
@@ -1898,7 +1737,7 @@ QString WorldDocument::DoEvaluateSpeedwalk(const QString& speedWalkString)
                 break;
 
             case 'F':
-                str = m_strSpeedWalkFiller;
+                str = m_speedwalk.filler;
                 break;
 
             case '(': // special string (e.g., (ne/sw))
@@ -2306,7 +2145,7 @@ Style* WorldDocument::AddStyle(quint16 iFlags, QRgb iForeColour, QRgb iBackColou
  * Line Buffer and CLine/CStyle Management
  *
  * When a line is completed (via StartNewLine), this method adds it to the
- * line buffer and ensures the buffer doesn't exceed m_maxlines by removing
+ * line buffer and ensures the buffer doesn't exceed m_display.max_lines by removing
  * the oldest lines.
  *
  * @param line The completed Line object to add (ownership transferred to buffer)
@@ -2321,7 +2160,7 @@ void WorldDocument::AddLineToBuffer(std::unique_ptr<Line> line)
     m_lineList.push_back(std::move(line));
 
     // Trim buffer if too large
-    while (static_cast<qint32>(m_lineList.size()) > m_maxlines) {
+    while (static_cast<qint32>(m_lineList.size()) > m_display.max_lines) {
         m_lineList.erase(m_lineList.begin()); // oldest line is deleted automatically
     }
 }
@@ -2429,15 +2268,16 @@ void WorldDocument::AddToLine(const char* sText, int iLength)
             int spacePos = currentLen + i;
             // Only remember this space if it's before the wrap column
             // (or if no wrap column is set)
-            if (m_nWrapColumn == 0 || spacePos < static_cast<int>(m_nWrapColumn)) {
+            if (m_display.wrap_column == 0 || spacePos < static_cast<int>(m_display.wrap_column)) {
                 m_lastSpace = spacePos;
             }
         }
     }
 
     // Check if line needs to wrap (exceeds wrap column)
-    // Only wrap if m_nWrapColumn > 0 (0 means no wrapping)
-    if (m_nWrapColumn > 0 && m_currentLine->len() >= static_cast<qint32>(m_nWrapColumn)) {
+    // Only wrap if m_display.wrap_column > 0 (0 means no wrapping)
+    if (m_display.wrap_column > 0 &&
+        m_currentLine->len() >= static_cast<qint32>(m_display.wrap_column)) {
         handleLineWrap();
     }
 }
@@ -2458,14 +2298,14 @@ void WorldDocument::AddToLine(unsigned char c)
  *
  * Source: doc.cpp:1512-1600 (original MUSHclient word-wrap logic)
  *
- * This is called when the current line length exceeds m_nWrapColumn.
- * Behavior depends on m_wrap setting:
- * - m_wrap = false: Hard break at column boundary
- * - m_wrap = true: Word-wrap at last space (if found within reasonable distance)
+ * This is called when the current line length exceeds m_display.wrap_column.
+ * Behavior depends on m_display.wrap setting:
+ * - m_display.wrap = false: Hard break at column boundary
+ * - m_display.wrap = true: Word-wrap at last space (if found within reasonable distance)
  *
  * Word-wrap logic:
- * 1. If m_wrap is enabled and we have a valid last space position
- * 2. And the text after the space isn't too long (< m_nWrapColumn)
+ * 1. If m_display.wrap is enabled and we have a valid last space position
+ * 2. And the text after the space isn't too long (< m_display.wrap_column)
  * 3. Break at the space, carry text after space to new line
  * 4. Otherwise, hard break at the column boundary
  */
@@ -2481,11 +2321,11 @@ void WorldDocument::handleLineWrap()
     int breakPoint = -1;
 
     // If word-wrap is enabled and we have a valid space position
-    if (m_wrap && m_lastSpace >= 0) {
+    if (m_display.wrap && m_lastSpace >= 0) {
         // Check that the text after the space isn't too long
         // (if remaining text is >= wrap column, we'd have to break again immediately)
         qint32 remainingLen = lineLen - m_lastSpace;
-        if (remainingLen < static_cast<qint32>(m_nWrapColumn)) {
+        if (remainingLen < static_cast<qint32>(m_display.wrap_column)) {
             breakPoint = m_lastSpace;
         }
     }
@@ -2493,7 +2333,7 @@ void WorldDocument::handleLineWrap()
     if (breakPoint >= 0) {
         // Word-wrap: break at the space
         // Original MUSHclient behavior (doc.cpp:1557-1562):
-        // When m_indent_paras is false (normal case), KEEP the space at end of this line
+        // When m_display.indent_paras is false (normal case), KEEP the space at end of this line
         // This ensures soft-wrapped lines display correctly when joined
 
         // Save the text AFTER the space to carry over to the next line
@@ -2506,7 +2346,7 @@ void WorldDocument::handleLineWrap()
         }
 
         // Truncate current line AFTER the space (include the space in this line)
-        // This matches original MUSHclient when m_indent_paras is false
+        // This matches original MUSHclient when m_display.indent_paras is false
         int truncateAt = breakPoint + 1; // Keep up to and including the space
         m_currentLine->textBuffer.resize(truncateAt);
         m_currentLine->textBuffer.push_back('\0');
@@ -2523,22 +2363,23 @@ void WorldDocument::handleLineWrap()
         // Add carried-over text to new line
         if (carryOverLen > 0) {
             // Temporarily disable wrap checking to avoid recursion
-            quint16 savedWrapColumn = m_nWrapColumn;
-            m_nWrapColumn = 0;
+            quint16 savedWrapColumn = m_display.wrap_column;
+            m_display.wrap_column = 0;
 
             AddToLine(carryOver.constData(), carryOverLen);
 
-            m_nWrapColumn = savedWrapColumn;
+            m_display.wrap_column = savedWrapColumn;
 
             // Re-check for wrap (in case carried text is still too long)
-            if (m_nWrapColumn > 0 && m_currentLine->len() >= static_cast<qint32>(m_nWrapColumn)) {
+            if (m_display.wrap_column > 0 &&
+                m_currentLine->len() >= static_cast<qint32>(m_display.wrap_column)) {
                 handleLineWrap();
             }
         }
     } else {
         // Hard break: split at the wrap column
         // Save text beyond the wrap column
-        int splitPoint = static_cast<int>(m_nWrapColumn);
+        int splitPoint = static_cast<int>(m_display.wrap_column);
         int carryOverLen = lineLen - splitPoint;
 
         QByteArray carryOver;
@@ -2562,15 +2403,16 @@ void WorldDocument::handleLineWrap()
         // Add carried-over text to new line
         if (carryOverLen > 0) {
             // Temporarily disable wrap checking to avoid recursion
-            quint16 savedWrapColumn = m_nWrapColumn;
-            m_nWrapColumn = 0;
+            quint16 savedWrapColumn = m_display.wrap_column;
+            m_display.wrap_column = 0;
 
             AddToLine(carryOver.constData(), carryOverLen);
 
-            m_nWrapColumn = savedWrapColumn;
+            m_display.wrap_column = savedWrapColumn;
 
             // Re-check for wrap (in case carried text is still too long)
-            if (m_nWrapColumn > 0 && m_currentLine->len() >= static_cast<qint32>(m_nWrapColumn)) {
+            if (m_display.wrap_column > 0 &&
+                m_currentLine->len() >= static_cast<qint32>(m_display.wrap_column)) {
                 handleLineWrap();
             }
         }
@@ -2731,18 +2573,18 @@ void WorldDocument::StartNewLine(bool bNewLine, unsigned char iFlags)
 
     // Special handling for user input and comments (like original)
     if (iFlags & USER_INPUT) {
-        // TODO(feature): Apply m_echo_colour setting to echoed command text.
+        // TODO(feature): Apply m_output.echo_colour setting to echoed command text.
     } else if (iFlags & COMMENT) {
-        // TODO(feature): Apply m_iNoteTextColour setting to Note() output text.
+        // TODO(feature): Apply m_colors.note_text_colour setting to Note() output text.
     }
 
     // Create new Line object
-    m_currentLine = std::make_unique<Line>(m_total_lines, // line number
-                                           m_nWrapColumn, // wrap column
-                                           iFlags,        // line flags
-                                           initialFore,   // foreground color
-                                           initialBack,   // background color
-                                           m_bUTF_8);     // UTF-8 mode
+    m_currentLine = std::make_unique<Line>(m_total_lines,         // line number
+                                           m_display.wrap_column, // wrap column
+                                           iFlags,                // line flags
+                                           initialFore,           // foreground color
+                                           initialBack,           // background color
+                                           m_display.utf8);       // UTF-8 mode
 
     // Reset word-wrap tracking for new line
     m_lastSpace = -1;
@@ -2958,8 +2800,8 @@ void WorldDocument::addToCommandHistory(const QString& command)
     m_commandHistory.append(command);
 
     // Trim to max size (remove oldest if over limit)
-    // Use m_nHistoryLines instead of m_maxCommandHistory (sendvw.cpp)
-    while (m_commandHistory.count() > m_nHistoryLines) {
+    // Use m_input.history_lines instead of m_maxCommandHistory (sendvw.cpp)
+    while (m_commandHistory.count() > m_input.history_lines) {
         m_commandHistory.removeFirst();
     }
 
@@ -2974,7 +2816,7 @@ void WorldDocument::addToCommandHistory(const QString& command)
 
     qCDebug(lcWorld) << "Command history: added" << command
                      << "- history size:" << m_commandHistory.count()
-                     << "/ max:" << m_nHistoryLines;
+                     << "/ max:" << m_input.history_lines;
 }
 
 /**
@@ -3241,7 +3083,7 @@ void WorldDocument::noteHr()
  * Based on CMUSHclientDoc::LoadScriptFile() and Execute_Script_File()
  *
  * Reads the script file from disk and executes it using parseLua().
- * The script file path is stored in m_strScriptFilename.
+ * The script file path is stored in m_scripting.filename.
  *
  * This is typically called:
  * - When world is opened
@@ -3251,7 +3093,7 @@ void WorldDocument::noteHr()
 void WorldDocument::loadScriptFile()
 {
     // Check if script filename is set
-    if (m_strScriptFilename.isEmpty()) {
+    if (m_scripting.filename.isEmpty()) {
         qCDebug(lcWorld) << "loadScriptFile: No script filename set";
         return;
     }
@@ -3263,12 +3105,12 @@ void WorldDocument::loadScriptFile()
         return;
     }
 
-    qCDebug(lcWorld) << "loadScriptFile: Loading" << m_strScriptFilename;
+    qCDebug(lcWorld) << "loadScriptFile: Loading" << m_scripting.filename;
 
     // Open script file
-    QFile file(m_strScriptFilename);
+    QFile file(m_scripting.filename);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        QString error = QString("Cannot open script file: %1").arg(m_strScriptFilename);
+        QString error = QString("Cannot open script file: %1").arg(m_scripting.filename);
         qWarning() << error;
         colourNote(BGR(255, 0, 0), BGR(0, 0, 0), error);
         return;
@@ -3287,15 +3129,15 @@ void WorldDocument::loadScriptFile()
     if (error) {
         // Orange error text on black background
         colourNote(BGR(255, 140, 0), BGR(0, 0, 0),
-                   QString("Script file contains errors: %1").arg(m_strScriptFilename));
+                   QString("Script file contains errors: %1").arg(m_scripting.filename));
     } else {
         qCDebug(lcWorld) << "loadScriptFile: Script executed successfully";
         // Optional: notify user
-        // note(QString("Script file loaded: %1").arg(m_strScriptFilename));
+        // note(QString("Script file loaded: %1").arg(m_scripting.filename));
     }
 
     // Update file modification time for change detection
-    QFileInfo fileInfo(m_strScriptFilename);
+    QFileInfo fileInfo(m_scripting.filename);
     if (fileInfo.exists()) {
         m_timeScriptFileMod = fileInfo.lastModified();
     }
@@ -3305,7 +3147,7 @@ void WorldDocument::loadScriptFile()
  * setupScriptFileWatcher - Set up file watcher for script file changes
  *
  * Creates or updates the QFileSystemWatcher to monitor the script file.
- * Called after setting m_strScriptFilename or loading a world.
+ * Called after setting m_scripting.filename or loading a world.
  *
  * Based on CMUSHclientDoc file watching behavior in scripting.cpp
  */
@@ -3318,21 +3160,21 @@ void WorldDocument::setupScriptFileWatcher()
     }
 
     // Don't set up watcher if no script file or if reload option is "never"
-    if (m_strScriptFilename.isEmpty()) {
+    if (m_scripting.filename.isEmpty()) {
         qCDebug(lcWorld) << "setupScriptFileWatcher: No script file to watch";
         return;
     }
 
-    if (m_nReloadOption == ScriptReloadOption::eReloadNever) {
+    if (m_scripting.reload_option == ScriptReloadOption::eReloadNever) {
         qCDebug(lcWorld) << "setupScriptFileWatcher: Reload option is 'never', not watching";
         return;
     }
 
     // Check if script file exists
-    QFileInfo fileInfo(m_strScriptFilename);
+    QFileInfo fileInfo(m_scripting.filename);
     if (!fileInfo.exists()) {
         qCDebug(lcWorld) << "setupScriptFileWatcher: Script file does not exist:"
-                         << m_strScriptFilename;
+                         << m_scripting.filename;
         return;
     }
 
@@ -3341,7 +3183,7 @@ void WorldDocument::setupScriptFileWatcher()
     // are the sole owners. Passing 'this' as parent would cause double-free: Qt would
     // delete the watcher again after ~WorldDocument already did.
     m_scriptFileWatcher = new QFileSystemWatcher();
-    m_scriptFileWatcher->addPath(m_strScriptFilename);
+    m_scriptFileWatcher->addPath(m_scripting.filename);
 
     // Connect file change signal
     connect(m_scriptFileWatcher, &QFileSystemWatcher::fileChanged, this,
@@ -3350,14 +3192,14 @@ void WorldDocument::setupScriptFileWatcher()
     // Store initial modification time
     m_timeScriptFileMod = fileInfo.lastModified();
 
-    qCDebug(lcWorld) << "setupScriptFileWatcher: Watching" << m_strScriptFilename;
+    qCDebug(lcWorld) << "setupScriptFileWatcher: Watching" << m_scripting.filename;
 }
 
 /**
  * onScriptFileChanged - Handle script file change notification
  *
  * Called when QFileSystemWatcher detects the script file has changed.
- * Behavior depends on m_nReloadOption:
+ * Behavior depends on m_scripting.reload_option:
  * - ScriptReloadOption::eReloadConfirm (0): Show dialog asking user
  * - ScriptReloadOption::eReloadAlways (1): Automatically reload
  * - ScriptReloadOption::eReloadNever (2): Ignore (but shouldn't get here since watcher not set up)
@@ -3376,10 +3218,10 @@ void WorldDocument::onScriptFileChanged(const QString& path)
     }
     m_bInScriptFileChanged = true;
 
-    qCDebug(lcWorld) << "onScriptFileChanged: Script file changed:" << m_strScriptFilename;
+    qCDebug(lcWorld) << "onScriptFileChanged: Script file changed:" << m_scripting.filename;
 
     // Check if file still exists (may have been deleted)
-    QFileInfo fileInfo(m_strScriptFilename);
+    QFileInfo fileInfo(m_scripting.filename);
     if (!fileInfo.exists()) {
         qCDebug(lcWorld) << "onScriptFileChanged: Script file no longer exists";
         m_bInScriptFileChanged = false;
@@ -3395,18 +3237,18 @@ void WorldDocument::onScriptFileChanged(const QString& path)
     }
 
     // Handle based on reload option
-    switch (m_nReloadOption) {
+    switch (m_scripting.reload_option) {
         case ScriptReloadOption::eReloadAlways:
             // Automatically reload
             qCDebug(lcWorld) << "onScriptFileChanged: Auto-reloading script";
             note(QString("Script file changed, reloading: %1")
-                     .arg(QFileInfo(m_strScriptFilename).fileName()));
+                     .arg(QFileInfo(m_scripting.filename).fileName()));
             loadScriptFile();
             break;
 
         case ScriptReloadOption::eReloadConfirm: {
             // Show confirmation dialog
-            QString filename = QFileInfo(m_strScriptFilename).fileName();
+            QString filename = QFileInfo(m_scripting.filename).fileName();
             int result = QMessageBox::question(
                 nullptr, "Script File Changed",
                 QString("The script file '%1' has been modified.\n\nDo you want to reload it?")
@@ -3435,7 +3277,7 @@ void WorldDocument::onScriptFileChanged(const QString& path)
 
     // Re-add the file to the watcher (QFileSystemWatcher removes it after notification)
     if (m_scriptFileWatcher && fileInfo.exists()) {
-        m_scriptFileWatcher->addPath(m_strScriptFilename);
+        m_scriptFileWatcher->addPath(m_scripting.filename);
     }
 
     m_bInScriptFileChanged = false;
@@ -3455,12 +3297,12 @@ void WorldDocument::onScriptFileChanged(const QString& path)
 void WorldDocument::showErrorLines(int lineNumber)
 {
     // Check if script filename is set
-    if (m_strScriptFilename.isEmpty()) {
+    if (m_scripting.filename.isEmpty()) {
         return;
     }
 
     // Open script file
-    QFile file(m_strScriptFilename);
+    QFile file(m_scripting.filename);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         return;
     }

@@ -27,12 +27,12 @@ NotepadWidget::NotepadWidget(IWorldContext* ctx, const QString& title, const QSt
     if (ctx) {
         WorldDocument* doc = static_cast<WorldDocument*>(ctx);
         m_iUniqueDocumentNumber = doc->m_iUniqueDocumentNumber;
-        m_strFontName = doc->m_input_font_name;
-        m_iFontSize = doc->m_input_font_height;
-        m_iFontWeight = doc->m_input_font_weight;
-        m_iFontCharset = doc->m_input_font_charset;
-        m_textColour = doc->m_input_text_colour;
-        m_backColour = doc->m_input_background_colour;
+        m_strFontName = doc->m_input.font_name;
+        m_iFontSize = doc->m_input.font_height;
+        m_iFontWeight = doc->m_input.font_weight;
+        m_iFontCharset = doc->m_input.font_charset;
+        m_textColour = doc->m_input.text_colour;
+        m_backColour = doc->m_input.background_colour;
 
         ApplyFont();
         ApplyColours();

@@ -46,7 +46,7 @@ class NotepadApiTest : public ::testing::Test {
         doc->m_mush_name = "Test World";
         doc->m_server = "test.mud.com";
         doc->m_port = 4000;
-        doc->m_bUTF_8 = true;
+        doc->m_display.utf8 = true;
 
         // Get Lua state
         ASSERT_NE(doc->m_ScriptEngine, nullptr) << "ScriptEngine should exist";

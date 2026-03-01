@@ -53,10 +53,10 @@ OutputView::OutputView(WorldDocument* doc, QWidget* parent)
     // Set up fixed-width font for MUD display
     // Read font from WorldDocument if available, otherwise use default
     // Use createScaledFont for cross-platform DPI-consistent sizing
-    if (m_doc && !m_doc->m_font_name.isEmpty()) {
-        m_font = createScaledFont(m_doc->m_font_name, m_doc->m_font_height);
-        qCDebug(lcUI) << "OutputView: Using font from WorldDocument:" << m_doc->m_font_name
-                      << m_doc->m_font_height;
+    if (m_doc && !m_doc->m_output.font_name.isEmpty()) {
+        m_font = createScaledFont(m_doc->m_output.font_name, m_doc->m_output.font_height);
+        qCDebug(lcUI) << "OutputView: Using font from WorldDocument:" << m_doc->m_output.font_name
+                      << m_doc->m_output.font_height;
     } else {
         m_font = createScaledFont("Courier New", 10);
         qCDebug(lcUI) << "OutputView: Using default font (Courier New, 10)";
@@ -181,15 +181,15 @@ void OutputView::calculateMetrics()
         }
 
         // Account for pixel offset (scrollbar margin)
-        int usableWidth = viewWidth - m_doc->m_iPixelOffset;
+        int usableWidth = viewWidth - m_doc->m_display.pixel_offset;
         int newWrapColumn = usableWidth / m_charWidth;
 
         // Clamp to reasonable range (20 to MAX_LINE_WIDTH=10000)
         newWrapColumn = qBound(20, newWrapColumn, 10000);
 
         // Only update if changed significantly (avoid constant updates from rounding)
-        if (m_doc->m_nWrapColumn != static_cast<quint16>(newWrapColumn)) {
-            m_doc->m_nWrapColumn = static_cast<quint16>(newWrapColumn);
+        if (m_doc->m_display.wrap_column != static_cast<quint16>(newWrapColumn)) {
+            m_doc->m_display.wrap_column = static_cast<quint16>(newWrapColumn);
             qCDebug(lcUI) << "Auto-wrap: updated wrap column to" << newWrapColumn
                           << "(width:" << viewWidth << "charWidth:" << m_charWidth << ")";
         }
@@ -266,7 +266,7 @@ void OutputView::onNewLinesAdded()
 
     // Flash taskbar icon if enabled and window is not active
     // Throttle to max once per second (like original MUSHclient)
-    if (m_doc->m_bFlashIcon) {
+    if (m_doc->m_display.flash_icon) {
         QWidget* mainWindow = window();
         if (mainWindow && !mainWindow->isActiveWindow()) {
             qint64 now = QDateTime::currentMSecsSinceEpoch();
@@ -317,7 +317,7 @@ void OutputView::onIncompleteLine()
  * If mouse is over a miniwindow with scroll wheel handler, invoke it.
  * Otherwise, scroll the text output by 3 lines per wheel step.
  *
- * Auto-Freeze Feature: If m_bAutoFreeze is enabled and the user scrolls up,
+ * Auto-Freeze Feature: If m_display.auto_freeze is enabled and the user scrolls up,
  * automatically freeze the output to prevent auto-scrolling.
  */
 void OutputView::wheelEvent(QWheelEvent* event)
@@ -336,7 +336,7 @@ void OutputView::wheelEvent(QWheelEvent* event)
     int delta = event->angleDelta().y() / 120; // 120 units = 1 "step"
 
     // Auto-freeze: If scrolling up and auto-freeze is enabled, freeze output
-    if (delta > 0 && m_doc->m_bAutoFreeze && !m_freeze) {
+    if (delta > 0 && m_doc->m_display.auto_freeze && !m_freeze) {
         // Scrolling up - freeze output so we don't auto-scroll
         setFrozen(true);
     }
@@ -398,7 +398,7 @@ QColor OutputView::ansiToRgb(quint32 color, quint16 flags, bool bold) const
     if (colorType == COLOUR_CUSTOM) {
         int index = color & 0xFF;
         if (index < MAX_CUSTOM) {
-            return bgrToQColor(m_doc->m_customtext[index]);
+            return bgrToQColor(m_doc->m_colors.custom_text[index]);
         }
         return Qt::white;
     }
@@ -407,7 +407,7 @@ QColor OutputView::ansiToRgb(quint32 color, quint16 flags, bool bold) const
     int index = color & 0xFF;
     if (index < 8) {
         // Standard ANSI color - use normal or bold color table
-        QRgb bgr = bold ? m_doc->m_boldcolour[index] : m_doc->m_normalcolour[index];
+        QRgb bgr = bold ? m_doc->m_colors.bold_colour[index] : m_doc->m_colors.normal_colour[index];
         return bgrToQColor(bgr);
     } else {
         // Extended 256-color - use xterm palette (stored as BGR)
@@ -641,17 +641,17 @@ void OutputView::drawLine(QPainter& painter, int y, Line* line, int lineIndex)
     QRgb cPreambleBack;
 
     if (line->flags & COMMENT) {
-        strPreamble = m_doc->m_strOutputLinePreambleNotes;
-        cPreambleText = m_doc->m_OutputLinePreambleNotesTextColour;
-        cPreambleBack = m_doc->m_OutputLinePreambleNotesBackColour;
+        strPreamble = m_doc->m_output.preamble_notes;
+        cPreambleText = m_doc->m_output.preamble_notes_text_colour;
+        cPreambleBack = m_doc->m_output.preamble_notes_back_colour;
     } else if (line->flags & USER_INPUT) {
-        strPreamble = m_doc->m_strOutputLinePreambleInput;
-        cPreambleText = m_doc->m_OutputLinePreambleInputTextColour;
-        cPreambleBack = m_doc->m_OutputLinePreambleInputBackColour;
+        strPreamble = m_doc->m_output.preamble_input;
+        cPreambleText = m_doc->m_output.preamble_input_text_colour;
+        cPreambleBack = m_doc->m_output.preamble_input_back_colour;
     } else {
-        strPreamble = m_doc->m_strOutputLinePreambleOutput;
-        cPreambleText = m_doc->m_OutputLinePreambleOutputTextColour;
-        cPreambleBack = m_doc->m_OutputLinePreambleOutputBackColour;
+        strPreamble = m_doc->m_output.preamble_output;
+        cPreambleText = m_doc->m_output.preamble_output_text_colour;
+        cPreambleBack = m_doc->m_output.preamble_output_back_colour;
     }
 
     // Expand time codes if preamble is not empty
@@ -951,7 +951,7 @@ void OutputView::mouseReleaseEvent(QMouseEvent* event)
             m_selectionActive = false;
 
             // Auto-freeze when selection is made (like original MUSHclient)
-            if (hasSelection() && m_doc && m_doc->m_bAutoFreeze && !m_freeze) {
+            if (hasSelection() && m_doc && m_doc->m_display.auto_freeze && !m_freeze) {
                 setFrozen(true);
             }
 
@@ -1194,11 +1194,11 @@ void OutputView::positionToLineChar(const QPoint& pos, int& line, int& charOffse
     // Account for preamble width (must match drawLine logic)
     QString strPreamble;
     if (pLine->flags & COMMENT) {
-        strPreamble = m_doc->m_strOutputLinePreambleNotes;
+        strPreamble = m_doc->m_output.preamble_notes;
     } else if (pLine->flags & USER_INPUT) {
-        strPreamble = m_doc->m_strOutputLinePreambleInput;
+        strPreamble = m_doc->m_output.preamble_input;
     } else {
-        strPreamble = m_doc->m_strOutputLinePreambleOutput;
+        strPreamble = m_doc->m_output.preamble_output;
     }
 
     if (!strPreamble.isEmpty()) {

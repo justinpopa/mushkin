@@ -130,12 +130,12 @@ void MapDialog::loadSettings()
         return;
 
     // Load mapper settings from WorldDocument
-    m_enableMapperCheck->setChecked(m_doc->m_bMapping);
-    m_removeMapReversesCheck->setChecked(m_doc->m_bRemoveMapReverses);
+    m_enableMapperCheck->setChecked(m_doc->m_mapping.enabled);
+    m_removeMapReversesCheck->setChecked(m_doc->m_mapping.remove_reverses);
 
     // Failure detection settings
-    m_failurePatternEdit->setText(m_doc->m_strMappingFailure);
-    m_failureRegexpCheck->setChecked(m_doc->m_bMapFailureRegexp);
+    m_failurePatternEdit->setText(m_doc->m_mapping.failure_message);
+    m_failureRegexpCheck->setChecked(m_doc->m_mapping.failure_regexp);
 }
 
 void MapDialog::saveSettings()
@@ -144,12 +144,12 @@ void MapDialog::saveSettings()
         return;
 
     // Save mapper settings to WorldDocument
-    m_doc->m_bMapping = m_enableMapperCheck->isChecked();
-    m_doc->m_bRemoveMapReverses = m_removeMapReversesCheck->isChecked();
+    m_doc->m_mapping.enabled = m_enableMapperCheck->isChecked();
+    m_doc->m_mapping.remove_reverses = m_removeMapReversesCheck->isChecked();
 
     // Failure detection settings
-    m_doc->m_strMappingFailure = m_failurePatternEdit->text();
-    m_doc->m_bMapFailureRegexp = m_failureRegexpCheck->isChecked();
+    m_doc->m_mapping.failure_message = m_failurePatternEdit->text();
+    m_doc->m_mapping.failure_regexp = m_failureRegexpCheck->isChecked();
 
     // Pack the flags back into m_iFlags1
     m_doc->packFlags();
@@ -164,9 +164,9 @@ void MapDialog::updateDirectionDisplays()
         return;
 
     // Update forwards and backwards direction displays
-    // These come from m_strSpecialForwards and m_strSpecialBackwards
-    m_forwardsDisplay->setPlainText(m_doc->m_strSpecialForwards);
-    m_backwardsDisplay->setPlainText(m_doc->m_strSpecialBackwards);
+    // These come from m_mapping.special_forwards and m_mapping.special_backwards
+    m_forwardsDisplay->setPlainText(m_doc->m_mapping.special_forwards);
+    m_backwardsDisplay->setPlainText(m_doc->m_mapping.special_backwards);
 }
 
 void MapDialog::onAccepted()
@@ -192,8 +192,8 @@ void MapDialog::onRemoveAllClicked()
 
     if (reply == QMessageBox::Yes) {
         // Clear all mapper data
-        m_doc->m_strSpecialForwards.clear();
-        m_doc->m_strSpecialBackwards.clear();
+        m_doc->m_mapping.special_forwards.clear();
+        m_doc->m_mapping.special_backwards.clear();
 
         updateDirectionDisplays();
 

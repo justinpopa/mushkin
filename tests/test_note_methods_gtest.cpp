@@ -27,7 +27,7 @@ class NoteMethodsTest : public ::testing::Test {
 
         // Initialize basic state
         doc->m_telnetParser->m_phase = Phase::NONE;
-        doc->m_bUTF_8 = true; // UTF-8 mode
+        doc->m_display.utf8 = true; // UTF-8 mode
         doc->m_bNotesInRGB = true;
         doc->m_iNoteColourFore = qRgb(255, 255, 255); // White
         doc->m_iNoteColourBack = qRgb(0, 0, 0);       // Black

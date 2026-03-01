@@ -6,7 +6,8 @@
  * Tests the enhanced command history features:
  * - Consecutive duplicate filtering (m_last_command)
  * - History size limit (m_nHistoryLines)
- * - History status tracking (HistoryStatus::eAtTop, HistoryStatus::eInMiddle, HistoryStatus::eAtBottom)
+ * - History status tracking (HistoryStatus::eAtTop, HistoryStatus::eInMiddle,
+ * HistoryStatus::eAtBottom)
  * - clearCommandHistory() method
  * - XML persistence
  *
@@ -95,7 +96,7 @@ TEST_F(CommandHistoryNavigationTest, ConsecutiveDuplicateFiltering)
  */
 TEST_F(CommandHistoryNavigationTest, HistorySizeLimit)
 {
-    doc->m_nHistoryLines = 5; // Set small limit for testing
+    doc->m_input.history_lines = 5; // Set small limit for testing
 
     // Add 5 commands (up to limit)
     doc->addToCommandHistory("cmd1");
@@ -171,7 +172,8 @@ TEST_F(CommandHistoryNavigationTest, ClearHistory)
     EXPECT_TRUE(doc->m_commandHistory.isEmpty()) << "History should be empty";
     EXPECT_TRUE(doc->m_last_command.isEmpty()) << "Last command should be empty";
     EXPECT_EQ(doc->m_historyPosition, 0) << "Position should be 0";
-    EXPECT_EQ(doc->m_iHistoryStatus, HistoryStatus::eAtBottom) << "Status should be HistoryStatus::eAtBottom";
+    EXPECT_EQ(doc->m_iHistoryStatus, HistoryStatus::eAtBottom)
+        << "Status should be HistoryStatus::eAtBottom";
 
     // Should be able to add commands again
     doc->addToCommandHistory("west");
@@ -251,7 +253,8 @@ TEST_F(CommandHistoryNavigationTest, XmlSerialization)
 
         // Verify position and status reset
         EXPECT_EQ(doc2.m_historyPosition, 4) << "Position should be at end";
-        EXPECT_EQ(doc2.m_iHistoryStatus, HistoryStatus::eAtBottom) << "Status should be HistoryStatus::eAtBottom";
+        EXPECT_EQ(doc2.m_iHistoryStatus, HistoryStatus::eAtBottom)
+            << "Status should be HistoryStatus::eAtBottom";
     }
 
     deleteFile(testFile);

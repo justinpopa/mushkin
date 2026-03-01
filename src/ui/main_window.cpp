@@ -1819,7 +1819,7 @@ void MainWindow::updateMenus()
         if (worldWidget) {
             isConnected = worldWidget->isConnected();
             isLogOpen = worldWidget->document()->IsLogOpen();
-            isAutoSayEnabled = worldWidget->document()->m_bEnableAutoSay;
+            isAutoSayEnabled = worldWidget->document()->m_auto_say.enabled;
         }
     }
     m_connectAction->setEnabled(hasActiveWorld && !isConnected);
@@ -1838,11 +1838,11 @@ void MainWindow::updateMenus()
     // Update Auto-Say checked state
     m_autoSayAction->setChecked(isAutoSayEnabled);
 
-    // Update Wrap Output checked state from document's m_wrap setting
+    // Update Wrap Output checked state from document's m_display.wrap setting
     if (hasActiveWorld) {
         WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
         if (worldWidget && worldWidget->document()) {
-            m_wrapOutputAction->setChecked(worldWidget->document()->m_wrap);
+            m_wrapOutputAction->setChecked(worldWidget->document()->m_display.wrap);
         }
     }
 
@@ -2546,18 +2546,18 @@ void MainWindow::pasteToWorld()
     }
 
     // Get settings from confirm dialog or use defaults
-    QString preamble = doc->m_paste_preamble;
-    QString postamble = doc->m_paste_postamble;
-    QString linePreamble = doc->m_pasteline_preamble;
-    QString linePostamble = doc->m_pasteline_postamble;
-    bool commentedSoftcode = doc->m_bPasteCommentedSoftcode;
-    int lineDelay = doc->m_nPasteDelay;
-    int lineDelayPerLines = doc->m_nPasteDelayPerLines;
-    bool echo = doc->m_bPasteEcho;
+    QString preamble = doc->m_paste.paste_preamble;
+    QString postamble = doc->m_paste.paste_postamble;
+    QString linePreamble = doc->m_paste.pasteline_preamble;
+    QString linePostamble = doc->m_paste.pasteline_postamble;
+    bool commentedSoftcode = doc->m_paste.paste_commented_softcode;
+    int lineDelay = doc->m_paste.paste_delay;
+    int lineDelayPerLines = doc->m_paste.paste_delay_per_lines;
+    bool echo = doc->m_paste.paste_echo;
     int lineCount = text.count('\n') + 1;
 
     // Check if confirmation is needed
-    if (doc->m_bConfirmOnPaste) {
+    if (doc->m_paste.confirm_on_paste) {
         ConfirmPreambleDialog dlg(this);
         dlg.setPasteMessage(QString("About to send: %1 characters, %2 lines to %3")
                                 .arg(text.length())
@@ -3079,7 +3079,7 @@ void MainWindow::reloadScriptFile()
     }
 
     // Check if a script file is configured
-    if (doc->m_strScriptFilename.isEmpty()) {
+    if (doc->m_scripting.filename.isEmpty()) {
         QMessageBox::information(
             this, "No Script File",
             "No script file is configured for this world.\n\n"
@@ -3122,7 +3122,7 @@ void MainWindow::toggleAutoSay()
 
     // Toggle Auto-Say setting
     bool newValue = m_autoSayAction->isChecked();
-    doc->m_bEnableAutoSay = newValue;
+    doc->m_auto_say.enabled = newValue;
 }
 
 void MainWindow::toggleWrapOutput()
@@ -3142,10 +3142,10 @@ void MainWindow::toggleWrapOutput()
         return;
     }
 
-    // Toggle m_wrap (word-wrap at spaces enabled/disabled)
-    // m_wrap is separate from m_nWrapColumn (the wrap column width)
+    // Toggle m_display.wrap (word-wrap at spaces enabled/disabled)
+    // m_display.wrap is separate from m_display.wrap_column (the wrap column width)
     // This matches original MUSHclient behavior from doc.cpp OnGameWraplines()
-    doc->m_wrap = m_wrapOutputAction->isChecked();
+    doc->m_display.wrap = m_wrapOutputAction->isChecked();
 }
 
 void MainWindow::minimizeToTray()
@@ -3229,7 +3229,7 @@ void MainWindow::editScriptFile()
     }
 
     // Check if a script file is configured
-    if (doc->m_strScriptFilename.isEmpty()) {
+    if (doc->m_scripting.filename.isEmpty()) {
         QMessageBox::information(
             this, "No Script File",
             "No script file is configured for this world.\n\n"
@@ -3238,12 +3238,12 @@ void MainWindow::editScriptFile()
     }
 
     // Open the script file in the system's default text editor
-    QUrl fileUrl = QUrl::fromLocalFile(doc->m_strScriptFilename);
+    QUrl fileUrl = QUrl::fromLocalFile(doc->m_scripting.filename);
     if (!QDesktopServices::openUrl(fileUrl)) {
         QMessageBox::warning(this, "Cannot Open File",
                              QString("Could not open script file:\n%1\n\n"
                                      "No application is associated with this file type.")
-                                 .arg(doc->m_strScriptFilename));
+                                 .arg(doc->m_scripting.filename));
     }
 }
 
@@ -5264,14 +5264,14 @@ void MainWindow::sendFile()
     }
 
     // Get settings from confirm dialog or use defaults
-    QString preamble = doc->m_file_preamble;
-    QString postamble = doc->m_file_postamble;
-    QString linePreamble = doc->m_line_preamble;
-    QString linePostamble = doc->m_line_postamble;
-    bool commentedSoftcode = doc->m_bFileCommentedSoftcode;
-    int lineDelay = doc->m_nFileDelay;
-    int lineDelayPerLines = doc->m_nFileDelayPerLines;
-    bool echo = doc->m_bSendEcho;
+    QString preamble = doc->m_paste.file_preamble;
+    QString postamble = doc->m_paste.file_postamble;
+    QString linePreamble = doc->m_paste.line_preamble;
+    QString linePostamble = doc->m_paste.line_postamble;
+    bool commentedSoftcode = doc->m_paste.file_commented_softcode;
+    int lineDelay = doc->m_paste.file_delay;
+    int lineDelayPerLines = doc->m_paste.file_delay_per_lines;
+    bool echo = doc->m_input.send_echo;
     int lineCount = text.count('\n') + 1;
     QString shortFileName = QFileInfo(fileName).fileName();
 

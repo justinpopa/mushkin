@@ -40,7 +40,7 @@ class ScriptLoadingTest : public ::testing::Test {
         doc->m_server = "test.mud.com";
         doc->m_port = 4000;
         doc->m_connectionManager->m_iConnectPhase = eConnectConnectedToMud;
-        doc->m_bUTF_8 = true;
+        doc->m_display.utf8 = true;
 
         // Initialize note() settings
         doc->m_bNotesInRGB = true;
@@ -147,7 +147,7 @@ TEST_F(ScriptLoadingTest, ParseLuaRuntimeError)
 // Test 5: loadScriptFile() with valid script
 TEST_F(ScriptLoadingTest, LoadValidScriptFile)
 {
-    doc->m_strScriptFilename = testDir + "/test_valid.lua";
+    doc->m_scripting.filename = testDir + "/test_valid.lua";
     doc->loadScriptFile();
 
     // Check if functions were defined
@@ -165,7 +165,7 @@ TEST_F(ScriptLoadingTest, LoadScriptFileWithSyntaxError)
 {
     resetLuaState();
 
-    doc->m_strScriptFilename = testDir + "/test_syntax_error.lua";
+    doc->m_scripting.filename = testDir + "/test_syntax_error.lua";
 
     // Should handle syntax error gracefully without crashing
     EXPECT_NO_THROW(doc->loadScriptFile()) << "Should handle syntax error gracefully";
@@ -176,7 +176,7 @@ TEST_F(ScriptLoadingTest, LoadScriptFileWithRuntimeError)
 {
     resetLuaState();
 
-    doc->m_strScriptFilename = testDir + "/test_runtime_error.lua";
+    doc->m_scripting.filename = testDir + "/test_runtime_error.lua";
 
     // Should handle runtime error gracefully without crashing
     EXPECT_NO_THROW(doc->loadScriptFile()) << "Should handle runtime error gracefully";
@@ -185,7 +185,7 @@ TEST_F(ScriptLoadingTest, LoadScriptFileWithRuntimeError)
 // Test 8: showErrorLines()
 TEST_F(ScriptLoadingTest, ShowErrorLines)
 {
-    doc->m_strScriptFilename = testDir + "/test_syntax_error.lua";
+    doc->m_scripting.filename = testDir + "/test_syntax_error.lua";
 
     // Should execute without crashing
     EXPECT_NO_THROW(doc->showErrorLines(13)) << "showErrorLines() should execute without crashing";
@@ -195,7 +195,7 @@ TEST_F(ScriptLoadingTest, ShowErrorLines)
 TEST_F(ScriptLoadingTest, TimingStatistics)
 {
     // Load a script to trigger timing
-    doc->m_strScriptFilename = testDir + "/test_valid.lua";
+    doc->m_scripting.filename = testDir + "/test_valid.lua";
     doc->loadScriptFile();
 
     EXPECT_GT(doc->m_iScriptTimeTaken, 0) << "Script timing should be recorded";

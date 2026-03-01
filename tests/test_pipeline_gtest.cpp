@@ -26,7 +26,7 @@ class PipelineTest : public ::testing::Test {
 
         // Initialize connection state (normally done by OnConnect)
         doc->m_telnetParser->m_phase = Phase::NONE;
-        doc->m_bUTF_8 = false; // ASCII mode for simplicity
+        doc->m_display.utf8 = false; // ASCII mode for simplicity
 
         // Initialize document style state
         doc->m_iFlags = COLOUR_ANSI;
@@ -141,7 +141,7 @@ TEST_F(PipelineTest, MultipleLines)
 TEST_F(PipelineTest, UTF8Text)
 {
     // Enable UTF-8 mode
-    doc->m_bUTF_8 = true;
+    doc->m_display.utf8 = true;
 
     // Process "Café\n" = 0x43 0x61 0x66 0xC3 0xA9 0x0A
     const unsigned char utf8Cafe[] = {0x43, 0x61, 0x66, 0xC3, 0xA9, 0x0A, 0};

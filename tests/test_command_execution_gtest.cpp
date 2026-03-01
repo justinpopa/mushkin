@@ -54,7 +54,7 @@ class CommandExecutionTest : public ::testing::Test {
 TEST_F(CommandExecutionTest, SendMsgMultilineSplitting)
 {
     // Enable speedwalk delay to force queueing
-    doc->m_iSpeedWalkDelay = 100; // 100ms delay
+    doc->m_speedwalk.delay = 100; // 100ms delay
 
     // Send multiline command
     QString multiline = "north\nsouth\neast";
@@ -85,7 +85,7 @@ TEST_F(CommandExecutionTest, SendMsgMultilineSplitting)
  */
 TEST_F(CommandExecutionTest, CommandQueueEncoding)
 {
-    doc->m_iSpeedWalkDelay = 100; // Enable queueing
+    doc->m_speedwalk.delay = 100; // Enable queueing
 
     // Test 1: Queue with echo and log
     doc->m_connectionManager->m_CommandQueue.clear();
@@ -129,9 +129,9 @@ TEST_F(CommandExecutionTest, CommandQueueEncoding)
 TEST_F(CommandExecutionTest, SpamPrevention)
 {
     // Enable spam prevention
-    doc->m_bEnableSpamPrevention = true;
-    doc->m_iSpamLineCount = 3; // Insert spam message after 3 repeats
-    doc->m_strSpamMessage = "*** SPAM FILLER ***";
+    doc->m_spam.enabled = true;
+    doc->m_spam.line_count = 3; // Insert spam message after 3 repeats
+    doc->m_spam.message = "*** SPAM FILLER ***";
 
     // Track last command sent
     EXPECT_TRUE(doc->m_strLastCommandSent.isEmpty()) << "Last command should be empty initially";
@@ -164,7 +164,7 @@ TEST_F(CommandExecutionTest, SpamPrevention)
  */
 TEST_F(CommandExecutionTest, CommandStripping)
 {
-    doc->m_iSpeedWalkDelay = 100; // Force queueing to inspect result
+    doc->m_speedwalk.delay = 100; // Force queueing to inspect result
 
     // Test trailing \r\n
     doc->m_connectionManager->m_CommandQueue.clear();
@@ -197,7 +197,7 @@ TEST_F(CommandExecutionTest, CommandStripping)
  */
 TEST_F(CommandExecutionTest, EmptyCommandHandling)
 {
-    doc->m_iSpeedWalkDelay = 100;
+    doc->m_speedwalk.delay = 100;
 
     // Send empty string
     doc->m_connectionManager->m_CommandQueue.clear();
@@ -229,7 +229,7 @@ TEST_F(CommandExecutionTest, QueueInitialState)
 TEST_F(CommandExecutionTest, ImmediateSending)
 {
     // No speedwalk delay
-    doc->m_iSpeedWalkDelay = 0;
+    doc->m_speedwalk.delay = 0;
 
     // Queue should remain empty (commands sent immediately)
     doc->m_connectionManager->m_CommandQueue.clear();

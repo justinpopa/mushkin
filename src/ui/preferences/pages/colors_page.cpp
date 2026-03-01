@@ -81,9 +81,9 @@ void ColorsPage::loadSettings()
     m_table->blockSignals(true);
 
     for (int i = 0; i < 16; i++) {
-        m_customText[i] = m_doc->m_customtext[i];
-        m_customBack[i] = m_doc->m_customback[i];
-        m_customNames[i] = m_doc->m_strCustomColourName[i];
+        m_customText[i] = m_doc->m_colors.custom_text[i];
+        m_customBack[i] = m_doc->m_colors.custom_back[i];
+        m_customNames[i] = m_doc->m_colors.custom_colour_name[i];
 
         // Update name
         m_table->item(i, 1)->setText(m_customNames[i]);
@@ -103,9 +103,9 @@ void ColorsPage::saveSettings()
         return;
 
     for (int i = 0; i < 16; i++) {
-        m_doc->m_customtext[i] = m_customText[i];
-        m_doc->m_customback[i] = m_customBack[i];
-        m_doc->m_strCustomColourName[i] = m_table->item(i, 1)->text();
+        m_doc->m_colors.custom_text[i] = m_customText[i];
+        m_doc->m_colors.custom_back[i] = m_customBack[i];
+        m_doc->m_colors.custom_colour_name[i] = m_table->item(i, 1)->text();
     }
 
     m_doc->setModified(true);

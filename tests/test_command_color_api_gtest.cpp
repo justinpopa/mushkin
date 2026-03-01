@@ -166,7 +166,7 @@ TEST_F(CommandColorAPITest, SetCustomColourNameValid)
     callLuaTest("test_set_custom_colour_name_valid");
 
     // Verify C++ side: color name should be set
-    EXPECT_EQ(doc->m_strCustomColourName[0], "MyRed");
+    EXPECT_EQ(doc->m_colors.custom_colour_name[0], "MyRed");
 }
 
 // Test SetCustomColourName with out of range index
@@ -199,8 +199,8 @@ TEST_F(CommandColorAPITest, SetCustomColourNameMaxLength)
     callLuaTest("test_set_custom_colour_name_max_length");
 
     // Verify C++ side: 30-char name should be set
-    EXPECT_EQ(doc->m_strCustomColourName[0], "123456789012345678901234567890");
-    EXPECT_EQ(doc->m_strCustomColourName[0].length(), 30);
+    EXPECT_EQ(doc->m_colors.custom_colour_name[0], "123456789012345678901234567890");
+    EXPECT_EQ(doc->m_colors.custom_colour_name[0].length(), 30);
 }
 
 // Test SetCustomColourName with different color indices
@@ -209,9 +209,9 @@ TEST_F(CommandColorAPITest, SetCustomColourNameDifferentValues)
     callLuaTest("test_set_custom_colour_name_different_values");
 
     // Verify C++ side: all three colors should be set
-    EXPECT_EQ(doc->m_strCustomColourName[0], "Color1");
-    EXPECT_EQ(doc->m_strCustomColourName[1], "Color2");
-    EXPECT_EQ(doc->m_strCustomColourName[15], "Color16");
+    EXPECT_EQ(doc->m_colors.custom_colour_name[0], "Color1");
+    EXPECT_EQ(doc->m_colors.custom_colour_name[1], "Color2");
+    EXPECT_EQ(doc->m_colors.custom_colour_name[15], "Color16");
 }
 
 // Test SetCustomColourName marks document as modified
@@ -236,7 +236,7 @@ TEST_F(CommandColorAPITest, SetCustomColourNameModifiesDocument)
 TEST_F(CommandColorAPITest, SetCustomColourNameNoChangeIfSame)
 {
     // Set initial name
-    doc->m_strCustomColourName[0] = "TestColor";
+    doc->m_colors.custom_colour_name[0] = "TestColor";
     doc->m_bModified = false;
 
     // Set same name again

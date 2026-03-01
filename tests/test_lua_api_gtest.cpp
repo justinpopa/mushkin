@@ -38,7 +38,7 @@ class LuaApiTest : public ::testing::Test {
         doc->m_server = "test.mud.com";
         doc->m_port = 4000;
         doc->m_connectionManager->m_iConnectPhase = eConnectConnectedToMud;
-        doc->m_bUTF_8 = true;
+        doc->m_display.utf8 = true;
 
         // Create initial line (needed for note() to work)
         doc->m_currentLine =

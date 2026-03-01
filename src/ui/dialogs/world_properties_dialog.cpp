@@ -507,14 +507,15 @@ void WorldPropertiesDialog::loadSettings()
 
     // Output tab
     // Reconstruct QFont from WorldDocument font properties
-    m_outputFont.setFamily(m_doc->m_font_name);
-    m_outputFont.setPointSize(qAbs(m_doc->m_font_height)); // Convert pixels to points approximation
-    m_outputFont.setWeight(m_doc->m_font_weight >= 700 ? QFont::Bold : QFont::Normal);
+    m_outputFont.setFamily(m_doc->m_output.font_name);
+    m_outputFont.setPointSize(
+        qAbs(m_doc->m_output.font_height)); // Convert pixels to points approximation
+    m_outputFont.setWeight(m_doc->m_output.font_weight >= 700 ? QFont::Bold : QFont::Normal);
     m_outputFontLabel->setText(
         QString("%1, %2pt").arg(m_outputFont.family()).arg(m_outputFont.pointSize()));
 
     // TODO(feature): Wire ANSI color picker to WorldDocument m_normalColour/m_boldColour arrays.
-    // WorldDocument has m_normalcolour[8] and m_boldcolour[8] — initialize from them here.
+    // WorldDocument has m_colors.normal_colour[8] and m_colors.bold_colour[8] — initialize from them here.
     // For now, initialize with default colors
     const std::array<QRgb, 16> defaultColors = {
         qRgb(0, 0, 0),       // Black
@@ -540,19 +541,19 @@ void WorldPropertiesDialog::loadSettings()
     }
 
     // Activity settings
-    m_flashIconCheck->setChecked(m_doc->m_bFlashIcon);
+    m_flashIconCheck->setChecked(m_doc->m_display.flash_icon);
 
     // Input tab
-    m_inputFont.setFamily(m_doc->m_input_font_name);
-    m_inputFont.setPointSize(qAbs(m_doc->m_input_font_height));
-    m_inputFont.setWeight(m_doc->m_input_font_weight >= 700 ? QFont::Bold : QFont::Normal);
-    m_inputFont.setItalic(m_doc->m_input_font_italic != 0);
+    m_inputFont.setFamily(m_doc->m_input.font_name);
+    m_inputFont.setPointSize(qAbs(m_doc->m_input.font_height));
+    m_inputFont.setWeight(m_doc->m_input.font_weight >= 700 ? QFont::Bold : QFont::Normal);
+    m_inputFont.setItalic(m_doc->m_input.font_italic != 0);
     m_inputFontLabel->setText(
         QString("%1, %2pt").arg(m_inputFont.family()).arg(m_inputFont.pointSize()));
 
     m_echoInputCheck->setChecked(m_doc->m_display_my_input);
-    // TODO(feature): Wire echo color combo to WorldDocument m_echo_colour (quint16, index into
-    // color table).
+    // TODO(feature): Wire echo color combo to WorldDocument m_output.echo_colour (quint16, index
+    // into color table).
 
     // Command history size
     m_historySizeSpin->setValue(m_doc->m_maxCommandHistory);
@@ -569,30 +570,30 @@ void WorldPropertiesDialog::loadSettings()
         m_logFormatCombo->setCurrentIndex(0);
 
     // Scripting tab
-    m_enableScriptCheck->setChecked(m_doc->m_bEnableScripts);
-    m_scriptFileEdit->setText(m_doc->m_strScriptFilename);
+    m_enableScriptCheck->setChecked(m_doc->m_scripting.enabled);
+    m_scriptFileEdit->setText(m_doc->m_scripting.filename);
     // Not applicable: Script language is always Lua — no multi-language support needed.
 
     // Paste to World tab
-    m_pastePreambleEdit->setText(m_doc->m_paste_preamble);
-    m_pastePostambleEdit->setText(m_doc->m_paste_postamble);
-    m_pasteLinePreambleEdit->setText(m_doc->m_pasteline_preamble);
-    m_pasteLinePostambleEdit->setText(m_doc->m_pasteline_postamble);
-    m_pasteDelaySpin->setValue(m_doc->m_nPasteDelay);
-    m_pasteDelayPerLinesSpin->setValue(m_doc->m_nPasteDelayPerLines);
-    m_pasteCommentedSoftcodeCheck->setChecked(m_doc->m_bPasteCommentedSoftcode);
-    m_pasteEchoCheck->setChecked(m_doc->m_bPasteEcho);
-    m_pasteConfirmCheck->setChecked(m_doc->m_bConfirmOnPaste);
+    m_pastePreambleEdit->setText(m_doc->m_paste.paste_preamble);
+    m_pastePostambleEdit->setText(m_doc->m_paste.paste_postamble);
+    m_pasteLinePreambleEdit->setText(m_doc->m_paste.pasteline_preamble);
+    m_pasteLinePostambleEdit->setText(m_doc->m_paste.pasteline_postamble);
+    m_pasteDelaySpin->setValue(m_doc->m_paste.paste_delay);
+    m_pasteDelayPerLinesSpin->setValue(m_doc->m_paste.paste_delay_per_lines);
+    m_pasteCommentedSoftcodeCheck->setChecked(m_doc->m_paste.paste_commented_softcode);
+    m_pasteEchoCheck->setChecked(m_doc->m_paste.paste_echo);
+    m_pasteConfirmCheck->setChecked(m_doc->m_paste.confirm_on_paste);
 
     // Send File tab
-    m_filePreambleEdit->setText(m_doc->m_file_preamble);
-    m_filePostambleEdit->setText(m_doc->m_file_postamble);
-    m_fileLinePreambleEdit->setText(m_doc->m_line_preamble);
-    m_fileLinePostambleEdit->setText(m_doc->m_line_postamble);
-    m_fileDelaySpin->setValue(m_doc->m_nFileDelay);
-    m_fileDelayPerLinesSpin->setValue(m_doc->m_nFileDelayPerLines);
-    m_fileCommentedSoftcodeCheck->setChecked(m_doc->m_bFileCommentedSoftcode);
-    m_fileEchoCheck->setChecked(m_doc->m_bSendEcho);
+    m_filePreambleEdit->setText(m_doc->m_paste.file_preamble);
+    m_filePostambleEdit->setText(m_doc->m_paste.file_postamble);
+    m_fileLinePreambleEdit->setText(m_doc->m_paste.line_preamble);
+    m_fileLinePostambleEdit->setText(m_doc->m_paste.line_postamble);
+    m_fileDelaySpin->setValue(m_doc->m_paste.file_delay);
+    m_fileDelayPerLinesSpin->setValue(m_doc->m_paste.file_delay_per_lines);
+    m_fileCommentedSoftcodeCheck->setChecked(m_doc->m_paste.file_commented_softcode);
+    m_fileEchoCheck->setChecked(m_doc->m_input.send_echo);
     m_fileConfirmCheck->setChecked(m_doc->m_bConfirmOnSend);
 
     // Remote Access tab
@@ -625,23 +626,23 @@ void WorldPropertiesDialog::saveSettings()
     m_doc->m_connect_now = m_autoConnectCheck->isChecked();
 
     // Output tab
-    m_doc->m_font_name = m_outputFont.family();
-    m_doc->m_font_height = m_outputFont.pointSize(); // Store as points
-    m_doc->m_font_weight = m_outputFont.weight();
+    m_doc->m_output.font_name = m_outputFont.family();
+    m_doc->m_output.font_height = m_outputFont.pointSize(); // Store as points
+    m_doc->m_output.font_weight = m_outputFont.weight();
     // TODO(feature): Wire ANSI color picker to WorldDocument m_normalColour/m_boldColour arrays.
-    // WorldDocument has m_normalcolour[8] and m_boldcolour[8] — save m_ansiColors[] to them here.
+    // WorldDocument has m_colors.normal_colour[8] and m_colors.bold_colour[8] — save m_ansiColors[] to them here.
 
     // Activity settings
-    m_doc->m_bFlashIcon = m_flashIconCheck->isChecked();
+    m_doc->m_display.flash_icon = m_flashIconCheck->isChecked();
 
     // Input tab
-    m_doc->m_input_font_name = m_inputFont.family();
-    m_doc->m_input_font_height = m_inputFont.pointSize();
-    m_doc->m_input_font_weight = m_inputFont.weight();
-    m_doc->m_input_font_italic = m_inputFont.italic() ? 1 : 0;
+    m_doc->m_input.font_name = m_inputFont.family();
+    m_doc->m_input.font_height = m_inputFont.pointSize();
+    m_doc->m_input.font_weight = m_inputFont.weight();
+    m_doc->m_input.font_italic = m_inputFont.italic() ? 1 : 0;
     m_doc->m_display_my_input = m_echoInputCheck->isChecked();
-    // TODO(feature): Wire echo color combo to WorldDocument m_echo_colour (quint16, index into
-    // color table).
+    // TODO(feature): Wire echo color combo to WorldDocument m_output.echo_colour (quint16, index
+    // into color table).
 
     // Command history size
     m_doc->m_maxCommandHistory = m_historySizeSpin->value();
@@ -654,30 +655,30 @@ void WorldPropertiesDialog::saveSettings()
     m_doc->m_logging.log_raw = (m_logFormatCombo->currentIndex() == 2);
 
     // Scripting tab
-    m_doc->m_bEnableScripts = m_enableScriptCheck->isChecked();
-    m_doc->m_strScriptFilename = m_scriptFileEdit->text();
+    m_doc->m_scripting.enabled = m_enableScriptCheck->isChecked();
+    m_doc->m_scripting.filename = m_scriptFileEdit->text();
     // Not applicable: Script language is always Lua — no multi-language support needed.
 
     // Paste to World tab
-    m_doc->m_paste_preamble = m_pastePreambleEdit->text();
-    m_doc->m_paste_postamble = m_pastePostambleEdit->text();
-    m_doc->m_pasteline_preamble = m_pasteLinePreambleEdit->text();
-    m_doc->m_pasteline_postamble = m_pasteLinePostambleEdit->text();
-    m_doc->m_nPasteDelay = m_pasteDelaySpin->value();
-    m_doc->m_nPasteDelayPerLines = m_pasteDelayPerLinesSpin->value();
-    m_doc->m_bPasteCommentedSoftcode = m_pasteCommentedSoftcodeCheck->isChecked();
-    m_doc->m_bPasteEcho = m_pasteEchoCheck->isChecked();
-    m_doc->m_bConfirmOnPaste = m_pasteConfirmCheck->isChecked();
+    m_doc->m_paste.paste_preamble = m_pastePreambleEdit->text();
+    m_doc->m_paste.paste_postamble = m_pastePostambleEdit->text();
+    m_doc->m_paste.pasteline_preamble = m_pasteLinePreambleEdit->text();
+    m_doc->m_paste.pasteline_postamble = m_pasteLinePostambleEdit->text();
+    m_doc->m_paste.paste_delay = m_pasteDelaySpin->value();
+    m_doc->m_paste.paste_delay_per_lines = m_pasteDelayPerLinesSpin->value();
+    m_doc->m_paste.paste_commented_softcode = m_pasteCommentedSoftcodeCheck->isChecked();
+    m_doc->m_paste.paste_echo = m_pasteEchoCheck->isChecked();
+    m_doc->m_paste.confirm_on_paste = m_pasteConfirmCheck->isChecked();
 
     // Send File tab
-    m_doc->m_file_preamble = m_filePreambleEdit->text();
-    m_doc->m_file_postamble = m_filePostambleEdit->text();
-    m_doc->m_line_preamble = m_fileLinePreambleEdit->text();
-    m_doc->m_line_postamble = m_fileLinePostambleEdit->text();
-    m_doc->m_nFileDelay = m_fileDelaySpin->value();
-    m_doc->m_nFileDelayPerLines = m_fileDelayPerLinesSpin->value();
-    m_doc->m_bFileCommentedSoftcode = m_fileCommentedSoftcodeCheck->isChecked();
-    m_doc->m_bSendEcho = m_fileEchoCheck->isChecked();
+    m_doc->m_paste.file_preamble = m_filePreambleEdit->text();
+    m_doc->m_paste.file_postamble = m_filePostambleEdit->text();
+    m_doc->m_paste.line_preamble = m_fileLinePreambleEdit->text();
+    m_doc->m_paste.line_postamble = m_fileLinePostambleEdit->text();
+    m_doc->m_paste.file_delay = m_fileDelaySpin->value();
+    m_doc->m_paste.file_delay_per_lines = m_fileDelayPerLinesSpin->value();
+    m_doc->m_paste.file_commented_softcode = m_fileCommentedSoftcodeCheck->isChecked();
+    m_doc->m_input.send_echo = m_fileEchoCheck->isChecked();
     m_doc->m_bConfirmOnSend = m_fileConfirmCheck->isChecked();
 
     // Remote Access tab

@@ -114,7 +114,7 @@ void InputView::onTextChanged()
  */
 void InputView::updateHeight()
 {
-    if (!m_doc || !m_doc->m_bAutoResizeCommandWindow) {
+    if (!m_doc || !m_doc->m_command_window.auto_resize) {
         return;
     }
 
@@ -122,8 +122,8 @@ void InputView::updateHeight()
     int lineCount = document()->blockCount();
 
     // Clamp to minimum/maximum
-    int minLines = qMax(1, static_cast<int>(m_doc->m_iAutoResizeMinimumLines));
-    int maxLines = qMax(minLines, static_cast<int>(m_doc->m_iAutoResizeMaximumLines));
+    int minLines = qMax(1, static_cast<int>(m_doc->m_command_window.minimum_lines));
+    int maxLines = qMax(minLines, static_cast<int>(m_doc->m_command_window.maximum_lines));
 
     if (lineCount < minLines) {
         lineCount = minLines;
@@ -196,7 +196,7 @@ void InputView::keyPressEvent(QKeyEvent* event)
     // Original MUSHclient: only navigate history if cursor at start OR end of text
     // Based on sendvw.cpp
     if (event->key() == Qt::Key_Up) {
-        if (m_doc->m_bArrowsChangeHistory) {
+        if (m_doc->m_input.arrows_change_history) {
             QTextCursor cursor = textCursor();
             int pos = cursor.position();
             int textLen = toPlainText().length();
@@ -206,7 +206,7 @@ void InputView::keyPressEvent(QKeyEvent* event)
                 if (hasCtrl) {
                     recallFirstCommand();
                     return;
-                } else if (hasAlt && m_doc->m_bAltArrowRecallsPartial) {
+                } else if (hasAlt && m_doc->m_input.alt_arrow_recalls_partial) {
                     recallPartialPrevious();
                     return;
                 } else if (!hasCtrl && !hasAlt) {
@@ -221,7 +221,7 @@ void InputView::keyPressEvent(QKeyEvent* event)
     // Original MUSHclient: only navigate history if cursor at start OR end of text
     // Based on sendvw.cpp
     else if (event->key() == Qt::Key_Down) {
-        if (m_doc->m_bArrowsChangeHistory) {
+        if (m_doc->m_input.arrows_change_history) {
             QTextCursor cursor = textCursor();
             int pos = cursor.position();
             int textLen = toPlainText().length();
@@ -231,7 +231,7 @@ void InputView::keyPressEvent(QKeyEvent* event)
                 if (hasCtrl) {
                     recallLastCommand();
                     return;
-                } else if (hasAlt && m_doc->m_bAltArrowRecallsPartial) {
+                } else if (hasAlt && m_doc->m_input.alt_arrow_recalls_partial) {
                     recallPartialNext();
                     return;
                 } else if (!hasCtrl && !hasAlt) {
@@ -250,7 +250,7 @@ void InputView::keyPressEvent(QKeyEvent* event)
 
     // Escape: Clear input (if enabled)
     else if (event->key() == Qt::Key_Escape) {
-        if (m_doc->m_bEscapeDeletesInput) {
+        if (m_doc->m_input.escape_deletes_input) {
             clear();
             return;
         }
@@ -345,21 +345,21 @@ void InputView::applyInputSettings()
 
     // Apply color settings using stylesheet (more reliable than QPalette for QPlainTextEdit)
     // Colors are stored in BGR format (Windows COLORREF), convert to QColor
-    QColor textColor = bgrToQColor(m_doc->m_input_text_colour);
-    QColor bgColor = bgrToQColor(m_doc->m_input_background_colour);
+    QColor textColor = bgrToQColor(m_doc->m_input.text_colour);
+    QColor bgColor = bgrToQColor(m_doc->m_input.background_colour);
 
     // Build font style string
-    QString fontStyle = m_doc->m_input_font_italic ? "italic" : "normal";
-    QString fontWeight = (m_doc->m_input_font_weight >= 700) ? "bold" : "normal";
+    QString fontStyle = m_doc->m_input.font_italic ? "italic" : "normal";
+    QString fontWeight = (m_doc->m_input.font_weight >= 700) ? "bold" : "normal";
 
     // Use stylesheet for reliable font and color application on QPlainTextEdit
     // Note: Use scaledFontSize() for cross-platform DPI-consistent sizing
-    int fontSizePx = scaledFontSize(m_doc->m_input_font_height);
+    int fontSizePx = scaledFontSize(m_doc->m_input.font_height);
 
     QString style =
         QString("QPlainTextEdit { color: %1; background-color: %2; "
                 "font-family: '%3'; font-size: %4px; font-style: %5; font-weight: %6; }")
-            .arg(textColor.name(), bgColor.name(), m_doc->m_input_font_name,
+            .arg(textColor.name(), bgColor.name(), m_doc->m_input.font_name,
                  QString::number(fontSizePx), fontStyle, fontWeight);
     setStyleSheet(style);
 
@@ -414,7 +414,8 @@ void InputView::recallPartialPrevious()
             QTextCursor cursor = textCursor();
             cursor.movePosition(QTextCursor::End);
             setTextCursor(cursor);
-            m_doc->m_iHistoryStatus = (searchPos == 0) ? HistoryStatus::eAtTop : HistoryStatus::eInMiddle;
+            m_doc->m_iHistoryStatus =
+                (searchPos == 0) ? HistoryStatus::eAtTop : HistoryStatus::eInMiddle;
             qCDebug(lcUI) << "Found partial match:" << strText << "(pos" << searchPos << ")";
             return;
         }
@@ -478,8 +479,9 @@ void InputView::recallPartialNext()
             QTextCursor cursor = textCursor();
             cursor.movePosition(QTextCursor::End);
             setTextCursor(cursor);
-            m_doc->m_iHistoryStatus =
-                (searchPos == m_doc->m_commandHistory.count() - 1) ? HistoryStatus::eAtBottom : HistoryStatus::eInMiddle;
+            m_doc->m_iHistoryStatus = (searchPos == m_doc->m_commandHistory.count() - 1)
+                                          ? HistoryStatus::eAtBottom
+                                          : HistoryStatus::eInMiddle;
             qCDebug(lcUI) << "Found partial match:" << strText << "(pos" << searchPos << ")";
             return;
         }
@@ -566,7 +568,7 @@ bool InputView::TabCompleteOneLine(int nStartChar, int nEndChar, const QString& 
                 break;
             }
 
-            QByteArray delimBytes = m_doc->m_strWordDelimiters.toUtf8();
+            QByteArray delimBytes = m_doc->m_command_window.word_delimiters.toUtf8();
             if (strchr(delimBytes.constData(), *p) != nullptr) {
                 break;
             }
@@ -577,11 +579,11 @@ bool InputView::TabCompleteOneLine(int nStartChar, int nEndChar, const QString& 
             if (candidateWord.length() > strWord.length()) {
                 QString sReplacement = candidateWord;
 
-                if (m_doc->m_bLowerCaseTabCompletion) {
+                if (m_doc->m_command_window.lower_case_tab_completion) {
                     sReplacement = sReplacement.toLower();
                 }
 
-                if (m_doc->m_bTabCompletionSpace) {
+                if (m_doc->m_command_window.tab_completion_space) {
                     sReplacement += " ";
                 }
 
@@ -627,7 +629,7 @@ void InputView::handleTabCompletion()
     }
 
     int nStartChar;
-    QByteArray delimBytes = m_doc->m_strWordDelimiters.toUtf8();
+    QByteArray delimBytes = m_doc->m_command_window.word_delimiters.toUtf8();
 
     for (nStartChar = nEndChar - 1; nStartChar >= 0; nStartChar--) {
         QChar c = strCurrent[nStartChar];
@@ -649,7 +651,8 @@ void InputView::handleTabCompletion()
     qCDebug(lcUI) << "Tab completion: searching for" << sWord << "from pos" << nStartChar << "to"
                   << nEndChar;
 
-    if (TabCompleteOneLine(nStartChar, nEndChar, sWord, m_doc->m_strTabCompletionDefaults)) {
+    if (TabCompleteOneLine(nStartChar, nEndChar, sWord,
+                           m_doc->m_command_window.tab_completion_defaults)) {
         return;
     }
 
@@ -659,8 +662,8 @@ void InputView::handleTabCompletion()
         Line* pLine = m_doc->m_lineList[i].get();
         QString strLine = QString::fromUtf8(pLine->text().data(), pLine->text().size());
 
-        if (++iCount > static_cast<int>(m_doc->m_iTabCompletionLines)) {
-            qCDebug(lcUI) << "Hit line limit" << m_doc->m_iTabCompletionLines;
+        if (++iCount > static_cast<int>(m_doc->m_command_window.tab_completion_lines)) {
+            qCDebug(lcUI) << "Hit line limit" << m_doc->m_command_window.tab_completion_lines;
             break;
         }
 
@@ -692,7 +695,7 @@ void InputView::handleShiftTabCompletion()
     int nStartChar = cursorPos;
     while (nStartChar > 0) {
         QChar c = inputText.at(nStartChar - 1);
-        if (m_doc->m_strWordDelimiters.contains(c) || c.isSpace()) {
+        if (m_doc->m_command_window.word_delimiters.contains(c) || c.isSpace()) {
             break;
         }
         nStartChar--;
@@ -701,7 +704,7 @@ void InputView::handleShiftTabCompletion()
     int nEndChar = cursorPos;
     while (nEndChar < inputText.length()) {
         QChar c = inputText.at(nEndChar);
-        if (m_doc->m_strWordDelimiters.contains(c) || c.isSpace()) {
+        if (m_doc->m_command_window.word_delimiters.contains(c) || c.isSpace()) {
             break;
         }
         nEndChar++;
@@ -718,12 +721,12 @@ void InputView::handleShiftTabCompletion()
     dialog.setExtraItems(extraItems);
 
     // Add Lua function names if functions mode is enabled
-    if (m_doc->m_bTabCompleteFunctions && m_doc->m_ScriptEngine) {
+    if (m_doc->m_scripting.tab_complete_functions && m_doc->m_ScriptEngine) {
         dialog.setItems(getLuaFunctionNames(m_doc->m_ScriptEngine->L));
     }
 
     dialog.setLuaMode(true);
-    dialog.setFunctionsMode(m_doc->m_bTabCompleteFunctions);
+    dialog.setFunctionsMode(m_doc->m_scripting.tab_complete_functions);
     dialog.setFilter(filterWord);
 
     QPoint cursorScreenPos = mapToGlobal(QPoint(cursorRect().x(), cursorRect().bottom()));

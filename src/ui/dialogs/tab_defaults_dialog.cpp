@@ -57,13 +57,13 @@ void TabDefaultsDialog::loadSettings()
         return;
 
     // Load default words
-    m_defaultWords->setPlainText(m_doc->m_strTabCompletionDefaults);
+    m_defaultWords->setPlainText(m_doc->m_command_window.tab_completion_defaults);
 
     // Load lines to search
-    m_linesToSearch->setValue(m_doc->m_iTabCompletionLines);
+    m_linesToSearch->setValue(m_doc->m_command_window.tab_completion_lines);
 
     // Load add space option
-    m_addSpace->setChecked(m_doc->m_bTabCompletionSpace);
+    m_addSpace->setChecked(m_doc->m_command_window.tab_completion_space);
 }
 
 void TabDefaultsDialog::saveSettings()
@@ -72,13 +72,13 @@ void TabDefaultsDialog::saveSettings()
         return;
 
     // Save default words
-    m_doc->m_strTabCompletionDefaults = m_defaultWords->toPlainText();
+    m_doc->m_command_window.tab_completion_defaults = m_defaultWords->toPlainText();
 
     // Save lines to search
-    m_doc->m_iTabCompletionLines = m_linesToSearch->value();
+    m_doc->m_command_window.tab_completion_lines = m_linesToSearch->value();
 
     // Save add space option
-    m_doc->m_bTabCompletionSpace = m_addSpace->isChecked();
+    m_doc->m_command_window.tab_completion_space = m_addSpace->isChecked();
 
     // Mark document as modified
     m_doc->setModified(true);

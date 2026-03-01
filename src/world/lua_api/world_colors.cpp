@@ -298,7 +298,7 @@ int L_GetNormalColour(lua_State* L)
         return 1;
     }
 
-    lua_pushnumber(L, pDoc->m_normalcolour[whichColour - 1]);
+    lua_pushnumber(L, pDoc->m_colors.normal_colour[whichColour - 1]);
     return 1;
 }
 
@@ -328,7 +328,7 @@ int L_GetBoldColour(lua_State* L)
         return 1;
     }
 
-    lua_pushnumber(L, pDoc->m_boldcolour[whichColour - 1]);
+    lua_pushnumber(L, pDoc->m_colors.bold_colour[whichColour - 1]);
     return 1;
 }
 
@@ -357,7 +357,7 @@ int L_SetNormalColour(lua_State* L)
     if (whichColour < 1 || whichColour > 8)
         return 0;
 
-    pDoc->m_normalcolour[whichColour - 1] = rgb & 0x00FFFFFF;
+    pDoc->m_colors.normal_colour[whichColour - 1] = rgb & 0x00FFFFFF;
     return 0;
 }
 
@@ -386,7 +386,7 @@ int L_SetBoldColour(lua_State* L)
     if (whichColour < 1 || whichColour > 8)
         return 0;
 
-    pDoc->m_boldcolour[whichColour - 1] = rgb & 0x00FFFFFF;
+    pDoc->m_colors.bold_colour[whichColour - 1] = rgb & 0x00FFFFFF;
     return 0;
 }
 
@@ -416,7 +416,7 @@ int L_SetCustomColourText(lua_State* L)
     if (whichColour < 1 || whichColour > MAX_CUSTOM)
         return 0;
 
-    pDoc->m_customtext[whichColour - 1] = rgb & 0x00FFFFFF;
+    pDoc->m_colors.custom_text[whichColour - 1] = rgb & 0x00FFFFFF;
     return 0;
 }
 
@@ -446,7 +446,7 @@ int L_SetCustomColourBackground(lua_State* L)
     if (whichColour < 1 || whichColour > MAX_CUSTOM)
         return 0;
 
-    pDoc->m_customback[whichColour - 1] = rgb & 0x00FFFFFF;
+    pDoc->m_colors.custom_back[whichColour - 1] = rgb & 0x00FFFFFF;
     return 0;
 }
 
@@ -475,7 +475,7 @@ int L_GetCustomColourText(lua_State* L)
         return 1;
     }
 
-    lua_pushnumber(L, pDoc->m_customtext[whichColour - 1]);
+    lua_pushnumber(L, pDoc->m_colors.custom_text[whichColour - 1]);
     return 1;
 }
 
@@ -503,7 +503,7 @@ int L_GetCustomColourBackground(lua_State* L)
         return 1;
     }
 
-    lua_pushnumber(L, pDoc->m_customback[whichColour - 1]);
+    lua_pushnumber(L, pDoc->m_colors.custom_back[whichColour - 1]);
     return 1;
 }
 
@@ -808,7 +808,7 @@ int L_GetCustomColourName(lua_State* L)
         return 1;
     }
 
-    const QString& name = pDoc->m_strCustomColourName[which - 1];
+    const QString& name = pDoc->m_colors.custom_colour_name[which - 1];
     QByteArray ba = name.toUtf8();
     lua_pushlstring(L, ba.constData(), ba.length());
     return 1;

@@ -346,7 +346,7 @@ int L_Hyperlink(lua_State* L)
     const char* hint = lua_isstring(L, 3) ? lua_tostring(L, 3) : "";
 
     // forecolour is optional, defaults to hyperlink color
-    QRgb foreColor = pDoc->m_iHyperlinkColour;
+    QRgb foreColor = pDoc->m_colors.hyperlink_colour;
     if (!lua_isnoneornil(L, 4)) {
         foreColor = getColor(L, 4, foreColor);
     }
@@ -792,7 +792,7 @@ int L_NoteColour(lua_State* L)
         lua_pushinteger(L, -1);
     } else {
         // SAMECOLOUR is typically -1 or 65535
-        lua_pushinteger(L, pDoc->m_iNoteTextColour == 65535 ? 0 : pDoc->m_iNoteTextColour + 1);
+        lua_pushinteger(L, pDoc->m_colors.note_text_colour == 65535 ? 0 : pDoc->m_colors.note_text_colour + 1);
     }
     return 1;
 }
@@ -932,18 +932,18 @@ int L_GetNoteColourFore(lua_State* L)
 
     if (pDoc->m_bNotesInRGB) {
         lua_pushinteger(L, pDoc->m_iNoteColourFore);
-    } else if (pDoc->m_iNoteTextColour == SAMECOLOUR) {
+    } else if (pDoc->m_colors.note_text_colour == SAMECOLOUR) {
         if (pDoc->m_bCustom16isDefaultColour)
-            lua_pushinteger(L, pDoc->m_customtext[15]);
+            lua_pushinteger(L, pDoc->m_colors.custom_text[15]);
         else
-            lua_pushinteger(L, pDoc->m_normalcolour[ANSI_WHITE]);
+            lua_pushinteger(L, pDoc->m_colors.normal_colour[ANSI_WHITE]);
     } else {
         // Ensure valid index
-        int index = pDoc->m_iNoteTextColour;
+        int index = pDoc->m_colors.note_text_colour;
         if (index >= 0 && index < MAX_CUSTOM)
-            lua_pushinteger(L, pDoc->m_customtext[index]);
+            lua_pushinteger(L, pDoc->m_colors.custom_text[index]);
         else
-            lua_pushinteger(L, pDoc->m_normalcolour[ANSI_WHITE]); // fallback
+            lua_pushinteger(L, pDoc->m_colors.normal_colour[ANSI_WHITE]); // fallback
     }
     return 1;
 }
@@ -974,18 +974,18 @@ int L_GetNoteColourBack(lua_State* L)
 
     if (pDoc->m_bNotesInRGB) {
         lua_pushinteger(L, pDoc->m_iNoteColourBack);
-    } else if (pDoc->m_iNoteTextColour == SAMECOLOUR) {
+    } else if (pDoc->m_colors.note_text_colour == SAMECOLOUR) {
         if (pDoc->m_bCustom16isDefaultColour)
-            lua_pushinteger(L, pDoc->m_customback[15]);
+            lua_pushinteger(L, pDoc->m_colors.custom_back[15]);
         else
-            lua_pushinteger(L, pDoc->m_normalcolour[ANSI_BLACK]);
+            lua_pushinteger(L, pDoc->m_colors.normal_colour[ANSI_BLACK]);
     } else {
         // Ensure valid index
-        int index = pDoc->m_iNoteTextColour;
+        int index = pDoc->m_colors.note_text_colour;
         if (index >= 0 && index < MAX_CUSTOM)
-            lua_pushinteger(L, pDoc->m_customback[index]);
+            lua_pushinteger(L, pDoc->m_colors.custom_back[index]);
         else
-            lua_pushinteger(L, pDoc->m_normalcolour[ANSI_BLACK]); // fallback
+            lua_pushinteger(L, pDoc->m_colors.normal_colour[ANSI_BLACK]); // fallback
     }
     return 1;
 }
@@ -1016,7 +1016,7 @@ int L_SetNoteColour(lua_State* L)
     lua_Integer colour = luaL_checkinteger(L, 1);
 
     if (colour >= 0 && colour <= MAX_CUSTOM) {
-        pDoc->m_iNoteTextColour =
+        pDoc->m_colors.note_text_colour =
             colour - 1; // Convert 1-based to 0-based (0 becomes -1/SAMECOLOUR)
         pDoc->m_bNotesInRGB = false;
     }
@@ -1048,17 +1048,17 @@ int L_SetNoteColourFore(lua_State* L)
 
     // Convert background to RGB if necessary
     if (!pDoc->m_bNotesInRGB) {
-        if (pDoc->m_iNoteTextColour == SAMECOLOUR) {
+        if (pDoc->m_colors.note_text_colour == SAMECOLOUR) {
             if (pDoc->m_bCustom16isDefaultColour)
-                pDoc->m_iNoteColourBack = pDoc->m_customback[15];
+                pDoc->m_iNoteColourBack = pDoc->m_colors.custom_back[15];
             else
-                pDoc->m_iNoteColourBack = pDoc->m_normalcolour[ANSI_BLACK];
+                pDoc->m_iNoteColourBack = pDoc->m_colors.normal_colour[ANSI_BLACK];
         } else {
-            int index = pDoc->m_iNoteTextColour;
+            int index = pDoc->m_colors.note_text_colour;
             if (index >= 0 && index < MAX_CUSTOM)
-                pDoc->m_iNoteColourBack = pDoc->m_customback[index];
+                pDoc->m_iNoteColourBack = pDoc->m_colors.custom_back[index];
             else
-                pDoc->m_iNoteColourBack = pDoc->m_normalcolour[ANSI_BLACK];
+                pDoc->m_iNoteColourBack = pDoc->m_colors.normal_colour[ANSI_BLACK];
         }
     }
 
@@ -1092,17 +1092,17 @@ int L_SetNoteColourBack(lua_State* L)
 
     // Convert foreground to RGB if necessary
     if (!pDoc->m_bNotesInRGB) {
-        if (pDoc->m_iNoteTextColour == SAMECOLOUR) {
+        if (pDoc->m_colors.note_text_colour == SAMECOLOUR) {
             if (pDoc->m_bCustom16isDefaultColour)
-                pDoc->m_iNoteColourFore = pDoc->m_customtext[15];
+                pDoc->m_iNoteColourFore = pDoc->m_colors.custom_text[15];
             else
-                pDoc->m_iNoteColourFore = pDoc->m_normalcolour[ANSI_WHITE];
+                pDoc->m_iNoteColourFore = pDoc->m_colors.normal_colour[ANSI_WHITE];
         } else {
-            int index = pDoc->m_iNoteTextColour;
+            int index = pDoc->m_colors.note_text_colour;
             if (index >= 0 && index < MAX_CUSTOM)
-                pDoc->m_iNoteColourFore = pDoc->m_customtext[index];
+                pDoc->m_iNoteColourFore = pDoc->m_colors.custom_text[index];
             else
-                pDoc->m_iNoteColourFore = pDoc->m_normalcolour[ANSI_WHITE];
+                pDoc->m_iNoteColourFore = pDoc->m_colors.normal_colour[ANSI_WHITE];
         }
     }
 
@@ -1595,8 +1595,8 @@ int L_DeleteLines(lua_State* L)
 
     if (needNewLine || pDoc->m_lineList.empty()) {
         pDoc->m_lineList.push_back(std::make_unique<Line>(
-            pDoc->m_total_lines + 1, pDoc->m_nWrapColumn, 0, pDoc->m_normalcolour[7],
-            pDoc->m_normalcolour[0], pDoc->m_bUTF_8));
+            pDoc->m_total_lines + 1, pDoc->m_display.wrap_column, 0, pDoc->m_colors.normal_colour[7],
+            pDoc->m_colors.normal_colour[0], pDoc->m_display.utf8));
     }
 
     pDoc->Repaint();
@@ -1624,8 +1624,8 @@ int L_DeleteOutput(lua_State* L)
     pDoc->m_lineList.clear();
     pDoc->m_total_lines = 0;
 
-    pDoc->m_currentLine = std::make_unique<Line>(1, pDoc->m_nWrapColumn, 0, pDoc->m_normalcolour[7],
-                                                 pDoc->m_normalcolour[0], pDoc->m_bUTF_8);
+    pDoc->m_currentLine = std::make_unique<Line>(1, pDoc->m_display.wrap_column, 0, pDoc->m_colors.normal_colour[7],
+                                                 pDoc->m_colors.normal_colour[0], pDoc->m_display.utf8);
 
     pDoc->m_selectionStartLine = 0;
     pDoc->m_selectionStartChar = 0;

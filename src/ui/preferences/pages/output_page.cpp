@@ -41,7 +41,7 @@ void OutputPage::setupUi()
     QGroupBox* displayGroup = new QGroupBox(tr("Display Options"), this);
     QVBoxLayout* displayLayout = new QVBoxLayout(displayGroup);
 
-    // Word wrap checkbox (m_wrap - enable word-wrap at spaces)
+    // Word wrap checkbox (m_display.wrap - enable word-wrap at spaces)
     m_wordWrapCheck = new QCheckBox(tr("Word wrap at spaces"), this);
     m_wordWrapCheck->setToolTip(
         tr("When enabled, lines wrap at the last space before the wrap column.\n"
@@ -49,7 +49,7 @@ void OutputPage::setupUi()
     connect(m_wordWrapCheck, &QCheckBox::toggled, this, &OutputPage::markChanged);
     displayLayout->addWidget(m_wordWrapCheck);
 
-    // Wrap column (m_nWrapColumn - the column width)
+    // Wrap column (m_display.wrap_column - the column width)
     QHBoxLayout* wrapLayout = new QHBoxLayout();
     wrapLayout->addWidget(new QLabel(tr("Wrap at column:"), this));
     m_wrapColumnSpin = new QSpinBox(this);
@@ -137,31 +137,31 @@ void OutputPage::loadSettings()
     m_flashIconCheck->blockSignals(true);
 
     // Load font
-    m_outputFont.setFamily(m_doc->m_font_name);
-    m_outputFont.setPointSize(qAbs(m_doc->m_font_height));
-    m_outputFont.setWeight(m_doc->m_font_weight >= 700 ? QFont::Bold : QFont::Normal);
+    m_outputFont.setFamily(m_doc->m_output.font_name);
+    m_outputFont.setPointSize(qAbs(m_doc->m_output.font_height));
+    m_outputFont.setWeight(m_doc->m_output.font_weight >= 700 ? QFont::Bold : QFont::Normal);
     m_outputFontLabel->setText(
         QString("%1, %2pt").arg(m_outputFont.family()).arg(m_outputFont.pointSize()));
 
     // Load wrap settings
-    m_wordWrapCheck->setChecked(m_doc->m_wrap);
-    m_wrapColumnSpin->setValue(m_doc->m_nWrapColumn);
+    m_wordWrapCheck->setChecked(m_doc->m_display.wrap);
+    m_wrapColumnSpin->setValue(m_doc->m_display.wrap_column);
 
     // Load text style options
-    m_showBoldCheck->setChecked(m_doc->m_bShowBold);
-    m_showItalicCheck->setChecked(m_doc->m_bShowItalic);
-    m_showUnderlineCheck->setChecked(m_doc->m_bShowUnderline);
+    m_showBoldCheck->setChecked(m_doc->m_display.show_bold);
+    m_showItalicCheck->setChecked(m_doc->m_display.show_italic);
+    m_showUnderlineCheck->setChecked(m_doc->m_display.show_underline);
 
     // Load ANSI colors from document
     for (int i = 0; i < 8; i++) {
-        m_ansiColors[i] = m_doc->m_normalcolour[i];
-        m_ansiColors[i + 8] = m_doc->m_boldcolour[i];
+        m_ansiColors[i] = m_doc->m_colors.normal_colour[i];
+        m_ansiColors[i + 8] = m_doc->m_colors.bold_colour[i];
         updateColorButton(i);
         updateColorButton(i + 8);
     }
 
     // Load activity settings
-    m_flashIconCheck->setChecked(m_doc->m_bFlashIcon);
+    m_flashIconCheck->setChecked(m_doc->m_display.flash_icon);
 
     // Unblock signals
     m_wordWrapCheck->blockSignals(false);
@@ -180,27 +180,27 @@ void OutputPage::saveSettings()
         return;
 
     // Save font settings
-    m_doc->m_font_name = m_outputFont.family();
-    m_doc->m_font_height = m_outputFont.pointSize();
-    m_doc->m_font_weight = m_outputFont.weight();
+    m_doc->m_output.font_name = m_outputFont.family();
+    m_doc->m_output.font_height = m_outputFont.pointSize();
+    m_doc->m_output.font_weight = m_outputFont.weight();
 
     // Save wrap settings
-    m_doc->m_wrap = m_wordWrapCheck->isChecked();
-    m_doc->m_nWrapColumn = m_wrapColumnSpin->value();
+    m_doc->m_display.wrap = m_wordWrapCheck->isChecked();
+    m_doc->m_display.wrap_column = m_wrapColumnSpin->value();
 
     // Save text style options
-    m_doc->m_bShowBold = m_showBoldCheck->isChecked();
-    m_doc->m_bShowItalic = m_showItalicCheck->isChecked();
-    m_doc->m_bShowUnderline = m_showUnderlineCheck->isChecked();
+    m_doc->m_display.show_bold = m_showBoldCheck->isChecked();
+    m_doc->m_display.show_italic = m_showItalicCheck->isChecked();
+    m_doc->m_display.show_underline = m_showUnderlineCheck->isChecked();
 
     // Save ANSI colors
     for (int i = 0; i < 8; i++) {
-        m_doc->m_normalcolour[i] = m_ansiColors[i];
-        m_doc->m_boldcolour[i] = m_ansiColors[i + 8];
+        m_doc->m_colors.normal_colour[i] = m_ansiColors[i];
+        m_doc->m_colors.bold_colour[i] = m_ansiColors[i + 8];
     }
 
     // Save activity settings
-    m_doc->m_bFlashIcon = m_flashIconCheck->isChecked();
+    m_doc->m_display.flash_icon = m_flashIconCheck->isChecked();
 
     m_doc->setModified(true);
     emit m_doc->outputSettingsChanged();

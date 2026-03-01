@@ -131,10 +131,10 @@ void InputPage::loadSettings()
     m_doubleClickSelectCheck->blockSignals(true);
 
     // Load font
-    m_inputFont.setFamily(m_doc->m_input_font_name);
-    m_inputFont.setPointSize(qAbs(m_doc->m_input_font_height));
-    m_inputFont.setWeight(m_doc->m_input_font_weight >= 700 ? QFont::Bold : QFont::Normal);
-    m_inputFont.setItalic(m_doc->m_input_font_italic != 0);
+    m_inputFont.setFamily(m_doc->m_input.font_name);
+    m_inputFont.setPointSize(qAbs(m_doc->m_input.font_height));
+    m_inputFont.setWeight(m_doc->m_input.font_weight >= 700 ? QFont::Bold : QFont::Normal);
+    m_inputFont.setItalic(m_doc->m_input.font_italic != 0);
     m_inputFontLabel->setText(
         QString("%1, %2pt").arg(m_inputFont.family()).arg(m_inputFont.pointSize()));
 
@@ -145,12 +145,12 @@ void InputPage::loadSettings()
     // Load history settings
     m_historySizeSpin->setValue(m_doc->m_maxCommandHistory);
     m_duplicateHistoryCheck->setChecked(false); // Not stored in WorldDocument
-    m_arrowHistoryCheck->setChecked(m_doc->m_bArrowKeysWrap);
+    m_arrowHistoryCheck->setChecked(m_doc->m_command_window.arrow_keys_wrap);
 
     // Load behavior settings
     m_autoRepeatCheck->setChecked(m_doc->m_bAutoRepeat);
-    m_escClearCheck->setChecked(m_doc->m_bEscapeDeletesInput);
-    m_doubleClickSelectCheck->setChecked(m_doc->m_bDoubleClickInserts);
+    m_escClearCheck->setChecked(m_doc->m_input.escape_deletes_input);
+    m_doubleClickSelectCheck->setChecked(m_doc->m_display.double_click_inserts);
 
     // Unblock signals
     m_echoInputCheck->blockSignals(false);
@@ -171,10 +171,10 @@ void InputPage::saveSettings()
         return;
 
     // Save font settings
-    m_doc->m_input_font_name = m_inputFont.family();
-    m_doc->m_input_font_height = m_inputFont.pointSize();
-    m_doc->m_input_font_weight = m_inputFont.weight();
-    m_doc->m_input_font_italic = m_inputFont.italic() ? 1 : 0;
+    m_doc->m_input.font_name = m_inputFont.family();
+    m_doc->m_input.font_height = m_inputFont.pointSize();
+    m_doc->m_input.font_weight = m_inputFont.weight();
+    m_doc->m_input.font_italic = m_inputFont.italic() ? 1 : 0;
 
     // Save echo settings
     m_doc->m_display_my_input = m_echoInputCheck->isChecked();
@@ -182,12 +182,12 @@ void InputPage::saveSettings()
 
     // Save history settings
     m_doc->m_maxCommandHistory = m_historySizeSpin->value();
-    m_doc->m_bArrowKeysWrap = m_arrowHistoryCheck->isChecked();
+    m_doc->m_command_window.arrow_keys_wrap = m_arrowHistoryCheck->isChecked();
 
     // Save behavior settings
     m_doc->m_bAutoRepeat = m_autoRepeatCheck->isChecked();
-    m_doc->m_bEscapeDeletesInput = m_escClearCheck->isChecked();
-    m_doc->m_bDoubleClickInserts = m_doubleClickSelectCheck->isChecked();
+    m_doc->m_input.escape_deletes_input = m_escClearCheck->isChecked();
+    m_doc->m_display.double_click_inserts = m_doubleClickSelectCheck->isChecked();
 
     m_doc->setModified(true);
     emit m_doc->outputSettingsChanged();

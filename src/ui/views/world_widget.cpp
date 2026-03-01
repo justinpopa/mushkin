@@ -210,7 +210,8 @@ void WorldWidget::setupUi()
 
     // Connect output settings signal
     connect(m_document, &WorldDocument::outputSettingsChanged, this, [this]() {
-        QFont font = createScaledFont(m_document->m_font_name, m_document->m_font_height);
+        QFont font =
+            createScaledFont(m_document->m_output.font_name, m_document->m_output.font_height);
         m_outputView->setOutputFont(font);
     });
 
@@ -434,7 +435,8 @@ std::expected<void, QString> WorldWidget::loadFromFile(const QString& filename)
     // Apply loaded settings to views (fonts, colors, etc.)
     // This triggers the output and input views to refresh with the new settings from the XML
     if (m_outputView && m_document) {
-        QFont font = createScaledFont(m_document->m_font_name, m_document->m_font_height);
+        QFont font =
+            createScaledFont(m_document->m_output.font_name, m_document->m_output.font_height);
         m_outputView->setOutputFont(font);
     }
     if (m_inputView && m_document) {
@@ -446,7 +448,7 @@ std::expected<void, QString> WorldWidget::loadFromFile(const QString& filename)
     m_document->loadScriptFile();
 
     // Set up file watcher for script file changes
-    // This will monitor the script file and reload it based on m_nReloadOption
+    // This will monitor the script file and reload it based on m_scripting.reload_option
     m_document->setupScriptFileWatcher();
 
     // Note: Welcome messages will be shown when OutputView is connected to document
@@ -523,18 +525,18 @@ void WorldWidget::sendCommand()
     // This handles all edge cases: override prefix, exclude non-alpha, exclude macros,
     // self-exclusion, multi-line processing, and re-evaluation
 
-    bool bAutoSay = m_document->m_bEnableAutoSay;
+    bool bAutoSay = m_document->m_auto_say.enabled;
 
     // 1. Check for override prefix - if present, disable auto-say and remove prefix
-    if (bAutoSay && !m_document->m_strOverridePrefix.isEmpty()) {
-        if (command.startsWith(m_document->m_strOverridePrefix)) {
+    if (bAutoSay && !m_document->m_auto_say.override_prefix.isEmpty()) {
+        if (command.startsWith(m_document->m_auto_say.override_prefix)) {
             bAutoSay = false;
-            command = command.mid(m_document->m_strOverridePrefix.length());
+            command = command.mid(m_document->m_auto_say.override_prefix.length());
         }
     }
 
     // 2. Exclude non-alphanumeric commands (e.g., "#", ".", etc.) if configured
-    if (!command.isEmpty() && bAutoSay && m_document->m_bExcludeNonAlpha) {
+    if (!command.isEmpty() && bAutoSay && m_document->m_auto_say.exclude_non_alpha) {
         QChar firstChar = command[0];
         if (!firstChar.isLetterOrNumber()) {
             bAutoSay = false;
@@ -542,7 +544,7 @@ void WorldWidget::sendCommand()
     }
 
     // 3. Exclude macro commands if configured
-    if (bAutoSay && m_document->m_bExcludeMacros) {
+    if (bAutoSay && m_document->m_auto_say.exclude_macros) {
         // Check if command starts with any configured macro
         // Note: Macros are stored in m_macros array, checked in original sendvw.cpp
         // For now, we don't have macro support implemented, so this is a placeholder
@@ -550,14 +552,14 @@ void WorldWidget::sendCommand()
     }
 
     // 4. Exclude if command already starts with auto-say string (prevent "say say Hello!")
-    if (bAutoSay && command.startsWith(m_document->m_strAutoSayString)) {
+    if (bAutoSay && command.startsWith(m_document->m_auto_say.say_string)) {
         bAutoSay = false;
     }
 
     // 5. If auto-say still enabled, process with special handling
     if (bAutoSay) {
         // Check connection if not re-evaluating (original sendvw.cpp)
-        if (!m_document->m_bReEvaluateAutoSay &&
+        if (!m_document->m_auto_say.re_evaluate &&
             m_document->m_connectionManager->m_iConnectPhase != eConnectConnectedToMud) {
             return; // Don't send if not connected
         }
@@ -567,33 +569,33 @@ void WorldWidget::sendCommand()
 
         // Temporarily disable auto-say and command stacking to prevent loops
         // (original sendvw.cpp)
-        bool savedAutoSay = m_document->m_bEnableAutoSay;
-        bool savedCommandStack = m_document->m_enable_command_stack;
-        m_document->m_bEnableAutoSay = false;
-        m_document->m_enable_command_stack = false;
+        bool savedAutoSay = m_document->m_auto_say.enabled;
+        bool savedCommandStack = m_document->m_input.enable_command_stack;
+        m_document->m_auto_say.enabled = false;
+        m_document->m_input.enable_command_stack = false;
 
         // Process each line (original sendvw.cpp)
         for (const QString& line : lines) {
-            if (m_document->m_bReEvaluateAutoSay) {
+            if (m_document->m_auto_say.re_evaluate) {
                 // Re-evaluate mode: prepend auto-say string and call Execute()
                 // This allows aliases/triggers to process the "say" command
                 // (original sendvw.cpp)
                 m_document->m_iExecutionDepth = 0; // Hand-typed command, depth zero
-                QString sayCommand = m_document->m_strAutoSayString + line;
+                QString sayCommand = m_document->m_auto_say.say_string + line;
                 m_document->Execute(sayCommand);
             } else {
                 // Direct send mode: prepend auto-say string and call SendMsg()
                 // This sends directly without alias/trigger processing
                 // (original sendvw.cpp)
-                m_document->SendMsg(m_document->m_strAutoSayString + line,
+                m_document->SendMsg(m_document->m_auto_say.say_string + line,
                                     m_document->m_display_my_input, false,
                                     m_document->m_logging.log_input);
             }
         }
 
         // Re-enable auto-say and command stacking (original sendvw.cpp)
-        m_document->m_bEnableAutoSay = savedAutoSay;
-        m_document->m_enable_command_stack = savedCommandStack;
+        m_document->m_auto_say.enabled = savedAutoSay;
+        m_document->m_input.enable_command_stack = savedCommandStack;
 
         // Early return - don't execute the normal command path
         // Clear input and return

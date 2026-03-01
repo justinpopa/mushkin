@@ -397,40 +397,124 @@ class WorldDocument : public QObject, public IWorldContext {
         QString password; // optional auth password
     } m_proxy;
 
-    // ========== Display Settings ==========
-    QString m_font_name;    // output font face name
-    qint32 m_font_height;   // font size in pixels
-    qint32 m_font_weight;   // bold/normal (400=normal, 700=bold)
-    quint32 m_font_charset; // character set
-    bool m_wrap;            // word-wrap enabled
-    bool m_timestamps;      // show timestamps?
-    bool m_match_width;     // match width?
+    // ========== Display Configuration ==========
+    struct DisplayConfig {
+        // Core output display
+        bool wrap = true;                        // word-wrap enabled
+        bool timestamps = false;                 // show timestamps?
+        bool match_width = false;                // match width?
+        qint32 max_lines = 5000;                 // maximum scrollback lines
+        quint16 wrap_column = 80;                // wrap column
+        bool indent_paras = true;                // indent paragraphs?
+        bool line_information = true;            // show line information?
+        bool keep_commands_on_same_line = false; // keep commands on same line?
 
-    // ========== Colors ==========
-    // ANSI colors 0-7 normal intensity
-    std::array<QRgb, 8> m_normalcolour;
-    // ANSI colors 0-7 bold/bright
-    std::array<QRgb, 8> m_boldcolour;
-    // Custom foreground colors
-    std::array<QRgb, MAX_CUSTOM> m_customtext;
-    // Custom background colors
-    std::array<QRgb, MAX_CUSTOM> m_customback;
-    // Custom color names
-    std::array<QString, 255> m_strCustomColourName;
+        // Text style display
+        bool show_bold = true;      // show bold in fonts?
+        bool show_italic = true;    // show italic?
+        bool show_underline = true; // show underline?
 
-    // ========== Input Colors and Font ==========
-    QRgb m_input_text_colour;
-    QRgb m_input_background_colour;
-    qint32 m_input_font_height;
-    QString m_input_font_name;
-    quint8 m_input_font_italic;
-    qint32 m_input_font_weight;
-    quint32 m_input_font_charset;
+        // Scrolling/freeze
+        quint16 pixel_offset = 1;           // pixel offset from window edge
+        bool auto_freeze = true;            // freeze if not at bottom?
+        bool keep_freeze_at_bottom = false; // don't unfreeze at bottom?
 
-    // ========== Output Buffer Settings ==========
-    qint32 m_maxlines;      // maximum scrollback lines
-    qint32 m_nHistoryLines; // command history size
-    quint16 m_nWrapColumn;  // wrap column
+        // Interaction
+        bool double_click_inserts = false;        // double-click inserts word?
+        bool copy_selection_to_clipboard = false; // auto-copy selection?
+        bool auto_copy_in_html = false;           // auto-copy in HTML?
+
+        // Spacing & encoding
+        quint16 line_spacing = 0; // line spacing (0 = auto)
+        bool utf8 = false;        // UTF-8 support?
+
+        // Activity indicators
+        bool flash_icon = false;                    // flash icon for activity?
+        bool do_not_show_outstanding_lines = false; // hide outstanding lines?
+    } m_display;
+
+    // ========== Output Configuration ==========
+    struct OutputConfig {
+        // Font
+        QString font_name = "Courier New"; // output font face name
+        qint32 font_height = 12;           // font size in pixels
+        qint32 font_weight = 400;          // bold/normal (400=normal, 700=bold)
+        quint32 font_charset = 0;          // character set
+
+        // Echo
+        quint16 echo_colour = 65535;                  // SAMECOLOUR
+        bool echo_hyperlink_in_output_window = false; // echo hyperlinks in output?
+
+        // Output line preambles (timestamps)
+        QString preamble_output;                        // preamble for MUD output lines
+        QString preamble_input;                         // preamble for input lines
+        QString preamble_notes;                         // preamble for note lines
+        QRgb preamble_output_text_colour = 0x00FFFFFFu; // text color - output (white BGR)
+        QRgb preamble_output_back_colour = 0x00000000u; // back color - output (black)
+        QRgb preamble_input_text_colour = 0x00800000u;  // text color - input (dark blue BGR)
+        QRgb preamble_input_back_colour = 0x00000000u;  // back color - input (black)
+        QRgb preamble_notes_text_colour = 0x000000FFu;  // text color - notes (blue BGR)
+        QRgb preamble_notes_back_colour = 0x00000000u;  // back color - notes (black)
+
+        // Recall window
+        QString recall_line_preamble; // line preamble for recall
+
+        // Output buffer fading
+        quint16 fade_after_seconds = 0;    // fade after N seconds (0 = disabled)
+        quint16 fade_opacity_percent = 20; // fade opacity %
+        quint16 fade_seconds = 8;          // fade duration
+    } m_output;
+
+    // ========== Color Configuration ==========
+    struct ColorConfig {
+        // ANSI colors 0-7 normal intensity (initialized by initializeColors())
+        std::array<QRgb, 8> normal_colour{};
+        // ANSI colors 0-7 bold/bright (initialized by initializeColors())
+        std::array<QRgb, 8> bold_colour{};
+        // Custom foreground colors (initialized by initializeColors())
+        std::array<QRgb, MAX_CUSTOM> custom_text{};
+        // Custom background colors (initialized by initializeColors())
+        std::array<QRgb, MAX_CUSTOM> custom_back{};
+        // Custom color names (initialized by initializeColors())
+        std::array<QString, 255> custom_colour_name{};
+        // Hyperlink color
+        QRgb hyperlink_colour =
+            0x000080FFu; // Light blue - BGR(255,128,0) = RGB(0,128,255) like original
+        // Note text color index (4 = cyan, 65535 = SAMECOLOUR)
+        quint16 note_text_colour = 4;
+        // Use default colors from parent world?
+        bool use_default_colours = false;
+    } m_colors;
+
+    // ========== Input Configuration ==========
+    struct InputConfig {
+        // Colors
+        QRgb text_colour = 0x000000u;       // input text color (BGR) — black
+        QRgb background_colour = 0xFFFFFFu; // input background color (BGR) — white
+
+        // Font
+        qint32 font_height = 12;           // font size in pixels
+        QString font_name = "Courier New"; // input font face name
+        quint8 font_italic = 0;            // italic flag (0=normal, 1=italic)
+        qint32 font_weight = 400;          // font weight (400=normal, 700=bold)
+        quint32 font_charset = 0;          // character set
+
+        // History
+        qint32 history_lines = 1000; // command history size
+
+        // Behavior flags
+        bool escape_deletes_input = false;      // Escape clears input?
+        bool arrows_change_history = true;      // arrow keys navigate history?
+        qint32 save_deleted_command = 0;        // save command on Escape?
+        bool alt_arrow_recalls_partial = false; // Alt+Up recalls partial match?
+        bool auto_wrap = false;                 // match input wrap to output?
+        bool send_echo = false;                 // echo sends?
+        bool no_echo_off = false;               // ignore echo-off from server?
+        bool enable_command_stack = false;      // split commands on stack char?
+        QString command_stack_character = ";";  // character to split commands
+        bool double_click_sends = false;        // double-click sends to MUD?
+        bool arrow_recalls_partial = false;     // Up/Down recalls partial match?
+    } m_input;
 
     // ========== Triggers, Aliases, Timers - Enable Flags ==========
     bool m_enable_aliases;
@@ -460,10 +544,6 @@ class WorldDocument : public QObject, public IWorldContext {
 
     // ========== Input Handling ==========
     bool m_display_my_input;
-    quint16 m_echo_colour;
-    bool m_bEscapeDeletesInput;
-    bool m_bArrowsChangeHistory;
-    bool m_bConfirmOnPaste;
 
     // ========== Command History ==========
     QStringList m_commandHistory;   // List of previous commands
@@ -473,11 +553,15 @@ class WorldDocument : public QObject, public IWorldContext {
     QString m_last_command;         // Last command sent (for consecutive duplicate check)
     HistoryStatus m_iHistoryStatus; // Current position status (eAtTop, eInMiddle, eAtBottom)
 
-    // ========== Sound ==========
-    bool m_enable_beeps;
-    bool m_enable_trigger_sounds;
-    QString m_new_activity_sound;
-    QString m_strBeepSound;
+    // ========== Sound Configuration ==========
+    struct SoundConfig {
+        bool enable_beeps = true;          // enable beep on ^G?
+        bool enable_trigger_sounds = true; // enable trigger sound actions?
+        QString new_activity_sound;        // sound played on new activity
+        QString beep_sound;                // sound file for beep (^G)
+        bool play_in_background = false;   // use global sound buffer?
+        bool use_msp = false;              // Use MSP (MUD Sound Protocol)
+    } m_sound;
 
     // ========== Macros (Function Keys) ==========
     std::array<QString, MACRO_COUNT> m_macros;     // text for F1-F12
@@ -489,49 +573,82 @@ class WorldDocument : public QObject, public IWorldContext {
     bool m_keypad_enable;                           // keypad enabled?
 
     // ========== Speed Walking ==========
-    bool m_enable_speed_walk;
-    QString m_speed_walk_prefix;
-    QString m_strSpeedWalkFiller;
-    quint16 m_iSpeedWalkDelay; // delay in ms
-
-    // ========== Command Stack ==========
-    bool m_enable_command_stack;
-    QString m_strCommandStackCharacter;
+    struct SpeedwalkConfig {
+        bool enabled = false; // enable speedwalk?
+        QString prefix;       // speedwalk prefix (e.g., "#")
+        QString filler;       // filler command ('F' token)
+        quint16 delay = 0;    // delay between commands (ms)
+    } m_speedwalk;
 
     // ========== Connection Text ==========
     QString m_connect_text;
 
-    // ========== File Handling ==========
-    QString m_file_postamble;
-    QString m_file_preamble;
-    QString m_line_postamble;
-    QString m_line_preamble;
+    // ========== Paste/Send File Configuration ==========
+    struct PasteSendConfig {
+        // Paste text framing
+        QString paste_preamble;      // sent before pasted block
+        QString paste_postamble;     // sent after pasted block
+        QString pasteline_preamble;  // sent before each pasted line
+        QString pasteline_postamble; // sent after each pasted line
 
-    // ========== Paste Settings ==========
-    QString m_paste_postamble;
-    QString m_paste_preamble;
-    QString m_pasteline_postamble;
-    QString m_pasteline_preamble;
+        // Send-file text framing
+        QString file_preamble;  // sent before file block
+        QString file_postamble; // sent after file block
+        QString line_preamble;  // sent before each file line
+        QString line_postamble; // sent after each file line
+
+        // Paste behavior
+        bool paste_commented_softcode = false; // strip softcode comments when pasting?
+        bool paste_echo = false;               // echo pasted lines?
+        bool confirm_on_paste = true;          // confirm before paste?
+        qint32 paste_delay = 0;                // delay between paste lines (ms)
+        qint32 paste_delay_per_lines = 1;      // lines between paste delays
+
+        // Send-file behavior
+        bool file_commented_softcode = false; // strip softcode comments when sending file?
+        qint32 file_delay = 0;                // delay between file lines (ms)
+        qint32 file_delay_per_lines = 1;      // lines between file delays
+    } m_paste;
 
     // ========== World Notes ==========
     QString m_notes;
 
-    // ========== Scripting ==========
-    QString m_strLanguage;             // script language (e.g., "Lua")
-    bool m_bEnableScripts;             // scripting enabled?
-    QString m_strScriptFilename;       // script file path
-    QString m_strScriptPrefix;         // script invocation prefix
-    QString m_strScriptEditor;         // editor path
-    QString m_strScriptEditorArgument; // editor arguments
+    // ========== Scripting Configuration ==========
+    struct ScriptConfig {
+        // Core settings
+        QString language = "Lua"; // script language (e.g., "Lua")
+        bool enabled = true;      // scripting enabled?
+        QString filename;         // script file path
+        QString prefix = "/";     // script invocation prefix
+        QString editor;           // editor path
+        QString editor_argument;  // editor arguments
 
-    // ========== Script Event Handlers ==========
-    QString m_strWorldOpen;       // handler on world open
-    QString m_strWorldClose;      // handler on world close
-    QString m_strWorldSave;       // handler on world save
-    QString m_strWorldConnect;    // handler on connect
-    QString m_strWorldDisconnect; // handler on disconnect
-    QString m_strWorldGetFocus;   // handler on focus gain
-    QString m_strWorldLoseFocus;  // handler on focus loss
+        // Event handlers
+        QString on_world_open;       // handler on world open
+        QString on_world_close;      // handler on world close
+        QString on_world_save;       // handler on world save
+        QString on_world_connect;    // handler on connect
+        QString on_world_disconnect; // handler on disconnect
+        QString on_world_get_focus;  // handler on focus gain
+        QString on_world_lose_focus; // handler on focus loss
+
+        // Reload & error handling
+        ScriptReloadOption reload_option = ScriptReloadOption::eReloadConfirm; // reload behavior
+        bool errors_to_output_window = false; // show errors in output?
+
+        // Execution options (kept as qint32 for integer-valued serialization compat)
+        qint32 edit_with_notepad = 1; // use built-in notepad?
+        qint32 warn_if_inactive = 1;  // warn if can't invoke script?
+
+        // Misc
+        bool tab_complete_functions = true; // show Lua functions in Shift+Tab menu
+
+        // Filters
+        QString triggers_filter;  // Lua filter for triggers
+        QString aliases_filter;   // Lua filter for aliases
+        QString timers_filter;    // Lua filter for timers
+        QString variables_filter; // Lua filter for variables
+    } m_scripting;
 
     // ========== MXP (MUD Extension Protocol) ==========
     MXPMode m_iUseMXP;              // MXP usage (see enum)
@@ -543,25 +660,20 @@ class WorldDocument : public QObject, public IWorldContext {
     QString m_strOnMXP_CloseTag;    // MXP tag close
     QString m_strOnMXP_SetVariable; // MXP variable set
 
-    // ========== Hyperlinks ==========
-    QRgb m_iHyperlinkColour; // hyperlink color
-
     // ========== Miscellaneous Flags ==========
-    bool m_indent_paras;
     bool m_bSaveWorldAutomatically;
-    bool m_bLineInformation;
     bool m_bStartPaused;
-    quint16 m_iNoteTextColour;
-    bool m_bKeepCommandsOnSameLine;
 
     // ========== Auto-say Settings ==========
-    QString m_strAutoSayString;
-    bool m_bEnableAutoSay;
-    bool m_bExcludeMacros;
-    bool m_bExcludeNonAlpha;
-    QString m_strOverridePrefix;
-    bool m_bConfirmBeforeReplacingTyping;
-    bool m_bReEvaluateAutoSay;
+    struct AutoSayConfig {
+        QString say_string = "say ";          // string prepended to commands
+        QString override_prefix = "-";        // prefix to bypass auto-say
+        bool enabled = false;                 // auto-say mode enabled?
+        bool exclude_macros = false;          // skip macro/accelerator keys?
+        bool exclude_non_alpha = false;       // skip commands not starting with a letter?
+        bool confirm_before_replacing = true; // confirm before replacing typed text?
+        bool re_evaluate = false;             // re-evaluate after alias expansion?
+    } m_auto_say;
 
     // ========== Script Variables Collection (SAVED TO DISK) ==========
     // Holds all script variables (key-value pairs)
@@ -579,73 +691,49 @@ class WorldDocument : public QObject, public IWorldContext {
     std::array<qint32, 8> m_nBoldPrintStyle;   // print style for bold colors
 
     // ========== Display Options (Version 9+) ==========
-    bool m_bShowBold;               // show bold in fonts?
-    bool m_bShowItalic;             // show italic?
-    bool m_bShowUnderline;          // show underline?
-    bool m_bAltArrowRecallsPartial; // alt+up recalls partial?
-    quint16 m_iPixelOffset;         // pixel offset from window edge
-    bool m_bAutoFreeze;             // freeze if not at bottom?
-    bool m_bKeepFreezeAtBottom;     // don't unfreeze at bottom?
-    bool m_bAutoRepeat;             // auto repeat last command?
-    bool m_bDisableCompression;     // disable MCCP?
-    bool m_bLowerCaseTabCompletion; // tab complete in lower case?
-    bool m_bDoubleClickInserts;     // double-click inserts word?
-    bool m_bDoubleClickSends;       // double-click sends to MUD?
-    bool m_bConfirmOnSend;          // confirm preamble/postamble?
-    bool m_bTranslateGerman;        // translate German chars?
+    bool m_bAutoRepeat;         // auto repeat last command?
+    bool m_bDisableCompression; // disable MCCP?
+    bool m_bConfirmOnSend;      // confirm preamble/postamble?
+    bool m_bTranslateGerman;    // translate German chars?
 
-    // ========== Tab Completion ==========
-    QString m_strTabCompletionDefaults; // initial words
-    quint32 m_iTabCompletionLines;      // lines to search
-    bool m_bTabCompletionSpace;         // insert space after word?
-    QString m_strWordDelimiters;        // word delimiters for tab completion
+    // ========== Command Window Configuration ==========
+    struct CommandWindowConfig {
+        // Auto-resize
+        bool auto_resize = false;   // auto-resize command window?
+        quint16 minimum_lines = 1;  // minimum lines when auto-resizing
+        quint16 maximum_lines = 20; // maximum lines when auto-resizing
+
+        // History behavior
+        bool no_macros_in_history = false; // macros not added to history?
+
+        // Tab completion
+        bool lower_case_tab_completion = false; // tab complete in lower case?
+        QString tab_completion_defaults;        // initial words
+        quint32 tab_completion_lines = 200;     // lines to search
+        bool tab_completion_space = false;      // insert space after word?
+        QString word_delimiters = "-._~!@#$%^&*()+=[]{}\\|;:'\",<>?/"; // word delimiters
+
+        // Miscellaneous sending
+        bool arrow_keys_wrap = false;     // arrow keys wrap history?
+        bool spell_check_on_send = false; // spell check on send?
+    } m_command_window;
 
     // Shift+Tab completion (Lua API controlled)
     QSet<QString> m_ExtraShiftTabCompleteItems; // extra items for Shift+Tab menu
-    bool m_bTabCompleteFunctions;               // show Lua functions in Shift+Tab menu
+    // tab_complete_functions moved to m_scripting.tab_complete_functions
 
     // ========== Auto Logging ==========
     // (fields moved to LoggingConfig m_logging below)
-
-    // ========== Output Line Preambles ==========
-    QString m_strOutputLinePreambleOutput;     // output preamble for MUD output
-    QString m_strOutputLinePreambleInput;      // output preamble for input
-    QString m_strOutputLinePreambleNotes;      // output preamble for notes
-    QRgb m_OutputLinePreambleOutputTextColour; // text color - output
-    QRgb m_OutputLinePreambleOutputBackColour; // back color - output
-    QRgb m_OutputLinePreambleInputTextColour;  // text color - input
-    QRgb m_OutputLinePreambleInputBackColour;  // back color - input
-    QRgb m_OutputLinePreambleNotesTextColour;  // text color - notes
-    QRgb m_OutputLinePreambleNotesBackColour;  // back color - notes
-
-    // ========== Recall Window ==========
-    QString m_strRecallLinePreamble; // line preamble for recall
-
-    // ========== Paste/File Options ==========
-    bool m_bPasteCommentedSoftcode; // paste commented softcode?
-    bool m_bFileCommentedSoftcode;  // send commented softcode?
-    bool m_bFlashIcon;              // flash icon for activity?
-    bool m_bArrowKeysWrap;          // arrow keys wrap history?
-    bool m_bSpellCheckOnSend;       // spell check on send?
-    qint32 m_nPasteDelay;           // paste delay (ms)
-    qint32 m_nFileDelay;            // file send delay (ms)
-    qint32 m_nPasteDelayPerLines;   // lines before delay
-    qint32 m_nFileDelayPerLines;    // lines before delay
+    // Note: output preambles and recall preamble moved to OutputConfig m_output
 
     // ========== Miscellaneous Options ==========
-    ScriptReloadOption m_nReloadOption;    // script reload option
+    // m_nReloadOption moved to m_scripting.reload_option
+    // m_bEditScriptWithNotepad moved to m_scripting.edit_with_notepad
+    // m_bWarnIfScriptingInactive moved to m_scripting.warn_if_inactive
     qint32 m_bUseDefaultOutputFont;        // use default output font?
-    qint32 m_bSaveDeletedCommand;          // save deleted command?
     qint32 m_bTranslateBackslashSequences; // interpret \n \r etc.?
-    qint32 m_bEditScriptWithNotepad;       // use built-in notepad?
-    qint32 m_bWarnIfScriptingInactive;     // warn if can't invoke script?
-
-    // ========== Sending Options ==========
-    bool m_bSendEcho;  // echo sends?
-    bool m_bPasteEcho; // echo pastes?
 
     // ========== Default Options ==========
-    bool m_bUseDefaultColours;
     bool m_bUseDefaultTriggers;
     bool m_bUseDefaultAliases;
     bool m_bUseDefaultMacros;
@@ -654,10 +742,6 @@ class WorldDocument : public QObject, public IWorldContext {
 
     // ========== Terminal Settings ==========
     QString m_strTerminalIdentification; // telnet negotiation ID
-
-    // ========== Mapping ==========
-    QString m_strMappingFailure; // mapping failure message
-    bool m_bMapFailureRegexp;    // mapping failure is regexp?
 
     // ========== Flag Containers ==========
     quint16 m_iFlags1; // misc flags (see FLAGS1_* defines)
@@ -668,62 +752,43 @@ class WorldDocument : public QObject, public IWorldContext {
 
     // ========== More Options (Version 15+) ==========
     bool m_bAlwaysRecordCommandHistory; // record even if echo off?
-    bool m_bCopySelectionToClipboard;   // auto-copy selection?
-    bool m_bCarriageReturnClearsLine;   // \r clears line?
     bool m_bSendMXP_AFK_Response;       // reply to <afk>?
     bool m_bMudCanChangeOptions;        // server may recommend?
-    bool m_bEnableSpamPrevention;       // spam prevention?
-    quint16 m_iSpamLineCount;           // spam line threshold
-    QString m_strSpamMessage;           // spam filler message
-
-    bool m_bDoNotShowOutstandingLines; // hide outstanding lines?
-    bool m_bDoNotTranslateIACtoIACIAC; // don't translate IAC?
 
     // ========== Clipboard and Display ==========
-    bool m_bAutoCopyInHTML;              // auto-copy in HTML?
-    quint16 m_iLineSpacing;              // line spacing (0 = auto)
-    bool m_bUTF_8;                       // UTF-8 support?
-    bool m_bConvertGAtoNewline;          // convert IAC/GA to newline?
     ActionSource m_iCurrentActionSource; // what caused current script?
 
     // ========== Filters ==========
-    QString m_strTriggersFilter;  // Lua filter for triggers
-    QString m_strAliasesFilter;   // Lua filter for aliases
-    QString m_strTimersFilter;    // Lua filter for timers
-    QString m_strVariablesFilter; // Lua filter for variables
+    // Moved to m_scripting: triggers_filter, aliases_filter, timers_filter, variables_filter
 
     // ========== Script Errors ==========
-    bool m_bScriptErrorsToOutputWindow; // show errors in output?
+    // Moved to m_scripting.errors_to_output_window
 
-    // ========== Command Window Auto-resize ==========
-    bool m_bAutoResizeCommandWindow;        // auto-resize command window?
-    QString m_strEditorWindowName;          // editor window name
-    quint16 m_iAutoResizeMinimumLines;      // minimum lines
-    quint16 m_iAutoResizeMaximumLines;      // maximum lines
-    bool m_bDoNotAddMacrosToCommandHistory; // macros not in history?
-    bool m_bSendKeepAlives;                 // use SO_KEEPALIVE?
+    // ========== Editor Window ==========
+    QString m_strEditorWindowName; // editor window name
+    bool m_bSendKeepAlives;        // use SO_KEEPALIVE?
 
-    // ========== Default Trigger Settings ==========
-    quint16 m_iDefaultTriggerSendTo;
-    quint16 m_iDefaultTriggerSequence;
-    bool m_bDefaultTriggerRegexp;
-    bool m_bDefaultTriggerExpandVariables;
-    bool m_bDefaultTriggerKeepEvaluating;
-    bool m_bDefaultTriggerIgnoreCase;
+    // ========== Automation Defaults Configuration ==========
+    struct AutomationDefaultsConfig {
+        // Default trigger settings
+        quint16 trigger_send_to = 0;           // default send-to for new triggers
+        quint16 trigger_sequence = 100;        // default sequence for new triggers
+        bool trigger_regexp = false;           // default regexp for new triggers?
+        bool trigger_expand_variables = false; // default expand vars for new triggers?
+        bool trigger_keep_evaluating = false;  // default keep evaluating for new triggers?
+        bool trigger_ignore_case = false;      // default ignore case for new triggers?
 
-    // ========== Default Alias Settings ==========
-    quint16 m_iDefaultAliasSendTo;
-    quint16 m_iDefaultAliasSequence;
-    bool m_bDefaultAliasRegexp;
-    bool m_bDefaultAliasExpandVariables;
-    bool m_bDefaultAliasKeepEvaluating;
-    bool m_bDefaultAliasIgnoreCase;
+        // Default alias settings
+        quint16 alias_send_to = 0;           // default send-to for new aliases
+        quint16 alias_sequence = 100;        // default sequence for new aliases
+        bool alias_regexp = false;           // default regexp for new aliases?
+        bool alias_expand_variables = false; // default expand vars for new aliases?
+        bool alias_keep_evaluating = false;  // default keep evaluating for new aliases?
+        bool alias_ignore_case = false;      // default ignore case for new aliases?
 
-    // ========== Default Timer Settings ==========
-    quint16 m_iDefaultTimerSendTo;
-
-    // ========== Sound ==========
-    bool m_bPlaySoundsInBackground; // use global sound buffer?
+        // Default timer settings
+        quint16 timer_send_to = 0; // default send-to for new timers
+    } m_automation_defaults;
 
     // ========== HTML Logging ==========
     bool m_bUnpauseOnSend; // cancel pause on send?
@@ -759,9 +824,6 @@ class WorldDocument : public QObject, public IWorldContext {
     bool m_bTreeviewAliases;  // show aliases in tree?
     bool m_bTreeviewTimers;   // show timers in tree?
 
-    // ========== Input Wrapping ==========
-    bool m_bAutoWrapInput; // match input wrap to output?
-
     // ========== Tooltips ==========
     quint32 m_iToolTipVisibleTime; // tooltip visible time (ms)
     quint32 m_iToolTipStartTime;   // tooltip delay time (ms)
@@ -769,11 +831,8 @@ class WorldDocument : public QObject, public IWorldContext {
     // ========== Save File Options ==========
     bool m_bOmitSavedDateFromSaveFiles; // don't write save date?
 
-    // ========== Output Buffer Fading ==========
-    quint16 m_iFadeOutputBufferAfterSeconds; // fade after N seconds
-    quint16 m_FadeOutputOpacityPercent;      // fade opacity %
-    quint16 m_FadeOutputSeconds;             // fade duration
-    bool m_bCtrlBackspaceDeletesLastWord;    // Ctrl+Backspace behavior?
+    // Note: output buffer fading fields moved to OutputConfig m_output
+    bool m_bCtrlBackspaceDeletesLastWord; // Ctrl+Backspace behavior?
 
     // ========== Remote Access Server Settings ==========
     struct RemoteAccessConfig {
@@ -785,6 +844,26 @@ class WorldDocument : public QObject, public IWorldContext {
         quint16 lockout_attempts = 3;   // failed attempts before lockout
         quint16 lockout_seconds = 300;  // lockout duration
     } m_remote;
+
+    // ========== Spam Prevention / Protocol Behavior Configuration ==========
+    struct SpamPreventionConfig {
+        bool enabled = false;                     // spam prevention?
+        quint16 line_count = 20;                  // spam line threshold
+        QString message = "look";                 // spam filler message
+        bool carriage_return_clears_line = false; // \r clears line?
+        bool convert_ga_to_newline = false;       // convert IAC/GA to newline?
+        bool do_not_translate_iac = false;        // don't translate IAC?
+    } m_spam;
+
+    // ========== Mapping Configuration ==========
+    struct MappingConfig {
+        bool enabled = false;        // mapping active?
+        bool remove_reverses = true; // auto-cancel opposite directions?
+        QString failure_message = "Alas, you cannot go that way."; // movement failure text
+        bool failure_regexp = false;                               // failure_message is regexp?
+        QString special_forwards;                                  // recorded forward directions
+        QString special_backwards;                                 // recorded backward directions
+    } m_mapping;
 
     // ========== RUNTIME STATE VARIABLES (Not saved to disk) ==========
 
@@ -1020,16 +1099,12 @@ class WorldDocument : public QObject, public IWorldContext {
     qint64 m_iUniqueDocumentNumber;
 
     // ========== Mapping ==========
-    QString m_strSpecialForwards;
-    QString m_strSpecialBackwards;
     // NOTE: m_CommandQueue moved to ConnectionManager.
     // Access via m_connectionManager->m_CommandQueue.
     bool m_bShowingMapperStatus;
 
     // Mapper state (Lua API: AddToMapper, GetMappingString, etc.)
     QStringList m_mapList;                   // Ordered list of map entries (directions/comments)
-    bool m_bMapping = false;                 // Whether mapping is active
-    bool m_bRemoveMapReverses = true;        // Auto-cancel opposite directions
     QMap<QRgb, QRgb> m_colourTranslationMap; // Color substitution map for display
 
     // ========== Plugins ==========
@@ -1117,19 +1192,16 @@ class WorldDocument : public QObject, public IWorldContext {
     // void* m_PaneMap;  // only if PANE is defined
 
     // ========== Unpacked flags from m_iFlags1 ==========
-    bool m_bArrowRecallsPartial;
     bool m_bCtrlZGoesToEndOfBuffer;
     bool m_bCtrlPGoesToPreviousCommand;
     bool m_bCtrlNGoesToNextCommand;
     bool m_bHyperlinkAddsToCommandHistory;
-    bool m_bEchoHyperlinkInOutputWindow;
+    // echo_hyperlink_in_output_window moved to m_output.echo_hyperlink_in_output_window
     bool m_bAutoWrapWindowWidth;
-    bool m_bNAWS;      // Negotiate About Window Size
-    bool m_bUseZMP;    // Use ZMP (Zenith MUD Protocol)
-    bool m_bUseATCP;   // Use ATCP (Achaea Telnet Client Protocol)
-    bool m_bUseMSP;    // Use MSP (MUD Sound Protocol)
-    bool m_bPueblo;    // Allow Pueblo
-    bool m_bNoEchoOff; // ignore echo off
+    bool m_bNAWS;    // Negotiate About Window Size
+    bool m_bUseZMP;  // Use ZMP (Zenith MUD Protocol)
+    bool m_bUseATCP; // Use ATCP (Achaea Telnet Client Protocol)
+    bool m_bPueblo;  // Allow Pueblo
     bool m_bUseCustomLinkColour;
     bool m_bMudCanChangeLinkColour;
     bool m_bUnderlineHyperlinks;

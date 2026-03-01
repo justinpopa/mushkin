@@ -212,7 +212,7 @@ TEST_F(SpeedwalkTest, ErrorActionNoDirection)
 // Expected: "look\nlook\n"
 TEST_F(SpeedwalkTest, FillerCommand)
 {
-    doc->m_strSpeedWalkFiller = "look";
+    doc->m_speedwalk.filler = "look";
     QString result = doc->DoEvaluateSpeedwalk("2f");
 
     EXPECT_FALSE(result.startsWith("*")) << "Should not return an error";

@@ -12,9 +12,9 @@ class Action;
 // These are stored in the COLOURTYPE bits (0x0300) of iFlags
 
 inline constexpr quint16 COLOUR_ANSI =
-    0x0000; // ANSI colour from ANSI table (m_normalcolour/m_boldcolour)
+    0x0000; // ANSI colour from ANSI table (m_colors.normal_colour/m_colors.bold_colour)
 inline constexpr quint16 COLOUR_CUSTOM =
-    0x0100; // Custom colour from custom table (m_customtext/m_customback)
+    0x0100; // Custom colour from custom table (m_colors.custom_text/m_colors.custom_back)
 inline constexpr quint16 COLOUR_RGB = 0x0200;      // RGB colour directly in iForeColour/iBackColour
 inline constexpr quint16 COLOUR_RESERVED = 0x0300; // Reserved for future use
 

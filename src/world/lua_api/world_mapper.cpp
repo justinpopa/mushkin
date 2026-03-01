@@ -193,7 +193,7 @@ int L_DeleteLastMapItem(lua_State* L)
 int L_EnableMapping(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    pDoc->m_bMapping = lua_gettop(L) < 1 || lua_toboolean(L, 1);
+    pDoc->m_mapping.enabled = lua_gettop(L) < 1 || lua_toboolean(L, 1);
     return luaReturnOK(L);
 }
 
@@ -334,7 +334,7 @@ int L_GetMappingString(lua_State* L)
 int L_GetMapping(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    lua_pushboolean(L, pDoc->m_bMapping ? 1 : 0);
+    lua_pushboolean(L, pDoc->m_mapping.enabled ? 1 : 0);
     return 1;
 }
 
@@ -351,7 +351,7 @@ int L_SetMapping(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
     // Default to true if no argument (optboolean pattern)
-    pDoc->m_bMapping = lua_gettop(L) < 1 || lua_toboolean(L, 1);
+    pDoc->m_mapping.enabled = lua_gettop(L) < 1 || lua_toboolean(L, 1);
     return luaReturnOK(L);
 }
 
@@ -433,7 +433,7 @@ int L_MapColourList(lua_State* L)
 int L_GetRemoveMapReverses(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    lua_pushboolean(L, pDoc->m_bRemoveMapReverses ? 1 : 0);
+    lua_pushboolean(L, pDoc->m_mapping.remove_reverses ? 1 : 0);
     return 1;
 }
 
@@ -449,6 +449,6 @@ int L_GetRemoveMapReverses(lua_State* L)
 int L_SetRemoveMapReverses(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    pDoc->m_bRemoveMapReverses = lua_toboolean(L, 1) != 0;
+    pDoc->m_mapping.remove_reverses = lua_toboolean(L, 1) != 0;
     return luaReturnOK(L);
 }
