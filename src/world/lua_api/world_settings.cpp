@@ -1545,15 +1545,6 @@ int L_GetInfo(lua_State* L)
 }
 
 /**
- * world.GetWorldName()
- *
- * Gets the world name.
- *
- * @return World name
- */
-LUA_DOC_GETTER(L_GetWorldName, pDoc->m_mush_name)
-
-/**
  * SetOption - Set a world option by name
  *
  * Lua signature: error_code = SetOption(option_name, value)
@@ -2282,9 +2273,6 @@ void register_setting_functions(lua_State* L)
     // World info functions
     lua_pushcfunction(L, L_GetInfo);
     lua_setfield(L, -2, "GetInfo");
-
-    lua_pushcfunction(L, L_GetWorldName);
-    lua_setfield(L, -2, "GetWorldName");
 
     lua_pushcfunction(L, L_SetOption);
     lua_setfield(L, -2, "SetOption");

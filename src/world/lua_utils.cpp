@@ -1475,7 +1475,6 @@ static int L_utils_functionlist(lua_State* L)
                                       "DeleteVariable",
                                       "GetVariableList",
                                       "GetInfo",
-                                      "GetWorldName",
                                       "GetOption",
                                       "SetOption",
                                       "SetStatus",

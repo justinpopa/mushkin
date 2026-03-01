@@ -78,7 +78,6 @@ extern int L_GetVariableList(lua_State* L);
 
 // World info functions
 extern int L_GetInfo(lua_State* L);
-extern int L_GetWorldName(lua_State* L);
 extern int L_GetOption(lua_State* L);
 extern int L_SetOption(lua_State* L);
 extern int L_GetAlphaOption(lua_State* L);
@@ -577,7 +576,6 @@ int RegisterLuaRoutines(lua_State* L)
 
         // World info functions
         {"GetInfo", L_GetInfo},
-        {"GetWorldName", L_GetWorldName},
         {"GetOption", L_GetOption},
         {"SetOption", L_SetOption},
         {"GetAlphaOption", L_GetAlphaOption},
@@ -1128,7 +1126,7 @@ int RegisterLuaRoutines(lua_State* L)
     lua_setglobal(L, "SetCursor");
 
     // Register WorldName as global function (for compatibility with legacy plugins)
-    lua_pushcfunction(L, L_GetWorldName);
+    lua_pushcfunction(L, L_WorldName);
     lua_setglobal(L, "WorldName");
 
     // Register AddTimer as global function (for compatibility with legacy plugins)

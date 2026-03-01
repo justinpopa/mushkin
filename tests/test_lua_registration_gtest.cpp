@@ -82,9 +82,9 @@ TEST_F(LuaRegistrationTest, WorldTableFunctionCount)
     }
     lua_pop(L, 1); // pop world table
 
-    // 409 worldlib entries + 19 array functions = 428
-    EXPECT_GE(count, 428)
-        << "world table should have at least 428 functions (409 worldlib + 19 array)";
+    // 408 worldlib entries + 19 array functions = 427
+    EXPECT_GE(count, 427)
+        << "world table should have at least 427 functions (408 worldlib + 19 array)";
 }
 
 // =============================================================================
@@ -145,7 +145,6 @@ TEST_F(LuaRegistrationTest, CoreFunctionSpotChecks)
     expectWorldFunction("SetOption");
     expectWorldFunction("GetAlphaOption");
     expectWorldFunction("SetAlphaOption");
-    expectWorldFunction("GetWorldName");
     expectWorldFunction("Version");
     expectWorldFunction("GetLineCount");
     expectWorldFunction("DoCommand");
