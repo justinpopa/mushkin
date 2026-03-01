@@ -4,7 +4,7 @@
 **Method:** Lua API diff (428 original vs 509 Mushkin) + Gemini Pro 3.1 codebase comparison
 **Source:** `../mushclient-original` (stripped), `../mushclient_resources`
 
-**Coverage:** 424/428 Lua API functions ported (~99.1%). Remaining: 4 non-API gaps (N1/N2).
+**Coverage:** 424/428 Lua API functions ported (~99.1%). N2 (zChat) won't be implemented (obsolete protocol).
 
 ---
 
@@ -227,14 +227,13 @@ These aren't Lua API functions but are architectural/feature gaps.
 
 **Completed:** ProxyConfig struct in WorldDocument (type/server/port/username/password), 5 config_options entries for XML serialization, proxy group box in Connection tab UI, legacy Lua API stubs (GetInfo case 62, GetOption case 229) wired to real fields.
 
-### N2 — Chat System (peer-to-peer)
+### N2 — Chat System (peer-to-peer) — Won't Implement
 
 **Impact:** Low–Medium — zChat/MudMaster chat protocol
 **Effort:** Large
 **Source:** `chat.cpp`
 
-- [ ] Peer-to-peer chat protocol implementation
-- [ ] Chat API functions (ChatCall, ChatAccept, ChatMessage, etc.)
+Won't implement. The zChat/MudMaster peer-to-peer chat protocol is obsolete — modern MUD communities use Discord, IRC, or in-game channels instead. The large implementation effort isn't justified for a protocol with near-zero active usage. Lua API stubs return appropriate error codes for any plugins that reference chat functions.
 
 ### N3 — DoCommand API (Done)
 
@@ -284,7 +283,7 @@ These aren't Lua API functions but are architectural/feature gaps.
 | G11 Text Transforms | 2 | Low | Small | Done (bfb6b40) |
 | G12 Colour | 2 | Low | Small | Done (bfb6b40) |
 | N1 Proxy | — | Medium | Medium | Done (QNetworkProxy) |
-| N2 Chat | — | Low–Med | Large | Not started |
+| N2 Chat | — | Low–Med | Large | Won't implement (obsolete protocol) |
 | N3 DoCommand API | — | Medium | Medium | Done (252 commands) |
 | N4 LuaFileSystem | — | Medium | Small | Done |
 | N5 Logging Settings | 6 | Low–Med | Small | Done |
