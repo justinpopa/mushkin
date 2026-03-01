@@ -62,7 +62,12 @@ add_library(world STATIC
     lua_api/world_commands.cpp
     lua_api/world_variables.cpp
     lua_api/world_colors.cpp
-    lua_api/world_utilities.cpp
+    lua_api/world_crypto.cpp
+    lua_api/world_udp.cpp
+    lua_api/world_session.cpp
+    lua_api/world_ui_control.cpp
+    lua_api/world_logging_opts.cpp
+    lua_api/world_misc.cpp
     lua_api/world_settings.cpp
     lua_api/lua_progress.cpp
     lua_api/world_triggers.cpp
@@ -71,7 +76,9 @@ add_library(world STATIC
     lua_api/world_logging.cpp
     lua_api/world_database.cpp
     lua_api/world_plugins.cpp
-    lua_api/world_miniwindows.cpp
+    lua_api/world_miniwindow_lifecycle.cpp
+    lua_api/world_miniwindow_drawing.cpp
+    lua_api/world_miniwindow_images.cpp
     lua_api/world_info.cpp
     lua_api/world_sounds.cpp        # Sound system API
     lua_api/world_notepads.cpp      # Notepad window API
