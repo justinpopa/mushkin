@@ -95,6 +95,25 @@ find_package(Qt6 COMPONENTS Multimedia SpatialAudio REQUIRED)
 # zlib for MCCP compression
 find_package(ZLIB REQUIRED)
 
+# libssh for SSH remote access server
+if(APPLE)
+    find_package(libssh CONFIG REQUIRED
+        PATHS /opt/homebrew/opt/libssh /usr/local/opt/libssh
+        NO_DEFAULT_PATH
+    )
+elseif(WIN32)
+    find_package(libssh CONFIG REQUIRED)
+else()
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(LIBSSH REQUIRED libssh)
+    if(NOT TARGET ssh)
+        add_library(ssh SHARED IMPORTED)
+        set_target_properties(ssh PROPERTIES
+            IMPORTED_LOCATION "${LIBSSH_LINK_LIBRARIES}"
+            INTERFACE_INCLUDE_DIRECTORIES "${LIBSSH_INCLUDE_DIRS}")
+    endif()
+endif()
+
 # PCRE for rex Lua library (Perl-compatible regular expressions)
 # Original MUSHclient uses PCRE 8.x (legacy PCRE, not PCRE2)
 if(APPLE)

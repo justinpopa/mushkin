@@ -12,6 +12,9 @@ add_library(network STATIC
     remote_client.h
     remote_access_server.cpp
     remote_access_server.h
+    # SSH host key management
+    ssh_host_key_manager.cpp
+    ssh_host_key_manager.h
 )
 
 target_link_libraries(network PUBLIC
@@ -20,6 +23,7 @@ target_link_libraries(network PUBLIC
     Qt6::Network
     ZLIB::ZLIB  # Needed because world_socket.cpp includes world_document.h which uses zlib
     utils
+    ssh
 )
 
 target_include_directories(network PUBLIC

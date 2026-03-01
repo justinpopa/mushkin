@@ -849,3 +849,18 @@ target_link_libraries(test-docommand-gtest PRIVATE
 gtest_discover_tests(test-docommand-gtest
     DISCOVERY_TIMEOUT 30
 )
+
+# SSH Host Key test
+add_executable(test-ssh-host-key-gtest
+    test_ssh_host_key_gtest.cpp
+)
+
+target_link_libraries(test-ssh-host-key-gtest PRIVATE
+    test_main_core
+    network
+    Qt6::Core
+)
+
+gtest_discover_tests(test-ssh-host-key-gtest
+    DISCOVERY_TIMEOUT 30
+)
