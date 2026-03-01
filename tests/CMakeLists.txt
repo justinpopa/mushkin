@@ -926,6 +926,22 @@ gtest_discover_tests(test-world-output-gtest
     DISCOVERY_TIMEOUT 30
 )
 
+# World protocol test
+add_executable(test-world-protocol-gtest
+    test_world_protocol_gtest.cpp
+)
+
+target_link_libraries(test-world-protocol-gtest PRIVATE
+    test_main_core
+    Qt6::Gui
+    Qt6::Widgets
+    ui
+)
+
+gtest_discover_tests(test-world-protocol-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
 # World serialization test
 add_executable(test-world-serialization-gtest
     test_world_serialization_gtest.cpp

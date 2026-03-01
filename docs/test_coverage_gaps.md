@@ -2,7 +2,7 @@
 
 **Date:** 2026-03-01
 **Method:** Cross-reference of all `src/` files (>200 lines) against `tests/` test files. Counts are direct GTest `TEST`/`TEST_F` only.
-**Current baseline:** 954 tests across 53 executables.
+**Current baseline:** 1003 tests across 54 executables.
 
 ## Critical — Zero Tests, High Risk
 
@@ -21,7 +21,7 @@
 | `ui/dialogs/global_preferences_dialog.cpp` | 1540 | ui | 0 | World property marshalling |
 | `ui/dialogs/plugin_wizard.cpp` | 1206 | ui | 0 | Plugin XML generation, `savePluginXml` std::expected path |
 | `ui/views/output_view_miniwindows.cpp` | 1039 | ui | 0 | Miniwindow overlay compositing |
-| `world/world_protocol.cpp` | 880 | world | 0 | Telnet negotiation, MCCP, MXP protocol dispatch (TelnetParser itself now has 33 tests) |
+| `world/world_protocol.cpp` | 880 | world | **49 tests added** (ProcessIncomingByte dispatch, ANSI style/cancel/color codes, 256-color, truecolor, GetStyleRGB, RememberStyle, xterm palette, SendPacket, UTF-8, MXP phase transitions) — moved to Well-Covered |
 | `world/world_document_plugins.cpp` | 1084 | world | 33 (partial) | Plugin install/load/hot-reload path; file loading not tested |
 | `network/ssh_server_session.cpp` | 458 | network | 0 | SSH channel handling, exec/shell dispatch — new feature |
 | `network/remote_access_server.cpp` | 320 | network | 0 | SSH server listen/accept loop |
@@ -77,6 +77,7 @@
 | `network/ansi_formatter.cpp` | 249 | `test_ansi_formatter_gtest.cpp` | 39 |
 | `world/lua_api/lua_registration.cpp` | 1429 | `test_lua_registration_gtest.cpp` | 23 |
 | `world/lua_api/world_output.cpp` | 1767 | `test_world_output_gtest.cpp` | 51 |
+| `world/world_protocol.cpp` | 880 | `test_world_protocol_gtest.cpp` | 49 |
 
 ## Recommended Next Targets
 
@@ -86,4 +87,4 @@ Prioritized by testability (no UI needed) and risk:
 2. ~~**`ansi_formatter.cpp`** — DONE. 39 tests added covering null/empty lines, text attributes (bold/underline/italic/inverse/strikeout), ANSI color indices (standard/bright/256), RGB truecolor, custom palette colors, multi-style lines, state caching, and edge cases.~~
 3. ~~**`lua_registration.cpp`** — DONE. 23 tests covering world table completeness (428 functions), 90+ spot checks, 35 global aliases, 9 constant tables, utils/rex modules, getLuaFunctionNames helper, and British/American spelling aliases. Duplicate registrations (Trim, SetStatus) cleaned up.~~
 4. ~~**`world_output.cpp`** — DONE. 51 tests covering Tell, ANSI, AnsiNote, Simulate, GetLineInfo, GetStyleInfo, NoteColour getters/setters, NoteStyle, NoteHr, entity functions, DeleteLines/DeleteOutput, Bookmark, info bar (Info/InfoClear/InfoColour/InfoBackground/InfoFont/ShowInfoBar), SetSelection, SetUnseenLines, ResetStatusTime, Hyperlink. Also fixed NoteHr bug: HORIZ_RULE flag was overwritten by StartNewLine's iFlags parameter.~~
-5. **`world_protocol.cpp`** — Telnet negotiation dispatch. TelnetParser handles the state machine, but the WorldDocument-level protocol logic is untested.
+5. ~~**`world_protocol.cpp`** — DONE. 49 tests covering ProcessIncomingByte dispatch (text, newline, CR, tab, ESC, IAC, MXP, UTF-8), InterpretANSIcode (reset, bold, underline, blink, inverse, strikeout, cancel codes, foreground/background colors), Interpret256ANSIcode (256-color foreground/background, 24-bit truecolor), GetStyleRGB (ANSI/custom/RGB mode resolution, HILITE bold table, nullptr), RememberStyle, xterm 256-color palette (7 spot checks), SendPacket null guard.~~
