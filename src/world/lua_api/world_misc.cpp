@@ -1237,7 +1237,8 @@ int L_ErrorDesc(lua_State* L)
 int L_Replace(lua_State* L)
 {
     auto [qSource, qSearchFor, qReplaceWith] = luaArgs<QString, QString, QString>(L);
-    bool multiple = lua_toboolean(L, 4);
+    // MUSHclient replaces all occurrences by default; explicit false means first-only
+    bool multiple = lua_isnoneornil(L, 4) ? true : lua_toboolean(L, 4);
 
     QString result;
     if (multiple) {

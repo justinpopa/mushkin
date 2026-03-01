@@ -37,17 +37,24 @@ int L_GetVariable(lua_State* L)
     Plugin* currentPlugin = plugin(L);
     QString value;
 
+    bool found = false;
     if (currentPlugin) {
-        // Get from plugin's variable map
         auto it = currentPlugin->m_VariableMap.find(qName);
         if (it != currentPlugin->m_VariableMap.end()) {
             value = it->second->contents;
+            found = true;
         }
     } else {
-        value = pDoc->getVariable(qName);
+        // Look up directly to distinguish "not found" from "empty string"
+        QString lowerName = qName.toLower();
+        auto it = pDoc->m_VariableMap.find(lowerName);
+        if (it != pDoc->m_VariableMap.end()) {
+            value = it->second->contents;
+            found = true;
+        }
     }
 
-    if (value.isEmpty()) {
+    if (!found) {
         lua_pushnil(L);
     } else {
         luaPushQString(L, value);

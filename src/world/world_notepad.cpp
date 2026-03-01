@@ -221,14 +221,15 @@ qint32 WorldDocument::CloseNotepad(const QString& title, bool querySave)
     }
 
     // TODO(feature): Prompt to save modified notepad content when querySave=true.
+
+    // Synchronously unregister before deferred deletion so that
+    // GetNotepadList (called in the same script) sees the removal immediately.
+    // The destructor's UnregisterNotepad call becomes a harmless no-op.
+    UnregisterNotepad(notepad);
+
     if (notepad->m_pMdiSubWindow) {
-        // Close the MDI wrapper; WA_DeleteOnClose on the subwindow destroys it,
-        // which destroys the NotepadWidget child and triggers UnregisterNotepad.
         notepad->m_pMdiSubWindow->close();
     } else {
-        // No MDI subwindow (e.g. headless / test environment).
-        // WA_DeleteOnClose is set on the widget itself — calling close() is
-        // sufficient to trigger deletion and UnregisterNotepad via ~NotepadWidget.
         notepad->close();
     }
 
