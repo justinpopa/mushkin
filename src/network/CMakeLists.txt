@@ -3,6 +3,7 @@ add_library(network STATIC
     world_socket.cpp
     world_socket.h
     # Remote Access Server (telnet server for remote client connections)
+    i_remote_transport.h
     ansi_formatter.cpp
     ansi_formatter.h
     telnet_server_session.cpp

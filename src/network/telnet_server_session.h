@@ -6,34 +6,46 @@
 #ifndef TELNET_SERVER_SESSION_H
 #define TELNET_SERVER_SESSION_H
 
+#include "i_remote_transport.h"
 #include <QByteArray>
-#include <QObject>
 
 class QTcpSocket;
 
 /** Server-side telnet protocol handler for negotiation and IAC processing. */
-class TelnetServerSession : public QObject {
+class TelnetServerSession : public IRemoteTransport {
     Q_OBJECT
 
   public:
     explicit TelnetServerSession(QTcpSocket* socket, QObject* parent = nullptr);
 
+    // Telnet-specific API
     void initiateNegotiation();
     bool isNegotiationComplete() const;
-    QByteArray processIncoming(const QByteArray& data);
-    static QByteArray escapeOutgoing(const QByteArray& data);
-    int clientWidth() const;
-    int clientHeight() const;
+
+    // IRemoteTransport overrides
+    QByteArray processIncoming() override;
+    QByteArray escapeOutgoing(const QByteArray& data) override;
+    void writeRaw(const QByteArray& data) override;
+    void close() override;
+    QString peerAddress() const override;
+    int terminalWidth() const override;
+    int terminalHeight() const override;
 
   signals:
     void windowSizeChanged(int width, int height);
     void negotiationComplete();
 
+  private slots:
+    void onSocketReadyRead();
+
   private:
-    void sendRaw(const QByteArray& data);
     void sendCommand(unsigned char command, unsigned char option);
     void handleCommand(unsigned char command, unsigned char option);
     void handleSubnegotiation(unsigned char option, const QByteArray& data);
+
+    // Runs data through the IAC state machine; appends clean bytes to
+    // m_cleanBuffer and returns immediately.
+    void processRaw(const QByteArray& data);
 
     enum class State {
         Normal,
@@ -57,6 +69,7 @@ class TelnetServerSession : public QObject {
     State m_state;
     unsigned char m_subnegOption;
     QByteArray m_subnegBuffer;
+    QByteArray m_cleanBuffer;
 };
 
 #endif // TELNET_SERVER_SESSION_H

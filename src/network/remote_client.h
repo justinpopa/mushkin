@@ -6,16 +6,14 @@
 #ifndef REMOTE_CLIENT_H
 #define REMOTE_CLIENT_H
 
-#include <QAbstractSocket>
 #include <QDateTime>
 #include <QObject>
 #include <QString>
 #include <memory>
 
-class QTcpSocket;
+class IRemoteTransport;
 class Line;
 class WorldDocument;
-class TelnetServerSession;
 class AnsiFormatter;
 
 /** Handles a single remote client connection with authentication and streaming. */
@@ -23,7 +21,7 @@ class RemoteClient : public QObject {
     Q_OBJECT
 
   public:
-    RemoteClient(QTcpSocket* socket, WorldDocument* doc, const QString& password,
+    RemoteClient(IRemoteTransport* transport, WorldDocument* doc, const QString& password,
                  int scrollbackLines, QObject* parent = nullptr);
     ~RemoteClient();
 
@@ -44,7 +42,6 @@ class RemoteClient : public QObject {
   private slots:
     void onReadyRead();
     void onDisconnected();
-    void onError(QAbstractSocket::SocketError socketError);
     void onNegotiationComplete();
 
   private:
@@ -59,9 +56,11 @@ class RemoteClient : public QObject {
     void sendScrollback();
     void sendBytes(const QByteArray& data);
 
-    QTcpSocket* m_pSocket;
+    // Non-owning pointer. Ownership is held by whoever created the transport
+    // (typically RemoteAccessServer, which parents it to the RemoteClient or
+    // manages its lifetime externally).
+    IRemoteTransport* m_transport;
     WorldDocument* m_pDoc;
-    std::unique_ptr<TelnetServerSession> m_telnet;
     std::unique_ptr<AnsiFormatter> m_formatter;
     QString m_password;
     int m_scrollbackLines;

@@ -7,43 +7,27 @@
 #include "../text/line.h"
 #include "../world/world_document.h"
 #include "ansi_formatter.h"
-#include "telnet_server_session.h"
-#include <QTcpSocket>
+#include "i_remote_transport.h"
+#include <QObject>
 
 namespace {
 constexpr int kMaxPasswordAttempts = 3;
 }
 
-RemoteClient::RemoteClient(QTcpSocket* socket, WorldDocument* doc, const QString& password,
+RemoteClient::RemoteClient(IRemoteTransport* transport, WorldDocument* doc, const QString& password,
                            int scrollbackLines, QObject* parent)
-    : QObject(parent), m_pSocket(socket), m_pDoc(doc),
-      m_telnet(std::make_unique<TelnetServerSession>(socket, this)),
+    : QObject(parent), m_transport(transport), m_pDoc(doc),
       m_formatter(std::make_unique<AnsiFormatter>(doc)), m_password(password),
       m_scrollbackLines(scrollbackLines), m_state(State::Negotiating), m_failedAttempts(0),
       m_maxFailedAttempts(kMaxPasswordAttempts), m_connectedAt(QDateTime::currentDateTime())
 {
-    // Takes ownership of socket via Qt parent-child (setParent below).
-    m_pSocket->setParent(this);
-
-    // Connect socket signals
-    connect(m_pSocket, &QTcpSocket::readyRead, this, &RemoteClient::onReadyRead);
-    connect(m_pSocket, &QTcpSocket::disconnected, this, &RemoteClient::onDisconnected);
-    connect(m_pSocket, &QTcpSocket::errorOccurred, this, &RemoteClient::onError);
-
-    // Connect telnet session signals
-    connect(m_telnet.get(), &TelnetServerSession::negotiationComplete, this,
-            &RemoteClient::onNegotiationComplete);
-
-    // Start telnet negotiation
-    m_telnet->initiateNegotiation();
+    // Connect transport signals
+    connect(m_transport, &IRemoteTransport::ready, this, &RemoteClient::onNegotiationComplete);
+    connect(m_transport, &IRemoteTransport::dataAvailable, this, &RemoteClient::onReadyRead);
+    connect(m_transport, &IRemoteTransport::closed, this, &RemoteClient::onDisconnected);
 }
 
-RemoteClient::~RemoteClient()
-{
-    if (m_pSocket && m_pSocket->isOpen()) {
-        m_pSocket->close();
-    }
-}
+RemoteClient::~RemoteClient() = default;
 
 bool RemoteClient::isAuthenticated() const
 {
@@ -52,10 +36,7 @@ bool RemoteClient::isAuthenticated() const
 
 QString RemoteClient::address() const
 {
-    if (m_pSocket) {
-        return QString("%1:%2").arg(m_pSocket->peerAddress().toString()).arg(m_pSocket->peerPort());
-    }
-    return QString();
+    return m_transport ? m_transport->peerAddress() : QString();
 }
 
 QDateTime RemoteClient::connectedAt() const
@@ -92,23 +73,21 @@ void RemoteClient::sendRawText(const QString& text, bool includeNewline)
 void RemoteClient::disconnect()
 {
     m_state = State::Disconnecting;
-    if (m_pSocket) {
-        m_pSocket->close();
+    if (m_transport) {
+        m_transport->close();
     }
 }
 
 void RemoteClient::sendBytes(const QByteArray& data)
 {
-    if (m_pSocket && m_pSocket->isOpen()) {
-        QByteArray escaped = TelnetServerSession::escapeOutgoing(data);
-        m_pSocket->write(escaped);
+    if (m_transport) {
+        m_transport->writeRaw(m_transport->escapeOutgoing(data));
     }
 }
 
 void RemoteClient::onReadyRead()
 {
-    QByteArray raw = m_pSocket->readAll();
-    QByteArray clean = m_telnet->processIncoming(raw);
+    QByteArray clean = m_transport->processIncoming();
 
     if (!clean.isEmpty()) {
         processInput(clean);
@@ -121,17 +100,9 @@ void RemoteClient::onDisconnected()
     emit disconnected();
 }
 
-void RemoteClient::onError(QAbstractSocket::SocketError socketError)
-{
-    Q_UNUSED(socketError);
-    if (m_pSocket) {
-        emit error(m_pSocket->errorString());
-    }
-}
-
 void RemoteClient::onNegotiationComplete()
 {
-    // Telnet negotiation done, send welcome and password prompt
+    // Transport is ready for application-level data; send welcome and password prompt.
     sendWelcome();
     sendPasswordPrompt();
     m_state = State::AwaitingPassword;

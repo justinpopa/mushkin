@@ -7,6 +7,7 @@
 #include "../text/line.h"
 #include "../world/world_document.h"
 #include "remote_client.h"
+#include "telnet_server_session.h"
 #include <QTcpServer>
 #include <QTcpSocket>
 
@@ -153,9 +154,21 @@ void RemoteAccessServer::onNewConnection()
             continue;
         }
 
+        // Create the telnet transport. RemoteClient will be its Qt parent,
+        // so the session is destroyed when the client is destroyed.
+        // initiateNegotiation() is called here (before RemoteClient connects
+        // its signals) to send the IAC sequence as early as possible; the
+        // ready() signal fires only after the client responds, so there is no
+        // race with onNegotiationComplete().
+        auto* session = new TelnetServerSession(socket);
+        session->initiateNegotiation();
+
         // Create client handler
         RemoteClient* client =
-            new RemoteClient(socket, m_pDoc, m_password, m_scrollbackLines, this);
+            new RemoteClient(session, m_pDoc, m_password, m_scrollbackLines, this);
+
+        // Parent the session to the client so it is destroyed together.
+        session->setParent(client);
 
         // Connect client signals
         connect(client, &RemoteClient::authenticated, this,
