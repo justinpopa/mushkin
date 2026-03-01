@@ -21,7 +21,8 @@
 #include <QFileInfo>
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
-#include <algorithm> // for std::sort
+#include <algorithm> // for std::sort, std::transform
+#include <string>
 
 namespace {
 
@@ -697,11 +698,14 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
                         continue;
                     }
 
-                    // Check if this is a string option in element form
-                    for (int i = 0; AlphaOptionsTable[i].pName != nullptr; i++) {
-                        const tConfigurationAlphaOption& opt = AlphaOptionsTable[i];
-
-                        if (elementName == opt.pName) {
+                    // Check if this is a string option in element form (O(1) lookup)
+                    {
+                        std::string elemKey = elementName.toStdString();
+                        std::transform(elemKey.begin(), elemKey.end(), elemKey.begin(), ::tolower);
+                        auto elemIt = getAlphaOptionMap().find(elemKey);
+                        if (elemIt != getAlphaOptionMap().end()) {
+                            const tConfigurationAlphaOption& opt =
+                                AlphaOptionsTable[elemIt->second];
                             QString value = reader.readElementText();
 
                             // Handle password decoding
@@ -713,7 +717,6 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
                             }
 
                             opt.setter(*doc, value);
-                            break;
                         }
                     }
                 }

@@ -9,6 +9,9 @@
 #ifndef CONFIG_OPTIONS_H
 #define CONFIG_OPTIONS_H
 
+#include <string>
+#include <unordered_map>
+
 // ============================================================================
 // NUMERIC OPTION FLAGS
 // ============================================================================
@@ -95,5 +98,15 @@ extern const tConfigurationNumericOption OptionsTable[];
 
 // Table of all string options (69 entries + NULL terminator)
 extern const tConfigurationAlphaOption AlphaOptionsTable[];
+
+// ============================================================================
+// O(1) LOOKUP MAPS (built once on first call, immutable thereafter)
+// ============================================================================
+
+// Maps lowercase option name -> index into OptionsTable[]
+const std::unordered_map<std::string, int>& getNumericOptionMap();
+
+// Maps lowercase option name -> index into AlphaOptionsTable[]
+const std::unordered_map<std::string, int>& getAlphaOptionMap();
 
 #endif // CONFIG_OPTIONS_H

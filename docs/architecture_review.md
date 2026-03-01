@@ -415,13 +415,15 @@ Consolidating to fewer binaries with shared test fixtures would reduce build tim
 
 ---
 
-### D3 — Config option O(N) linear scan [HIGH]
+### D3 — Config option O(N) linear scan ✅ DONE
 
-**Risk:** `GetOption`/`SetOption` in `config_options.cpp` performs linear search through option arrays for every lookup. With ~233 options, this is measurably slow for scripts that query options frequently.
+**Risk:** `GetOption`/`SetOption` in `config_options.cpp` performs linear search through option arrays for every lookup. With ~240 options, this is measurably slow for scripts that query options frequently.
 
 **Targets:**
-- [ ] Replace linear scan with `std::unordered_map<QString, OptionEntry>` or similar O(1) lookup
-- [ ] Maintain backward compatibility with existing option name strings
+- [x] Replace linear scan with `std::unordered_map<QString, OptionEntry>` or similar O(1) lookup
+- [x] Maintain backward compatibility with existing option name strings
+
+**Resolution:** Added `getNumericOptionMap()` and `getAlphaOptionMap()` — lazy-initialized `std::unordered_map<std::string, int>` mapping lowercase option names to indices into the original arrays. Replaced 10 linear scan loops across `world_settings.cpp` and `xml_serialization.cpp` with hash map lookups. Original arrays unchanged for iteration (GetOptionList, XML serialization).
 
 **Acceptance:** Option lookup is O(1). Build + test pass.
 

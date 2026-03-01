@@ -29,7 +29,9 @@
 #include <QRegularExpression>
 #include <QSettings>
 #include <QSysInfo>
+#include <algorithm>
 #include <sqlite3.h>
+#include <string>
 
 // Lua 5.1 C headers
 extern "C" {
@@ -1575,19 +1577,14 @@ int L_SetOption(lua_State* L)
         value = luaL_checknumber(L, 2);
     }
 
-    // Find the option in OptionsTable
-    int optionIndex = -1;
+    // Find the option in OptionsTable (O(1) hash map lookup)
     QString optionNameStr = luaCheckQString(L, 1);
-    for (int i = 0; OptionsTable[i].pName != nullptr; i++) {
-        if (optionNameStr.compare(OptionsTable[i].pName, Qt::CaseInsensitive) == 0) {
-            optionIndex = i;
-            break;
-        }
-    }
-
-    if (optionIndex == -1) {
+    std::string key = optionNameStr.toLower().trimmed().toStdString();
+    auto it = getNumericOptionMap().find(key);
+    if (it == getNumericOptionMap().end()) {
         return luaReturnError(L, eUnknownOption);
     }
+    int optionIndex = it->second;
 
     // Check if plugin is allowed to write this option
     if (pDoc->m_CurrentPlugin && (OptionsTable[optionIndex].iFlags & OPT_PLUGIN_CANNOT_WRITE)) {
@@ -1624,22 +1621,24 @@ int L_GetOption(lua_State* L)
     WorldDocument* pDoc = doc(L);
     const char* optionName = luaL_checkstring(L, 1);
 
-    // Search numeric options table first
-    for (int i = 0; OptionsTable[i].pName != nullptr; i++) {
-        const tConfigurationNumericOption& opt = OptionsTable[i];
+    // Build lowercase key for O(1) lookup
+    std::string key(optionName);
+    std::transform(key.begin(), key.end(), key.begin(), ::tolower);
 
-        if (strcmp(opt.pName, optionName) == 0) {
-            lua_pushnumber(L, opt.getter(*pDoc));
+    // Search numeric options table first (O(1))
+    {
+        auto it = getNumericOptionMap().find(key);
+        if (it != getNumericOptionMap().end()) {
+            lua_pushnumber(L, OptionsTable[it->second].getter(*pDoc));
             return 1;
         }
     }
 
-    // Search alpha (string) options table
-    for (int i = 0; AlphaOptionsTable[i].pName != nullptr; i++) {
-        const tConfigurationAlphaOption& opt = AlphaOptionsTable[i];
-
-        if (strcmp(opt.pName, optionName) == 0) {
-            luaPushQString(L, opt.getter(*pDoc));
+    // Search alpha (string) options table (O(1))
+    {
+        auto it = getAlphaOptionMap().find(key);
+        if (it != getAlphaOptionMap().end()) {
+            luaPushQString(L, AlphaOptionsTable[it->second].getter(*pDoc));
             return 1;
         }
     }
@@ -1664,22 +1663,19 @@ int L_GetAlphaOption(lua_State* L)
     WorldDocument* pDoc = doc(L);
 
     // Normalize option name: lowercase, trimmed (matches original)
-    QString normalizedName = luaCheckQString(L, 1).toLower().trimmed();
+    std::string key = luaCheckQString(L, 1).toLower().trimmed().toStdString();
 
-    // Search alpha (string) options table only
-    for (int i = 0; AlphaOptionsTable[i].pName != nullptr; i++) {
-        const tConfigurationAlphaOption& opt = AlphaOptionsTable[i];
-
-        if (normalizedName == opt.pName) {
-            // Check if plugin is allowed to read this option
-            if (pDoc->m_CurrentPlugin && (opt.iFlags & OPT_PLUGIN_CANNOT_READ)) {
-                lua_pushnil(L);
-                return 1;
-            }
-
-            luaPushQString(L, opt.getter(*pDoc));
+    // Search alpha (string) options table only (O(1))
+    auto it = getAlphaOptionMap().find(key);
+    if (it != getAlphaOptionMap().end()) {
+        const tConfigurationAlphaOption& opt = AlphaOptionsTable[it->second];
+        // Check if plugin is allowed to read this option
+        if (pDoc->m_CurrentPlugin && (opt.iFlags & OPT_PLUGIN_CANNOT_READ)) {
+            lua_pushnil(L);
             return 1;
         }
+        luaPushQString(L, opt.getter(*pDoc));
+        return 1;
     }
 
     // Option not found
@@ -1697,34 +1693,31 @@ int L_GetAlphaOption(lua_State* L)
 int L_GetCurrentValue(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    QString normalizedName = luaCheckQString(L, 1).toLower().trimmed();
+    std::string key = luaCheckQString(L, 1).toLower().trimmed().toStdString();
 
-    // Search numeric options table first
-    for (int i = 0; OptionsTable[i].pName != nullptr; i++) {
-        const tConfigurationNumericOption& opt = OptionsTable[i];
-
-        if (normalizedName == opt.pName) {
-            // Check if plugin is allowed to read this option
+    // Search numeric options table first (O(1))
+    {
+        auto it = getNumericOptionMap().find(key);
+        if (it != getNumericOptionMap().end()) {
+            const tConfigurationNumericOption& opt = OptionsTable[it->second];
             if (pDoc->m_CurrentPlugin && (opt.iFlags & OPT_PLUGIN_CANNOT_READ)) {
                 lua_pushnil(L);
                 return 1;
             }
-
             lua_pushnumber(L, opt.getter(*pDoc));
             return 1;
         }
     }
 
-    // Search alpha (string) options table
-    for (int i = 0; AlphaOptionsTable[i].pName != nullptr; i++) {
-        const tConfigurationAlphaOption& opt = AlphaOptionsTable[i];
-
-        if (normalizedName == opt.pName) {
+    // Search alpha (string) options table (O(1))
+    {
+        auto it = getAlphaOptionMap().find(key);
+        if (it != getAlphaOptionMap().end()) {
+            const tConfigurationAlphaOption& opt = AlphaOptionsTable[it->second];
             if (pDoc->m_CurrentPlugin && (opt.iFlags & OPT_PLUGIN_CANNOT_READ)) {
                 lua_pushnil(L);
                 return 1;
             }
-
             luaPushQString(L, opt.getter(*pDoc));
             return 1;
         }
@@ -1744,33 +1737,31 @@ int L_GetCurrentValue(lua_State* L)
 int L_GetDefaultValue(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    QString normalizedName = luaCheckQString(L, 1).toLower().trimmed();
+    std::string key = luaCheckQString(L, 1).toLower().trimmed().toStdString();
 
-    // Search numeric options table first
-    for (int i = 0; OptionsTable[i].pName != nullptr; i++) {
-        const tConfigurationNumericOption& opt = OptionsTable[i];
-
-        if (normalizedName == opt.pName) {
+    // Search numeric options table first (O(1))
+    {
+        auto it = getNumericOptionMap().find(key);
+        if (it != getNumericOptionMap().end()) {
+            const tConfigurationNumericOption& opt = OptionsTable[it->second];
             if (pDoc->m_CurrentPlugin && (opt.iFlags & OPT_PLUGIN_CANNOT_READ)) {
                 lua_pushnil(L);
                 return 1;
             }
-
             lua_pushnumber(L, opt.iDefault);
             return 1;
         }
     }
 
-    // Search alpha (string) options table
-    for (int i = 0; AlphaOptionsTable[i].pName != nullptr; i++) {
-        const tConfigurationAlphaOption& opt = AlphaOptionsTable[i];
-
-        if (normalizedName == opt.pName) {
+    // Search alpha (string) options table (O(1))
+    {
+        auto it = getAlphaOptionMap().find(key);
+        if (it != getAlphaOptionMap().end()) {
+            const tConfigurationAlphaOption& opt = AlphaOptionsTable[it->second];
             if (pDoc->m_CurrentPlugin && (opt.iFlags & OPT_PLUGIN_CANNOT_READ)) {
                 lua_pushnil(L);
                 return 1;
             }
-
             if (opt.sDefault) {
                 lua_pushstring(L, opt.sDefault);
             } else {
@@ -1794,21 +1785,21 @@ int L_GetDefaultValue(lua_State* L)
 int L_GetLoadedValue(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    QString normalizedName = luaCheckQString(L, 1).toLower().trimmed();
+    std::string key = luaCheckQString(L, 1).toLower().trimmed().toStdString();
+    QString normalizedName = QString::fromStdString(key);
 
-    // Search numeric options table first
-    for (int i = 0; OptionsTable[i].pName != nullptr; i++) {
-        const tConfigurationNumericOption& opt = OptionsTable[i];
-
-        if (normalizedName == opt.pName) {
+    // Search numeric options table first (O(1))
+    {
+        auto it = getNumericOptionMap().find(key);
+        if (it != getNumericOptionMap().end()) {
+            const tConfigurationNumericOption& opt = OptionsTable[it->second];
             if (pDoc->m_CurrentPlugin && (opt.iFlags & OPT_PLUGIN_CANNOT_READ)) {
                 lua_pushnil(L);
                 return 1;
             }
-
-            auto it = pDoc->m_loadedNumericOptions.find(normalizedName);
-            if (it != pDoc->m_loadedNumericOptions.end()) {
-                lua_pushnumber(L, it->second);
+            auto loadIt = pDoc->m_loadedNumericOptions.find(normalizedName);
+            if (loadIt != pDoc->m_loadedNumericOptions.end()) {
+                lua_pushnumber(L, loadIt->second);
             } else {
                 // No loaded snapshot available (world not loaded from file)
                 lua_pushnil(L);
@@ -1817,19 +1808,18 @@ int L_GetLoadedValue(lua_State* L)
         }
     }
 
-    // Search alpha (string) options table
-    for (int i = 0; AlphaOptionsTable[i].pName != nullptr; i++) {
-        const tConfigurationAlphaOption& opt = AlphaOptionsTable[i];
-
-        if (normalizedName == opt.pName) {
+    // Search alpha (string) options table (O(1))
+    {
+        auto it = getAlphaOptionMap().find(key);
+        if (it != getAlphaOptionMap().end()) {
+            const tConfigurationAlphaOption& opt = AlphaOptionsTable[it->second];
             if (pDoc->m_CurrentPlugin && (opt.iFlags & OPT_PLUGIN_CANNOT_READ)) {
                 lua_pushnil(L);
                 return 1;
             }
-
-            auto it = pDoc->m_loadedAlphaOptions.find(normalizedName);
-            if (it != pDoc->m_loadedAlphaOptions.end()) {
-                luaPushQString(L, it->second);
+            auto loadIt = pDoc->m_loadedAlphaOptions.find(normalizedName);
+            if (loadIt != pDoc->m_loadedAlphaOptions.end()) {
+                luaPushQString(L, loadIt->second);
             } else {
                 lua_pushnil(L);
             }
@@ -1858,68 +1848,67 @@ int L_SetAlphaOption(lua_State* L)
 
     // Normalize option name: lowercase, trimmed (matches original)
     auto [rawName, strValue] = luaArgs<QString, QString>(L);
-    QString normalizedName = rawName.toLower().trimmed();
+    std::string key = rawName.toLower().trimmed().toStdString();
 
-    // Search alpha (string) options table
-    for (int i = 0; AlphaOptionsTable[i].pName != nullptr; i++) {
-        const tConfigurationAlphaOption& opt = AlphaOptionsTable[i];
+    // Search alpha (string) options table (O(1))
+    auto it = getAlphaOptionMap().find(key);
+    if (it != getAlphaOptionMap().end()) {
+        const tConfigurationAlphaOption& opt = AlphaOptionsTable[it->second];
 
-        if (normalizedName == opt.pName) {
-            // Check if this option can be written at all
-            if (opt.iFlags & OPT_CANNOT_WRITE) {
+        // Check if this option can be written at all
+        if (opt.iFlags & OPT_CANNOT_WRITE) {
+            return luaReturnError(L, eOptionOutOfRange);
+        }
+
+        // Check if plugin is allowed to write this option
+        if (pDoc->m_CurrentPlugin && (opt.iFlags & OPT_PLUGIN_CANNOT_WRITE)) {
+            return luaReturnError(L, ePluginCannotSetOption);
+        }
+
+        // Special validation for command stack character
+        if (opt.iFlags & OPT_COMMAND_STACK) {
+            if (strValue.length() > 1) {
                 return luaReturnError(L, eOptionOutOfRange);
             }
-
-            // Check if plugin is allowed to write this option
-            if (pDoc->m_CurrentPlugin && (opt.iFlags & OPT_PLUGIN_CANNOT_WRITE)) {
-                return luaReturnError(L, ePluginCannotSetOption);
+            if (strValue.isEmpty()) {
+                // Disable command stack
+                pDoc->m_input.enable_command_stack = false;
+                return luaReturnError(L, eOptionOutOfRange);
             }
-
-            // Special validation for command stack character
-            if (opt.iFlags & OPT_COMMAND_STACK) {
-                if (strValue.length() > 1) {
-                    return luaReturnError(L, eOptionOutOfRange);
-                }
-                if (strValue.isEmpty()) {
-                    // Disable command stack
-                    pDoc->m_input.enable_command_stack = false;
-                    return luaReturnError(L, eOptionOutOfRange);
-                }
-                QChar ch = strValue.at(0);
-                if (!ch.isPrint() || ch.isSpace()) {
-                    pDoc->m_input.enable_command_stack = false;
-                    return luaReturnError(L, eOptionOutOfRange);
-                }
+            QChar ch = strValue.at(0);
+            if (!ch.isPrint() || ch.isSpace()) {
+                pDoc->m_input.enable_command_stack = false;
+                return luaReturnError(L, eOptionOutOfRange);
             }
-
-            // Special validation for world ID
-            if (opt.iFlags & OPT_WORLD_ID) {
-                if (!strValue.isEmpty()) {
-                    if (strValue.length() != 24) { // PLUGIN_UNIQUE_ID_LENGTH
-                        return luaReturnError(L, eOptionOutOfRange);
-                    }
-                    // Ensure all hex characters
-                    static QRegularExpression hexRegex("^[0-9a-fA-F]+$");
-                    if (!hexRegex.match(strValue).hasMatch()) {
-                        return luaReturnError(L, eOptionOutOfRange);
-                    }
-                    strValue = strValue.toLower();
-                }
-            }
-
-            // Strip newlines from non-multiline options
-            if (!(opt.iFlags & OPT_MULTLINE)) {
-                strValue.remove('\n');
-                strValue.remove('\r');
-            }
-
-            opt.setter(*pDoc, strValue);
-
-            // TODO(ui): Trigger UI refresh callbacks (view repaint, font reload) when options
-            // change.
-
-            return luaReturnOK(L);
         }
+
+        // Special validation for world ID
+        if (opt.iFlags & OPT_WORLD_ID) {
+            if (!strValue.isEmpty()) {
+                if (strValue.length() != 24) { // PLUGIN_UNIQUE_ID_LENGTH
+                    return luaReturnError(L, eOptionOutOfRange);
+                }
+                // Ensure all hex characters
+                static QRegularExpression hexRegex("^[0-9a-fA-F]+$");
+                if (!hexRegex.match(strValue).hasMatch()) {
+                    return luaReturnError(L, eOptionOutOfRange);
+                }
+                strValue = strValue.toLower();
+            }
+        }
+
+        // Strip newlines from non-multiline options
+        if (!(opt.iFlags & OPT_MULTLINE)) {
+            strValue.remove('\n');
+            strValue.remove('\r');
+        }
+
+        opt.setter(*pDoc, strValue);
+
+        // TODO(ui): Trigger UI refresh callbacks (view repaint, font reload) when options
+        // change.
+
+        return luaReturnOK(L);
     }
 
     // Option not found

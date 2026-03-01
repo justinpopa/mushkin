@@ -11,8 +11,11 @@
 #include "../automation/sendto.h"
 #include "world_document.h"
 #include <QColor>
+#include <algorithm>
 #include <climits>
+#include <string>
 #include <type_traits>
+#include <unordered_map>
 
 // ============================================================================
 // HELPER MACROS FOR TABLE DEFINITIONS
@@ -392,3 +395,35 @@ const tConfigurationAlphaOption AlphaOptionsTable[] = {
 
     {nullptr} // NULL sentinel - end of table marker
 };
+
+// ============================================================================
+// O(1) LOOKUP MAPS
+// ============================================================================
+
+const std::unordered_map<std::string, int>& getNumericOptionMap()
+{
+    static const auto map = []() {
+        std::unordered_map<std::string, int> m;
+        for (int i = 0; OptionsTable[i].pName != nullptr; i++) {
+            std::string key(OptionsTable[i].pName);
+            std::transform(key.begin(), key.end(), key.begin(), ::tolower);
+            m[key] = i;
+        }
+        return m;
+    }();
+    return map;
+}
+
+const std::unordered_map<std::string, int>& getAlphaOptionMap()
+{
+    static const auto map = []() {
+        std::unordered_map<std::string, int> m;
+        for (int i = 0; AlphaOptionsTable[i].pName != nullptr; i++) {
+            std::string key(AlphaOptionsTable[i].pName);
+            std::transform(key.begin(), key.end(), key.begin(), ::tolower);
+            m[key] = i;
+        }
+        return m;
+    }();
+    return map;
+}
