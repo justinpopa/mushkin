@@ -356,7 +356,20 @@ int L_DeleteTrigger(lua_State* L)
     WorldDocument* pDoc = doc(L);
     QString qName = luaCheckQString(L, 1);
 
-    LUA_UNWRAP_VOID(pDoc->deleteTrigger(qName), eTriggerNotFound);
+    Plugin* currentPlugin = plugin(L);
+    if (currentPlugin) {
+        auto it = currentPlugin->m_TriggerMap.find(qName);
+        if (it == currentPlugin->m_TriggerMap.end()) {
+            return luaReturnError(L, eTriggerNotFound);
+        }
+        if (it->second->executing_script) {
+            return luaReturnError(L, eItemInUse);
+        }
+        currentPlugin->m_TriggerMap.erase(it);
+        currentPlugin->m_triggersNeedSorting = true;
+    } else {
+        LUA_UNWRAP_VOID(pDoc->deleteTrigger(qName), eTriggerNotFound);
+    }
 
     return luaReturnOK(L);
 }
@@ -383,9 +396,8 @@ int L_DeleteTrigger(lua_State* L)
  */
 int L_IsTrigger(lua_State* L)
 {
-    WorldDocument* pDoc = doc(L);
     QString qName = luaCheckQString(L, 1);
-    Trigger* trigger = pDoc->getTrigger(qName);
+    Trigger* trigger = findTrigger(L, qName);
 
     lua_pushnumber(L, trigger ? eOK : eTriggerNotFound);
     return 1;
@@ -420,9 +432,8 @@ int L_IsTrigger(lua_State* L)
  */
 int L_GetTrigger(lua_State* L)
 {
-    WorldDocument* pDoc = doc(L);
     QString qName = luaCheckQString(L, 1);
-    Trigger* trigger = pDoc->getTrigger(qName);
+    Trigger* trigger = findTrigger(L, qName);
 
     if (!trigger) {
         return luaReturnError(L, eTriggerNotFound);
@@ -477,10 +488,9 @@ int L_GetTrigger(lua_State* L)
  */
 int L_EnableTrigger(lua_State* L)
 {
-    WorldDocument* pDoc = doc(L);
     QString qName = luaCheckQString(L, 1);
     bool enabled = lua_toboolean(L, 2);
-    Trigger* trigger = pDoc->getTrigger(qName);
+    Trigger* trigger = findTrigger(L, qName);
 
     if (!trigger) {
         return luaReturnError(L, eTriggerNotFound);
@@ -592,9 +602,17 @@ int L_GetTriggerList(lua_State* L)
 
     lua_newtable(L);
     int i = 1;
-    for (const auto& [name, triggerPtr] : pDoc->m_automationRegistry->m_TriggerMap) {
-        luaPushQString(L, name);
-        lua_rawseti(L, -2, i++);
+    Plugin* currentPlugin = plugin(L);
+    if (currentPlugin) {
+        for (const auto& [name, triggerPtr] : currentPlugin->m_TriggerMap) {
+            luaPushQString(L, name);
+            lua_rawseti(L, -2, i++);
+        }
+    } else {
+        for (const auto& [name, triggerPtr] : pDoc->m_automationRegistry->m_TriggerMap) {
+            luaPushQString(L, name);
+            lua_rawseti(L, -2, i++);
+        }
     }
 
     return 1;
@@ -834,18 +852,19 @@ int L_EnableTriggerGroup(lua_State* L)
 
     long count = 0;
 
-    // Iterate through all triggers
-    for (const auto& [name, triggerPtr] : pDoc->m_automationRegistry->m_TriggerMap) {
-        Trigger* trigger = triggerPtr.get();
-        if (trigger && trigger->group == qGroupName) {
-            trigger->enabled = enabled;
-            count++;
+    Plugin* currentPlugin = plugin(L);
+    if (currentPlugin) {
+        // Plugin context: only iterate plugin's trigger map
+        for (const auto& [name, triggerPtr] : currentPlugin->m_TriggerMap) {
+            Trigger* trigger = triggerPtr.get();
+            if (trigger && trigger->group == qGroupName) {
+                trigger->enabled = enabled;
+                count++;
+            }
         }
-    }
-
-    // If in plugin context, also check plugin triggers
-    if (pDoc->m_CurrentPlugin) {
-        for (const auto& [name, triggerPtr] : pDoc->m_CurrentPlugin->m_TriggerMap) {
+    } else {
+        // World context: iterate world-level trigger map
+        for (const auto& [name, triggerPtr] : pDoc->m_automationRegistry->m_TriggerMap) {
             Trigger* trigger = triggerPtr.get();
             if (trigger && trigger->group == qGroupName) {
                 trigger->enabled = enabled;
@@ -891,11 +910,10 @@ int L_EnableTriggerGroup(lua_State* L)
  */
 int L_GetTriggerOption(lua_State* L)
 {
-    WorldDocument* pDoc = doc(L);
     QString qName = luaCheckQString(L, 1);
     QString qOption = luaCheckQString(L, 2).toLower().trimmed();
 
-    Trigger* trigger = pDoc->getTrigger(qName);
+    Trigger* trigger = findTrigger(L, qName);
     if (!trigger) {
         lua_pushnil(L);
         return 1;
@@ -1016,7 +1034,8 @@ int L_SetTriggerOption(lua_State* L)
     QString qName = luaCheckQString(L, 1);
     QString qOption = luaCheckQString(L, 2).toLower().trimmed();
 
-    Trigger* trigger = pDoc->getTrigger(qName);
+    Plugin* currentPlugin = plugin(L);
+    Trigger* trigger = findTrigger(L, qName);
     if (!trigger) {
         return luaReturnError(L, eTriggerNotFound);
     }
@@ -1049,7 +1068,11 @@ int L_SetTriggerOption(lua_State* L)
             trigger->send_to = static_cast<SendTo>(value);
         } else if (qOption == "sequence") {
             trigger->sequence = value;
-            pDoc->m_automationRegistry->m_triggersNeedSorting = true;
+            if (currentPlugin) {
+                currentPlugin->m_triggersNeedSorting = true;
+            } else {
+                pDoc->m_automationRegistry->m_triggersNeedSorting = true;
+            }
         } else if (qOption == "user") {
             trigger->user_option = value;
         }
@@ -1293,16 +1316,32 @@ int L_DeleteTriggerGroup(lua_State* L)
     QString qGroupName = luaCheckQString(L, 1);
     QStringList toDelete;
 
-    // Find all triggers in this group
-    for (const auto& [name, triggerPtr] : pDoc->m_automationRegistry->m_TriggerMap) {
-        if (triggerPtr->group == qGroupName) {
-            toDelete.append(name);
+    Plugin* currentPlugin = plugin(L);
+    if (currentPlugin) {
+        // Find all triggers in this group within the plugin map
+        for (const auto& [name, triggerPtr] : currentPlugin->m_TriggerMap) {
+            if (triggerPtr->group == qGroupName) {
+                toDelete.append(name);
+            }
         }
-    }
-
-    // Delete them
-    for (const QString& name : toDelete) {
-        (void)pDoc->deleteTrigger(name); // intentional: bulk group/temporary delete
+        // Delete them from the plugin map
+        for (const QString& name : toDelete) {
+            currentPlugin->m_TriggerMap.erase(name);
+        }
+        if (!toDelete.isEmpty()) {
+            currentPlugin->m_triggersNeedSorting = true;
+        }
+    } else {
+        // Find all triggers in this group within the world map
+        for (const auto& [name, triggerPtr] : pDoc->m_automationRegistry->m_TriggerMap) {
+            if (triggerPtr->group == qGroupName) {
+                toDelete.append(name);
+            }
+        }
+        // Delete them
+        for (const QString& name : toDelete) {
+            (void)pDoc->deleteTrigger(name); // intentional: bulk group/temporary delete
+        }
     }
 
     lua_pushnumber(L, toDelete.size());
@@ -1330,16 +1369,32 @@ int L_DeleteTemporaryTriggers(lua_State* L)
     WorldDocument* pDoc = doc(L);
     QStringList toDelete;
 
-    // Find all temporary triggers
-    for (const auto& [name, triggerPtr] : pDoc->m_automationRegistry->m_TriggerMap) {
-        if (triggerPtr->temporary) {
-            toDelete.append(name);
+    Plugin* currentPlugin = plugin(L);
+    if (currentPlugin) {
+        // Find all temporary triggers in the plugin map
+        for (const auto& [name, triggerPtr] : currentPlugin->m_TriggerMap) {
+            if (triggerPtr->temporary) {
+                toDelete.append(name);
+            }
         }
-    }
-
-    // Delete them
-    for (const QString& name : toDelete) {
-        (void)pDoc->deleteTrigger(name); // intentional: bulk group/temporary delete
+        // Delete them from the plugin map
+        for (const QString& name : toDelete) {
+            currentPlugin->m_TriggerMap.erase(name);
+        }
+        if (!toDelete.isEmpty()) {
+            currentPlugin->m_triggersNeedSorting = true;
+        }
+    } else {
+        // Find all temporary triggers in the world map
+        for (const auto& [name, triggerPtr] : pDoc->m_automationRegistry->m_TriggerMap) {
+            if (triggerPtr->temporary) {
+                toDelete.append(name);
+            }
+        }
+        // Delete them
+        for (const QString& name : toDelete) {
+            (void)pDoc->deleteTrigger(name); // intentional: bulk group/temporary delete
+        }
     }
 
     lua_pushnumber(L, toDelete.size());

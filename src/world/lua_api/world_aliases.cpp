@@ -339,7 +339,20 @@ int L_DeleteAlias(lua_State* L)
 
     QString qName = luaCheckQString(L, 1);
 
-    LUA_UNWRAP_VOID(pDoc->deleteAlias(qName), eAliasNotFound);
+    Plugin* currentPlugin = plugin(L);
+    if (currentPlugin) {
+        auto it = currentPlugin->m_AliasMap.find(qName);
+        if (it == currentPlugin->m_AliasMap.end()) {
+            return luaReturnError(L, eAliasNotFound);
+        }
+        if (it->second->executing_script) {
+            return luaReturnError(L, eItemInUse);
+        }
+        currentPlugin->m_AliasMap.erase(it);
+        currentPlugin->m_aliasesNeedSorting = true;
+    } else {
+        LUA_UNWRAP_VOID(pDoc->deleteAlias(qName), eAliasNotFound);
+    }
 
     return luaReturnOK(L);
 }
@@ -366,10 +379,8 @@ int L_DeleteAlias(lua_State* L)
  */
 int L_IsAlias(lua_State* L)
 {
-    WorldDocument* pDoc = doc(L);
-
     QString qName = luaCheckQString(L, 1);
-    Alias* alias = pDoc->getAlias(qName);
+    Alias* alias = findAlias(L, qName);
 
     lua_pushnumber(L, alias ? eOK : eAliasNotFound);
     return 1;
@@ -401,10 +412,8 @@ int L_IsAlias(lua_State* L)
  */
 int L_GetAlias(lua_State* L)
 {
-    WorldDocument* pDoc = doc(L);
-
     QString qName = luaCheckQString(L, 1);
-    Alias* alias = pDoc->getAlias(qName);
+    Alias* alias = findAlias(L, qName);
 
     if (!alias) {
         return luaReturnError(L, eAliasNotFound);
@@ -458,11 +467,10 @@ int L_GetAlias(lua_State* L)
  */
 int L_EnableAlias(lua_State* L)
 {
-    WorldDocument* pDoc = doc(L);
     bool enabled = lua_toboolean(L, 2);
 
     QString qName = luaCheckQString(L, 1);
-    Alias* alias = pDoc->getAlias(qName);
+    Alias* alias = findAlias(L, qName);
 
     if (!alias) {
         return luaReturnError(L, eAliasNotFound);
@@ -567,9 +575,17 @@ int L_GetAliasList(lua_State* L)
 
     lua_newtable(L);
     int i = 1;
-    for (const auto& [name, aliasPtr] : pDoc->m_automationRegistry->m_AliasMap) {
-        luaPushQString(L, name);
-        lua_rawseti(L, -2, i++);
+    Plugin* currentPlugin = plugin(L);
+    if (currentPlugin) {
+        for (const auto& [name, aliasPtr] : currentPlugin->m_AliasMap) {
+            luaPushQString(L, name);
+            lua_rawseti(L, -2, i++);
+        }
+    } else {
+        for (const auto& [name, aliasPtr] : pDoc->m_automationRegistry->m_AliasMap) {
+            luaPushQString(L, name);
+            lua_rawseti(L, -2, i++);
+        }
     }
 
     return 1;
@@ -764,12 +780,10 @@ int L_GetPluginAliasOption(lua_State* L)
  */
 int L_GetAliasOption(lua_State* L)
 {
-    WorldDocument* pDoc = doc(L);
-
     QString qName = luaCheckQString(L, 1);
     QString qOption = luaCheckQString(L, 2).toLower().trimmed();
 
-    Alias* alias = pDoc->getAlias(qName);
+    Alias* alias = findAlias(L, qName);
     if (!alias) {
         lua_pushnil(L);
         return 1;
@@ -868,7 +882,8 @@ int L_SetAliasOption(lua_State* L)
     QString qName = luaCheckQString(L, 1);
     QString qOption = luaCheckQString(L, 2).toLower().trimmed();
 
-    Alias* alias = pDoc->getAlias(qName);
+    Plugin* currentPlugin = plugin(L);
+    Alias* alias = findAlias(L, qName);
     if (!alias) {
         return luaReturnError(L, eAliasNotFound);
     }
@@ -881,7 +896,11 @@ int L_SetAliasOption(lua_State* L)
             alias->send_to = static_cast<SendTo>(value);
         } else if (qOption == "sequence") {
             alias->sequence = value;
-            pDoc->m_automationRegistry->m_aliasesNeedSorting = true;
+            if (currentPlugin) {
+                currentPlugin->m_aliasesNeedSorting = true;
+            } else {
+                pDoc->m_automationRegistry->m_aliasesNeedSorting = true;
+            }
         } else if (qOption == "user") {
             alias->user_option = value;
         }
@@ -978,12 +997,24 @@ int L_EnableAliasGroup(lua_State* L)
     QString qGroupName = luaCheckQString(L, 1);
     int count = 0;
 
-    // Iterate through all aliases
-    for (const auto& [name, aliasPtr] : pDoc->m_automationRegistry->m_AliasMap) {
-        Alias* alias = aliasPtr.get();
-        if (alias->group == qGroupName) {
-            alias->enabled = enabled;
-            count++;
+    Plugin* currentPlugin = plugin(L);
+    if (currentPlugin) {
+        // Plugin context: only iterate plugin's alias map
+        for (const auto& [name, aliasPtr] : currentPlugin->m_AliasMap) {
+            Alias* alias = aliasPtr.get();
+            if (alias->group == qGroupName) {
+                alias->enabled = enabled;
+                count++;
+            }
+        }
+    } else {
+        // World context: iterate world-level alias map
+        for (const auto& [name, aliasPtr] : pDoc->m_automationRegistry->m_AliasMap) {
+            Alias* alias = aliasPtr.get();
+            if (alias->group == qGroupName) {
+                alias->enabled = enabled;
+                count++;
+            }
         }
     }
 
@@ -1014,16 +1045,32 @@ int L_DeleteAliasGroup(lua_State* L)
     QString qGroupName = luaCheckQString(L, 1);
     QStringList toDelete;
 
-    // Find all aliases in this group
-    for (const auto& [name, aliasPtr] : pDoc->m_automationRegistry->m_AliasMap) {
-        if (aliasPtr->group == qGroupName) {
-            toDelete.append(name);
+    Plugin* currentPlugin = plugin(L);
+    if (currentPlugin) {
+        // Find all aliases in this group within the plugin map
+        for (const auto& [name, aliasPtr] : currentPlugin->m_AliasMap) {
+            if (aliasPtr->group == qGroupName) {
+                toDelete.append(name);
+            }
         }
-    }
-
-    // Delete them
-    for (const QString& name : toDelete) {
-        (void)pDoc->deleteAlias(name); // intentional: bulk group/temporary delete
+        // Delete them from the plugin map
+        for (const QString& name : toDelete) {
+            currentPlugin->m_AliasMap.erase(name);
+        }
+        if (!toDelete.isEmpty()) {
+            currentPlugin->m_aliasesNeedSorting = true;
+        }
+    } else {
+        // Find all aliases in this group within the world map
+        for (const auto& [name, aliasPtr] : pDoc->m_automationRegistry->m_AliasMap) {
+            if (aliasPtr->group == qGroupName) {
+                toDelete.append(name);
+            }
+        }
+        // Delete them
+        for (const QString& name : toDelete) {
+            (void)pDoc->deleteAlias(name); // intentional: bulk group/temporary delete
+        }
     }
 
     lua_pushnumber(L, toDelete.size());
@@ -1051,16 +1098,32 @@ int L_DeleteTemporaryAliases(lua_State* L)
     WorldDocument* pDoc = doc(L);
     QStringList toDelete;
 
-    // Find all temporary aliases
-    for (const auto& [name, aliasPtr] : pDoc->m_automationRegistry->m_AliasMap) {
-        if (aliasPtr->temporary) {
-            toDelete.append(name);
+    Plugin* currentPlugin = plugin(L);
+    if (currentPlugin) {
+        // Find all temporary aliases in the plugin map
+        for (const auto& [name, aliasPtr] : currentPlugin->m_AliasMap) {
+            if (aliasPtr->temporary) {
+                toDelete.append(name);
+            }
         }
-    }
-
-    // Delete them
-    for (const QString& name : toDelete) {
-        (void)pDoc->deleteAlias(name); // intentional: bulk group/temporary delete
+        // Delete them from the plugin map
+        for (const QString& name : toDelete) {
+            currentPlugin->m_AliasMap.erase(name);
+        }
+        if (!toDelete.isEmpty()) {
+            currentPlugin->m_aliasesNeedSorting = true;
+        }
+    } else {
+        // Find all temporary aliases in the world map
+        for (const auto& [name, aliasPtr] : pDoc->m_automationRegistry->m_AliasMap) {
+            if (aliasPtr->temporary) {
+                toDelete.append(name);
+            }
+        }
+        // Delete them
+        for (const QString& name : toDelete) {
+            (void)pDoc->deleteAlias(name); // intentional: bulk group/temporary delete
+        }
     }
 
     lua_pushnumber(L, toDelete.size());

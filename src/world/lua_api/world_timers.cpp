@@ -612,9 +612,17 @@ int L_GetTimerList(lua_State* L)
 
     lua_newtable(L);
     int i = 1;
-    for (const auto& [name, timer] : pDoc->m_automationRegistry->m_TimerMap) {
-        luaPushQString(L, name);
-        lua_rawseti(L, -2, i++);
+    Plugin* currentPlugin = plugin(L);
+    if (currentPlugin) {
+        for (const auto& [name, timerPtr] : currentPlugin->m_TimerMap) {
+            luaPushQString(L, name);
+            lua_rawseti(L, -2, i++);
+        }
+    } else {
+        for (const auto& [name, timer] : pDoc->m_automationRegistry->m_TimerMap) {
+            luaPushQString(L, name);
+            lua_rawseti(L, -2, i++);
+        }
     }
 
     return 1;
@@ -685,9 +693,17 @@ int L_ResetTimers(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    // Iterate through all timers and reset each one
-    for (const auto& [name, timer] : pDoc->m_automationRegistry->m_TimerMap) {
-        pDoc->calculateNextFireTime(timer.get());
+    Plugin* currentPlugin = plugin(L);
+    if (currentPlugin) {
+        // Plugin context: reset all timers in the plugin's map
+        for (const auto& [name, timerPtr] : currentPlugin->m_TimerMap) {
+            pDoc->calculateNextFireTime(timerPtr.get());
+        }
+    } else {
+        // World context: iterate through all world-level timers and reset each one
+        for (const auto& [name, timer] : pDoc->m_automationRegistry->m_TimerMap) {
+            pDoc->calculateNextFireTime(timer.get());
+        }
     }
 
     return 0;
@@ -973,12 +989,24 @@ int L_EnableTimerGroup(lua_State* L)
     bool enabled = lua_toboolean(L, 2);
     int count = 0;
 
-    // Iterate through all timers
-    for (const auto& [name, timerPtr] : pDoc->m_automationRegistry->m_TimerMap) {
-        Timer* timer = timerPtr.get();
-        if (timer->group == qGroupName) {
-            timer->enabled = enabled;
-            count++;
+    Plugin* currentPlugin = plugin(L);
+    if (currentPlugin) {
+        // Plugin context: only iterate plugin's timer map
+        for (const auto& [name, timerPtr] : currentPlugin->m_TimerMap) {
+            Timer* timer = timerPtr.get();
+            if (timer->group == qGroupName) {
+                timer->enabled = enabled;
+                count++;
+            }
+        }
+    } else {
+        // World context: iterate world-level timer map
+        for (const auto& [name, timerPtr] : pDoc->m_automationRegistry->m_TimerMap) {
+            Timer* timer = timerPtr.get();
+            if (timer->group == qGroupName) {
+                timer->enabled = enabled;
+                count++;
+            }
         }
     }
 
@@ -1009,16 +1037,33 @@ int L_DeleteTimerGroup(lua_State* L)
     QString qGroupName = luaCheckQString(L, 1);
     QStringList toDelete;
 
-    // Find all timers in this group
-    for (const auto& [name, timerPtr] : pDoc->m_automationRegistry->m_TimerMap) {
-        if (timerPtr->group == qGroupName) {
-            toDelete.append(name);
+    Plugin* currentPlugin = plugin(L);
+    if (currentPlugin) {
+        // Find all timers in this group within the plugin map
+        for (const auto& [name, timerPtr] : currentPlugin->m_TimerMap) {
+            if (timerPtr->group == qGroupName) {
+                toDelete.append(name);
+            }
         }
-    }
-
-    // Delete them
-    for (const QString& name : toDelete) {
-        (void)pDoc->deleteTimer(name); // intentional: bulk group/temporary delete
+        // Delete them from the plugin map (also clean reverse map)
+        for (const QString& name : toDelete) {
+            auto it = currentPlugin->m_TimerMap.find(name);
+            if (it != currentPlugin->m_TimerMap.end()) {
+                currentPlugin->m_TimerRevMap.remove(it->second.get());
+                currentPlugin->m_TimerMap.erase(it);
+            }
+        }
+    } else {
+        // Find all timers in this group within the world map
+        for (const auto& [name, timerPtr] : pDoc->m_automationRegistry->m_TimerMap) {
+            if (timerPtr->group == qGroupName) {
+                toDelete.append(name);
+            }
+        }
+        // Delete them
+        for (const QString& name : toDelete) {
+            (void)pDoc->deleteTimer(name); // intentional: bulk group/temporary delete
+        }
     }
 
     lua_pushnumber(L, toDelete.size());
@@ -1046,16 +1091,33 @@ int L_DeleteTemporaryTimers(lua_State* L)
     WorldDocument* pDoc = doc(L);
     QStringList toDelete;
 
-    // Find all temporary timers
-    for (const auto& [name, timerPtr] : pDoc->m_automationRegistry->m_TimerMap) {
-        if (timerPtr->temporary) {
-            toDelete.append(name);
+    Plugin* currentPlugin = plugin(L);
+    if (currentPlugin) {
+        // Find all temporary timers in the plugin map
+        for (const auto& [name, timerPtr] : currentPlugin->m_TimerMap) {
+            if (timerPtr->temporary) {
+                toDelete.append(name);
+            }
         }
-    }
-
-    // Delete them
-    for (const QString& name : toDelete) {
-        (void)pDoc->deleteTimer(name); // intentional: bulk group/temporary delete
+        // Delete them from the plugin map (also clean reverse map)
+        for (const QString& name : toDelete) {
+            auto it = currentPlugin->m_TimerMap.find(name);
+            if (it != currentPlugin->m_TimerMap.end()) {
+                currentPlugin->m_TimerRevMap.remove(it->second.get());
+                currentPlugin->m_TimerMap.erase(it);
+            }
+        }
+    } else {
+        // Find all temporary timers in the world map
+        for (const auto& [name, timerPtr] : pDoc->m_automationRegistry->m_TimerMap) {
+            if (timerPtr->temporary) {
+                toDelete.append(name);
+            }
+        }
+        // Delete them
+        for (const QString& name : toDelete) {
+            (void)pDoc->deleteTimer(name); // intentional: bulk group/temporary delete
+        }
     }
 
     lua_pushnumber(L, toDelete.size());
