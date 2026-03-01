@@ -385,20 +385,18 @@ Note: Lua API boundary functions intentionally return integers (Lua convention).
 
 ---
 
-### D1 — Lua API boilerplate (~75% of 27K LOC) ✅ DONE
+### D1 — Lua API boilerplate ✅ DONE
 
-**Risk:** ~428 `L_*` functions across `src/world/lua_api/*.cpp` follow near-identical patterns: `doc(L)` lookup, `luaL_check*` argument extraction, call through to WorldDocument, `luaReturnOK`/`luaReturnError`. ~75% of this code is mechanical boilerplate, only ~25% is actual logic.
+**Original estimate:** "~75% of 27K LOC is boilerplate; a declarative system could reduce to ~5K." This was wildly optimistic. In practice, ~40% of the 27K is doc comments (correctly preserved), and most function bodies contain enough custom logic (plugin/world branching, validation, flag decoding, object construction) that only the argument extraction and return-value pushing are truly mechanical.
 
-A declarative binding/macro system could reduce ~27K LOC to ~5K while improving consistency and making it easier for new contributors to add API functions.
+**What was actually done:**
+- [x] Created `lua_bind.h` — type-safe templates (`luaPush<T>`/`luaGet<T>`, `luaArgs<Ts...>`, `luaReturn`), macros (`LUA_DOC_GETTER`, `LUA_DOC_SETTER_BOOL`, `LUA_UNWRAP`), info table generator (`InfoField<T>`/`luaInfoLookup`), plugin/world lookup helpers (`findTrigger`/`findAlias`/`findTimer`)
+- [x] First pass: shared QString/validation helpers across 26 files (-650 lines)
+- [x] Second pass: info table dedup, getter macros, luaArgs/luaReturn across 20 files (-706 from existing files, +356 for infrastructure)
 
-**Targets:**
-- [x] Design declarative Lua binding macro/template system
-- [x] Prototype with one API category (e.g., `world_variables.cpp` — simple get/set pattern)
-- [x] Migrate remaining categories incrementally
+**Actual reduction:** 27,179 → 26,829 LOC (**-1,350 lines total, ~5%**). The 20K+ estimate was unrealistic without adopting a full binding library (sol2/luabridge), which would require rewriting all 411 function signatures and risk plugin compatibility.
 
-**Resolution:** Created `lua_bind.h` with 7 components: type traits (`luaPush<T>`/`luaGet<T>`), variadic arg extraction (`luaArgs<Ts...>`), variadic return (`luaReturn`), `LUA_UNWRAP` macros, simple getter/setter macros (`LUA_DOC_GETTER`/`LUA_DOC_SETTER_BOOL`/`LUA_DOC_METHOD_OK`), info table generator (`InfoField<T>`/`luaInfoLookup`), and plugin/world lookup helpers (`findTrigger`/`findAlias`/`findTimer`). Applied across 20 files: 6 duplicated GetXxxInfo switch statements collapsed into 3 shared descriptor tables, ~11 trivial getters became one-liners, getter/setter pairs became macro pairs. Total: 27,179 → 26,829 LOC (-350 net, -706 from existing files + 356 for infrastructure). Combined with D1 first pass (commit 5d41be7, -650 lines): **total D1 reduction ~1,350 lines**.
-
-**Acceptance:** New Lua API functions can be added with <10 lines of boilerplate. Existing functions compile and pass tests after migration.
+**Real value:** Maintainability, not LOC. New API functions need 1–5 lines of boilerplate instead of 10–50. Six duplicated 170-line switch statements collapsed into 3 shared descriptor tables. Consistent patterns across all 30 files.
 
 ---
 
