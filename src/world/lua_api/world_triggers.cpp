@@ -327,9 +327,7 @@ int L_AddTrigger(lua_State* L)
             currentPlugin->m_TriggerArray.push_back(t.get());
         }
     } else {
-        if (!pDoc->addTrigger(qName, std::move(trigger)).has_value()) {
-            return luaReturnError(L, eTriggerAlreadyExists);
-        }
+        LUA_UNWRAP_VOID(pDoc->addTrigger(qName, std::move(trigger)), eTriggerAlreadyExists);
     }
 
     return luaReturnOK(L);
@@ -1253,11 +1251,8 @@ int L_AddTriggerEx(lua_State* L)
     trigger->sequence = sequence;
     trigger->variable = qName; // kludge from original
 
-    // Compile regexp
-    if (!trigger->compileRegexp().has_value()) {
-        // unique_ptr will automatically delete on scope exit
-        return luaReturnError(L, eBadRegularExpression);
-    }
+    // Compile regexp (unique_ptr will automatically delete on scope exit if this fails)
+    LUA_UNWRAP_VOID(trigger->compileRegexp(), eBadRegularExpression);
 
     // Add to appropriate trigger map (plugin or world)
     if (currentPlugin) {
@@ -1269,9 +1264,7 @@ int L_AddTriggerEx(lua_State* L)
             currentPlugin->m_TriggerArray.push_back(t.get());
         }
     } else {
-        if (!pDoc->addTrigger(qName, std::move(trigger)).has_value()) {
-            return luaReturnError(L, eTriggerAlreadyExists);
-        }
+        LUA_UNWRAP_VOID(pDoc->addTrigger(qName, std::move(trigger)), eTriggerAlreadyExists);
     }
 
     return luaReturnOK(L);

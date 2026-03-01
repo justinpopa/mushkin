@@ -444,7 +444,7 @@ Consolidating to fewer binaries with shared test fixtures would reduce build tim
 
 ---
 
-### D5 — Repeated `std::expected` error handling in Lua API [MEDIUM]
+### D5 — Repeated `std::expected` error handling in Lua API [MEDIUM] ✅
 
 **Risk:** Every `L_*` function that calls an `std::expected`-returning method repeats the same unwrap-and-return pattern:
 ```cpp
@@ -455,8 +455,8 @@ if (!result) return luaReturnError(L, result.error().message());
 A helper macro or function could reduce this to a single line.
 
 **Targets:**
-- [ ] Create `luaUnwrapOrReturn(L, expr)` macro/helper
-- [ ] Apply to existing `L_*` functions opportunistically
+- [x] Create `luaUnwrapOrReturn(L, expr)` macro/helper — `LUA_UNWRAP` and `LUA_UNWRAP_VOID` in `lua_bind.h`
+- [x] Apply to existing `L_*` functions opportunistically — all 12 call sites converted
 
 **Acceptance:** Common unwrap pattern has a reusable helper. Build + test pass.
 

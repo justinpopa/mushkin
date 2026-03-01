@@ -309,9 +309,7 @@ int L_AddAlias(lua_State* L)
             currentPlugin->m_AliasArray.push_back(a.get());
         }
     } else {
-        if (!pDoc->addAlias(qName, std::move(alias)).has_value()) {
-            return luaReturnError(L, eAliasAlreadyExists);
-        }
+        LUA_UNWRAP_VOID(pDoc->addAlias(qName, std::move(alias)), eAliasAlreadyExists);
     }
 
     return luaReturnOK(L);

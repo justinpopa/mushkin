@@ -317,11 +317,8 @@ int L_AddTimer(lua_State* L)
         currentPlugin->m_TimerRevMap[rawTimer] = qName;
         // Fire time already calculated above when timer was created
     } else {
-        // Add to world's timer map
-        if (!pDoc->addTimer(qName, std::move(timer)).has_value()) {
-            // addTimer fails if timer already exists (shouldn't happen - we checked above)
-            return luaReturnError(L, eTimerAlreadyExists);
-        }
+        // Add to world's timer map (shouldn't fail - we checked above)
+        LUA_UNWRAP_VOID(pDoc->addTimer(qName, std::move(timer)), eTimerAlreadyExists);
     }
 
     return luaReturnOK(L);
@@ -750,9 +747,7 @@ int L_DoAfter(lua_State* L)
     timer->send_to = eSendToWorld;
 
     // Add to document (transfer ownership)
-    if (!pDoc->addTimer(name, std::move(timer)).has_value()) {
-        return luaReturnError(L, eTimerAlreadyExists);
-    }
+    LUA_UNWRAP_VOID(pDoc->addTimer(name, std::move(timer)), eTimerAlreadyExists);
 
     return luaReturnOK(L);
 }
@@ -839,9 +834,7 @@ int L_DoAfterSpecial(lua_State* L)
         // Initialize fire time for plugin timer
         pDoc->resetOneTimer(rawTimer);
     } else {
-        if (!pDoc->addTimer(name, std::move(timer)).has_value()) {
-            return luaReturnError(L, eTimerAlreadyExists);
-        }
+        LUA_UNWRAP_VOID(pDoc->addTimer(name, std::move(timer)), eTimerAlreadyExists);
     }
 
     return luaReturnOK(L);
@@ -950,9 +943,7 @@ int L_DoAfterSpeedWalk(lua_State* L)
     timer->active_when_closed = true;
     timer->send_to = eSendToSpeedwalk;
 
-    if (!pDoc->addTimer(name, std::move(timer)).has_value()) {
-        return luaReturnError(L, eTimerAlreadyExists);
-    }
+    LUA_UNWRAP_VOID(pDoc->addTimer(name, std::move(timer)), eTimerAlreadyExists);
 
     return luaReturnOK(L);
 }
