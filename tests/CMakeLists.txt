@@ -864,3 +864,34 @@ target_link_libraries(test-ssh-host-key-gtest PRIVATE
 gtest_discover_tests(test-ssh-host-key-gtest
     DISCOVERY_TIMEOUT 30
 )
+
+add_executable(test-telnet-parser-gtest
+    test_telnet_parser_gtest.cpp
+)
+
+target_link_libraries(test-telnet-parser-gtest PRIVATE
+    test_main_core
+    Qt6::Gui
+    Qt6::Widgets
+    ui
+)
+
+gtest_discover_tests(test-telnet-parser-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
+# World serialization test
+add_executable(test-world-serialization-gtest
+    test_world_serialization_gtest.cpp
+)
+
+target_link_libraries(test-world-serialization-gtest PRIVATE
+    test_main_core
+    Qt6::Gui
+    Qt6::Widgets
+    ui
+)
+
+gtest_discover_tests(test-world-serialization-gtest
+    DISCOVERY_TIMEOUT 30
+)

@@ -207,6 +207,11 @@ bool AcceleratorManager::parseKeyString(const QString& keyString, QKeySequence& 
                 return false; // Duplicate modifier
             }
             modifiers |= Qt::MetaModifier;
+        } else if (upper == "NUM" || upper == "NUMPAD" || upper == "KP") {
+            if (modifiers & Qt::KeypadModifier) {
+                return false; // Duplicate modifier
+            }
+            modifiers |= Qt::KeypadModifier;
         } else {
             // Must be the key itself
             if (key != Qt::Key_unknown) {
