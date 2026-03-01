@@ -505,13 +505,23 @@ void TelnetParser::Phase_SB(unsigned char c)
 
 /**
  * Phase_SUBNEGOTIATION - Collect subnegotiation data
+ *
+ * Security: cap buffer at 8KB to prevent OOM from malicious servers
+ * sending unbounded data without IAC SE.
  */
 void TelnetParser::Phase_SUBNEGOTIATION(unsigned char c)
 {
     if (c == IAC) {
         m_phase = Phase::HAVE_SUBNEGOTIATION_IAC;
     } else {
-        m_IAC_subnegotiation_data.append(c);
+        constexpr int kMaxSubnegotiationSize = 8192;
+        if (m_IAC_subnegotiation_data.size() < kMaxSubnegotiationSize) {
+            m_IAC_subnegotiation_data.append(c);
+        } else {
+            // Buffer full — discard subnegotiation and reset
+            m_IAC_subnegotiation_data.clear();
+            m_phase = Phase::NONE;
+        }
     }
 }
 

@@ -1736,6 +1736,13 @@ void WorldDocument::AddToLine(const char* sText, int iLength)
         return;
     }
 
+    // Security: force a line break if the line exceeds 1MB to prevent
+    // OOM from servers sending continuous data without newlines.
+    constexpr qint32 kMaxLineLength = 1024 * 1024;
+    if (m_currentLine->len() + iLength > kMaxLineLength) {
+        StartNewLine(false, 0); // soft break (not a real MUD newline)
+    }
+
     // Style coalescing: Check if we can extend the last style instead of creating new one
     Style* lastStyle = nullptr;
     if (!m_currentLine->styleList.empty()) {

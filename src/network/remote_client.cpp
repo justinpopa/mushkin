@@ -141,6 +141,15 @@ void RemoteClient::processInput(const QByteArray& data)
 {
     m_inputBuffer.append(QString::fromUtf8(data));
 
+    // Security: cap input buffer to prevent OOM from clients sending
+    // continuous data without newlines (can happen pre-authentication).
+    constexpr int kMaxInputBuffer = 4096;
+    if (m_inputBuffer.size() > kMaxInputBuffer) {
+        sendRawText("\r\nInput too long. Disconnecting.\r\n");
+        disconnect();
+        return;
+    }
+
     // Process complete lines (telnet sends \r\n, some clients send just \n)
     int nlPos;
     while ((nlPos = m_inputBuffer.indexOf('\n')) != -1) {

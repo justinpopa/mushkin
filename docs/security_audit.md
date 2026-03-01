@@ -43,7 +43,7 @@ m_IAC_subnegotiation_data.append(c);
 **Attack scenario:** A malicious MUD server sends `IAC SB <type>` followed by gigabytes of data without ever sending `IAC SE`. The buffer grows until OOM.
 
 **Recommended fix:**
-- [ ] Add a size limit (e.g., 8KB) to `Phase_SUBNEGOTIATION`; abort and reset if exceeded
+- [x] Add a size limit (8KB) to `Phase_SUBNEGOTIATION`; abort and reset if exceeded
 
 ---
 
@@ -55,7 +55,7 @@ m_IAC_subnegotiation_data.append(c);
 **Attack scenario:** Malicious server sends megabytes of text without `\n`. The line buffer grows until OOM.
 
 **Recommended fix:**
-- [ ] Force a line break after a configurable maximum (e.g., 64KB or 1MB)
+- [x] Force a line break after 1MB maximum
 
 ---
 
@@ -72,7 +72,7 @@ An unauthenticated client can send data without newlines, growing the buffer ind
 **Attack scenario:** Attacker connects to the remote access port and streams data without `\n`. No authentication required — the buffer grows during the `AwaitingPassword` state. OOM crash.
 
 **Recommended fix:**
-- [ ] Limit `m_inputBuffer` to ~4KB; disconnect client if exceeded
+- [x] Limit `m_inputBuffer` to 4KB; disconnect client if exceeded
 
 ---
 
@@ -153,10 +153,10 @@ This is **by design** (mirrors MUSHclient original), but the remote client has i
 
 | ID | Severity | Category | Status |
 |:---|:---|:---|:---|
-| S1 | CRITICAL | Lua sandbox | By design (MUSHclient compat) — document risk |
-| S2 | HIGH | Protocol DoS | Needs fix |
-| S3 | HIGH | Protocol DoS | Needs fix |
-| S4 | HIGH | Remote access DoS | Needs fix |
+| S1 | CRITICAL | Lua sandbox | Accepted risk (MUSHclient compat) |
+| S2 | HIGH | Protocol DoS | **Fixed** — 8KB subnegotiation buffer cap |
+| S3 | HIGH | Protocol DoS | **Fixed** — 1MB line length cap with forced break |
+| S4 | HIGH | Remote access DoS | **Fixed** — 4KB input buffer cap, disconnect on exceed |
 | S5 | MEDIUM | MXP DoS | Needs fix |
 | S6 | MEDIUM | Plugin XML DoS | Low priority (local files) |
 | S7 | LOW | Timing attack | Low priority (attempt limit) |
@@ -165,7 +165,7 @@ This is **by design** (mirrors MUSHclient original), but the remote client has i
 
 ## Recommended Priority
 
-1. **S2 + S3 + S4** — Buffer limits (all DoS vectors, straightforward fixes)
+1. ~~**S2 + S3 + S4** — Buffer limits (all DoS vectors, straightforward fixes)~~ **Done**
 2. **S5** — MXP entity size cap
 3. **S1** — Document Lua risk; add plugin trust prompt
 4. **S8** — Document remote access = full control
