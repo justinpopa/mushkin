@@ -2,7 +2,7 @@
 
 **Date:** 2026-03-01
 **Method:** Cross-reference of all `src/` files (>200 lines) against `tests/` test files. Counts are direct GTest `TEST`/`TEST_F` only.
-**Current baseline:** 841 tests across 50 executables.
+**Current baseline:** 880 tests across 51 executables.
 
 ## Critical — Zero Tests, High Risk
 
@@ -25,7 +25,7 @@
 | `world/world_document_plugins.cpp` | 1084 | world | 33 (partial) | Plugin install/load/hot-reload path; file loading not tested |
 | `network/ssh_server_session.cpp` | 458 | network | 0 | SSH channel handling, exec/shell dispatch — new feature |
 | `network/remote_access_server.cpp` | 320 | network | 0 | SSH server listen/accept loop |
-| `network/ansi_formatter.cpp` | 249 | network | 0 | Core ANSI sequence parsing — processes every byte of MUD output |
+| `network/ansi_formatter.cpp` | 249 | network | **39 tests added** — moved to Well-Covered |
 
 ## Medium — Thin Coverage or Zero Tests
 
@@ -74,13 +74,14 @@
 | `utils/url_linkifier.cpp` | 143 | `test_url_detection_gtest.cpp` | 13 |
 | `world/world_serialization.cpp` | 1427 | `test_world_serialization_gtest.cpp` + 3 existing | 20 + 21 |
 | `world/xml_serialization.cpp` | 1103 | `test_xml_serialization_gtest.cpp`, `test_xml_roundtrip_gtest.cpp`, `test_world_serialization_gtest.cpp` | 35 |
+| `network/ansi_formatter.cpp` | 249 | `test_ansi_formatter_gtest.cpp` | 39 |
 
 ## Recommended Next Targets
 
 Prioritized by testability (no UI needed) and risk:
 
 1. ~~**`world_serialization.cpp`** — DONE. 20 tests added covering timer at-time, variables, ExportXML/ImportXML, accelerator/macro/keypad, temporary items, CDATA, option snapshots.~~
-2. **`ansi_formatter.cpp`** — Core text pipeline. Every byte of MUD output passes through it. Similar profile to TelnetParser before we added tests.
+2. ~~**`ansi_formatter.cpp`** — DONE. 39 tests added covering null/empty lines, text attributes (bold/underline/italic/inverse/strikeout), ANSI color indices (standard/bright/256), RGB truecolor, custom palette colors, multi-style lines, state caching, and edge cases.~~
 3. **`lua_registration.cpp`** — Function table. A missing registration silently breaks a Lua API. Easy to write a completeness check.
 4. **`world_output.cpp`** — Note/Tell/ColourNote are the most-used Lua functions. Testable via WorldDocument fixture.
 5. **`world_protocol.cpp`** — Telnet negotiation dispatch. TelnetParser handles the state machine, but the WorldDocument-level protocol logic is untested.
