@@ -10,7 +10,10 @@
 #include "../text/style.h"
 #include "accelerator_manager.h"
 #include "logging.h"
+#include "miniwindow.h" // MiniWindow (complete type for unique_ptr destructor)
 #include "script_engine.h"
+#include "sound_manager.h"    // SoundManager (complete type for make_unique + destructor)
+#include "speedwalk_engine.h" // speedwalk::evaluate/reverse/removeBacktracks
 #include "view_interfaces.h"
 #include "world_socket.h"
 #include <QClipboard>

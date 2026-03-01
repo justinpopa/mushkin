@@ -32,6 +32,7 @@
 #include "../automation/plugin.h" // For plugin callback constants
 #include "../text/style.h"        // For Style
 #include "logging.h"              // For qCDebug(lcWorld)
+#include "sound_manager.h"        // SoundManager (complete type for method calls)
 #include "world_document.h"
 #include "world_error.h"
 #include "world_socket.h" // For m_pSocket->send()
@@ -380,7 +381,8 @@ void WorldDocument::GetStyleRGB(const Style* pOldStyle, QRgb& iForeColour, QRgb&
         if (foreIndex < 8) {
             // Use bold table if HILITE flag set, otherwise normal table
             bool bold = (flags & HILITE) != 0;
-            iForeColour = bold ? m_colors.bold_colour[foreIndex] : m_colors.normal_colour[foreIndex];
+            iForeColour =
+                bold ? m_colors.bold_colour[foreIndex] : m_colors.normal_colour[foreIndex];
         } else {
             // Invalid index, use as-is
             iForeColour = fore;

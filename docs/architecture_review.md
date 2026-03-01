@@ -462,14 +462,16 @@ A helper macro or function could reduce this to a single line.
 
 ---
 
-### D6 — God-include chain (`world_document.h` — 43 includes) [MEDIUM]
+### D6 — God-include chain (`world_document.h` — 43 includes) [MEDIUM] ✅
 
 **Risk:** `world_document.h` transitively pulls in 43 headers. Most translation units that include it get far more than they need, slowing compilation and increasing coupling.
 
 **Targets:**
-- [ ] Forward-declare where possible instead of including
-- [ ] Move implementation details to `.cpp` files
-- [ ] Consider opaque pointer (pimpl) for rarely-accessed subsystems
+- [x] Forward-declare where possible instead of including — `SoundManager`, `MiniWindow` forward-declared
+- [x] Move implementation details to `.cpp` files — `speedwalk_engine.h`, `mxp_types.h`, `zlib.h`, 4× QJson headers dropped; moved to .cpp consumers
+- [ ] Consider opaque pointer (pimpl) for rarely-accessed subsystems — deferred (5 companion headers still needed for inline wrappers; de-inlining risks circular deps)
+
+**Result:** 40 → 34 includes (−8 headers, +2 forward declarations). Remaining companion includes (`automation_registry.h`, `connection_manager.h`, `mxp_engine.h`, `output_formatter.h`, `telnet_parser.h`) are required by inline forwarding wrappers.
 
 **Acceptance:** Measurable reduction in include count. Build + test pass.
 

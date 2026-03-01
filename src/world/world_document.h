@@ -3,9 +3,8 @@
 
 #include <QColor>
 #include <QDateTime>
-#include <QFile>              // Log file management
-#include <QFileSystemWatcher> // Script file change monitoring
-#include <QJsonDocument>      // GMCP JSON parsing
+#include <QFile>              // std::unique_ptr<QFile> m_logfile
+#include <QFileSystemWatcher> // QFileSystemWatcher* m_scriptFileWatcher
 #include <QMap>               // TriggerMap, AliasMap
 #include <QObject>
 #include <QPoint>
@@ -30,8 +29,6 @@
 #include "connection_manager.h"  // ConnectionManager companion object (owns connection state)
 #include "mxp_engine.h"          // MXPEngine companion object (owns MXP protocol state)
 #include "output_formatter.h" // OutputFormatter companion object (owns note/colour/hyperlink output)
-#include "sound_manager.h"    // SoundManager companion object (owns spatial audio state)
-#include "speedwalk_engine.h" // speedwalk::evaluate/reverse/removeBacktracks free functions
 #include "telnet_parser.h"    // TelnetParser, Phase enum, telnet constants
 #include "world_context.h"    // IWorldContext interface
 #include "world_error.h"      // WorldError, WorldErrorType
@@ -40,12 +37,6 @@
 #include "../automation/sendto.h"          // SendTo enum
 #include "../automation/variable.h"        // ArraysMap type
 #include "../text/style.h" // Style flag bits (HILITE, UNDERLINE, BLINK, INVERSE, STRIKEOUT, COLOUR_*, COLOURTYPE, ACTIONTYPE, STYLE_BITS)
-#include "miniwindow.h"    // MiniWindow (off-screen drawing surface)
-#include "mxp_types.h"     // MXP data structures (still used by some callers)
-#include <QJsonArray>      // GMCP JSON parsing
-#include <QJsonObject>     // GMCP JSON parsing
-#include <QJsonValue>      // GMCP JSON parsing
-#include <zlib.h>          // For MCCP compression
 
 // Forward declarations
 class WorldSocket;
@@ -61,6 +52,8 @@ class Variable;           //
 class IOutputView;        // Interface for output view (see view_interfaces.h)
 class IInputView;         // Interface for input view (see view_interfaces.h)
 class NotepadWidget;      // Notepad window
+class MiniWindow;         // Off-screen drawing surface (miniwindow.h)
+class SoundManager;       // Spatial audio state (sound_manager.h)
 class RemoteAccessServer; // Remote access server for telnet connections
 class AcceleratorManager; // Keyboard accelerator management
 
