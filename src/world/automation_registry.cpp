@@ -391,7 +391,9 @@ static bool evaluateOneTriggerSequence(const QVector<Trigger*>& triggerArray, Li
                                        const QString& lineText, IWorldContext* ctx,
                                        AutomationRegistry* registry, QString& oneShotToDelete)
 {
-    for (Trigger* trigger : triggerArray) {
+    // Copy the array — scripts may modify it during execution (AddTrigger/DeleteTrigger)
+    const auto snapshot = triggerArray;
+    for (Trigger* trigger : snapshot) {
         if (!trigger->enabled) {
             continue;
         }
@@ -536,7 +538,9 @@ void AutomationRegistry::evaluateTriggers(Line* line)
 static bool evaluateOneAliasSequence(const QVector<Alias*>& aliasArray, const QString& command,
                                      IWorldContext* ctx, bool& anyMatched)
 {
-    for (Alias* alias : aliasArray) {
+    // Copy the array — scripts may modify it during execution (AddAlias/DeleteAlias)
+    const auto snapshot = aliasArray;
+    for (Alias* alias : snapshot) {
         if (!alias->enabled) {
             continue;
         }
