@@ -2,7 +2,7 @@
 
 **Date:** 2026-03-01
 **Method:** Cross-reference of all `src/` files (>200 lines) against `tests/` test files. Counts are direct GTest `TEST`/`TEST_F` only.
-**Current baseline:** 899 tests across 52 executables.
+**Current baseline:** 903 tests across 52 executables.
 
 ## Critical — Zero Tests, High Risk
 
@@ -75,7 +75,7 @@
 | `world/world_serialization.cpp` | 1427 | `test_world_serialization_gtest.cpp` + 3 existing | 20 + 21 |
 | `world/xml_serialization.cpp` | 1103 | `test_xml_serialization_gtest.cpp`, `test_xml_roundtrip_gtest.cpp`, `test_world_serialization_gtest.cpp` | 35 |
 | `network/ansi_formatter.cpp` | 249 | `test_ansi_formatter_gtest.cpp` | 39 |
-| `world/lua_api/lua_registration.cpp` | 1429 | `test_lua_registration_gtest.cpp` | 19 |
+| `world/lua_api/lua_registration.cpp` | 1429 | `test_lua_registration_gtest.cpp` | 23 |
 
 ## Recommended Next Targets
 
@@ -83,6 +83,6 @@ Prioritized by testability (no UI needed) and risk:
 
 1. ~~**`world_serialization.cpp`** — DONE. 20 tests added covering timer at-time, variables, ExportXML/ImportXML, accelerator/macro/keypad, temporary items, CDATA, option snapshots.~~
 2. ~~**`ansi_formatter.cpp`** — DONE. 39 tests added covering null/empty lines, text attributes (bold/underline/italic/inverse/strikeout), ANSI color indices (standard/bright/256), RGB truecolor, custom palette colors, multi-style lines, state caching, and edge cases.~~
-3. ~~**`lua_registration.cpp`** — DONE. 19 tests covering world table completeness (428 functions), 90+ spot checks, 35 global aliases, 5 constant tables, utils/rex modules, getLuaFunctionNames helper, and British/American spelling aliases.~~
+3. ~~**`lua_registration.cpp`** — DONE. 23 tests covering world table completeness (428 functions), 90+ spot checks, 35 global aliases, 9 constant tables, utils/rex modules, getLuaFunctionNames helper, and British/American spelling aliases. Duplicate registrations (Trim, SetStatus) cleaned up.~~
 4. **`world_output.cpp`** — Note/Tell/ColourNote are the most-used Lua functions. Testable via WorldDocument fixture.
 5. **`world_protocol.cpp`** — Telnet negotiation dispatch. TelnetParser handles the state machine, but the WorldDocument-level protocol logic is untested.

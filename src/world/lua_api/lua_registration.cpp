@@ -713,7 +713,7 @@ int RegisterLuaRoutines(lua_State* L)
         {"ReadNamesFile", L_ReadNamesFile},
         {"TranslateGerman", L_TranslateGerman},
         {"LowercaseWildcard", L_LowercaseWildcard},
-        {"Trim", L_Trim},
+        // Note: Trim is already registered under Output functions (line 533)
         {"GetUniqueNumber", L_GetUniqueNumber},
         {"GetUniqueID", L_GetUniqueID},
         {"CreateGUID", L_CreateGUID},
@@ -722,7 +722,7 @@ int RegisterLuaRoutines(lua_State* L)
         {"FixupHTML", L_FixupHTML},
         {"MakeRegularExpression", L_MakeRegularExpression},
         {"Execute", L_Execute},
-        {"SetStatus", L_SetStatus},
+        // Note: SetStatus is already registered under World info functions (line 588)
         {"GetGlobalOption", L_GetGlobalOption},
         {"SetCursor", L_SetCursor},
         {"Accelerator", L_Accelerator},

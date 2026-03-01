@@ -82,9 +82,9 @@ TEST_F(LuaRegistrationTest, WorldTableFunctionCount)
     }
     lua_pop(L, 1); // pop world table
 
-    // 411 worldlib entries minus 2 duplicates (Trim, SetStatus) = 409 unique + 19 array = 428
+    // 409 worldlib entries + 19 array functions = 428
     EXPECT_GE(count, 428)
-        << "world table should have at least 428 functions (409 unique worldlib + 19 array)";
+        << "world table should have at least 428 functions (409 worldlib + 19 array)";
 }
 
 // =============================================================================
@@ -322,6 +322,26 @@ TEST_F(LuaRegistrationTest, SendtoTableExists)
 TEST_F(LuaRegistrationTest, MiniwinTableExists)
 {
     expectConstantTable("miniwin", 1);
+}
+
+TEST_F(LuaRegistrationTest, ErrorDescTableExists)
+{
+    expectConstantTable("error_desc", 1);
+}
+
+TEST_F(LuaRegistrationTest, CustomColourTableExists)
+{
+    expectConstantTable("custom_colour", 1);
+}
+
+TEST_F(LuaRegistrationTest, TimerFlagTableExists)
+{
+    expectConstantTable("timer_flag", 1);
+}
+
+TEST_F(LuaRegistrationTest, ExtendedColoursTableExists)
+{
+    expectConstantTable("extended_colours", 1);
 }
 
 // =============================================================================
