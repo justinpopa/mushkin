@@ -29,10 +29,12 @@
 #include "automation_registry.h" // AutomationRegistry companion object (owns automation storage)
 #include "connection_manager.h"  // ConnectionManager companion object (owns connection state)
 #include "mxp_engine.h"          // MXPEngine companion object (owns MXP protocol state)
-#include "sound_manager.h"       // SoundManager companion object (owns spatial audio state)
-#include "telnet_parser.h"       // TelnetParser, Phase enum, telnet constants
-#include "world_context.h"       // IWorldContext interface
-#include "world_error.h"         // WorldError, WorldErrorType
+#include "output_formatter.h" // OutputFormatter companion object (owns note/colour/hyperlink output)
+#include "sound_manager.h"    // SoundManager companion object (owns spatial audio state)
+#include "speedwalk_engine.h" // speedwalk::evaluate/reverse/removeBacktracks free functions
+#include "telnet_parser.h"    // TelnetParser, Phase enum, telnet constants
+#include "world_context.h"    // IWorldContext interface
+#include "world_error.h"      // WorldError, WorldErrorType
 
 #include "../automation/script_language.h" // ScriptLanguage enum
 #include "../automation/sendto.h"          // SendTo enum
@@ -245,22 +247,7 @@ inline constexpr auto eMXP_room_description = MXP_MODE_ROOM_DESCRIPTION;
 inline constexpr auto eMXP_room_exits = MXP_MODE_ROOM_EXITS;
 inline constexpr auto eMXP_welcome = MXP_MODE_WELCOME;
 
-// ========== Speedwalk Direction Mapping ==========
-
-/**
- * DirectionInfo - Information about a speedwalk direction
- *
- * Based on original MUSHclient MapDirectionsMap in mapping.cpp
- */
-struct DirectionInfo {
-    QString m_sDirectionToSend;  // Command to send (e.g., "north")
-    QString m_sReverseDirection; // Reverse direction (e.g., for "n" it's "s")
-
-    DirectionInfo(const QString& toSend = "", const QString& reverse = "")
-        : m_sDirectionToSend(toSend), m_sReverseDirection(reverse)
-    {
-    }
-};
+// DirectionInfo is defined in speedwalk_engine.h (included above)
 
 
 // ========== ANSI Color/Style Constants (stdafx.h) ==========
@@ -379,6 +366,12 @@ class WorldDocument : public QObject, public IWorldContext {
     // NOTE: m_pSocket is now at m_connectionManager->m_pSocket.
     // Direct access to the socket in WorldDocument member functions goes through
     // m_connectionManager->m_pSocket (see world_document.cpp, world_protocol.cpp).
+
+    // ========== OutputFormatter (companion object) ==========
+    // Owns note/colour/hyperlink output formatting logic.
+    // Extracted from WorldDocument for composability.
+    // All access via m_outputFormatter->method().
+    std::unique_ptr<OutputFormatter> m_outputFormatter;
 
     // ========== Connection Settings ==========
     QString m_server;    // hostname or IP address
@@ -1434,14 +1427,32 @@ class WorldDocument : public QObject, public IWorldContext {
 
     // ========== Script Output Methods ==========
 
-    void note(const QString& text); // Display note in output window
-    void colourNote(QRgb foreColor, QRgb backColor, const QString& text); // Display colored note
-    void colourTell(QRgb foreColor, QRgb backColor,
-                    const QString& text); // Display colored text without newline (optional)
+    // Forwarding wrappers — implementation lives in OutputFormatter (output_formatter.cpp)
+    void note(const QString& text)
+    {
+        m_outputFormatter->note(text);
+    }
+    void colourNote(QRgb foreColor, QRgb backColor, const QString& text)
+    {
+        m_outputFormatter->colourNote(foreColor, backColor, text);
+    }
+    void colourTell(QRgb foreColor, QRgb backColor, const QString& text)
+    {
+        m_outputFormatter->colourTell(foreColor, backColor, text);
+    }
     void hyperlink(const QString& action, const QString& text, const QString& hint, QRgb foreColor,
-                   QRgb backColor, bool isUrl); // Display clickable hyperlink
-    void simulate(const QString& text);         // Process text as if received from MUD
-    void noteHr();                              // Display horizontal rule
+                   QRgb backColor, bool isUrl)
+    {
+        m_outputFormatter->hyperlink(action, text, hint, foreColor, backColor, isUrl);
+    }
+    void simulate(const QString& text)
+    {
+        m_outputFormatter->simulate(text);
+    }
+    void noteHr()
+    {
+        m_outputFormatter->noteHr();
+    }
 
     // ========== Script Loading and Parsing ==========
     void loadScriptFile();               // Load and execute script file
@@ -1668,11 +1679,6 @@ class WorldDocument : public QObject, public IWorldContext {
 
     // ========== Command Stacking ==========
     void Execute(const QString& command); // Process command with stacking support
-
-    // ========== Speed Walking ==========
-    QString DoEvaluateSpeedwalk(const QString& speedWalkString); // Parse speedwalk notation
-    QString DoReverseSpeedwalk(const QString& speedWalkString);  // Reverse a speedwalk
-    QString RemoveBacktracks(const QString& speedWalkString);    // Remove redundant movements
 
     // ========== Log File Management ==========
     qint32 OpenLog(const QString& filename, bool append); // Open log file for writing

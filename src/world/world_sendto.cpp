@@ -27,6 +27,7 @@
 #include "logging.h"
 #include "notepad_widget.h"
 #include "script_engine.h"
+#include "speedwalk_engine.h"
 #include "view_interfaces.h"
 #include "world_document.h"
 #include <QDebug>
@@ -164,7 +165,7 @@ void WorldDocument::sendTo(SendTo iWhere, const QString& strSendText, bool omit_
         // ========== eSendToSpeedwalk: Expand speedwalk and send to MUD ==========
         // Original: doc.cpp
         case eSendToSpeedwalk: {
-            QString expanded = DoEvaluateSpeedwalk(strSendText);
+            QString expanded = speedwalk::evaluate(strSendText, m_speedwalk.filler);
             if (!expanded.isEmpty()) {
                 sendToMud(expanded);
             }

@@ -4,6 +4,10 @@ add_library(world STATIC
     color_utils.h
     connection_manager.h   # ConnectionManager companion object (owns connection state)
     connection_manager.cpp # ConnectionManager implementation
+    speedwalk_engine.h     # speedwalk free functions (evaluate/reverse/removeBacktracks)
+    speedwalk_engine.cpp   # speedwalk implementation
+    output_formatter.h     # OutputFormatter companion object (note/color/hyperlink display)
+    output_formatter.cpp   # OutputFormatter implementation
     telnet_parser.h
     telnet_parser.cpp
     world_document.cpp

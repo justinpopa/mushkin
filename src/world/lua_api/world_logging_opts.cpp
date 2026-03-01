@@ -4,6 +4,8 @@
 
 #include "lua_common.h"
 
+#include "../speedwalk_engine.h"
+
 // Forward declarations for functions defined in this file that call each other
 static int L_GetEchoInput_impl(lua_State* L);
 static int L_SetEchoInput_impl(lua_State* L);
@@ -411,7 +413,7 @@ int L_EvaluateSpeedwalk(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
     const char* speedwalk = luaL_checkstring(L, 1);
-    QString result = pDoc->DoEvaluateSpeedwalk(QString::fromUtf8(speedwalk));
+    QString result = speedwalk::evaluate(QString::fromUtf8(speedwalk), pDoc->m_speedwalk.filler);
     lua_pushstring(L, result.toUtf8().constData());
     return 1;
 }
@@ -440,7 +442,7 @@ int L_ReverseSpeedwalk(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
     const char* speedwalk = luaL_checkstring(L, 1);
-    QString result = pDoc->DoReverseSpeedwalk(QString::fromUtf8(speedwalk));
+    QString result = speedwalk::reverse(QString::fromUtf8(speedwalk));
     lua_pushstring(L, result.toUtf8().constData());
     return 1;
 }
@@ -473,7 +475,8 @@ int L_RemoveBacktracks(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
     const char* speedwalk = luaL_checkstring(L, 1);
-    QString result = pDoc->RemoveBacktracks(QString::fromUtf8(speedwalk));
+    QString result =
+        speedwalk::removeBacktracks(QString::fromUtf8(speedwalk), pDoc->m_speedwalk.filler);
     lua_pushstring(L, result.toUtf8().constData());
     return 1;
 }
