@@ -10,19 +10,14 @@
 #include "i_remote_transport.h"
 #include <QObject>
 
-namespace {
-constexpr int kMaxPasswordAttempts = 3;
-}
-
-RemoteClient::RemoteClient(IRemoteTransport* transport, WorldDocument* doc, const QString& password,
-                           int scrollbackLines, QObject* parent)
+RemoteClient::RemoteClient(IRemoteTransport* transport, WorldDocument* doc, int scrollbackLines,
+                           QObject* parent)
     : QObject(parent), m_transport(transport), m_pDoc(doc),
-      m_formatter(std::make_unique<AnsiFormatter>(doc)), m_password(password),
-      m_scrollbackLines(scrollbackLines), m_state(State::Negotiating), m_failedAttempts(0),
-      m_maxFailedAttempts(kMaxPasswordAttempts), m_connectedAt(QDateTime::currentDateTime())
+      m_formatter(std::make_unique<AnsiFormatter>(doc)), m_scrollbackLines(scrollbackLines),
+      m_state(State::Connecting), m_connectedAt(QDateTime::currentDateTime())
 {
-    // Connect transport signals
-    connect(m_transport, &IRemoteTransport::ready, this, &RemoteClient::onNegotiationComplete);
+    // Connect transport signals.
+    connect(m_transport, &IRemoteTransport::ready, this, &RemoteClient::onTransportReady);
     connect(m_transport, &IRemoteTransport::dataAvailable, this, &RemoteClient::onReadyRead);
     connect(m_transport, &IRemoteTransport::closed, this, &RemoteClient::onDisconnected);
 }
@@ -100,12 +95,15 @@ void RemoteClient::onDisconnected()
     emit disconnected();
 }
 
-void RemoteClient::onNegotiationComplete()
+void RemoteClient::onTransportReady()
 {
-    // Transport is ready for application-level data; send welcome and password prompt.
+    // SSH transport has completed key exchange and authentication.
+    // The connection is already authenticated — go straight to active state.
+    m_state = State::Authenticated;
+    m_formatter->reset(); // Reset ANSI state for clean output.
     sendWelcome();
-    sendPasswordPrompt();
-    m_state = State::AwaitingPassword;
+    sendScrollback();
+    emit authenticated();
 }
 
 void RemoteClient::processInput(const QByteArray& data)
@@ -113,7 +111,7 @@ void RemoteClient::processInput(const QByteArray& data)
     m_inputBuffer.append(QString::fromUtf8(data));
 
     // Security: cap input buffer to prevent OOM from clients sending
-    // continuous data without newlines (can happen pre-authentication).
+    // continuous data without newlines.
     constexpr int kMaxInputBuffer = 4096;
     if (m_inputBuffer.size() > kMaxInputBuffer) {
         sendRawText("\r\nInput too long. Disconnecting.\r\n");
@@ -121,27 +119,18 @@ void RemoteClient::processInput(const QByteArray& data)
         return;
     }
 
-    // Process complete lines (telnet sends \r\n, some clients send just \n)
+    // Process complete lines (SSH clients typically send \r\n or just \n).
     int nlPos;
     while ((nlPos = m_inputBuffer.indexOf('\n')) != -1) {
         QString line = m_inputBuffer.left(nlPos);
         m_inputBuffer.remove(0, nlPos + 1);
 
-        // Strip trailing \r if present (handles \r\n)
+        // Strip trailing \r if present (handles \r\n).
         if (line.endsWith('\r')) {
             line.chop(1);
         }
 
-        // Handle based on state
         switch (m_state) {
-            case State::AwaitingPassword:
-                if (checkPassword(line)) {
-                    handleAuthSuccess();
-                } else {
-                    handleAuthFailure();
-                }
-                break;
-
             case State::Authenticated:
                 if (!line.isEmpty()) {
                     emit commandReceived(line);
@@ -149,7 +138,7 @@ void RemoteClient::processInput(const QByteArray& data)
                 break;
 
             default:
-                // Ignore input in other states
+                // Ignore input in other states.
                 break;
         }
     }
@@ -161,46 +150,10 @@ void RemoteClient::sendWelcome()
     QString banner = QString("\r\n"
                              "=== MUSHclient Qt Remote Access ===\r\n"
                              "World: %1\r\n"
+                             "Streaming output...\r\n"
                              "\r\n")
                          .arg(worldName);
     sendBytes(banner.toUtf8());
-}
-
-void RemoteClient::sendPasswordPrompt()
-{
-    sendBytes(QByteArray("Password: "));
-}
-
-bool RemoteClient::checkPassword(const QString& attempt)
-{
-    return attempt == m_password;
-}
-
-void RemoteClient::handleAuthSuccess()
-{
-    m_state = State::Authenticated;
-    m_formatter->reset(); // Reset ANSI state for clean output
-
-    sendRawText("\r\nAuthenticated. Streaming output...\r\n");
-
-    // Send scrollback
-    sendScrollback();
-
-    emit authenticated();
-}
-
-void RemoteClient::handleAuthFailure()
-{
-    m_failedAttempts++;
-
-    if (m_failedAttempts >= m_maxFailedAttempts) {
-        sendRawText("\r\nToo many failed attempts. Disconnecting.\r\n");
-        disconnect();
-    } else {
-        int remaining = m_maxFailedAttempts - m_failedAttempts;
-        sendRawText(QString("\r\nIncorrect password. %1 attempt(s) remaining.\r\n").arg(remaining));
-        sendPasswordPrompt();
-    }
 }
 
 void RemoteClient::sendScrollback()

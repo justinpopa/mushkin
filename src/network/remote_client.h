@@ -16,13 +16,13 @@ class Line;
 class WorldDocument;
 class AnsiFormatter;
 
-/** Handles a single remote client connection with authentication and streaming. */
+/** Handles a single remote client connection. Auth is performed by the transport layer. */
 class RemoteClient : public QObject {
     Q_OBJECT
 
   public:
-    RemoteClient(IRemoteTransport* transport, WorldDocument* doc, const QString& password,
-                 int scrollbackLines, QObject* parent = nullptr);
+    RemoteClient(IRemoteTransport* transport, WorldDocument* doc, int scrollbackLines,
+                 QObject* parent = nullptr);
     ~RemoteClient();
 
     bool isAuthenticated() const;
@@ -42,31 +42,23 @@ class RemoteClient : public QObject {
   private slots:
     void onReadyRead();
     void onDisconnected();
-    void onNegotiationComplete();
+    void onTransportReady();
 
   private:
-    enum class State { Negotiating, AwaitingPassword, Authenticated, Disconnecting };
+    enum class State { Connecting, Authenticated, Disconnecting };
 
     void processInput(const QByteArray& data);
     void sendWelcome();
-    void sendPasswordPrompt();
-    bool checkPassword(const QString& attempt);
-    void handleAuthSuccess();
-    void handleAuthFailure();
     void sendScrollback();
     void sendBytes(const QByteArray& data);
 
     // Non-owning pointer. Ownership is held by whoever created the transport
-    // (typically RemoteAccessServer, which parents it to the RemoteClient or
-    // manages its lifetime externally).
+    // (typically RemoteAccessServer, which parents it to the RemoteClient).
     IRemoteTransport* m_transport;
     WorldDocument* m_pDoc;
     std::unique_ptr<AnsiFormatter> m_formatter;
-    QString m_password;
     int m_scrollbackLines;
     State m_state;
-    int m_failedAttempts;
-    int m_maxFailedAttempts;
     QDateTime m_connectedAt;
     QString m_inputBuffer;
 };

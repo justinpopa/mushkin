@@ -1,7 +1,7 @@
 // remote_access_server.h
 // Remote Access Server for MUSHclient Qt
 //
-// Allows remote telnet clients to connect and control the MUD client.
+// Allows remote SSH clients to connect and control the MUD client.
 // Each world has its own server instance.
 
 #ifndef REMOTE_ACCESS_SERVER_H
@@ -15,14 +15,19 @@
 enum class StartError {
     NoPassword,
     BindFailed,
+    HostKeyFailed,
 };
 
-class QTcpServer;
+// Forward-declare libssh bind type to avoid polluting headers.
+struct ssh_bind_struct;
+typedef ssh_bind_struct* ssh_bind;
+
+class QSocketNotifier;
 class WorldDocument;
 class RemoteClient;
 class Line;
 
-/** TCP server allowing remote telnet clients to view output and send commands. */
+/** SSH server allowing remote clients to view output and send commands. */
 class RemoteAccessServer : public QObject {
     Q_OBJECT
 
@@ -30,10 +35,10 @@ class RemoteAccessServer : public QObject {
     explicit RemoteAccessServer(WorldDocument* doc, QObject* parent = nullptr);
     ~RemoteAccessServer() override;
 
-    // Start the server. By default binds to localhost only for security.
-    // Pass QHostAddress::Any to allow connections from other machines.
-    std::expected<void, StartError>
-    start(quint16 port, const QHostAddress& bindAddress = QHostAddress::LocalHost);
+    // Start the server. Binds to any address by default (SSH is encrypted).
+    // Pass QHostAddress::LocalHost to restrict to loopback.
+    std::expected<void, StartError> start(quint16 port,
+                                          const QHostAddress& bindAddress = QHostAddress::Any);
     void stop();
     bool isRunning() const;
     quint16 port() const;
@@ -44,6 +49,7 @@ class RemoteAccessServer : public QObject {
     void setPassword(const QString& password);
     void setScrollbackLines(int lines);
     void setMaxClients(int max);
+    void setAuthorizedKeysFile(const QString& path);
 
   signals:
     void serverStarted(quint16 port);
@@ -66,11 +72,15 @@ class RemoteAccessServer : public QObject {
     void broadcastIncompleteLine(const Line* line);
 
     WorldDocument* m_pDoc;
-    // Owned via Qt parent-child (parent = this). nullptr when stopped.
-    QTcpServer* m_pServer = nullptr;
+    // Owned via libssh (ssh_bind_free). nullptr when stopped.
+    ssh_bind m_sshBind = nullptr;
+    // Qt parent-child owned (parent = this). nullptr when stopped.
+    QSocketNotifier* m_bindNotifier = nullptr;
     // Each RemoteClient is Qt-parented to this. Removed from list before deleteLater().
     QList<RemoteClient*> m_clients;
     QString m_password;
+    QString m_authorizedKeysFile;
+    quint16 m_port = 0;
     int m_scrollbackLines;
     int m_maxClients;
     int m_lastLineIndex;
