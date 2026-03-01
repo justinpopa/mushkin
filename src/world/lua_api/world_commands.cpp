@@ -93,14 +93,14 @@ struct CommandEntry {
 static const CommandEntry kCommandTable[] = {
     {"Connect",
      [](WorldDocument* pDoc) -> int {
-         if (pDoc->m_connectionManager->m_iConnectPhase != CONNECT_NOT_CONNECTED)
+         if (pDoc->connectPhase() != CONNECT_NOT_CONNECTED)
              return eWorldOpen;
          pDoc->connectToMud();
          return eOK;
      }},
     {"Disconnect",
      [](WorldDocument* pDoc) -> int {
-         qint32 phase = pDoc->m_connectionManager->m_iConnectPhase;
+         qint32 phase = pDoc->connectPhase();
          if (phase == CONNECT_NOT_CONNECTED || phase == CONNECT_DISCONNECTING)
              return eWorldClosed;
          pDoc->disconnectFromMud();

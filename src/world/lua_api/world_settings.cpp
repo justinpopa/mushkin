@@ -863,14 +863,12 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 106: // Not connected
-            lua_pushboolean(L,
-                            pDoc->m_connectionManager->m_iConnectPhase != eConnectConnectedToMud);
+            lua_pushboolean(L, pDoc->connectPhase() != eConnectConnectedToMud);
             break;
 
         case 107: // Connecting (not disconnected and not connected)
-            lua_pushboolean(L, pDoc->m_connectionManager->m_iConnectPhase != eConnectNotConnected &&
-                                   pDoc->m_connectionManager->m_iConnectPhase !=
-                                       eConnectConnectedToMud);
+            lua_pushboolean(L, pDoc->connectPhase() != eConnectNotConnected &&
+                                   pDoc->connectPhase() != eConnectConnectedToMud);
             break;
 
         case 108: // Disconnect OK
@@ -1057,7 +1055,7 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 227: // Connection phase
-            lua_pushinteger(L, pDoc->m_connectionManager->m_iConnectPhase);
+            lua_pushinteger(L, pDoc->connectPhase());
             break;
 
         case 228: // IP address as integer (host byte order)

@@ -1261,6 +1261,98 @@ class WorldDocument : public QObject, public IWorldContext {
         m_connectionManager->resetConnectedTime();
     }
 
+    // ConnectionManager state accessors
+    [[nodiscard]] qint32 connectPhase() const
+    {
+        return m_connectionManager->m_iConnectPhase;
+    }
+    [[nodiscard]] qint64 bytesIn() const
+    {
+        return m_connectionManager->m_nBytesIn;
+    }
+    [[nodiscard]] qint64 bytesOut() const
+    {
+        return m_connectionManager->m_nBytesOut;
+    }
+    [[nodiscard]] qint32 totalLinesSent() const
+    {
+        return m_connectionManager->m_nTotalLinesSent;
+    }
+    [[nodiscard]] qint64 inputPacketCount() const
+    {
+        return m_connectionManager->m_iInputPacketCount;
+    }
+    [[nodiscard]] qint64 outputPacketCount() const
+    {
+        return m_connectionManager->m_iOutputPacketCount;
+    }
+
+    // TelnetParser state accessors
+    [[nodiscard]] bool isEchoOff() const
+    {
+        return m_telnetParser->m_bNoEcho;
+    }
+    [[nodiscard]] bool isCompressing() const
+    {
+        return m_telnetParser->m_bCompress;
+    }
+    [[nodiscard]] qint32 mccpType() const
+    {
+        return m_telnetParser->m_iMCCP_type;
+    }
+    [[nodiscard]] qint64 totalUncompressed() const
+    {
+        return m_telnetParser->m_nTotalUncompressed;
+    }
+    [[nodiscard]] qint64 totalCompressed() const
+    {
+        return m_telnetParser->m_nTotalCompressed;
+    }
+
+    // MXPEngine state accessors
+    [[nodiscard]] bool isMXPActive() const
+    {
+        return m_mxpEngine->m_bMXP;
+    }
+    [[nodiscard]] bool isPuebloActive() const
+    {
+        return m_mxpEngine->m_bPuebloActive;
+    }
+    [[nodiscard]] qint64 mxpErrorCount() const
+    {
+        return m_mxpEngine->m_iMXPerrors;
+    }
+    [[nodiscard]] qint64 mxpTagCount() const
+    {
+        return m_mxpEngine->m_iMXPtags;
+    }
+    [[nodiscard]] qint64 mxpEntityCount() const
+    {
+        return m_mxpEngine->m_iMXPentities;
+    }
+
+    // AutomationRegistry statistics accessors
+    [[nodiscard]] qint32 triggersEvaluatedCount() const
+    {
+        return m_automationRegistry->m_iTriggersEvaluatedCount;
+    }
+    [[nodiscard]] qint32 triggersMatchedCount() const
+    {
+        return m_automationRegistry->m_iTriggersMatchedCount;
+    }
+    [[nodiscard]] qint32 aliasesEvaluatedCount() const
+    {
+        return m_automationRegistry->m_iAliasesEvaluatedCount;
+    }
+    [[nodiscard]] qint32 aliasesMatchedCount() const
+    {
+        return m_automationRegistry->m_iAliasesMatchedCount;
+    }
+    [[nodiscard]] qint32 timersFiredCount() const
+    {
+        return m_automationRegistry->m_iTimersFiredCount;
+    }
+
     // Logging status (for status bar)
     bool isLogging() const
     {

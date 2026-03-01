@@ -303,7 +303,7 @@ int L_LogSend(lua_State* L)
     WorldDocument* pDoc = doc(L);
 
     // Check if connected
-    if (pDoc->m_connectionManager->m_iConnectPhase != eConnectConnectedToMud) {
+    if (pDoc->connectPhase() != eConnectConnectedToMud) {
         return luaReturnError(L, eWorldClosed);
     }
 

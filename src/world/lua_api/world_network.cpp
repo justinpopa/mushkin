@@ -31,7 +31,7 @@ int L_Send(lua_State* L)
     QString text = luaCheckQString(L, 1);
 
     // Check if connected
-    if (pDoc->m_connectionManager->m_iConnectPhase != eConnectConnectedToMud) {
+    if (pDoc->connectPhase() != eConnectConnectedToMud) {
         return luaReturnError(L, eWorldClosed);
     }
 
@@ -70,7 +70,7 @@ int L_Connect(lua_State* L)
     WorldDocument* pDoc = doc(L);
 
     // Check if already connected
-    if (pDoc->m_connectionManager->m_iConnectPhase != eConnectNotConnected) {
+    if (pDoc->connectPhase() != eConnectNotConnected) {
         return luaReturnError(L, eWorldOpen);
     }
 
@@ -99,8 +99,8 @@ int L_Disconnect(lua_State* L)
     WorldDocument* pDoc = doc(L);
 
     // Check if already disconnected or disconnecting
-    if (pDoc->m_connectionManager->m_iConnectPhase == eConnectNotConnected ||
-        pDoc->m_connectionManager->m_iConnectPhase == eConnectDisconnecting) {
+    if (pDoc->connectPhase() == eConnectNotConnected ||
+        pDoc->connectPhase() == eConnectDisconnecting) {
         return luaReturnError(L, eWorldClosed);
     }
 
@@ -127,7 +127,7 @@ int L_Disconnect(lua_State* L)
 int L_IsConnected(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    bool connected = (pDoc->m_connectionManager->m_iConnectPhase == eConnectConnectedToMud);
+    bool connected = (pDoc->connectPhase() == eConnectConnectedToMud);
     lua_pushboolean(L, connected);
     return 1;
 }
@@ -158,7 +158,7 @@ int L_SendImmediate(lua_State* L)
     QString text = luaCheckQString(L, 1);
 
     // Check if connected
-    if (pDoc->m_connectionManager->m_iConnectPhase != eConnectConnectedToMud) {
+    if (pDoc->connectPhase() != eConnectConnectedToMud) {
         return luaReturnError(L, eWorldClosed);
     }
 
@@ -198,7 +198,7 @@ int L_SendNoEcho(lua_State* L)
     QString text = luaCheckQString(L, 1);
 
     // Check if connected
-    if (pDoc->m_connectionManager->m_iConnectPhase != eConnectConnectedToMud) {
+    if (pDoc->connectPhase() != eConnectConnectedToMud) {
         return luaReturnError(L, eWorldClosed);
     }
 
@@ -239,7 +239,7 @@ int L_SendPush(lua_State* L)
     QString text = luaCheckQString(L, 1);
 
     // Check if connected
-    if (pDoc->m_connectionManager->m_iConnectPhase != eConnectConnectedToMud) {
+    if (pDoc->connectPhase() != eConnectConnectedToMud) {
         return luaReturnError(L, eWorldClosed);
     }
 
@@ -295,7 +295,7 @@ int L_SendSpecial(lua_State* L)
     bool history = lua_toboolean(L, 5);
 
     // Check if connected
-    if (pDoc->m_connectionManager->m_iConnectPhase != eConnectConnectedToMud) {
+    if (pDoc->connectPhase() != eConnectConnectedToMud) {
         return luaReturnError(L, eWorldClosed);
     }
 

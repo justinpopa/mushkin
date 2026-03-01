@@ -940,7 +940,7 @@ int L_SendPkt(lua_State* L)
     WorldDocument* pDoc = doc(L);
 
     // Check if connected (eWorldClosed = 1, eOK = 0)
-    if (pDoc->m_connectionManager->m_iConnectPhase != eConnectConnectedToMud) {
+    if (pDoc->connectPhase() != eConnectConnectedToMud) {
         lua_pushnumber(L, 1); // eWorldClosed
         return 1;
     }

@@ -54,6 +54,16 @@ When spawning a Sonnet subagent, include the appropriate persona in the task pro
 
 See AGENTS.md for full council details.
 
+## Companion Access Convention
+WorldDocument owns 8 companion objects. Follow these rules for accessing them:
+
+- **Actions/mutations** MUST go through WorldDocument wrappers (e.g., `doc->connectToMud()`, not `doc->m_connectionManager->connectToMud()`).
+- **State queries** MUST use WorldDocument accessors where they exist (e.g., `doc->connectPhase()`, `doc->isEchoOff()`, `doc->bytesIn()`).
+- **Collection iteration** (AutomationRegistry maps/arrays) MAY access the registry directly — wrapping a const ref adds no value.
+- **ScriptEngine** (`m_ScriptEngine->L`, `->executeLua()`, etc.) MAY be accessed directly — it's effectively part of WorldDocument's public API.
+- **Well-encapsulated companions** (OutputFormatter, SoundManager): all access goes through wrappers. Keep it that way.
+- When adding new companion methods, add a forwarding wrapper on WorldDocument first.
+
 ## Code Style
 - Struct fields: snake_case (no Hungarian prefixes).
 - When editing a function, rename Hungarian-prefixed local variables to modern style

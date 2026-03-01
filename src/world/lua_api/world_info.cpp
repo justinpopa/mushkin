@@ -97,7 +97,7 @@ int L_GetConnectDuration(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    if (pDoc->m_connectionManager->m_iConnectPhase != eConnectConnectedToMud) {
+    if (pDoc->connectPhase() != eConnectConnectedToMud) {
         lua_pushnumber(L, 0);
         return 1;
     }

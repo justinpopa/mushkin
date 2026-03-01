@@ -560,7 +560,7 @@ void WorldWidget::sendCommand()
     if (bAutoSay) {
         // Check connection if not re-evaluating (original sendvw.cpp)
         if (!m_document->m_auto_say.re_evaluate &&
-            m_document->m_connectionManager->m_iConnectPhase != eConnectConnectedToMud) {
+            m_document->connectPhase() != eConnectConnectedToMud) {
             return; // Don't send if not connected
         }
 
@@ -599,7 +599,7 @@ void WorldWidget::sendCommand()
 
         // Early return - don't execute the normal command path
         // Clear input and return
-        if (m_document->m_bAutoRepeat && !m_document->m_telnetParser->m_bNoEcho) {
+        if (m_document->m_bAutoRepeat && !m_document->isEchoOff()) {
             m_inputView->selectAll();
         } else {
             m_inputView->clear();
@@ -618,7 +618,7 @@ void WorldWidget::sendCommand()
     // Clear input after sending (configurable)
     // m_bAutoRepeat allows command to stay in field for easy repetition
     // Based on CSendView::SendCommand() from sendvw.cpp
-    if (m_document->m_bAutoRepeat && !m_document->m_telnetParser->m_bNoEcho) {
+    if (m_document->m_bAutoRepeat && !m_document->isEchoOff()) {
         // Keep command and select all (so typing replaces it)
         m_inputView->selectAll();
     } else {

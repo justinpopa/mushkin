@@ -139,16 +139,16 @@ void ActivityWindow::refresh()
 
         // Status
         QString status;
-        if (doc->m_connectionManager->m_iConnectPhase == eConnectConnectedToMud)
+        if (doc->connectPhase() == eConnectConnectedToMud)
             status = tr("Connected");
-        else if (doc->m_connectionManager->m_iConnectPhase == eConnectNotConnected)
+        else if (doc->connectPhase() == eConnectNotConnected)
             status = tr("Disconnected");
         else
             status = tr("Connecting...");
         QTableWidgetItem* statusItem = new QTableWidgetItem(status);
-        if (doc->m_connectionManager->m_iConnectPhase == eConnectConnectedToMud) {
+        if (doc->connectPhase() == eConnectConnectedToMud) {
             statusItem->setForeground(QColor(0, 128, 0)); // Green
-        } else if (doc->m_connectionManager->m_iConnectPhase == eConnectNotConnected) {
+        } else if (doc->connectPhase() == eConnectNotConnected) {
             statusItem->setForeground(Qt::gray);
         } else {
             statusItem->setForeground(QColor(255, 165, 0)); // Orange
@@ -157,7 +157,7 @@ void ActivityWindow::refresh()
 
         // Since (connection start time)
         QString sinceStr;
-        if (doc->m_connectionManager->m_iConnectPhase == eConnectConnectedToMud &&
+        if (doc->connectPhase() == eConnectConnectedToMud &&
             doc->m_connectionManager->m_tConnectTime.isValid()) {
             sinceStr = formatTime(doc->m_connectionManager->m_tConnectTime);
         }
@@ -167,7 +167,7 @@ void ActivityWindow::refresh()
         // Duration - includes previous connections plus current session
         // m_tsConnectDuration is in milliseconds
         qint64 totalSecs = doc->m_connectionManager->m_tsConnectDuration / 1000;
-        if (doc->m_connectionManager->m_iConnectPhase == eConnectConnectedToMud &&
+        if (doc->connectPhase() == eConnectConnectedToMud &&
             doc->m_connectionManager->m_tConnectTime.isValid()) {
             totalSecs +=
                 doc->m_connectionManager->m_tConnectTime.secsTo(QDateTime::currentDateTime());
@@ -241,14 +241,12 @@ void ActivityWindow::onContextMenu(const QPoint& pos)
 
     QAction* connectAction = menu.addAction(tr("C&onnect"));
     connectAction->setEnabled(ww && ww->document() &&
-                              ww->document()->m_connectionManager->m_iConnectPhase ==
-                                  eConnectNotConnected);
+                              ww->document()->connectPhase() == eConnectNotConnected);
     connect(connectAction, &QAction::triggered, this, &ActivityWindow::connectWorld);
 
     QAction* disconnectAction = menu.addAction(tr("&Disconnect"));
     disconnectAction->setEnabled(ww && ww->document() &&
-                                 ww->document()->m_connectionManager->m_iConnectPhase ==
-                                     eConnectConnectedToMud);
+                                 ww->document()->connectPhase() == eConnectConnectedToMud);
     connect(disconnectAction, &QAction::triggered, this, &ActivityWindow::disconnectWorld);
 
     menu.addSeparator();
