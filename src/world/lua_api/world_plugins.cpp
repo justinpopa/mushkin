@@ -376,11 +376,8 @@ int L_GetPluginList(lua_State* L)
 int L_IsPluginInstalled(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-
-    Plugin* plugin = pDoc->FindPluginByID(luaCheckQString(L, 1));
-
-    lua_pushboolean(L, plugin != nullptr);
-    return 1;
+    auto [pluginID] = luaArgs<QString>(L);
+    return luaReturn(L, pDoc->FindPluginByID(pluginID) != nullptr);
 }
 
 /**
@@ -438,8 +435,7 @@ int L_GetPluginInfo(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    QString pluginID = luaCheckQString(L, 1);
-    int infoType = luaL_checkinteger(L, 2);
+    auto [pluginID, infoType] = luaArgs<QString, int>(L);
 
     qCDebug(lcScript) << "GetPluginInfo called: pluginID=" << pluginID << "infoType=" << infoType;
 
@@ -659,7 +655,7 @@ int L_ReloadPlugin(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    QString pluginID = luaCheckQString(L, 1);
+    auto [pluginID] = luaArgs<QString>(L);
 
     Plugin* plugin = pDoc->FindPluginByID(pluginID);
 
@@ -721,7 +717,7 @@ int L_UnloadPlugin(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    QString pluginID = luaCheckQString(L, 1);
+    auto [pluginID] = luaArgs<QString>(L);
 
     Plugin* plugin = pDoc->FindPluginByID(pluginID);
 
@@ -770,8 +766,7 @@ int L_EnablePlugin(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    QString pluginID = luaCheckQString(L, 1);
-    bool enabled = lua_toboolean(L, 2);
+    auto [pluginID, enabled] = luaArgs<QString, bool>(L);
 
     Plugin* plugin = pDoc->FindPluginByID(pluginID);
 
@@ -814,7 +809,8 @@ int L_PluginSupports(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    Plugin* plugin = pDoc->FindPluginByID(luaCheckQString(L, 1));
+    auto [pluginIDStr] = luaArgs<QString>(L);
+    Plugin* plugin = pDoc->FindPluginByID(pluginIDStr);
     const char* routine = luaL_checkstring(L, 2);
 
     if (!plugin) {
@@ -1030,8 +1026,8 @@ int L_GetPluginVariable(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    Plugin* plugin = pDoc->FindPluginByID(luaCheckQString(L, 1));
-    QString varName = luaCheckQString(L, 2);
+    auto [pluginIDStr, varName] = luaArgs<QString, QString>(L);
+    Plugin* plugin = pDoc->FindPluginByID(pluginIDStr);
 
     if (!plugin) {
         lua_pushnil(L);
@@ -1078,7 +1074,8 @@ int L_GetPluginVariableList(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    Plugin* plugin = pDoc->FindPluginByID(luaCheckQString(L, 1));
+    auto [pluginIDStr] = luaArgs<QString>(L);
+    Plugin* plugin = pDoc->FindPluginByID(pluginIDStr);
 
     lua_newtable(L);
 

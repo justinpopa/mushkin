@@ -6,17 +6,6 @@
 
 #include "../speedwalk_engine.h"
 
-// Forward declarations for functions defined in this file that call each other
-static int L_GetEchoInput_impl(lua_State* L);
-static int L_SetEchoInput_impl(lua_State* L);
-static int L_GetSpeedWalkDelay_impl(lua_State* L);
-static int L_SetSpeedWalkDelay_impl(lua_State* L);
-static int L_GetLogInput_impl(lua_State* L);
-static int L_SetLogInput_impl(lua_State* L);
-static int L_GetLogNotes_impl(lua_State* L);
-static int L_SetLogNotes_impl(lua_State* L);
-static int L_GetLogOutput_impl(lua_State* L);
-static int L_SetLogOutput_impl(lua_State* L);
 
 /**
  * world.GetLogInput()
@@ -33,12 +22,7 @@ static int L_SetLogOutput_impl(lua_State* L);
  *
  * @see SetLogInput, GetLogOutput, GetLogNotes
  */
-int L_GetLogInput(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-    lua_pushboolean(L, pDoc->m_logging.log_input);
-    return 1;
-}
+LUA_DOC_GETTER(L_GetLogInput, pDoc->m_logging.log_input)
 
 /**
  * world.SetLogInput(enable)
@@ -59,14 +43,7 @@ int L_GetLogInput(lua_State* L)
  *
  * @see GetLogInput, SetLogOutput, SetLogNotes
  */
-int L_SetLogInput(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-    // Default to true if no argument provided (matches original optboolean behavior)
-    bool enable = lua_isnone(L, 1) ? true : lua_toboolean(L, 1);
-    pDoc->m_logging.log_input = enable;
-    return 0;
-}
+LUA_DOC_SETTER_BOOL(L_SetLogInput, m_logging.log_input)
 
 /**
  * world.GetLogNotes()
@@ -83,12 +60,7 @@ int L_SetLogInput(lua_State* L)
  *
  * @see SetLogNotes, GetLogInput, GetLogOutput
  */
-int L_GetLogNotes(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-    lua_pushboolean(L, pDoc->m_logging.log_notes);
-    return 1;
-}
+LUA_DOC_GETTER(L_GetLogNotes, pDoc->m_logging.log_notes)
 
 /**
  * world.SetLogNotes(enable)
@@ -107,14 +79,7 @@ int L_GetLogNotes(lua_State* L)
  *
  * @see GetLogNotes, SetLogInput, SetLogOutput
  */
-int L_SetLogNotes(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-    // Default to true if no argument provided (matches original optboolean behavior)
-    bool enable = lua_isnone(L, 1) ? true : lua_toboolean(L, 1);
-    pDoc->m_logging.log_notes = enable;
-    return 0;
-}
+LUA_DOC_SETTER_BOOL(L_SetLogNotes, m_logging.log_notes)
 
 /**
  * world.GetLogOutput()
@@ -131,12 +96,7 @@ int L_SetLogNotes(lua_State* L)
  *
  * @see SetLogOutput, GetLogInput, GetLogNotes
  */
-int L_GetLogOutput(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-    lua_pushboolean(L, pDoc->m_logging.log_output);
-    return 1;
-}
+LUA_DOC_GETTER(L_GetLogOutput, pDoc->m_logging.log_output)
 
 /**
  * world.SetLogOutput(enable)
@@ -157,14 +117,7 @@ int L_GetLogOutput(lua_State* L)
  *
  * @see GetLogOutput, SetLogInput, SetLogNotes
  */
-int L_SetLogOutput(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-    // Default to true if no argument provided (matches original optboolean behavior)
-    bool enable = lua_isnone(L, 1) ? true : lua_toboolean(L, 1);
-    pDoc->m_logging.log_output = enable;
-    return 0;
-}
+LUA_DOC_SETTER_BOOL(L_SetLogOutput, m_logging.log_output)
 
 // ========== Bare-name compatibility aliases (dual get/set dispatch) ==========
 
@@ -412,9 +365,7 @@ int L_SetSpeedWalkDelay(lua_State* L)
 int L_EvaluateSpeedwalk(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    QString result = speedwalk::evaluate(luaCheckQString(L, 1), pDoc->m_speedwalk.filler);
-    luaPushQString(L, result);
-    return 1;
+    return luaReturn(L, speedwalk::evaluate(luaCheckQString(L, 1), pDoc->m_speedwalk.filler));
 }
 
 /**
@@ -440,9 +391,7 @@ int L_EvaluateSpeedwalk(lua_State* L)
 int L_ReverseSpeedwalk(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    QString result = speedwalk::reverse(luaCheckQString(L, 1));
-    luaPushQString(L, result);
-    return 1;
+    return luaReturn(L, speedwalk::reverse(luaCheckQString(L, 1)));
 }
 
 /**
@@ -472,7 +421,6 @@ int L_ReverseSpeedwalk(lua_State* L)
 int L_RemoveBacktracks(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    QString result = speedwalk::removeBacktracks(luaCheckQString(L, 1), pDoc->m_speedwalk.filler);
-    luaPushQString(L, result);
-    return 1;
+    return luaReturn(L,
+                     speedwalk::removeBacktracks(luaCheckQString(L, 1), pDoc->m_speedwalk.filler));
 }

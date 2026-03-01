@@ -76,9 +76,7 @@ int L_Queue(lua_State* L)
 int L_DiscardQueue(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    qint32 count = pDoc->DiscardQueue();
-    lua_pushnumber(L, count);
-    return 1;
+    return luaReturn(L, pDoc->DiscardQueue());
 }
 
 // ========== Internal Command Dispatch ==========

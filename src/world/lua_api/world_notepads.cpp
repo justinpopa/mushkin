@@ -26,11 +26,8 @@ extern "C" {
 int L_SendToNotepad(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-
-    auto result = pDoc->SendToNotepad(luaCheckQString(L, 1), luaCheckQString(L, 2));
-
-    lua_pushboolean(L, result.has_value() ? 1 : 0);
-    return 1;
+    auto [title, contents] = luaArgs<QString, QString>(L);
+    return luaReturn(L, pDoc->SendToNotepad(title, contents).has_value());
 }
 
 /**
@@ -45,11 +42,8 @@ int L_SendToNotepad(lua_State* L)
 int L_AppendToNotepad(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-
-    auto result = pDoc->AppendToNotepad(luaCheckQString(L, 1), luaCheckQString(L, 2));
-
-    lua_pushboolean(L, result.has_value() ? 1 : 0);
-    return 1;
+    auto [title, contents] = luaArgs<QString, QString>(L);
+    return luaReturn(L, pDoc->AppendToNotepad(title, contents).has_value());
 }
 
 /**
@@ -64,11 +58,8 @@ int L_AppendToNotepad(lua_State* L)
 int L_ReplaceNotepad(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-
-    auto result = pDoc->ReplaceNotepad(luaCheckQString(L, 1), luaCheckQString(L, 2));
-
-    lua_pushboolean(L, result.has_value() ? 1 : 0);
-    return 1;
+    auto [title, contents] = luaArgs<QString, QString>(L);
+    return luaReturn(L, pDoc->ReplaceNotepad(title, contents).has_value());
 }
 
 /**
@@ -82,11 +73,8 @@ int L_ReplaceNotepad(lua_State* L)
 int L_ActivateNotepad(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-
-    auto result = pDoc->ActivateNotepad(luaCheckQString(L, 1));
-
-    lua_pushboolean(L, result.has_value() ? 1 : 0);
-    return 1;
+    auto [title] = luaArgs<QString>(L);
+    return luaReturn(L, pDoc->ActivateNotepad(title).has_value());
 }
 
 /**
@@ -120,17 +108,15 @@ int L_CloseNotepad(lua_State* L)
 int L_GetNotepadText(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-
-    NotepadWidget* notepad = pDoc->FindNotepad(luaCheckQString(L, 1));
+    auto [title] = luaArgs<QString>(L);
+    NotepadWidget* notepad = pDoc->FindNotepad(title);
 
     if (!notepad) {
         lua_pushnil(L);
         return 1;
     }
 
-    luaPushQString(L, notepad->GetText());
-
-    return 1;
+    return luaReturn(L, notepad->GetText());
 }
 
 /**

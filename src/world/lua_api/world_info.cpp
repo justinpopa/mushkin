@@ -28,12 +28,7 @@
  *
  * @see GetLinesInBufferCount, GetReceivedBytes, GetConnectDuration
  */
-int L_GetLineCount(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-    lua_pushnumber(L, pDoc->m_total_lines);
-    return 1;
-}
+LUA_DOC_GETTER(L_GetLineCount, pDoc->m_total_lines)
 
 /**
  * world.GetSentBytes()
@@ -49,12 +44,7 @@ int L_GetLineCount(lua_State* L)
  *
  * @see GetReceivedBytes, GetConnectDuration, GetLineCount
  */
-int L_GetSentBytes(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-    lua_pushnumber(L, pDoc->m_connectionManager->m_nBytesOut);
-    return 1;
-}
+LUA_DOC_GETTER(L_GetSentBytes, pDoc->bytesOut())
 
 /**
  * world.GetReceivedBytes()
@@ -70,12 +60,7 @@ int L_GetSentBytes(lua_State* L)
  *
  * @see GetSentBytes, GetLineCount, GetConnectDuration
  */
-int L_GetReceivedBytes(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-    lua_pushnumber(L, pDoc->m_connectionManager->m_nBytesIn);
-    return 1;
-}
+LUA_DOC_GETTER(L_GetReceivedBytes, pDoc->bytesIn())
 
 /**
  * world.GetConnectDuration()
@@ -106,8 +91,7 @@ int L_GetConnectDuration(lua_State* L)
     qint64 msecs = pDoc->m_connectionManager->m_tConnectTime.msecsTo(QDateTime::currentDateTime());
     qint64 seconds = msecs / 1000;
 
-    lua_pushnumber(L, seconds);
-    return 1;
+    return luaReturn(L, seconds);
 }
 
 /**
@@ -124,12 +108,7 @@ int L_GetConnectDuration(lua_State* L)
  *
  * @see WorldPort, WorldName, IsConnected
  */
-int L_WorldAddress(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-    luaPushQString(L, pDoc->m_server);
-    return 1;
-}
+LUA_DOC_GETTER(L_WorldAddress, pDoc->m_server)
 
 /**
  * world.WorldPort()
@@ -143,12 +122,7 @@ int L_WorldAddress(lua_State* L)
  *
  * @see WorldAddress, WorldName, IsConnected
  */
-int L_WorldPort(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-    lua_pushnumber(L, pDoc->m_port);
-    return 1;
-}
+LUA_DOC_GETTER(L_WorldPort, pDoc->m_port)
 
 /**
  * world.WorldName()
@@ -163,12 +137,7 @@ int L_WorldPort(lua_State* L)
  *
  * @see WorldAddress, WorldPort, Version
  */
-int L_WorldName(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-    luaPushQString(L, pDoc->m_mush_name);
-    return 1;
-}
+LUA_DOC_GETTER(L_WorldName, pDoc->m_mush_name)
 
 /**
  * world.Version()
@@ -206,12 +175,7 @@ int L_Version(lua_State* L)
  *
  * @see GetLineCount, GetRecentLines, GetLineInfo
  */
-int L_GetLinesInBufferCount(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-    lua_pushnumber(L, pDoc->m_lineList.size());
-    return 1;
-}
+LUA_DOC_GETTER(L_GetLinesInBufferCount, static_cast<int>(pDoc->m_lineList.size()))
 
 /**
  * world.GetSysColor(index)
@@ -306,8 +270,7 @@ int L_GetSysColor(lua_State* L)
     }
 
     // Return as 0xRRGGBB (Windows format, no alpha)
-    lua_pushnumber(L, (color.red() << 16) | (color.green() << 8) | color.blue());
-    return 1;
+    return luaReturn(L, (color.red() << 16) | (color.green() << 8) | color.blue());
 }
 
 /**
@@ -605,12 +568,7 @@ int L_GetFrame(lua_State* L)
  *
  * @see GetSelectionEndLine, GetSelectionStartColumn, GetSelectionEndColumn
  */
-int L_GetSelectionStartLine(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-    lua_pushnumber(L, pDoc->GetSelectionStartLine());
-    return 1;
-}
+LUA_DOC_GETTER(L_GetSelectionStartLine, pDoc->GetSelectionStartLine())
 
 /**
  * world.GetSelectionEndLine()
@@ -626,12 +584,7 @@ int L_GetSelectionStartLine(lua_State* L)
  *
  * @see GetSelectionStartLine, GetSelectionStartColumn, GetSelectionEndColumn
  */
-int L_GetSelectionEndLine(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-    lua_pushnumber(L, pDoc->GetSelectionEndLine());
-    return 1;
-}
+LUA_DOC_GETTER(L_GetSelectionEndLine, pDoc->GetSelectionEndLine())
 
 /**
  * world.GetSelectionStartColumn()
@@ -648,12 +601,7 @@ int L_GetSelectionEndLine(lua_State* L)
  *
  * @see GetSelectionEndColumn, GetSelectionStartLine, GetSelectionEndLine
  */
-int L_GetSelectionStartColumn(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-    lua_pushnumber(L, pDoc->GetSelectionStartColumn());
-    return 1;
-}
+LUA_DOC_GETTER(L_GetSelectionStartColumn, pDoc->GetSelectionStartColumn())
 
 /**
  * world.GetSelectionEndColumn()
@@ -670,9 +618,4 @@ int L_GetSelectionStartColumn(lua_State* L)
  *
  * @see GetSelectionStartColumn, GetSelectionStartLine, GetSelectionEndLine
  */
-int L_GetSelectionEndColumn(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-    lua_pushnumber(L, pDoc->GetSelectionEndColumn());
-    return 1;
-}
+LUA_DOC_GETTER(L_GetSelectionEndColumn, pDoc->GetSelectionEndColumn())

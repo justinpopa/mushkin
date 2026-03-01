@@ -33,8 +33,7 @@
  */
 int L_Trim(lua_State* L)
 {
-    luaPushQString(L, luaCheckQString(L, 1).trimmed());
-    return 1;
+    return luaReturn(L, luaCheckQString(L, 1).trimmed());
 }
 
 /**
@@ -457,8 +456,7 @@ int L_ChangeDir(lua_State* L)
     QString path = luaCheckQString(L, 1);
 
     bool success = QDir::setCurrent(path);
-    lua_pushboolean(L, success);
-    return 1;
+    return luaReturn(L, success);
 }
 
 /**
@@ -1238,9 +1236,7 @@ int L_ErrorDesc(lua_State* L)
  */
 int L_Replace(lua_State* L)
 {
-    QString qSource = luaCheckQString(L, 1);
-    QString qSearchFor = luaCheckQString(L, 2);
-    QString qReplaceWith = luaCheckQString(L, 3);
+    auto [qSource, qSearchFor, qReplaceWith] = luaArgs<QString, QString, QString>(L);
     bool multiple = lua_toboolean(L, 4);
 
     QString result;
@@ -1256,8 +1252,7 @@ int L_Replace(lua_State* L)
         }
     }
 
-    luaPushQString(L, result);
-    return 1;
+    return luaReturn(L, result);
 }
 
 /**
@@ -1385,8 +1380,8 @@ int L_ShiftTabCompleteItem(lua_State* L)
 int L_GetTriggerWildcard(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    QString name = luaCheckQString(L, 1).trimmed().toLower();
-    QString wcName = luaCheckQString(L, 2);
+    auto [rawName, wcName] = luaArgs<QString, QString>(L);
+    QString name = rawName.trimmed().toLower();
 
     // Find the trigger
     auto it = pDoc->m_automationRegistry->m_TriggerMap.find(name);
@@ -1436,8 +1431,8 @@ int L_GetTriggerWildcard(lua_State* L)
 int L_GetAliasWildcard(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    QString name = luaCheckQString(L, 1).trimmed().toLower();
-    QString wcName = luaCheckQString(L, 2);
+    auto [rawName, wcName] = luaArgs<QString, QString>(L);
+    QString name = rawName.trimmed().toLower();
 
     // Find the alias
     auto it = pDoc->m_automationRegistry->m_AliasMap.find(name);
@@ -1478,12 +1473,7 @@ int L_GetAliasWildcard(lua_State* L)
  *
  * @see SetNotes
  */
-int L_GetNotes(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-    luaPushQString(L, pDoc->m_notes);
-    return 1;
-}
+LUA_DOC_GETTER(L_GetNotes, pDoc->m_notes)
 
 /**
  * world.SetNotes(notes)
@@ -1551,12 +1541,7 @@ int L_DeleteCommandHistory(lua_State* L)
  *
  * @see GetCommand, SetCommand, GetCommandList
  */
-int L_PushCommand(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-    luaPushQString(L, pDoc->PushCommand());
-    return 1;
-}
+LUA_DOC_GETTER(L_PushCommand, pDoc->PushCommand())
 
 /**
  * world.SetChanged(changed)

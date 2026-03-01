@@ -1549,12 +1549,7 @@ int L_GetInfo(lua_State* L)
  *
  * @return World name
  */
-int L_GetWorldName(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-    luaPushQString(L, pDoc->m_mush_name);
-    return 1;
-}
+LUA_DOC_GETTER(L_GetWorldName, pDoc->m_mush_name)
 
 /**
  * SetOption - Set a world option by name
@@ -1862,8 +1857,8 @@ int L_SetAlphaOption(lua_State* L)
     WorldDocument* pDoc = doc(L);
 
     // Normalize option name: lowercase, trimmed (matches original)
-    QString normalizedName = luaCheckQString(L, 1).toLower().trimmed();
-    QString strValue = luaCheckQString(L, 2);
+    auto [rawName, strValue] = luaArgs<QString, QString>(L);
+    QString normalizedName = rawName.toLower().trimmed();
 
     // Search alpha (string) options table
     for (int i = 0; AlphaOptionsTable[i].pName != nullptr; i++) {
@@ -1997,15 +1992,8 @@ int L_TextRectangle(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    qint32 left = luaL_checkinteger(L, 1);
-    qint32 top = luaL_checkinteger(L, 2);
-    qint32 right = luaL_checkinteger(L, 3);
-    qint32 bottom = luaL_checkinteger(L, 4);
-    qint32 borderOffset = luaL_checkinteger(L, 5);
-    QRgb borderColour = luaL_checkinteger(L, 6);
-    qint32 borderWidth = luaL_checkinteger(L, 7);
-    QRgb outsideFillColour = luaL_checkinteger(L, 8);
-    qint32 outsideFillStyle = luaL_checkinteger(L, 9);
+    auto [left, top, right, bottom, borderOffset, borderColour, borderWidth, outsideFillColour,
+          outsideFillStyle] = luaArgs<int, int, int, int, int, int, int, int, int>(L);
 
     qCDebug(lcScript) << "TextRectangle called: rect=(" << left << top << right << bottom
                       << ") border=" << borderOffset << borderWidth;
@@ -2016,9 +2004,9 @@ int L_TextRectangle(lua_State* L)
     // Use QPoint constructor to create from coordinates
     pDoc->m_TextRectangle = QRect(QPoint(left, top), QPoint(right, bottom));
     pDoc->m_TextRectangleBorderOffset = borderOffset;
-    pDoc->m_TextRectangleBorderColour = borderColour;
+    pDoc->m_TextRectangleBorderColour = static_cast<QRgb>(borderColour);
     pDoc->m_TextRectangleBorderWidth = borderWidth;
-    pDoc->m_TextRectangleOutsideFillColour = outsideFillColour;
+    pDoc->m_TextRectangleOutsideFillColour = static_cast<QRgb>(outsideFillColour);
     pDoc->m_TextRectangleOutsideFillStyle = outsideFillStyle;
 
     // Notify OutputView that text rectangle config changed
@@ -2028,8 +2016,7 @@ int L_TextRectangle(lua_State* L)
     // Trigger redraw
     pDoc->Repaint();
 
-    lua_pushinteger(L, 0); // eOK
-    return 1;
+    return luaReturn(L, eOK);
 }
 
 /**
@@ -2051,8 +2038,7 @@ int L_SetBackgroundImage(lua_State* L)
 
     // Validate mode (matches original)
     if (mode < 0 || mode > 13) {
-        lua_pushinteger(L, eBadParameter);
-        return 1;
+        return luaReturn(L, eBadParameter);
     }
 
     // Store the image path and mode
@@ -2064,8 +2050,7 @@ int L_SetBackgroundImage(lua_State* L)
         pDoc->m_pActiveOutputView->reloadBackgroundImage();
     }
 
-    lua_pushinteger(L, eOK);
-    return 1;
+    return luaReturn(L, eOK);
 }
 
 /**
@@ -2077,12 +2062,7 @@ int L_SetBackgroundImage(lua_State* L)
  *
  * @return Current command text
  */
-int L_GetCommand(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-    luaPushQString(L, pDoc->GetCommand());
-    return 1;
-}
+LUA_DOC_GETTER(L_GetCommand, pDoc->GetCommand())
 
 /**
  * SetCommandWindowHeight - Set command window height (stub implementation)
@@ -2094,8 +2074,7 @@ int L_SetCommandWindowHeight(lua_State* L)
 {
     // qint32 height = luaL_checkinteger(L, 1);
     // qDebug() << "SetCommandWindowHeight called (stub): height=" << height;
-    lua_pushinteger(L, 0); // eOK
-    return 1;
+    return luaReturn(L, eOK);
 }
 
 /**
@@ -2115,8 +2094,7 @@ int L_SetScroll(lua_State* L)
     // qint32 position = luaL_checkinteger(L, 1);
     // bool visible = lua_toboolean(L, 2);
     // qDebug() << "SetScroll called (stub): position=" << position << ", visible=" << visible;
-    lua_pushinteger(L, 0); // eOK
-    return 1;
+    return luaReturn(L, eOK);
 }
 
 /**
@@ -2196,8 +2174,7 @@ int L_SetCursor(lua_State* L)
             break;
         default:
             // Invalid cursor type - return error
-            lua_pushinteger(L, eBadParameter);
-            return 1;
+            return luaReturn(L, eBadParameter);
     }
 
     // Set cursor on the output view (if it exists)
@@ -2205,8 +2182,7 @@ int L_SetCursor(lua_State* L)
         pDoc->m_pActiveOutputView->setViewCursor(QCursor(qtCursor));
     }
 
-    lua_pushinteger(L, eOK);
-    return 1;
+    return luaReturn(L, eOK);
 }
 
 /**
@@ -2228,8 +2204,7 @@ int L_SetCommand(lua_State* L)
     QString qText = QString::fromUtf8(text, len);
 
     qint32 result = pDoc->SetCommand(qText);
-    lua_pushinteger(L, result);
-    return 1;
+    return luaReturn(L, result);
 }
 
 /**
@@ -2247,12 +2222,10 @@ int L_SetCommand(lua_State* L)
 int L_SetCommandSelection(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    qint32 first = luaL_checkinteger(L, 1);
-    qint32 last = luaL_checkinteger(L, 2);
+    auto [first, last] = luaArgs<int, int>(L);
 
     qint32 result = pDoc->SetCommandSelection(first, last);
-    lua_pushinteger(L, result);
-    return 1;
+    return luaReturn(L, result);
 }
 
 /**

@@ -41,10 +41,7 @@ int L_PlaySound(lua_State* L)
     double pan = luaL_optnumber(L, 5, 0.0);    // Default: center
 
     // Call PlaySound
-    qint32 result = pDoc->PlaySound(buffer, luaCheckQString(L, 2), loop, volume, pan);
-
-    lua_pushinteger(L, result);
-    return 1;
+    return luaReturn(L, pDoc->PlaySound(buffer, luaCheckQString(L, 2), loop, volume, pan));
 }
 
 /**
@@ -71,10 +68,7 @@ int L_StopSound(lua_State* L)
     qint16 buffer = luaL_checkinteger(L, 1);
 
     // Call StopSound
-    qint32 result = pDoc->StopSound(buffer);
-
-    lua_pushinteger(L, result);
-    return 1;
+    return luaReturn(L, pDoc->StopSound(buffer));
 }
 
 /**
@@ -98,12 +92,10 @@ int L_Sound(lua_State* L)
         return luaL_error(L, "No world document");
     }
 
+    auto [filename] = luaArgs<QString>(L);
     // Call PlaySoundFile (finds first available buffer)
-    bool success = pDoc->PlaySoundFile(luaCheckQString(L, 1));
-
     // Return error code (eOK or eCannotPlaySound) for API compatibility
-    lua_pushinteger(L, success ? eOK : eCannotPlaySound);
-    return 1;
+    return luaReturn(L, pDoc->PlaySoundFile(filename) ? eOK : eCannotPlaySound);
 }
 
 /**
@@ -175,8 +167,5 @@ int L_GetSoundStatus(lua_State* L)
     qint16 buffer = luaL_checkinteger(L, 1);
 
     // Call GetSoundStatus
-    qint32 status = pDoc->GetSoundStatus(buffer);
-
-    lua_pushinteger(L, status);
-    return 1;
+    return luaReturn(L, pDoc->GetSoundStatus(buffer));
 }

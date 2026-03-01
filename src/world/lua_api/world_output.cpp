@@ -483,8 +483,7 @@ int L_ColourTell(lua_State* L)
 int L_GetLineInfo(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    int lineNumber = luaL_checkinteger(L, 1);
-    int infoType = luaL_checkinteger(L, 2);
+    auto [lineNumber, infoType] = luaArgs<int, int>(L);
 
     // Check line exists (1-based index)
     if (lineNumber <= 0 || lineNumber > static_cast<int>(pDoc->m_lineList.size())) {
@@ -586,9 +585,7 @@ int L_GetLineInfo(lua_State* L)
 int L_GetStyleInfo(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    int lineNumber = luaL_checkinteger(L, 1);
-    int styleNumber = luaL_checkinteger(L, 2);
-    int infoType = luaL_checkinteger(L, 3);
+    auto [lineNumber, styleNumber, infoType] = luaArgs<int, int, int>(L);
 
     // Check line exists (1-based index)
     if (lineNumber <= 0 || lineNumber > static_cast<int>(pDoc->m_lineList.size())) {
@@ -752,8 +749,7 @@ int L_GetRecentLines(lua_State* L)
         result += pDoc->m_recentLines[static_cast<size_t>(i)];
     }
 
-    luaPushQString(L, result);
-    return 1;
+    return luaReturn(L, result);
 }
 
 /**
@@ -808,12 +804,7 @@ int L_NoteColour(lua_State* L)
  *
  * @see NoteColourBack, GetNoteColourFore, NoteColourRGB
  */
-int L_NoteColourFore(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-    lua_pushinteger(L, pDoc->m_iNoteColourFore & 0x00FFFFFF);
-    return 1;
-}
+LUA_DOC_GETTER(L_NoteColourFore, pDoc->m_iNoteColourFore & 0x00FFFFFF)
 
 /**
  * world.NoteColourBack()
@@ -830,12 +821,7 @@ int L_NoteColourFore(lua_State* L)
  *
  * @see NoteColourFore, GetNoteColourBack, NoteColourRGB
  */
-int L_NoteColourBack(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-    lua_pushinteger(L, pDoc->m_iNoteColourBack & 0x00FFFFFF);
-    return 1;
-}
+LUA_DOC_GETTER(L_NoteColourBack, pDoc->m_iNoteColourBack & 0x00FFFFFF)
 
 /**
  * world.NoteColourRGB(foreground, background)
@@ -859,8 +845,7 @@ int L_NoteColourBack(lua_State* L)
 int L_NoteColourRGB(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    lua_Integer fore = luaL_checkinteger(L, 1);
-    lua_Integer back = luaL_checkinteger(L, 2);
+    auto [fore, back] = luaArgs<int, int>(L);
 
     pDoc->m_bNotesInRGB = true;
     pDoc->m_iNoteColourFore = fore & 0x00FFFFFF;
@@ -1157,12 +1142,7 @@ int L_NoteStyle(lua_State* L)
  *
  * @see NoteStyle
  */
-int L_GetNoteStyle(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-    lua_pushinteger(L, pDoc->m_iNoteStyle & 0x0F);
-    return 1;
-}
+LUA_DOC_GETTER(L_GetNoteStyle, pDoc->m_iNoteStyle & 0x0F)
 
 /**
  * world.NoteHr()
@@ -1462,8 +1442,7 @@ int L_GetXMLEntity(lua_State* L)
     // both numeric (&#65;, &#x41;) and named standard entities.
     QString resolved = pDoc->m_mxpEngine->MXP_GetEntity(luaCheckQString(L, 1));
 
-    luaPushQString(L, resolved);
-    return 1;
+    return luaReturn(L, resolved);
 }
 
 /**
@@ -1643,10 +1622,11 @@ int L_SetSelection(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const int startLine = static_cast<int>(luaL_checkinteger(L, 1)) - 1;
-    const int endLine = static_cast<int>(luaL_checkinteger(L, 2)) - 1;
-    const int startCol = static_cast<int>(luaL_checkinteger(L, 3)) - 1;
-    const int endCol = static_cast<int>(luaL_checkinteger(L, 4)) - 1;
+    auto [rawStartLine, rawEndLine, rawStartCol, rawEndCol] = luaArgs<int, int, int, int>(L);
+    const int startLine = rawStartLine - 1;
+    const int endLine = rawEndLine - 1;
+    const int startCol = rawStartCol - 1;
+    const int endCol = rawEndCol - 1;
 
     pDoc->m_selectionStartLine = startLine;
     pDoc->m_selectionEndLine = endLine;

@@ -28,7 +28,7 @@
 int L_Send(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    QString text = luaCheckQString(L, 1);
+    auto [text] = luaArgs<QString>(L);
 
     // Check if connected
     if (pDoc->connectPhase() != eConnectConnectedToMud) {
@@ -124,13 +124,7 @@ int L_Disconnect(lua_State* L)
  *
  * @see Connect, Disconnect
  */
-int L_IsConnected(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-    bool connected = (pDoc->connectPhase() == eConnectConnectedToMud);
-    lua_pushboolean(L, connected);
-    return 1;
-}
+LUA_DOC_GETTER(L_IsConnected, pDoc->connectPhase() == eConnectConnectedToMud)
 
 /**
  * world.SendImmediate(text)
@@ -155,7 +149,7 @@ int L_IsConnected(lua_State* L)
 int L_SendImmediate(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    QString text = luaCheckQString(L, 1);
+    auto [text] = luaArgs<QString>(L);
 
     // Check if connected
     if (pDoc->connectPhase() != eConnectConnectedToMud) {
@@ -195,7 +189,7 @@ int L_SendImmediate(lua_State* L)
 int L_SendNoEcho(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    QString text = luaCheckQString(L, 1);
+    auto [text] = luaArgs<QString>(L);
 
     // Check if connected
     if (pDoc->connectPhase() != eConnectConnectedToMud) {
@@ -236,7 +230,7 @@ int L_SendNoEcho(lua_State* L)
 int L_SendPush(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    QString text = luaCheckQString(L, 1);
+    auto [text] = luaArgs<QString>(L);
 
     // Check if connected
     if (pDoc->connectPhase() != eConnectConnectedToMud) {

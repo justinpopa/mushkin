@@ -31,7 +31,7 @@
 int L_GetVariable(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    QString qName = luaCheckQString(L, 1);
+    auto [qName] = luaArgs<QString>(L);
 
     // Use plugin(L) to get the plugin from Lua registry
     Plugin* currentPlugin = plugin(L);
@@ -81,8 +81,7 @@ int L_GetVariable(lua_State* L)
 int L_SetVariable(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    QString qName = luaCheckQString(L, 1);
-    QString qValue = luaCheckQString(L, 2);
+    auto [qName, qValue] = luaArgs<QString, QString>(L);
 
     // Validate and trim the name
     qint32 status = validateObjectName(qName);
@@ -143,7 +142,7 @@ int L_SetVariable(lua_State* L)
 int L_DeleteVariable(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    QString qName = luaCheckQString(L, 1);
+    auto [qName] = luaArgs<QString>(L);
 
     // Validate and trim the name
     qint32 status = validateObjectName(qName);

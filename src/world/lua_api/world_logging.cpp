@@ -69,11 +69,7 @@ int L_OpenLog(lua_State* L)
 int L_CloseLog(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-
-    qint32 result = pDoc->CloseLog();
-
-    lua_pushnumber(L, result);
-    return 1;
+    return luaReturn(L, pDoc->CloseLog());
 }
 
 /**
@@ -98,13 +94,8 @@ int L_CloseLog(lua_State* L)
 int L_WriteLog(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-
-    QString message = luaCheckQString(L, 1);
-
-    qint32 result = pDoc->WriteLog(message);
-
-    lua_pushnumber(L, result);
-    return 1;
+    auto [message] = luaArgs<QString>(L);
+    return luaReturn(L, pDoc->WriteLog(message));
 }
 
 /**
@@ -128,11 +119,7 @@ int L_WriteLog(lua_State* L)
 int L_FlushLog(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-
-    qint32 result = pDoc->FlushLog();
-
-    lua_pushnumber(L, result);
-    return 1;
+    return luaReturn(L, pDoc->FlushLog());
 }
 
 /**
@@ -150,15 +137,7 @@ int L_FlushLog(lua_State* L)
  *
  * @see OpenLog, CloseLog
  */
-int L_IsLogOpen(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-
-    bool isOpen = pDoc->IsLogOpen();
-
-    lua_pushboolean(L, isOpen);
-    return 1;
-}
+LUA_DOC_GETTER(L_IsLogOpen, pDoc->IsLogOpen())
 
 /**
  * world.OmitFromLogFile()

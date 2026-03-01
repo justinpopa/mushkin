@@ -196,10 +196,7 @@ int L_AcceleratorList(lua_State* L)
  */
 int L_GetClipboard(lua_State* L)
 {
-    QClipboard* clipboard = QGuiApplication::clipboard();
-    QString text = clipboard->text();
-    luaPushQString(L, text);
-    return 1;
+    return luaReturn(L, QGuiApplication::clipboard()->text());
 }
 
 /**

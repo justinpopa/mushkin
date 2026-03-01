@@ -238,9 +238,7 @@ int L_GetUniqueNumber(lua_State* L)
  */
 int L_GetUniqueID(lua_State* L)
 {
-    QString uniqueID = generateUniqueID();
-    luaPushQString(L, uniqueID);
-    return 1;
+    return luaReturn(L, generateUniqueID());
 }
 
 /**
@@ -262,9 +260,7 @@ int L_GetUniqueID(lua_State* L)
  */
 int L_CreateGUID(lua_State* L)
 {
-    QString guid = createGUID();
-    luaPushQString(L, guid);
-    return 1;
+    return luaReturn(L, createGUID());
 }
 
 /**

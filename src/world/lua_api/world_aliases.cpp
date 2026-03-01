@@ -20,6 +20,158 @@ extern "C" {
 
 #include "lua_common.h"
 
+// ============================================================
+// Info table for GetAliasInfo / GetPluginAliasInfo
+// Shared by both world and plugin variants via luaInfoLookup.
+// ============================================================
+
+static const InfoField<Alias> kAliasInfoFields[] = {
+    {1, [](lua_State* L, const Alias& a) { luaPush(L, a.name); }},
+    {2, [](lua_State* L, const Alias& a) { luaPush(L, a.contents); }},
+    {3, [](lua_State* L, const Alias& a) { luaPush(L, a.procedure); }},
+    {4, [](lua_State* L, const Alias& a) { luaPush(L, a.omit_from_log); }},
+    {5, [](lua_State* L, const Alias& a) { luaPush(L, a.omit_from_output); }},
+    {6, [](lua_State* L, const Alias& a) { luaPush(L, a.enabled); }},
+    {7, [](lua_State* L, const Alias& a) { luaPush(L, a.use_regexp); }},
+    {8, [](lua_State* L, const Alias& a) { luaPush(L, a.ignore_case); }},
+    {9, [](lua_State* L, const Alias& a) { luaPush(L, a.expand_variables); }},
+    {10, [](lua_State* L, const Alias& a) { luaPush(L, a.invocation_count); }},
+    {11, [](lua_State* L, const Alias& a) { luaPush(L, a.matched); }},
+    {12, [](lua_State* L, const Alias& a) { luaPush(L, a.menu); }},
+    {13,
+     [](lua_State* L, const Alias& a) {
+         if (a.when_matched.isValid()) {
+             // Return as Unix timestamp (seconds since epoch)
+             lua_pushnumber(L, a.when_matched.toSecsSinceEpoch());
+         } else {
+             lua_pushnil(L); // Return nil if never matched
+         }
+     }},
+    {14, [](lua_State* L, const Alias& a) { luaPush(L, a.temporary); }},
+    {15, [](lua_State* L, const Alias& a) { luaPush(L, a.included); }},
+    {16, [](lua_State* L, const Alias& a) { luaPush(L, a.group); }},
+    {17, [](lua_State* L, const Alias& a) { luaPush(L, a.variable); }},
+    {18, [](lua_State* L, const Alias& a) { luaPush(L, static_cast<int>(a.send_to)); }},
+    {19, [](lua_State* L, const Alias& a) { luaPush(L, a.keep_evaluating); }},
+    {20, [](lua_State* L, const Alias& a) { luaPush(L, a.sequence); }},
+    {21, [](lua_State* L, const Alias& a) { luaPush(L, a.echo_alias); }},
+    {22, [](lua_State* L, const Alias& a) { luaPush(L, a.omit_from_command_history); }},
+    {23, [](lua_State* L, const Alias& a) { luaPush(L, a.user_option); }},
+    {24,
+     [](lua_State* L, const Alias& a) {
+         // Count of wildcard matches (how many wildcards were captured)
+         lua_pushnumber(L, a.regexp ? static_cast<lua_Number>(a.wildcards.size()) : 0);
+     }},
+    {25,
+     [](lua_State* L, const Alias& a) {
+         // wildcards[0] is the entire match
+         if (!a.wildcards.isEmpty()) {
+             luaPushQString(L, a.wildcards[0]);
+         } else {
+             lua_pushstring(L, "");
+         }
+     }},
+    {26, [](lua_State* L, const Alias& a) { luaPush(L, a.executing_script); }},
+    {27, [](lua_State* L, const Alias& a) { luaPush(L, a.dispid != -1); }},
+    {28,
+     [](lua_State* L, const Alias&) {
+         // We don't track regexp errors in Qt (always 0)
+         lua_pushnumber(L, 0);
+     }},
+    {29, [](lua_State* L, const Alias& a) { luaPush(L, a.one_shot); }},
+    {30,
+     [](lua_State* L, const Alias&) {
+         // We don't track execution time (always 0)
+         lua_pushnumber(L, 0);
+     }},
+    {31,
+     [](lua_State* L, const Alias&) {
+         // We don't track match attempts (always 0)
+         lua_pushnumber(L, 0);
+     }},
+    // Wildcards: 101-109 = wildcards[1-9], 110 = wildcard 0 (entire match)
+    {101,
+     [](lua_State* L, const Alias& a) {
+         if (1 < a.wildcards.size()) {
+             luaPushQString(L, a.wildcards[1]);
+         } else {
+             lua_pushstring(L, "");
+         }
+     }},
+    {102,
+     [](lua_State* L, const Alias& a) {
+         if (2 < a.wildcards.size()) {
+             luaPushQString(L, a.wildcards[2]);
+         } else {
+             lua_pushstring(L, "");
+         }
+     }},
+    {103,
+     [](lua_State* L, const Alias& a) {
+         if (3 < a.wildcards.size()) {
+             luaPushQString(L, a.wildcards[3]);
+         } else {
+             lua_pushstring(L, "");
+         }
+     }},
+    {104,
+     [](lua_State* L, const Alias& a) {
+         if (4 < a.wildcards.size()) {
+             luaPushQString(L, a.wildcards[4]);
+         } else {
+             lua_pushstring(L, "");
+         }
+     }},
+    {105,
+     [](lua_State* L, const Alias& a) {
+         if (5 < a.wildcards.size()) {
+             luaPushQString(L, a.wildcards[5]);
+         } else {
+             lua_pushstring(L, "");
+         }
+     }},
+    {106,
+     [](lua_State* L, const Alias& a) {
+         if (6 < a.wildcards.size()) {
+             luaPushQString(L, a.wildcards[6]);
+         } else {
+             lua_pushstring(L, "");
+         }
+     }},
+    {107,
+     [](lua_State* L, const Alias& a) {
+         if (7 < a.wildcards.size()) {
+             luaPushQString(L, a.wildcards[7]);
+         } else {
+             lua_pushstring(L, "");
+         }
+     }},
+    {108,
+     [](lua_State* L, const Alias& a) {
+         if (8 < a.wildcards.size()) {
+             luaPushQString(L, a.wildcards[8]);
+         } else {
+             lua_pushstring(L, "");
+         }
+     }},
+    {109,
+     [](lua_State* L, const Alias& a) {
+         if (9 < a.wildcards.size()) {
+             luaPushQString(L, a.wildcards[9]);
+         } else {
+             lua_pushstring(L, "");
+         }
+     }},
+    {110,
+     [](lua_State* L, const Alias& a) {
+         if (!a.wildcards.isEmpty()) {
+             luaPushQString(L, a.wildcards[0]);
+         } else {
+             lua_pushstring(L, "");
+         }
+     }},
+};
+
 /**
  * world.AddAlias(name, match, response, flags, script)
  *
@@ -189,9 +341,7 @@ int L_DeleteAlias(lua_State* L)
 
     QString qName = luaCheckQString(L, 1);
 
-    if (!pDoc->deleteAlias(qName).has_value()) {
-        return luaReturnError(L, eAliasNotFound);
-    }
+    LUA_UNWRAP_VOID(pDoc->deleteAlias(qName), eAliasNotFound);
 
     return luaReturnOK(L);
 }
@@ -282,13 +432,7 @@ int L_GetAlias(lua_State* L)
         flags |= eKeepEvaluating;
 
     // Return: error_code, match, response, flags, script
-    lua_pushnumber(L, eOK);
-    luaPushQString(L, alias->name);
-    luaPushQString(L, alias->contents);
-    lua_pushnumber(L, flags);
-    luaPushQString(L, alias->procedure);
-
-    return 5;
+    return luaReturn(L, eOK, alias->name, alias->contents, flags, alias->procedure);
 }
 
 /**
@@ -391,155 +535,15 @@ int L_EnableAlias(lua_State* L)
  */
 int L_GetAliasInfo(lua_State* L)
 {
-    WorldDocument* pDoc = doc(L);
-    int info_type = luaL_checkinteger(L, 2);
-
-    QString qName = luaCheckQString(L, 1);
-    Alias* alias = pDoc->getAlias(qName);
+    auto [name, info_type] = luaArgs<QString, int>(L);
+    Alias* alias = findAlias(L, name);
 
     if (!alias) {
         lua_pushnil(L);
         return 1;
     }
 
-    switch (info_type) {
-        case 1: // name (match pattern)
-            luaPushQString(L, alias->name);
-            break;
-        case 2: // contents (send text)
-            luaPushQString(L, alias->contents);
-            break;
-        case 3: // procedure (script name)
-            luaPushQString(L, alias->procedure);
-            break;
-        case 4: // omit_from_log
-            lua_pushboolean(L, alias->omit_from_log);
-            break;
-        case 5: // omit_from_output
-            lua_pushboolean(L, alias->omit_from_output);
-            break;
-        case 6: // enabled
-            lua_pushboolean(L, alias->enabled);
-            break;
-        case 7: // use_regexp
-            lua_pushboolean(L, alias->use_regexp);
-            break;
-        case 8: // ignore_case
-            lua_pushboolean(L, alias->ignore_case);
-            break;
-        case 9: // expand_variables
-            lua_pushboolean(L, alias->expand_variables);
-            break;
-        case 10: // invocation_count
-            lua_pushnumber(L, alias->invocation_count);
-            break;
-        case 11: // matched
-            lua_pushnumber(L, alias->matched);
-            break;
-        case 12: // menu
-            lua_pushboolean(L, alias->menu);
-            break;
-        case 13: // when_matched
-            if (alias->when_matched.isValid()) {
-                // Return as Unix timestamp (seconds since epoch)
-                lua_pushnumber(L, alias->when_matched.toSecsSinceEpoch());
-            } else {
-                lua_pushnil(L); // Return nil if never matched
-            }
-            break;
-        case 14: // temporary
-            lua_pushboolean(L, alias->temporary);
-            break;
-        case 15: // included
-            lua_pushboolean(L, alias->included);
-            break;
-        case 16: // group
-            luaPushQString(L, alias->group);
-            break;
-        case 17: // variable
-            luaPushQString(L, alias->variable);
-            break;
-        case 18: // send_to
-            lua_pushnumber(L, static_cast<int>(alias->send_to));
-            break;
-        case 19: // keep_evaluating
-            lua_pushboolean(L, alias->keep_evaluating);
-            break;
-        case 20: // sequence
-            lua_pushnumber(L, alias->sequence);
-            break;
-        case 21: // echo_alias
-            lua_pushboolean(L, alias->echo_alias);
-            break;
-        case 22: // omit_from_command_history
-            lua_pushboolean(L, alias->omit_from_command_history);
-            break;
-        case 23: // user_option
-            lua_pushnumber(L, alias->user_option);
-            break;
-        case 24: // regexp match count
-            if (alias->regexp) {
-                // Count of wildcard matches (how many wildcards were captured)
-                lua_pushnumber(L, alias->wildcards.size());
-            } else {
-                lua_pushnumber(L, 0);
-            }
-            break;
-        case 25: // last matching string
-            if (!alias->wildcards.isEmpty()) {
-                // wildcards[0] is the entire match
-                luaPushQString(L, alias->wildcards[0]);
-            } else {
-                lua_pushstring(L, "");
-            }
-            break;
-        case 26: // executing_script
-            lua_pushboolean(L, alias->executing_script);
-            break;
-        case 27: // has script (dispid != DISPID_UNKNOWN)
-            lua_pushboolean(L, alias->dispid != -1);
-            break;
-        case 28: // regexp execution error
-            // We don't track regexp errors in Qt (always 0)
-            lua_pushnumber(L, 0);
-            break;
-        case 29: // one_shot
-            lua_pushboolean(L, alias->one_shot);
-            break;
-        case 30: // regexp execution time
-            // We don't track execution time (always 0)
-            lua_pushnumber(L, 0);
-            break;
-        case 31: // regexp match attempts
-            // We don't track match attempts (always 0)
-            lua_pushnumber(L, 0);
-            break;
-
-        // Wildcards: 101-110 = wildcards[1-9] and [0]
-        case 101:
-        case 102:
-        case 103:
-        case 104:
-        case 105:
-        case 106:
-        case 107:
-        case 108:
-        case 109:
-        case 110: {
-            int wildcard_index = (info_type == 110) ? 0 : (info_type - 100);
-            if (wildcard_index < alias->wildcards.size()) {
-                luaPushQString(L, alias->wildcards[wildcard_index]);
-            } else {
-                lua_pushstring(L, "");
-            }
-        } break;
-
-        default:
-            lua_pushnil(L);
-            break;
-    }
-
-    return 1;
+    return luaInfoLookup(L, *alias, kAliasInfoFields, info_type);
 }
 
 /**
@@ -662,141 +666,12 @@ int L_GetPluginAliasInfo(lua_State* L)
         return 1;
     }
 
-    switch (infoType) {
-        case 1: // name (match pattern)
-            luaPushQString(L, alias->name);
-            break;
-        case 2: // contents (send text)
-            luaPushQString(L, alias->contents);
-            break;
-        case 3: // procedure (script name)
-            luaPushQString(L, alias->procedure);
-            break;
-        case 4: // omit_from_log
-            lua_pushboolean(L, alias->omit_from_log);
-            break;
-        case 5: // omit_from_output
-            lua_pushboolean(L, alias->omit_from_output);
-            break;
-        case 6: // enabled
-            lua_pushboolean(L, alias->enabled);
-            break;
-        case 7: // use_regexp
-            lua_pushboolean(L, alias->use_regexp);
-            break;
-        case 8: // ignore_case
-            lua_pushboolean(L, alias->ignore_case);
-            break;
-        case 9: // expand_variables
-            lua_pushboolean(L, alias->expand_variables);
-            break;
-        case 10: // invocation_count
-            lua_pushnumber(L, alias->invocation_count);
-            break;
-        case 11: // matched
-            lua_pushnumber(L, alias->matched);
-            break;
-        case 12: // menu
-            lua_pushboolean(L, alias->menu);
-            break;
-        case 13: // when_matched
-            if (alias->when_matched.isValid()) {
-                lua_pushnumber(L, alias->when_matched.toSecsSinceEpoch());
-            } else {
-                lua_pushnil(L);
-            }
-            break;
-        case 14: // temporary
-            lua_pushboolean(L, alias->temporary);
-            break;
-        case 15: // included
-            lua_pushboolean(L, alias->included);
-            break;
-        case 16: // group
-            luaPushQString(L, alias->group);
-            break;
-        case 17: // variable
-            luaPushQString(L, alias->variable);
-            break;
-        case 18: // send_to
-            lua_pushnumber(L, static_cast<int>(alias->send_to));
-            break;
-        case 19: // keep_evaluating
-            lua_pushboolean(L, alias->keep_evaluating);
-            break;
-        case 20: // sequence
-            lua_pushnumber(L, alias->sequence);
-            break;
-        case 21: // echo_alias
-            lua_pushboolean(L, alias->echo_alias);
-            break;
-        case 22: // omit_from_command_history
-            lua_pushboolean(L, alias->omit_from_command_history);
-            break;
-        case 23: // user_option
-            lua_pushnumber(L, alias->user_option);
-            break;
-        case 24: // regexp match count
-            if (alias->regexp) {
-                lua_pushnumber(L, alias->wildcards.size());
-            } else {
-                lua_pushnumber(L, 0);
-            }
-            break;
-        case 25: // last matching string
-            if (!alias->wildcards.isEmpty()) {
-                luaPushQString(L, alias->wildcards[0]);
-            } else {
-                lua_pushstring(L, "");
-            }
-            break;
-        case 26: // executing_script
-            lua_pushboolean(L, alias->executing_script);
-            break;
-        case 27: // has script (dispid != DISPID_UNKNOWN)
-            lua_pushboolean(L, alias->dispid != -1);
-            break;
-        case 28: // regexp execution error
-            lua_pushnumber(L, 0);
-            break;
-        case 29: // one_shot
-            lua_pushboolean(L, alias->one_shot);
-            break;
-        case 30: // regexp execution time
-            lua_pushnumber(L, 0);
-            break;
-        case 31: // regexp match attempts
-            lua_pushnumber(L, 0);
-            break;
-
-        // Wildcards: 101-110 = wildcards[1-9] and [0]
-        case 101:
-        case 102:
-        case 103:
-        case 104:
-        case 105:
-        case 106:
-        case 107:
-        case 108:
-        case 109:
-        case 110: {
-            int wildcard_index = (infoType == 110) ? 0 : (infoType - 100);
-            if (wildcard_index < alias->wildcards.size()) {
-                luaPushQString(L, alias->wildcards[wildcard_index]);
-            } else {
-                lua_pushstring(L, "");
-            }
-        } break;
-
-        default:
-            lua_pushnil(L);
-            break;
-    }
+    int result = luaInfoLookup(L, *alias, kAliasInfoFields, infoType);
 
     // Restore context
     pDoc->m_CurrentPlugin = savedPlugin;
 
-    return 1;
+    return result;
 }
 
 /**

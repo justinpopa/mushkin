@@ -34,7 +34,7 @@
 int L_Execute(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    QString str = luaCheckQString(L, 1);
+    auto [str] = luaArgs<QString>(L);
 
     // Call ON_PLUGIN_COMMAND callback with recursion guard
     if (!pDoc->m_bPluginProcessingCommand) {
@@ -117,12 +117,7 @@ int L_ActivateClient(lua_State* L)
  *
  * @see GetWorldList, GetWorldIdList
  */
-int L_GetWorldID(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-    luaPushQString(L, pDoc->m_strWorldID);
-    return 1;
-}
+LUA_DOC_GETTER(L_GetWorldID, pDoc->m_strWorldID)
 
 /**
  * world.GetWorldList()
@@ -312,12 +307,7 @@ int L_Reset(lua_State* L)
  *
  * @see SetTrace, GetTrace, TraceOut
  */
-int L_Trace(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-    lua_pushboolean(L, pDoc->m_bTrace);
-    return 1;
-}
+LUA_DOC_GETTER(L_Trace, pDoc->m_bTrace)
 
 /**
  * world.TraceOut(message)
@@ -344,8 +334,9 @@ int L_Trace(lua_State* L)
 int L_TraceOut(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
+    auto [msg] = luaArgs<QString>(L);
     // Use Trace() which has plugin callback support
-    pDoc->Trace(luaCheckQString(L, 1));
+    pDoc->Trace(msg);
 
     return 0;
 }
@@ -379,12 +370,7 @@ int L_Debug(lua_State* L)
  *
  * @see Trace, SetTrace, TraceOut
  */
-int L_GetTrace(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-    lua_pushboolean(L, pDoc->m_bTrace);
-    return 1;
-}
+LUA_DOC_GETTER(L_GetTrace, pDoc->m_bTrace)
 
 /**
  * world.SetTrace(enable)
@@ -443,12 +429,7 @@ int L_SetTrace(lua_State* L)
  *
  * @see SetEchoInput
  */
-int L_GetEchoInput(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-    lua_pushboolean(L, pDoc->m_display_my_input);
-    return 1;
-}
+LUA_DOC_GETTER(L_GetEchoInput, pDoc->m_display_my_input)
 
 /**
  * world.SetEchoInput(enable)
@@ -504,11 +485,11 @@ int L_SetEchoInput(lua_State* L)
 int L_PasteCommand(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
+    auto [text] = luaArgs<QString>(L);
     // Emit signal to paste text into command input
-    emit pDoc->pasteToCommand(luaCheckQString(L, 1));
+    emit pDoc->pasteToCommand(text);
 
-    lua_pushstring(L, "");
-    return 1;
+    return luaReturn(L, "");
 }
 
 /**

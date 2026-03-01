@@ -237,9 +237,8 @@ QString RGBColourToName(QRgb bgr)
  */
 int L_ColourNameToRGB(lua_State* L)
 {
-    QRgb rgb = ColourNameToRGB(luaCheckQString(L, 1));
-    lua_pushinteger(L, (lua_Integer)rgb);
-    return 1;
+    auto [name] = luaArgs<QString>(L);
+    return luaReturn(L, static_cast<lua_Integer>(ColourNameToRGB(name)));
 }
 
 /**
@@ -264,10 +263,8 @@ int L_ColourNameToRGB(lua_State* L)
  */
 int L_RGBColourToName(lua_State* L)
 {
-    lua_Integer rgbValue = luaL_checkinteger(L, 1);
-    QString name = RGBColourToName((QRgb)rgbValue);
-    luaPushQString(L, name);
-    return 1;
+    auto [rgbValue] = luaArgs<int>(L);
+    return luaReturn(L, RGBColourToName(static_cast<QRgb>(rgbValue)));
 }
 
 /**

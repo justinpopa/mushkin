@@ -408,4 +408,6 @@ inline void luaPushQStringList(lua_State* L, const QStringList& list)
             return luaReturnError(L, _status);                                                     \
     } while (0)
 
+#include "lua_bind.h"
+
 #endif // LUA_COMMON_H

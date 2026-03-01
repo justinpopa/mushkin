@@ -19,6 +19,165 @@ extern "C" {
 
 #include "lua_common.h"
 
+// ============================================================
+// Info table for GetTriggerInfo / GetPluginTriggerInfo
+// Shared by both world and plugin variants via luaInfoLookup.
+// ============================================================
+
+static const InfoField<Trigger> kTriggerInfoFields[] = {
+    {1, [](lua_State* L, const Trigger& t) { luaPush(L, t.trigger); }},
+    {2, [](lua_State* L, const Trigger& t) { luaPush(L, t.contents); }},
+    {3, [](lua_State* L, const Trigger& t) { luaPush(L, t.sound_to_play); }},
+    {4, [](lua_State* L, const Trigger& t) { luaPush(L, t.procedure); }},
+    {5, [](lua_State* L, const Trigger& t) { luaPush(L, t.omit_from_log); }},
+    {6, [](lua_State* L, const Trigger& t) { luaPush(L, t.omit_from_output); }},
+    {7, [](lua_State* L, const Trigger& t) { luaPush(L, t.keep_evaluating); }},
+    {8, [](lua_State* L, const Trigger& t) { luaPush(L, t.enabled); }},
+    {9, [](lua_State* L, const Trigger& t) { luaPush(L, t.use_regexp); }},
+    {10, [](lua_State* L, const Trigger& t) { luaPush(L, t.ignore_case); }},
+    {11, [](lua_State* L, const Trigger& t) { luaPush(L, t.repeat); }},
+    {12, [](lua_State* L, const Trigger& t) { luaPush(L, t.sound_if_inactive); }},
+    {13, [](lua_State* L, const Trigger& t) { luaPush(L, t.expand_variables); }},
+    {14, [](lua_State* L, const Trigger& t) { luaPush(L, t.clipboard_arg); }},
+    {15, [](lua_State* L, const Trigger& t) { luaPush(L, static_cast<int>(t.send_to)); }},
+    {16, [](lua_State* L, const Trigger& t) { luaPush(L, t.sequence); }},
+    {17, [](lua_State* L, const Trigger& t) { luaPush(L, t.match_type); }},
+    {18, [](lua_State* L, const Trigger& t) { luaPush(L, t.style); }},
+    {19, [](lua_State* L, const Trigger& t) { luaPush(L, t.colour); }},
+    {20, [](lua_State* L, const Trigger& t) { luaPush(L, t.invocation_count); }},
+    {21, [](lua_State* L, const Trigger& t) { luaPush(L, t.matched); }},
+    {22,
+     [](lua_State* L, const Trigger& t) {
+         if (t.when_matched.isValid()) {
+             // Return as Unix timestamp (seconds since epoch)
+             lua_pushnumber(L, t.when_matched.toSecsSinceEpoch());
+         } else {
+             lua_pushnil(L); // Return nil if never matched
+         }
+     }},
+    {23, [](lua_State* L, const Trigger& t) { luaPush(L, t.temporary); }},
+    {24, [](lua_State* L, const Trigger& t) { luaPush(L, t.included); }},
+    {25, [](lua_State* L, const Trigger& t) { luaPush(L, t.lowercase_wildcard); }},
+    {26, [](lua_State* L, const Trigger& t) { luaPush(L, t.group); }},
+    {27, [](lua_State* L, const Trigger& t) { luaPush(L, t.variable); }},
+    {28, [](lua_State* L, const Trigger& t) { luaPush(L, t.user_option); }},
+    {29, [](lua_State* L, const Trigger& t) { luaPush(L, t.other_foreground); }},
+    {30, [](lua_State* L, const Trigger& t) { luaPush(L, t.other_background); }},
+    {31,
+     [](lua_State* L, const Trigger& t) {
+         // Count of wildcard matches (how many wildcards were captured)
+         lua_pushnumber(L, t.regexp ? static_cast<lua_Number>(t.wildcards.size()) : 0);
+     }},
+    {32,
+     [](lua_State* L, const Trigger& t) {
+         // wildcards[0] is the entire match
+         if (!t.wildcards.isEmpty()) {
+             luaPushQString(L, t.wildcards[0]);
+         } else {
+             lua_pushstring(L, "");
+         }
+     }},
+    {33, [](lua_State* L, const Trigger& t) { luaPush(L, t.executing_script); }},
+    {34, [](lua_State* L, const Trigger& t) { luaPush(L, t.dispid != -1); }},
+    {35,
+     [](lua_State* L, const Trigger&) {
+         // We don't track regexp errors in Qt (always 0)
+         lua_pushnumber(L, 0);
+     }},
+    {36, [](lua_State* L, const Trigger& t) { luaPush(L, t.one_shot); }},
+    {37,
+     [](lua_State* L, const Trigger&) {
+         // We don't track execution time (always 0)
+         lua_pushnumber(L, 0);
+     }},
+    {38,
+     [](lua_State* L, const Trigger&) {
+         // We don't track match attempts (always 0)
+         lua_pushnumber(L, 0);
+     }},
+    // Wildcards: 101-109 = wildcards[1-9], 110 = wildcard 0 (entire match)
+    {101,
+     [](lua_State* L, const Trigger& t) {
+         if (1 < t.wildcards.size()) {
+             luaPushQString(L, t.wildcards[1]);
+         } else {
+             lua_pushstring(L, "");
+         }
+     }},
+    {102,
+     [](lua_State* L, const Trigger& t) {
+         if (2 < t.wildcards.size()) {
+             luaPushQString(L, t.wildcards[2]);
+         } else {
+             lua_pushstring(L, "");
+         }
+     }},
+    {103,
+     [](lua_State* L, const Trigger& t) {
+         if (3 < t.wildcards.size()) {
+             luaPushQString(L, t.wildcards[3]);
+         } else {
+             lua_pushstring(L, "");
+         }
+     }},
+    {104,
+     [](lua_State* L, const Trigger& t) {
+         if (4 < t.wildcards.size()) {
+             luaPushQString(L, t.wildcards[4]);
+         } else {
+             lua_pushstring(L, "");
+         }
+     }},
+    {105,
+     [](lua_State* L, const Trigger& t) {
+         if (5 < t.wildcards.size()) {
+             luaPushQString(L, t.wildcards[5]);
+         } else {
+             lua_pushstring(L, "");
+         }
+     }},
+    {106,
+     [](lua_State* L, const Trigger& t) {
+         if (6 < t.wildcards.size()) {
+             luaPushQString(L, t.wildcards[6]);
+         } else {
+             lua_pushstring(L, "");
+         }
+     }},
+    {107,
+     [](lua_State* L, const Trigger& t) {
+         if (7 < t.wildcards.size()) {
+             luaPushQString(L, t.wildcards[7]);
+         } else {
+             lua_pushstring(L, "");
+         }
+     }},
+    {108,
+     [](lua_State* L, const Trigger& t) {
+         if (8 < t.wildcards.size()) {
+             luaPushQString(L, t.wildcards[8]);
+         } else {
+             lua_pushstring(L, "");
+         }
+     }},
+    {109,
+     [](lua_State* L, const Trigger& t) {
+         if (9 < t.wildcards.size()) {
+             luaPushQString(L, t.wildcards[9]);
+         } else {
+             lua_pushstring(L, "");
+         }
+     }},
+    {110,
+     [](lua_State* L, const Trigger& t) {
+         if (!t.wildcards.isEmpty()) {
+             luaPushQString(L, t.wildcards[0]);
+         } else {
+             lua_pushstring(L, "");
+         }
+     }},
+};
+
 /**
  * world.AddTrigger(name, match, response, flags, color, wildcard, sound_file, script, send_to,
  * sequence)
@@ -199,9 +358,7 @@ int L_DeleteTrigger(lua_State* L)
     WorldDocument* pDoc = doc(L);
     QString qName = luaCheckQString(L, 1);
 
-    if (!pDoc->deleteTrigger(qName).has_value()) {
-        return luaReturnError(L, eTriggerNotFound);
-    }
+    LUA_UNWRAP_VOID(pDoc->deleteTrigger(qName), eTriggerNotFound);
 
     return luaReturnOK(L);
 }
@@ -293,16 +450,8 @@ int L_GetTrigger(lua_State* L)
         flags |= eTriggerOneShot;
 
     // Return: error_code, match, response, flags, colour, wildcard, sound, script
-    lua_pushnumber(L, eOK);
-    luaPushQString(L, trigger->trigger);
-    luaPushQString(L, trigger->contents);
-    lua_pushnumber(L, flags);
-    lua_pushnumber(L, trigger->colour);
-    lua_pushnumber(L, trigger->clipboard_arg);
-    luaPushQString(L, trigger->sound_to_play);
-    luaPushQString(L, trigger->procedure);
-
-    return 8;
+    return luaReturn(L, eOK, trigger->trigger, trigger->contents, flags, trigger->colour,
+                     trigger->clipboard_arg, trigger->sound_to_play, trigger->procedure);
 }
 
 /**
@@ -411,175 +560,15 @@ int L_EnableTrigger(lua_State* L)
  */
 int L_GetTriggerInfo(lua_State* L)
 {
-    WorldDocument* pDoc = doc(L);
-    QString qName = luaCheckQString(L, 1);
-    int info_type = luaL_checkinteger(L, 2);
-    Trigger* trigger = pDoc->getTrigger(qName);
+    auto [name, info_type] = luaArgs<QString, int>(L);
+    Trigger* trigger = findTrigger(L, name);
 
     if (!trigger) {
         lua_pushnil(L);
         return 1;
     }
 
-    switch (info_type) {
-        case 1: // trigger pattern
-            luaPushQString(L, trigger->trigger);
-            break;
-        case 2: // contents (send text)
-            luaPushQString(L, trigger->contents);
-            break;
-        case 3: // sound_to_play
-            luaPushQString(L, trigger->sound_to_play);
-            break;
-        case 4: // procedure (script name)
-            luaPushQString(L, trigger->procedure);
-            break;
-        case 5: // omit_from_log
-            lua_pushboolean(L, trigger->omit_from_log);
-            break;
-        case 6: // omit_from_output
-            lua_pushboolean(L, trigger->omit_from_output);
-            break;
-        case 7: // keep_evaluating
-            lua_pushboolean(L, trigger->keep_evaluating);
-            break;
-        case 8: // enabled
-            lua_pushboolean(L, trigger->enabled);
-            break;
-        case 9: // use_regexp
-            lua_pushboolean(L, trigger->use_regexp);
-            break;
-        case 10: // ignore_case
-            lua_pushboolean(L, trigger->ignore_case);
-            break;
-        case 11: // repeat
-            lua_pushboolean(L, trigger->repeat);
-            break;
-        case 12: // sound_if_inactive
-            lua_pushboolean(L, trigger->sound_if_inactive);
-            break;
-        case 13: // expand_variables
-            lua_pushboolean(L, trigger->expand_variables);
-            break;
-        case 14: // clipboard_arg
-            lua_pushnumber(L, trigger->clipboard_arg);
-            break;
-        case 15: // send_to
-            lua_pushnumber(L, static_cast<int>(trigger->send_to));
-            break;
-        case 16: // sequence
-            lua_pushnumber(L, trigger->sequence);
-            break;
-        case 17: // match_type
-            lua_pushnumber(L, trigger->match_type);
-            break;
-        case 18: // style
-            lua_pushnumber(L, trigger->style);
-            break;
-        case 19: // colour
-            lua_pushnumber(L, trigger->colour);
-            break;
-        case 20: // invocation_count
-            lua_pushnumber(L, trigger->invocation_count);
-            break;
-        case 21: // matched
-            lua_pushnumber(L, trigger->matched);
-            break;
-        case 22: // when_matched
-            if (trigger->when_matched.isValid()) {
-                // Return as Unix timestamp (seconds since epoch)
-                lua_pushnumber(L, trigger->when_matched.toSecsSinceEpoch());
-            } else {
-                lua_pushnil(L); // Return nil if never matched
-            }
-            break;
-        case 23: // temporary
-            lua_pushboolean(L, trigger->temporary);
-            break;
-        case 24: // included
-            lua_pushboolean(L, trigger->included);
-            break;
-        case 25: // lowercase_wildcard
-            lua_pushboolean(L, trigger->lowercase_wildcard);
-            break;
-        case 26: // group
-            luaPushQString(L, trigger->group);
-            break;
-        case 27: // variable
-            luaPushQString(L, trigger->variable);
-            break;
-        case 28: // user_option
-            lua_pushnumber(L, trigger->user_option);
-            break;
-        case 29: // other_foreground
-            lua_pushnumber(L, trigger->other_foreground);
-            break;
-        case 30: // other_background
-            lua_pushnumber(L, trigger->other_background);
-            break;
-        case 31: // regexp match count
-            if (trigger->regexp) {
-                // Count of wildcard matches (how many wildcards were captured)
-                lua_pushnumber(L, trigger->wildcards.size());
-            } else {
-                lua_pushnumber(L, 0);
-            }
-            break;
-        case 32: // last matching string
-            if (!trigger->wildcards.isEmpty()) {
-                // wildcards[0] is the entire match
-                luaPushQString(L, trigger->wildcards[0]);
-            } else {
-                lua_pushstring(L, "");
-            }
-            break;
-        case 33: // executing_script
-            lua_pushboolean(L, trigger->executing_script);
-            break;
-        case 34: // has script (dispid != DISPID_UNKNOWN)
-            lua_pushboolean(L, trigger->dispid != -1);
-            break;
-        case 35: // regexp execution error
-            // We don't track regexp errors in Qt (always 0)
-            lua_pushnumber(L, 0);
-            break;
-        case 36: // one_shot
-            lua_pushboolean(L, trigger->one_shot);
-            break;
-        case 37: // regexp execution time
-            // We don't track execution time (always 0)
-            lua_pushnumber(L, 0);
-            break;
-        case 38: // regexp match attempts
-            // We don't track match attempts (always 0)
-            lua_pushnumber(L, 0);
-            break;
-
-        // Wildcards: 101-110 = wildcards[1-9] and [0]
-        case 101:
-        case 102:
-        case 103:
-        case 104:
-        case 105:
-        case 106:
-        case 107:
-        case 108:
-        case 109:
-        case 110: {
-            int wildcard_index = (info_type == 110) ? 0 : (info_type - 100);
-            if (wildcard_index < trigger->wildcards.size()) {
-                luaPushQString(L, trigger->wildcards[wildcard_index]);
-            } else {
-                lua_pushstring(L, "");
-            }
-        } break;
-
-        default:
-            lua_pushnil(L);
-            break;
-    }
-
-    return 1;
+    return luaInfoLookup(L, *trigger, kTriggerInfoFields, info_type);
 }
 
 /**
@@ -699,162 +688,12 @@ int L_GetPluginTriggerInfo(lua_State* L)
         return 1;
     }
 
-    switch (infoType) {
-        case 1: // trigger pattern
-            luaPushQString(L, trigger->trigger);
-            break;
-        case 2: // contents (send text)
-            luaPushQString(L, trigger->contents);
-            break;
-        case 3: // sound_to_play
-            luaPushQString(L, trigger->sound_to_play);
-            break;
-        case 4: // procedure (script name)
-            luaPushQString(L, trigger->procedure);
-            break;
-        case 5: // omit_from_log
-            lua_pushboolean(L, trigger->omit_from_log);
-            break;
-        case 6: // omit_from_output
-            lua_pushboolean(L, trigger->omit_from_output);
-            break;
-        case 7: // keep_evaluating
-            lua_pushboolean(L, trigger->keep_evaluating);
-            break;
-        case 8: // enabled
-            lua_pushboolean(L, trigger->enabled);
-            break;
-        case 9: // use_regexp
-            lua_pushboolean(L, trigger->use_regexp);
-            break;
-        case 10: // ignore_case
-            lua_pushboolean(L, trigger->ignore_case);
-            break;
-        case 11: // repeat
-            lua_pushboolean(L, trigger->repeat);
-            break;
-        case 12: // sound_if_inactive
-            lua_pushboolean(L, trigger->sound_if_inactive);
-            break;
-        case 13: // expand_variables
-            lua_pushboolean(L, trigger->expand_variables);
-            break;
-        case 14: // clipboard_arg
-            lua_pushnumber(L, trigger->clipboard_arg);
-            break;
-        case 15: // send_to
-            lua_pushnumber(L, static_cast<int>(trigger->send_to));
-            break;
-        case 16: // sequence
-            lua_pushnumber(L, trigger->sequence);
-            break;
-        case 17: // match_type
-            lua_pushnumber(L, trigger->match_type);
-            break;
-        case 18: // style
-            lua_pushnumber(L, trigger->style);
-            break;
-        case 19: // colour
-            lua_pushnumber(L, trigger->colour);
-            break;
-        case 20: // invocation_count
-            lua_pushnumber(L, trigger->invocation_count);
-            break;
-        case 21: // matched
-            lua_pushnumber(L, trigger->matched);
-            break;
-        case 22: // when_matched
-            if (trigger->when_matched.isValid()) {
-                lua_pushnumber(L, trigger->when_matched.toSecsSinceEpoch());
-            } else {
-                lua_pushnil(L);
-            }
-            break;
-        case 23: // temporary
-            lua_pushboolean(L, trigger->temporary);
-            break;
-        case 24: // included
-            lua_pushboolean(L, trigger->included);
-            break;
-        case 25: // lowercase_wildcard
-            lua_pushboolean(L, trigger->lowercase_wildcard);
-            break;
-        case 26: // group
-            luaPushQString(L, trigger->group);
-            break;
-        case 27: // variable
-            luaPushQString(L, trigger->variable);
-            break;
-        case 28: // user_option
-            lua_pushnumber(L, trigger->user_option);
-            break;
-        case 29: // other_foreground
-            lua_pushnumber(L, trigger->other_foreground);
-            break;
-        case 30: // other_background
-            lua_pushnumber(L, trigger->other_background);
-            break;
-        case 31: // regexp match count
-            if (trigger->regexp) {
-                lua_pushnumber(L, trigger->wildcards.size());
-            } else {
-                lua_pushnumber(L, 0);
-            }
-            break;
-        case 32: // last matching string
-            if (!trigger->wildcards.isEmpty()) {
-                luaPushQString(L, trigger->wildcards[0]);
-            } else {
-                lua_pushstring(L, "");
-            }
-            break;
-        case 33: // executing_script
-            lua_pushboolean(L, trigger->executing_script);
-            break;
-        case 34: // has script (dispid != DISPID_UNKNOWN)
-            lua_pushboolean(L, trigger->dispid != -1);
-            break;
-        case 35: // regexp execution error
-            lua_pushnumber(L, 0);
-            break;
-        case 36: // one_shot
-            lua_pushboolean(L, trigger->one_shot);
-            break;
-        case 37: // regexp execution time
-            lua_pushnumber(L, 0);
-            break;
-        case 38: // regexp match attempts
-            lua_pushnumber(L, 0);
-            break;
-
-        // Wildcards: 101-110 = wildcards[1-9] and [0]
-        case 101:
-        case 102:
-        case 103:
-        case 104:
-        case 105:
-        case 106:
-        case 107:
-        case 108:
-        case 109:
-        case 110: {
-            int wildcard_index = (infoType == 110) ? 0 : (infoType - 100);
-            if (wildcard_index < trigger->wildcards.size()) {
-                luaPushQString(L, trigger->wildcards[wildcard_index]);
-            } else {
-                lua_pushstring(L, "");
-            }
-        } break;
-
-        default:
-            lua_pushnil(L);
-            break;
-    }
+    int result = luaInfoLookup(L, *trigger, kTriggerInfoFields, infoType);
 
     // Restore context
     pDoc->m_CurrentPlugin = savedPlugin;
 
-    return 1;
+    return result;
 }
 
 /**
