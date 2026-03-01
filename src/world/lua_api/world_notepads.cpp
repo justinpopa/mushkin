@@ -26,10 +26,8 @@ extern "C" {
 int L_SendToNotepad(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* title = luaL_checkstring(L, 1);
-    const char* contents = luaL_checkstring(L, 2);
 
-    auto result = pDoc->SendToNotepad(QString::fromUtf8(title), QString::fromUtf8(contents));
+    auto result = pDoc->SendToNotepad(luaCheckQString(L, 1), luaCheckQString(L, 2));
 
     lua_pushboolean(L, result.has_value() ? 1 : 0);
     return 1;
@@ -47,10 +45,8 @@ int L_SendToNotepad(lua_State* L)
 int L_AppendToNotepad(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* title = luaL_checkstring(L, 1);
-    const char* contents = luaL_checkstring(L, 2);
 
-    auto result = pDoc->AppendToNotepad(QString::fromUtf8(title), QString::fromUtf8(contents));
+    auto result = pDoc->AppendToNotepad(luaCheckQString(L, 1), luaCheckQString(L, 2));
 
     lua_pushboolean(L, result.has_value() ? 1 : 0);
     return 1;
@@ -68,10 +64,8 @@ int L_AppendToNotepad(lua_State* L)
 int L_ReplaceNotepad(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* title = luaL_checkstring(L, 1);
-    const char* contents = luaL_checkstring(L, 2);
 
-    auto result = pDoc->ReplaceNotepad(QString::fromUtf8(title), QString::fromUtf8(contents));
+    auto result = pDoc->ReplaceNotepad(luaCheckQString(L, 1), luaCheckQString(L, 2));
 
     lua_pushboolean(L, result.has_value() ? 1 : 0);
     return 1;
@@ -88,9 +82,8 @@ int L_ReplaceNotepad(lua_State* L)
 int L_ActivateNotepad(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* title = luaL_checkstring(L, 1);
 
-    auto result = pDoc->ActivateNotepad(QString::fromUtf8(title));
+    auto result = pDoc->ActivateNotepad(luaCheckQString(L, 1));
 
     lua_pushboolean(L, result.has_value() ? 1 : 0);
     return 1;
@@ -108,10 +101,9 @@ int L_ActivateNotepad(lua_State* L)
 int L_CloseNotepad(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* title = luaL_checkstring(L, 1);
     bool querySave = lua_toboolean(L, 2);
 
-    qint32 result = pDoc->CloseNotepad(QString::fromUtf8(title), querySave);
+    qint32 result = pDoc->CloseNotepad(luaCheckQString(L, 1), querySave);
 
     lua_pushnumber(L, result);
     return 1;
@@ -128,18 +120,15 @@ int L_CloseNotepad(lua_State* L)
 int L_GetNotepadText(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* title = luaL_checkstring(L, 1);
 
-    NotepadWidget* notepad = pDoc->FindNotepad(QString::fromUtf8(title));
+    NotepadWidget* notepad = pDoc->FindNotepad(luaCheckQString(L, 1));
 
     if (!notepad) {
         lua_pushnil(L);
         return 1;
     }
 
-    QString text = notepad->GetText();
-    QByteArray ba = text.toUtf8();
-    lua_pushlstring(L, ba.constData(), ba.length());
+    luaPushQString(L, notepad->GetText());
 
     return 1;
 }
@@ -155,9 +144,8 @@ int L_GetNotepadText(lua_State* L)
 int L_GetNotepadLength(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* title = luaL_checkstring(L, 1);
 
-    NotepadWidget* notepad = pDoc->FindNotepad(QString::fromUtf8(title));
+    NotepadWidget* notepad = pDoc->FindNotepad(luaCheckQString(L, 1));
 
     qint32 length = notepad ? notepad->GetLength() : 0;
     lua_pushnumber(L, length);
@@ -180,12 +168,7 @@ int L_GetNotepadList(lua_State* L)
 
     QStringList titles = pDoc->GetNotepadList(includeAll);
 
-    lua_newtable(L);
-    for (int i = 0; i < titles.size(); i++) {
-        QByteArray ba = titles[i].toUtf8();
-        lua_pushlstring(L, ba.constData(), ba.length());
-        lua_rawseti(L, -2, i + 1);
-    }
+    luaPushQStringList(L, titles);
 
     return 1;
 }
@@ -204,12 +187,10 @@ int L_GetNotepadList(lua_State* L)
 int L_SaveNotepad(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* title = luaL_checkstring(L, 1);
-    const char* filename = luaL_checkstring(L, 2);
     bool replaceExisting = lua_isboolean(L, 3) ? lua_toboolean(L, 3) : true;
 
     qint32 result =
-        pDoc->SaveNotepad(QString::fromUtf8(title), QString::fromUtf8(filename), replaceExisting);
+        pDoc->SaveNotepad(luaCheckQString(L, 1), luaCheckQString(L, 2), replaceExisting);
 
     lua_pushnumber(L, result);
     return 1;
@@ -230,14 +211,12 @@ int L_SaveNotepad(lua_State* L)
 int L_NotepadFont(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* title = luaL_checkstring(L, 1);
-    const char* fontName = luaL_checkstring(L, 2);
     qint32 size = luaL_checknumber(L, 3);
     qint32 style = luaL_checknumber(L, 4);
     qint32 charset = luaL_checknumber(L, 5);
 
-    qint32 result = pDoc->NotepadFont(QString::fromUtf8(title), QString::fromUtf8(fontName), size,
-                                      style, charset);
+    qint32 result =
+        pDoc->NotepadFont(luaCheckQString(L, 1), luaCheckQString(L, 2), size, style, charset);
 
     lua_pushnumber(L, result);
     return 1;
@@ -257,12 +236,9 @@ int L_NotepadFont(lua_State* L)
 int L_NotepadColour(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* title = luaL_checkstring(L, 1);
-    const char* textColour = luaL_checkstring(L, 2);
-    const char* backColour = luaL_checkstring(L, 3);
 
-    qint32 result = pDoc->NotepadColour(QString::fromUtf8(title), QString::fromUtf8(textColour),
-                                        QString::fromUtf8(backColour));
+    qint32 result =
+        pDoc->NotepadColour(luaCheckQString(L, 1), luaCheckQString(L, 2), luaCheckQString(L, 3));
 
     lua_pushnumber(L, result);
     return 1;
@@ -280,10 +256,9 @@ int L_NotepadColour(lua_State* L)
 int L_NotepadReadOnly(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* title = luaL_checkstring(L, 1);
     bool readOnly = lua_toboolean(L, 2);
 
-    qint32 result = pDoc->NotepadReadOnly(QString::fromUtf8(title), readOnly);
+    qint32 result = pDoc->NotepadReadOnly(luaCheckQString(L, 1), readOnly);
 
     lua_pushnumber(L, result);
     return 1;
@@ -301,10 +276,9 @@ int L_NotepadReadOnly(lua_State* L)
 int L_NotepadSaveMethod(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* title = luaL_checkstring(L, 1);
     qint32 method = luaL_checknumber(L, 2);
 
-    qint32 result = pDoc->NotepadSaveMethod(QString::fromUtf8(title), method);
+    qint32 result = pDoc->NotepadSaveMethod(luaCheckQString(L, 1), method);
 
     lua_pushnumber(L, result);
     return 1;
@@ -325,13 +299,12 @@ int L_NotepadSaveMethod(lua_State* L)
 int L_MoveNotepadWindow(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* title = luaL_checkstring(L, 1);
     qint32 left = luaL_checknumber(L, 2);
     qint32 top = luaL_checknumber(L, 3);
     qint32 width = luaL_checknumber(L, 4);
     qint32 height = luaL_checknumber(L, 5);
 
-    auto result = pDoc->MoveNotepadWindow(QString::fromUtf8(title), left, top, width, height);
+    auto result = pDoc->MoveNotepadWindow(luaCheckQString(L, 1), left, top, width, height);
 
     lua_pushboolean(L, result.has_value() ? 1 : 0);
     return 1;
@@ -348,17 +321,15 @@ int L_MoveNotepadWindow(lua_State* L)
 int L_GetNotepadWindowPosition(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* title = luaL_checkstring(L, 1);
 
-    QString position = pDoc->GetNotepadWindowPosition(QString::fromUtf8(title));
+    QString position = pDoc->GetNotepadWindowPosition(luaCheckQString(L, 1));
 
     if (position.isEmpty()) {
         lua_pushnil(L);
         return 1;
     }
 
-    QByteArray ba = position.toUtf8();
-    lua_pushlstring(L, ba.constData(), ba.length());
+    luaPushQString(L, position);
 
     return 1;
 }

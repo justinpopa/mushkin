@@ -34,8 +34,7 @@
 int L_Execute(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* command = luaL_checkstring(L, 1);
-    QString str = QString::fromUtf8(command);
+    QString str = luaCheckQString(L, 1);
 
     // Call ON_PLUGIN_COMMAND callback with recursion guard
     if (!pDoc->m_bPluginProcessingCommand) {
@@ -121,8 +120,7 @@ int L_ActivateClient(lua_State* L)
 int L_GetWorldID(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    QByteArray id = pDoc->m_strWorldID.toUtf8();
-    lua_pushlstring(L, id.constData(), id.length());
+    luaPushQString(L, pDoc->m_strWorldID);
     return 1;
 }
 
@@ -149,8 +147,7 @@ int L_GetWorldList(lua_State* L)
     lua_newtable(L);
 
     // TODO(multi-world): Iterate over all open worlds, not just current.
-    QByteArray name = pDoc->m_mush_name.toUtf8();
-    lua_pushlstring(L, name.constData(), name.length());
+    luaPushQString(L, pDoc->m_mush_name);
     lua_rawseti(L, -2, 1);
 
     return 1;
@@ -179,8 +176,7 @@ int L_GetWorldIdList(lua_State* L)
     lua_newtable(L);
 
     // TODO(multi-world): Iterate over all open worlds, not just current.
-    QByteArray id = pDoc->m_strWorldID.toUtf8();
-    lua_pushlstring(L, id.constData(), id.length());
+    luaPushQString(L, pDoc->m_strWorldID);
     lua_rawseti(L, -2, 1);
 
     return 1;
@@ -348,10 +344,8 @@ int L_Trace(lua_State* L)
 int L_TraceOut(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* message = luaL_checkstring(L, 1);
-
     // Use Trace() which has plugin callback support
-    pDoc->Trace(QString::fromUtf8(message));
+    pDoc->Trace(luaCheckQString(L, 1));
 
     return 0;
 }
@@ -510,10 +504,8 @@ int L_SetEchoInput(lua_State* L)
 int L_PasteCommand(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* text = luaL_checkstring(L, 1);
-
     // Emit signal to paste text into command input
-    emit pDoc->pasteToCommand(QString::fromUtf8(text));
+    emit pDoc->pasteToCommand(luaCheckQString(L, 1));
 
     lua_pushstring(L, "");
     return 1;
@@ -565,7 +557,7 @@ int L_GetCommandList(lua_State* L)
     // Return most recent commands first
     int tableIndex = 1;
     for (int i = total - count; i < total; i++) {
-        lua_pushstring(L, history.at(i).toUtf8().constData());
+        luaPushQString(L, history.at(i));
         lua_rawseti(L, -2, tableIndex++);
     }
 
@@ -629,7 +621,7 @@ int L_GetQueue(lua_State* L)
 
     int tableIndex = 1;
     for (const QString& cmd : queue) {
-        lua_pushstring(L, cmd.toUtf8().constData());
+        luaPushQString(L, cmd);
         lua_rawseti(L, -2, tableIndex++);
     }
 

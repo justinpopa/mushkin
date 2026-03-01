@@ -33,11 +33,7 @@
  */
 int L_Trim(lua_State* L)
 {
-    const char* text = luaL_checkstring(L, 1);
-    QString trimmed = QString::fromUtf8(text).trimmed();
-
-    QByteArray ba = trimmed.toUtf8();
-    lua_pushlstring(L, ba.constData(), ba.length());
+    luaPushQString(L, luaCheckQString(L, 1).trimmed());
     return 1;
 }
 
@@ -77,8 +73,7 @@ int L_Trim(lua_State* L)
  */
 int L_GetGlobalOption(lua_State* L)
 {
-    const char* name = luaL_checkstring(L, 1);
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
 
     auto& db = Database::instance();
     if (!db.isOpen()) {
@@ -149,8 +144,7 @@ int L_GetGlobalOption(lua_State* L)
     // String options (from AlphaGlobalOptionsTable in original)
     QString value = db.getPreference(qName, QString());
     if (!value.isNull()) {
-        QByteArray ba = value.toUtf8();
-        lua_pushlstring(L, ba.constData(), ba.length());
+        luaPushQString(L, value);
         return 1;
     }
 
@@ -415,8 +409,7 @@ int L_EditDistance(lua_State* L)
  */
 int L_OpenBrowser(lua_State* L)
 {
-    const char* urlStr = luaL_checkstring(L, 1);
-    QString url = QString::fromUtf8(urlStr);
+    QString url = luaCheckQString(L, 1);
 
     if (url.isEmpty()) {
         return luaReturnError(L, eBadParameter);
@@ -461,8 +454,7 @@ int L_OpenBrowser(lua_State* L)
  */
 int L_ChangeDir(lua_State* L)
 {
-    const char* pathStr = luaL_checkstring(L, 1);
-    QString path = QString::fromUtf8(pathStr);
+    QString path = luaCheckQString(L, 1);
 
     bool success = QDir::setCurrent(path);
     lua_pushboolean(L, success);
@@ -581,12 +573,11 @@ int L_ExportXML(lua_State* L)
     int flags = luaL_optinteger(L, 1, XML_ALL);
 
     // Get optional comment
-    const char* comment = luaL_optstring(L, 2, "");
-    QString qComment = QString::fromUtf8(comment);
+    QString qComment = luaOptQString(L, 2);
 
     QString xmlOutput = XmlSerialization::ExportXML(pDoc, flags, qComment);
 
-    lua_pushstring(L, xmlOutput.toUtf8().constData());
+    luaPushQString(L, xmlOutput);
     return 1;
 }
 
@@ -717,8 +708,7 @@ int L_StripANSI(lua_State* L)
         result += QString::fromUtf8(start, p - start);
     }
 
-    QByteArray ba = result.toUtf8();
-    lua_pushlstring(L, ba.constData(), ba.length());
+    luaPushQString(L, result);
     return 1;
 }
 
@@ -841,8 +831,7 @@ int L_FixupEscapeSequences(lua_State* L)
         }
     }
 
-    QByteArray ba = result.toUtf8();
-    lua_pushlstring(L, ba.constData(), ba.length());
+    luaPushQString(L, result);
     return 1;
 }
 
@@ -901,8 +890,7 @@ int L_FixupHTML(lua_State* L)
         }
     }
 
-    QByteArray ba = result.toUtf8();
-    lua_pushlstring(L, ba.constData(), ba.length());
+    luaPushQString(L, result);
     return 1;
 }
 
@@ -963,8 +951,7 @@ int L_MakeRegularExpression(lua_State* L)
     // Add $ at end for whole-line matching
     result += '$';
 
-    QByteArray ba = result.toUtf8();
-    lua_pushlstring(L, ba.constData(), ba.length());
+    luaPushQString(L, result);
     return 1;
 }
 
@@ -1006,10 +993,9 @@ int L_MakeRegularExpression(lua_State* L)
 int L_EnableGroup(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* groupName = luaL_checkstring(L, 1);
     bool enabled = lua_isnone(L, 2) ? true : lua_toboolean(L, 2);
 
-    QString qGroupName = QString::fromUtf8(groupName);
+    QString qGroupName = luaCheckQString(L, 1);
 
     if (qGroupName.isEmpty()) {
         lua_pushnumber(L, 0);
@@ -1077,9 +1063,8 @@ int L_EnableGroup(lua_State* L)
 int L_DeleteGroup(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* groupName = luaL_checkstring(L, 1);
 
-    QString qGroupName = QString::fromUtf8(groupName);
+    QString qGroupName = luaCheckQString(L, 1);
 
     if (qGroupName.isEmpty()) {
         lua_pushnumber(L, 0);
@@ -1253,14 +1238,10 @@ int L_ErrorDesc(lua_State* L)
  */
 int L_Replace(lua_State* L)
 {
-    const char* source = luaL_checkstring(L, 1);
-    const char* searchFor = luaL_checkstring(L, 2);
-    const char* replaceWith = luaL_checkstring(L, 3);
+    QString qSource = luaCheckQString(L, 1);
+    QString qSearchFor = luaCheckQString(L, 2);
+    QString qReplaceWith = luaCheckQString(L, 3);
     bool multiple = lua_toboolean(L, 4);
-
-    QString qSource = QString::fromUtf8(source);
-    QString qSearchFor = QString::fromUtf8(searchFor);
-    QString qReplaceWith = QString::fromUtf8(replaceWith);
 
     QString result;
     if (multiple) {
@@ -1275,7 +1256,7 @@ int L_Replace(lua_State* L)
         }
     }
 
-    lua_pushstring(L, result.toUtf8().constData());
+    luaPushQString(L, result);
     return 1;
 }
 
@@ -1404,10 +1385,8 @@ int L_ShiftTabCompleteItem(lua_State* L)
 int L_GetTriggerWildcard(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* triggerName = luaL_checkstring(L, 1);
-    const char* wildcardName = luaL_checkstring(L, 2);
-
-    QString name = QString::fromUtf8(triggerName).trimmed().toLower();
+    QString name = luaCheckQString(L, 1).trimmed().toLower();
+    QString wcName = luaCheckQString(L, 2);
 
     // Find the trigger
     auto it = pDoc->m_automationRegistry->m_TriggerMap.find(name);
@@ -1419,13 +1398,11 @@ int L_GetTriggerWildcard(lua_State* L)
     Trigger* trigger = it->second.get();
 
     // Try to get wildcard by name or number
-    QString wcName = QString::fromUtf8(wildcardName);
-
     // Try as number first
     bool ok;
     int wcNum = wcName.toInt(&ok);
     if (ok && wcNum >= 0 && wcNum < trigger->wildcards.size()) {
-        lua_pushstring(L, trigger->wildcards[wcNum].toUtf8().constData());
+        luaPushQString(L, trigger->wildcards[wcNum]);
         return 1;
     }
 
@@ -1459,10 +1436,8 @@ int L_GetTriggerWildcard(lua_State* L)
 int L_GetAliasWildcard(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* aliasName = luaL_checkstring(L, 1);
-    const char* wildcardName = luaL_checkstring(L, 2);
-
-    QString name = QString::fromUtf8(aliasName).trimmed().toLower();
+    QString name = luaCheckQString(L, 1).trimmed().toLower();
+    QString wcName = luaCheckQString(L, 2);
 
     // Find the alias
     auto it = pDoc->m_automationRegistry->m_AliasMap.find(name);
@@ -1474,13 +1449,11 @@ int L_GetAliasWildcard(lua_State* L)
     Alias* alias = it->second.get();
 
     // Try to get wildcard by name or number
-    QString wcName = QString::fromUtf8(wildcardName);
-
     // Try as number first
     bool ok;
     int wcNum = wcName.toInt(&ok);
     if (ok && wcNum >= 0 && wcNum < alias->wildcards.size()) {
-        lua_pushstring(L, alias->wildcards[wcNum].toUtf8().constData());
+        luaPushQString(L, alias->wildcards[wcNum]);
         return 1;
     }
 
@@ -1508,8 +1481,7 @@ int L_GetAliasWildcard(lua_State* L)
 int L_GetNotes(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    QByteArray notes = pDoc->m_notes.toUtf8();
-    lua_pushlstring(L, notes.constData(), notes.length());
+    luaPushQString(L, pDoc->m_notes);
     return 1;
 }
 
@@ -1533,8 +1505,7 @@ int L_GetNotes(lua_State* L)
 int L_SetNotes(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* notes = luaL_checkstring(L, 1);
-    pDoc->m_notes = QString::fromUtf8(notes);
+    pDoc->m_notes = luaCheckQString(L, 1);
     pDoc->setModified(true);
     return 0;
 }
@@ -1583,9 +1554,7 @@ int L_DeleteCommandHistory(lua_State* L)
 int L_PushCommand(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    QString command = pDoc->PushCommand();
-    QByteArray cmd = command.toUtf8();
-    lua_pushlstring(L, cmd.constData(), cmd.length());
+    luaPushQString(L, pDoc->PushCommand());
     return 1;
 }
 
@@ -2465,7 +2434,7 @@ int L_Save(lua_State* L)
     // Get optional filename parameter
     QString filename;
     if (lua_gettop(L) >= 1 && !lua_isnil(L, 1)) {
-        filename = QString::fromUtf8(luaL_checkstring(L, 1));
+        filename = luaCheckQString(L, 1);
     }
 
     // If empty, use current world path
@@ -2566,8 +2535,7 @@ int L_TranslateGerman(lua_State* L)
     input.replace(QChar(0xD6), "Oe"); // Ö → Oe
     input.replace(QChar(0xDC), "Ue"); // Ü → Ue
 
-    QByteArray ba = input.toUtf8();
-    lua_pushlstring(L, ba.constData(), ba.length());
+    luaPushQString(L, input);
     return 1;
 }
 

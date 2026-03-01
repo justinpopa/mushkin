@@ -54,13 +54,9 @@ int L_WindowLoadImage(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
-    const char* imageId = luaL_checkstring(L, 2);
-    const char* filename = luaL_checkstring(L, 3);
-
-    QString windowName = QString::fromUtf8(name);
-    QString qImageId = QString::fromUtf8(imageId);
-    QString qFilename = QString::fromUtf8(filename);
+    QString windowName = luaCheckQString(L, 1);
+    QString qImageId = luaCheckQString(L, 2);
+    QString qFilename = luaCheckQString(L, 3);
 
     // Get miniwindow
     MiniWindow* win = getMiniWindow(pDoc, windowName);
@@ -135,8 +131,8 @@ int L_WindowDrawImage(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
-    const char* imageId = luaL_checkstring(L, 2);
+    QString windowName = luaCheckQString(L, 1);
+    QString imageId = luaCheckQString(L, 2);
     qint32 left = luaL_checkinteger(L, 3);
     qint32 top = luaL_checkinteger(L, 4);
     qint32 right = luaL_checkinteger(L, 5);
@@ -147,14 +143,13 @@ int L_WindowDrawImage(lua_State* L)
     qint32 srcRight = luaL_optinteger(L, 10, 0);
     qint32 srcBottom = luaL_optinteger(L, 11, 0);
 
-    QString windowName = QString::fromUtf8(name);
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         return luaReturnError(L, eNoSuchWindow);
     }
 
-    qint32 result = win->DrawImage(QString::fromUtf8(imageId), left, top, right, bottom, mode,
-                                   srcLeft, srcTop, srcRight, srcBottom);
+    qint32 result = win->DrawImage(imageId, left, top, right, bottom, mode, srcLeft, srcTop,
+                                   srcRight, srcBottom);
     lua_pushnumber(L, result);
     return 1;
 }
@@ -201,8 +196,8 @@ int L_WindowBlendImage(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
-    const char* imageId = luaL_checkstring(L, 2);
+    QString windowName = luaCheckQString(L, 1);
+    QString imageId = luaCheckQString(L, 2);
     qint32 left = luaL_checkinteger(L, 3);
     qint32 top = luaL_checkinteger(L, 4);
     qint32 right = luaL_checkinteger(L, 5);
@@ -214,14 +209,13 @@ int L_WindowBlendImage(lua_State* L)
     qint32 srcRight = luaL_optinteger(L, 11, 0);
     qint32 srcBottom = luaL_optinteger(L, 12, 0);
 
-    QString windowName = QString::fromUtf8(name);
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         return luaReturnError(L, eNoSuchWindow);
     }
 
-    qint32 result = win->BlendImage(QString::fromUtf8(imageId), left, top, right, bottom, mode,
-                                    opacity, srcLeft, srcTop, srcRight, srcBottom);
+    qint32 result = win->BlendImage(imageId, left, top, right, bottom, mode, opacity, srcLeft,
+                                    srcTop, srcRight, srcBottom);
     lua_pushnumber(L, result);
     return 1;
 }
@@ -251,18 +245,16 @@ int L_WindowImageFromWindow(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
-    const char* imageId = luaL_checkstring(L, 2);
-    const char* srcWindowName = luaL_checkstring(L, 3);
+    QString windowName = luaCheckQString(L, 1);
+    QString imageId = luaCheckQString(L, 2);
+    QString srcWindowName = luaCheckQString(L, 3);
 
-    QString windowName = QString::fromUtf8(name);
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         return luaReturnError(L, eNoSuchWindow);
     }
 
-    qint32 result =
-        win->ImageFromWindow(QString::fromUtf8(imageId), pDoc, QString::fromUtf8(srcWindowName));
+    qint32 result = win->ImageFromWindow(imageId, pDoc, srcWindowName);
     lua_pushnumber(L, result);
     return 1;
 }
@@ -294,18 +286,17 @@ int L_WindowImageInfo(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
-    const char* imageId = luaL_checkstring(L, 2);
+    QString windowName = luaCheckQString(L, 1);
+    QString imageId = luaCheckQString(L, 2);
     qint32 infoType = luaL_checkinteger(L, 3);
 
-    QString windowName = QString::fromUtf8(name);
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         lua_pushnil(L);
         return 1;
     }
 
-    QVariant result = win->ImageInfo(QString::fromUtf8(imageId), infoType);
+    QVariant result = win->ImageInfo(imageId, infoType);
     if (!result.isValid()) {
         lua_pushnil(L);
     } else {
@@ -338,9 +329,8 @@ int L_WindowImageList(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
+    QString windowName = luaCheckQString(L, 1);
 
-    QString windowName = QString::fromUtf8(name);
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         lua_newtable(L); // Return empty table
@@ -348,13 +338,7 @@ int L_WindowImageList(lua_State* L)
     }
 
     QStringList imageIds = win->ImageList();
-
-    // Create Lua table
-    lua_newtable(L);
-    for (int i = 0; i < imageIds.size(); ++i) {
-        lua_pushstring(L, imageIds[i].toUtf8().constData());
-        lua_rawseti(L, -2, i + 1); // Lua tables are 1-indexed
-    }
+    luaPushQStringList(L, imageIds);
 
     return 1;
 }
@@ -388,8 +372,8 @@ int L_WindowGetImageAlpha(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
-    const char* imageId = luaL_checkstring(L, 2);
+    QString windowName = luaCheckQString(L, 1);
+    QString imageId = luaCheckQString(L, 2);
     qint32 left = luaL_checkinteger(L, 3);
     qint32 top = luaL_checkinteger(L, 4);
     qint32 right = luaL_checkinteger(L, 5);
@@ -397,14 +381,12 @@ int L_WindowGetImageAlpha(lua_State* L)
     qint32 srcLeft = luaL_checkinteger(L, 7);
     qint32 srcTop = luaL_checkinteger(L, 8);
 
-    QString windowName = QString::fromUtf8(name);
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         return luaReturnError(L, eNoSuchWindow);
     }
 
-    qint32 result =
-        win->GetImageAlpha(QString::fromUtf8(imageId), left, top, right, bottom, srcLeft, srcTop);
+    qint32 result = win->GetImageAlpha(imageId, left, top, right, bottom, srcLeft, srcTop);
     lua_pushnumber(L, result);
     return 1;
 }
@@ -443,8 +425,8 @@ int L_WindowDrawImageAlpha(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
-    const char* imageId = luaL_checkstring(L, 2);
+    QString windowName = luaCheckQString(L, 1);
+    QString imageId = luaCheckQString(L, 2);
     qint32 left = luaL_checkinteger(L, 3);
     qint32 top = luaL_checkinteger(L, 4);
     qint32 right = luaL_checkinteger(L, 5);
@@ -453,14 +435,13 @@ int L_WindowDrawImageAlpha(lua_State* L)
     qint32 srcLeft = luaL_checkinteger(L, 8);
     qint32 srcTop = luaL_checkinteger(L, 9);
 
-    QString windowName = QString::fromUtf8(name);
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         return luaReturnError(L, eNoSuchWindow);
     }
 
-    qint32 result = win->DrawImageAlpha(QString::fromUtf8(imageId), left, top, right, bottom,
-                                        opacity, srcLeft, srcTop);
+    qint32 result =
+        win->DrawImageAlpha(imageId, left, top, right, bottom, opacity, srcLeft, srcTop);
     lua_pushnumber(L, result);
     return 1;
 }
@@ -502,9 +483,9 @@ int L_WindowMergeImageAlpha(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
-    const char* imageId = luaL_checkstring(L, 2);
-    const char* maskId = luaL_checkstring(L, 3);
+    QString windowName = luaCheckQString(L, 1);
+    QString imageId = luaCheckQString(L, 2);
+    QString maskId = luaCheckQString(L, 3);
     qint32 left = luaL_checkinteger(L, 4);
     qint32 top = luaL_checkinteger(L, 5);
     qint32 right = luaL_checkinteger(L, 6);
@@ -516,15 +497,13 @@ int L_WindowMergeImageAlpha(lua_State* L)
     qint32 srcRight = luaL_checkinteger(L, 12);
     qint32 srcBottom = luaL_checkinteger(L, 13);
 
-    QString windowName = QString::fromUtf8(name);
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         return luaReturnError(L, eNoSuchWindow);
     }
 
-    qint32 result =
-        win->MergeImageAlpha(QString::fromUtf8(imageId), QString::fromUtf8(maskId), left, top,
-                             right, bottom, mode, opacity, srcLeft, srcTop, srcRight, srcBottom);
+    qint32 result = win->MergeImageAlpha(imageId, maskId, left, top, right, bottom, mode, opacity,
+                                         srcLeft, srcTop, srcRight, srcBottom);
     lua_pushnumber(L, result);
     return 1;
 }
@@ -569,8 +548,8 @@ int L_WindowTransformImage(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
-    const char* imageId = luaL_checkstring(L, 2);
+    QString windowName = luaCheckQString(L, 1);
+    QString imageId = luaCheckQString(L, 2);
     float left = luaL_checknumber(L, 3);
     float top = luaL_checknumber(L, 4);
     qint16 mode = luaL_checkinteger(L, 5);
@@ -579,14 +558,12 @@ int L_WindowTransformImage(lua_State* L)
     float myx = luaL_checknumber(L, 8);
     float myy = luaL_checknumber(L, 9);
 
-    QString windowName = QString::fromUtf8(name);
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         return luaReturnError(L, eNoSuchWindow);
     }
 
-    qint32 result =
-        win->TransformImage(QString::fromUtf8(imageId), left, top, mode, mxx, mxy, myx, myy);
+    qint32 result = win->TransformImage(imageId, left, top, mode, mxx, mxy, myx, myy);
     lua_pushnumber(L, result);
     return 1;
 }
@@ -631,8 +608,8 @@ int L_WindowCreateImage(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
-    const char* imageId = luaL_checkstring(L, 2);
+    QString windowName = luaCheckQString(L, 1);
+    QString imageId = luaCheckQString(L, 2);
     qint32 row1 = luaL_checkinteger(L, 3);
     qint32 row2 = luaL_checkinteger(L, 4);
     qint32 row3 = luaL_checkinteger(L, 5);
@@ -642,14 +619,12 @@ int L_WindowCreateImage(lua_State* L)
     qint32 row7 = luaL_checkinteger(L, 9);
     qint32 row8 = luaL_checkinteger(L, 10);
 
-    QString windowName = QString::fromUtf8(name);
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         return luaReturnError(L, eNoSuchWindow);
     }
 
-    qint32 result = win->CreateImage(QString::fromUtf8(imageId), row1, row2, row3, row4, row5, row6,
-                                     row7, row8);
+    qint32 result = win->CreateImage(imageId, row1, row2, row3, row4, row5, row6, row7, row8);
 
     lua_pushnumber(L, result);
     return 1;
@@ -697,7 +672,7 @@ int L_WindowImageOp(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
+    QString windowName = luaCheckQString(L, 1);
     qint16 action = luaL_checkinteger(L, 2);
     qint32 left = luaL_checkinteger(L, 3);
     qint32 top = luaL_checkinteger(L, 4);
@@ -707,19 +682,18 @@ int L_WindowImageOp(lua_State* L)
     qint32 penStyle = luaL_checkinteger(L, 8);
     qint32 penWidth = luaL_checkinteger(L, 9);
     qint32 brushColor = luaL_checkinteger(L, 10);
-    const char* imageId = luaL_checkstring(L, 11);
+    QString imageId = luaCheckQString(L, 11);
     qint32 ellipseWidth = luaL_optinteger(L, 12, 0);
     qint32 ellipseHeight = luaL_optinteger(L, 13, 0);
 
-    QString windowName = QString::fromUtf8(name);
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         return luaReturnError(L, eNoSuchWindow);
     }
 
-    qint32 result = win->ImageOp(action, left, top, right, bottom, static_cast<QRgb>(penColor),
-                                 penStyle, penWidth, static_cast<QRgb>(brushColor),
-                                 QString::fromUtf8(imageId), ellipseWidth, ellipseHeight);
+    qint32 result =
+        win->ImageOp(action, left, top, right, bottom, static_cast<QRgb>(penColor), penStyle,
+                     penWidth, static_cast<QRgb>(brushColor), imageId, ellipseWidth, ellipseHeight);
 
     lua_pushnumber(L, result);
     return 1;
@@ -756,23 +730,22 @@ int L_WindowLoadImageMemory(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
-    const char* imageId = luaL_checkstring(L, 2);
+    QString windowName = luaCheckQString(L, 1);
+    QString imageId = luaCheckQString(L, 2);
 
     // Get data as string (can contain binary data including nulls)
     size_t len;
     const char* data = luaL_checklstring(L, 3, &len);
     bool alpha = lua_toboolean(L, 4);
 
-    QString windowName = QString::fromUtf8(name);
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         return luaReturnError(L, eNoSuchWindow);
     }
 
     qint32 result = win->LoadImageMemory(
-        QString::fromUtf8(imageId),
-        std::span<const unsigned char>(reinterpret_cast<const unsigned char*>(data), len), alpha);
+        imageId, std::span<const unsigned char>(reinterpret_cast<const unsigned char*>(data), len),
+        alpha);
 
     lua_pushnumber(L, result);
     return 1;
@@ -831,29 +804,27 @@ int L_WindowAddHotspot(lua_State* L)
     WorldDocument* pDoc = doc(L);
 
     // Extract all parameters (14 total)
-    const char* name = luaL_checkstring(L, 1);
-    const char* hotspotId = luaL_checkstring(L, 2);
+    QString windowName = luaCheckQString(L, 1);
+    QString hotspotIdStr = luaCheckQString(L, 2);
     qint32 left = luaL_checkinteger(L, 3);
     qint32 top = luaL_checkinteger(L, 4);
     qint32 right = luaL_checkinteger(L, 5);
     qint32 bottom = luaL_checkinteger(L, 6);
-    const char* mouseOver = luaL_optstring(L, 7, "");
-    const char* cancelMouseOver = luaL_optstring(L, 8, "");
-    const char* mouseDown = luaL_optstring(L, 9, "");
-    const char* cancelMouseDown = luaL_optstring(L, 10, "");
-    const char* mouseUp = luaL_optstring(L, 11, "");
-    const char* tooltipText = luaL_optstring(L, 12, "");
+    QString mouseOver = luaOptQString(L, 7);
+    QString cancelMouseOver = luaOptQString(L, 8);
+    QString mouseDown = luaOptQString(L, 9);
+    QString cancelMouseDown = luaOptQString(L, 10);
+    QString mouseUp = luaOptQString(L, 11);
+    QString tooltipText = luaOptQString(L, 12);
     qint32 cursor = luaL_optinteger(L, 13, 0);
     qint32 flags = luaL_optinteger(L, 14, 0);
 
-    QString windowName = QString::fromUtf8(name);
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         return luaReturnError(L, eNoSuchWindow);
     }
 
     // Create or replace hotspot
-    QString hotspotIdStr = QString::fromUtf8(hotspotId);
     auto hotspot = std::make_unique<Hotspot>();
 
     // Handle special case: right=0 or bottom=0 means "use window edge"
@@ -869,14 +840,14 @@ int L_WindowAddHotspot(lua_State* L)
     hotspot->m_rect = QRect(left, top, right - left, bottom - top);
 
     // Set mouse event callbacks
-    hotspot->m_sMouseOver = QString::fromUtf8(mouseOver);
-    hotspot->m_sCancelMouseOver = QString::fromUtf8(cancelMouseOver);
-    hotspot->m_sMouseDown = QString::fromUtf8(mouseDown);
-    hotspot->m_sCancelMouseDown = QString::fromUtf8(cancelMouseDown);
-    hotspot->m_sMouseUp = QString::fromUtf8(mouseUp);
+    hotspot->m_sMouseOver = mouseOver;
+    hotspot->m_sCancelMouseOver = cancelMouseOver;
+    hotspot->m_sMouseDown = mouseDown;
+    hotspot->m_sCancelMouseDown = cancelMouseDown;
+    hotspot->m_sMouseUp = mouseUp;
 
     // Set tooltip
-    hotspot->m_sTooltipText = QString::fromUtf8(tooltipText);
+    hotspot->m_sTooltipText = tooltipText;
 
     // Set cursor and flags
     hotspot->m_Cursor = cursor;
@@ -911,16 +882,14 @@ int L_WindowAddHotspot(lua_State* L)
 int L_WindowDeleteHotspot(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-    const char* hotspotId = luaL_checkstring(L, 2);
+    QString windowName = luaCheckQString(L, 1);
+    QString hotspotIdStr = luaCheckQString(L, 2);
 
-    QString windowName = QString::fromUtf8(name);
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         return luaReturnError(L, eNoSuchWindow);
     }
 
-    QString hotspotIdStr = QString::fromUtf8(hotspotId);
     auto it = win->hotspots.find(hotspotIdStr);
     if (it == win->hotspots.end()) {
         return luaReturnError(L, eHotspotNotInstalled);
@@ -952,9 +921,8 @@ int L_WindowDeleteHotspot(lua_State* L)
 int L_WindowDeleteAllHotspots(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
+    QString windowName = luaCheckQString(L, 1);
 
-    QString windowName = QString::fromUtf8(name);
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         return luaReturnError(L, eNoSuchWindow);
@@ -989,24 +957,22 @@ int L_WindowDeleteAllHotspots(lua_State* L)
 int L_WindowHotspotTooltip(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-    const char* hotspotId = luaL_checkstring(L, 2);
-    const char* tooltipText = luaL_checkstring(L, 3);
+    QString windowName = luaCheckQString(L, 1);
+    QString hotspotIdStr = luaCheckQString(L, 2);
+    QString tooltipText = luaCheckQString(L, 3);
 
-    QString windowName = QString::fromUtf8(name);
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         return luaReturnError(L, eNoSuchWindow);
     }
 
-    QString hotspotIdStr = QString::fromUtf8(hotspotId);
     auto it = win->hotspots.find(hotspotIdStr);
     if (it == win->hotspots.end()) {
         return luaReturnError(L, eHotspotNotInstalled);
     }
 
     // Update tooltip
-    it->second->m_sTooltipText = QString::fromUtf8(tooltipText);
+    it->second->m_sTooltipText = tooltipText;
 
     return luaReturnOK(L);
 }
@@ -1045,19 +1011,16 @@ int L_WindowDragHandler(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
-    const char* hotspotId = luaL_checkstring(L, 2);
-    const char* moveCallback = luaL_optstring(L, 3, "");
-    const char* releaseCallback = luaL_optstring(L, 4, "");
+    QString windowName = luaCheckQString(L, 1);
+    QString hotspotIdStr = luaCheckQString(L, 2);
+    QString moveCallback = luaOptQString(L, 3);
+    QString releaseCallback = luaOptQString(L, 4);
     qint32 flags = luaL_optinteger(L, 5, 0);
 
-    QString windowName = QString::fromUtf8(name);
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         return luaReturnError(L, eNoSuchWindow);
     }
-
-    QString hotspotIdStr = QString::fromUtf8(hotspotId);
 
     // Get raw pointer from unique_ptr in map
     auto it = win->hotspots.find(hotspotIdStr);
@@ -1067,8 +1030,8 @@ int L_WindowDragHandler(lua_State* L)
     Hotspot* hotspot = it->second.get();
 
     // Set drag-and-drop callbacks and flags
-    hotspot->m_sMoveCallback = QString::fromUtf8(moveCallback);
-    hotspot->m_sReleaseCallback = QString::fromUtf8(releaseCallback);
+    hotspot->m_sMoveCallback = moveCallback;
+    hotspot->m_sReleaseCallback = releaseCallback;
     hotspot->m_DragFlags = flags;
 
     return luaReturnOK(L);
@@ -1113,13 +1076,10 @@ int L_WindowMenu(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
+    QString windowName = luaCheckQString(L, 1);
     qint32 x = luaL_checkinteger(L, 2);
     qint32 y = luaL_checkinteger(L, 3);
-    const char* menuString = luaL_checkstring(L, 4);
-
-    QString windowName = QString::fromUtf8(name);
-    QString menuStr = QString::fromUtf8(menuString);
+    QString menuStr = luaCheckQString(L, 4);
 
     // Get miniwindow to convert coordinates
     MiniWindow* win = getMiniWindow(pDoc, windowName);
@@ -1261,7 +1221,7 @@ int L_WindowMenu(lua_State* L)
     // MUSHclient returns the position number, not the text
     if (selectedAction && actionIndexMap.contains(selectedAction)) {
         int index = actionIndexMap[selectedAction];
-        lua_pushstring(L, QString::number(index).toUtf8().constData());
+        luaPushQString(L, QString::number(index));
     } else {
         lua_pushstring(L, "");
     }
@@ -1299,20 +1259,17 @@ int L_WindowMoveHotspot(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
-    const char* hotspotId = luaL_checkstring(L, 2);
+    QString windowName = luaCheckQString(L, 1);
+    QString hotspotIdStr = luaCheckQString(L, 2);
     qint32 left = luaL_checkinteger(L, 3);
     qint32 top = luaL_checkinteger(L, 4);
     qint32 right = luaL_checkinteger(L, 5);
     qint32 bottom = luaL_checkinteger(L, 6);
 
-    QString windowName = QString::fromUtf8(name);
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         return luaReturnError(L, eNoSuchWindow);
     }
-
-    QString hotspotIdStr = QString::fromUtf8(hotspotId);
 
     // Get raw pointer from unique_ptr in map
     auto it = win->hotspots.find(hotspotIdStr);
@@ -1376,18 +1333,15 @@ int L_WindowHotspotInfo(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
-    const char* hotspotId = luaL_checkstring(L, 2);
+    QString windowName = luaCheckQString(L, 1);
+    QString hotspotIdStr = luaCheckQString(L, 2);
     qint32 infoType = luaL_checkinteger(L, 3);
 
-    QString windowName = QString::fromUtf8(name);
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         lua_pushnil(L); // No such window
         return 1;
     }
-
-    QString hotspotIdStr = QString::fromUtf8(hotspotId);
 
     // Get raw pointer from unique_ptr in map
     auto it = win->hotspots.find(hotspotIdStr);
@@ -1412,22 +1366,22 @@ int L_WindowHotspotInfo(lua_State* L)
             lua_pushinteger(L, hotspot->m_rect.bottom());
             break;
         case 5: // MouseOver callback
-            lua_pushstring(L, hotspot->m_sMouseOver.toUtf8().constData());
+            luaPushQString(L, hotspot->m_sMouseOver);
             break;
         case 6: // CancelMouseOver callback
-            lua_pushstring(L, hotspot->m_sCancelMouseOver.toUtf8().constData());
+            luaPushQString(L, hotspot->m_sCancelMouseOver);
             break;
         case 7: // MouseDown callback
-            lua_pushstring(L, hotspot->m_sMouseDown.toUtf8().constData());
+            luaPushQString(L, hotspot->m_sMouseDown);
             break;
         case 8: // CancelMouseDown callback
-            lua_pushstring(L, hotspot->m_sCancelMouseDown.toUtf8().constData());
+            luaPushQString(L, hotspot->m_sCancelMouseDown);
             break;
         case 9: // MouseUp callback
-            lua_pushstring(L, hotspot->m_sMouseUp.toUtf8().constData());
+            luaPushQString(L, hotspot->m_sMouseUp);
             break;
         case 10: // TooltipText
-            lua_pushstring(L, hotspot->m_sTooltipText.toUtf8().constData());
+            luaPushQString(L, hotspot->m_sTooltipText);
             break;
         case 11: // cursor code
             lua_pushinteger(L, hotspot->m_Cursor);
@@ -1436,10 +1390,10 @@ int L_WindowHotspotInfo(lua_State* L)
             lua_pushinteger(L, hotspot->m_Flags);
             break;
         case 13: // MoveCallback (drag-and-drop)
-            lua_pushstring(L, hotspot->m_sMoveCallback.toUtf8().constData());
+            luaPushQString(L, hotspot->m_sMoveCallback);
             break;
         case 14: // ReleaseCallback (drag-and-drop)
-            lua_pushstring(L, hotspot->m_sReleaseCallback.toUtf8().constData());
+            luaPushQString(L, hotspot->m_sReleaseCallback);
             break;
         case 15: // drag flags
             lua_pushinteger(L, hotspot->m_DragFlags);
@@ -1486,17 +1440,14 @@ int L_WindowScrollwheelHandler(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
-    const char* hotspotId = luaL_checkstring(L, 2);
-    const char* scrollCallback = luaL_optstring(L, 3, "");
+    QString windowName = luaCheckQString(L, 1);
+    QString hotspotIdStr = luaCheckQString(L, 2);
+    QString scrollCallback = luaOptQString(L, 3);
 
-    QString windowName = QString::fromUtf8(name);
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         return luaReturnError(L, eNoSuchWindow);
     }
-
-    QString hotspotIdStr = QString::fromUtf8(hotspotId);
 
     // Get raw pointer from unique_ptr in map
     auto it = win->hotspots.find(hotspotIdStr);
@@ -1506,7 +1457,7 @@ int L_WindowScrollwheelHandler(lua_State* L)
     Hotspot* hotspot = it->second.get();
 
     // Set scroll wheel callback
-    hotspot->m_sScrollwheelCallback = QString::fromUtf8(scrollCallback);
+    hotspot->m_sScrollwheelCallback = scrollCallback;
 
     return luaReturnOK(L);
 }

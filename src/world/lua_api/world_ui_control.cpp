@@ -49,8 +49,8 @@
 int L_AcceleratorTo(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* key_string = luaL_checkstring(L, 1);
-    const char* script = luaL_checkstring(L, 2);
+    QString key_string = luaCheckQString(L, 1);
+    QString script = luaCheckQString(L, 2);
     int send_to = luaL_checkinteger(L, 3);
 
     // Get current plugin ID if running from a plugin
@@ -60,8 +60,7 @@ int L_AcceleratorTo(lua_State* L)
     }
 
     // Register the accelerator
-    int result = pDoc->m_acceleratorManager->addAccelerator(
-        QString::fromUtf8(key_string), QString::fromUtf8(script), send_to, pluginId);
+    int result = pDoc->m_acceleratorManager->addAccelerator(key_string, script, send_to, pluginId);
 
     lua_pushnumber(L, result);
     return 1;
@@ -101,8 +100,8 @@ int L_AcceleratorTo(lua_State* L)
 int L_Accelerator(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* key_string = luaL_checkstring(L, 1);
-    const char* send_string = luaL_checkstring(L, 2);
+    QString key_string = luaCheckQString(L, 1);
+    QString send_string = luaCheckQString(L, 2);
 
     // Get current plugin ID if running from a plugin
     QString pluginId;
@@ -111,8 +110,7 @@ int L_Accelerator(lua_State* L)
     }
 
     // Register the accelerator with eSendToExecute (12)
-    int result = pDoc->m_acceleratorManager->addAccelerator(QString::fromUtf8(key_string),
-                                                            QString::fromUtf8(send_string),
+    int result = pDoc->m_acceleratorManager->addAccelerator(key_string, send_string,
                                                             12, // eSendToExecute
                                                             pluginId);
 
@@ -164,7 +162,7 @@ int L_AcceleratorList(lua_State* L)
             str += QString("\t[%1]").arg(entry.sendTo);
         }
 
-        lua_pushstring(L, str.toUtf8().constData());
+        luaPushQString(L, str);
         lua_rawseti(L, -2, index++);
     }
 
@@ -200,7 +198,7 @@ int L_GetClipboard(lua_State* L)
 {
     QClipboard* clipboard = QGuiApplication::clipboard();
     QString text = clipboard->text();
-    lua_pushstring(L, text.toUtf8().constData());
+    luaPushQString(L, text);
     return 1;
 }
 
@@ -227,9 +225,8 @@ int L_GetClipboard(lua_State* L)
  */
 int L_SetClipboard(lua_State* L)
 {
-    const char* text = luaL_checkstring(L, 1);
     QClipboard* clipboard = QGuiApplication::clipboard();
-    clipboard->setText(QString::fromUtf8(text));
+    clipboard->setText(luaCheckQString(L, 1));
     return 0;
 }
 
@@ -272,11 +269,8 @@ int L_SetClipboard(lua_State* L)
  */
 int L_Menu(lua_State* L)
 {
-    const char* items = luaL_checkstring(L, 1);
-    const char* defaultItem = luaL_optstring(L, 2, "");
-
-    QString itemsStr = QString::fromUtf8(items);
-    QString defaultStr = QString::fromUtf8(defaultItem);
+    QString itemsStr = luaCheckQString(L, 1);
+    QString defaultStr = luaOptQString(L, 2);
 
     // Must have at least one item
     if (itemsStr.trimmed().isEmpty()) {
@@ -330,8 +324,7 @@ int L_Menu(lua_State* L)
 
     // Return selected item text (or empty string if canceled)
     if (selectedAction && actionMap.contains(selectedAction)) {
-        QString result = actionMap[selectedAction];
-        lua_pushstring(L, result.toUtf8().constData());
+        luaPushQString(L, actionMap[selectedAction]);
     } else {
         lua_pushstring(L, "");
     }
@@ -624,10 +617,9 @@ int L_SetBackgroundColour(lua_State* L)
 int L_SetOutputFont(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* fontName = luaL_checkstring(L, 1);
     int pointSize = luaL_checkinteger(L, 2);
 
-    pDoc->m_output.font_name = QString::fromUtf8(fontName);
+    pDoc->m_output.font_name = luaCheckQString(L, 1);
     pDoc->m_output.font_height = pointSize; // Store as provided
     emit pDoc->outputSettingsChanged();
     return 0;
@@ -648,12 +640,11 @@ int L_SetOutputFont(lua_State* L)
 int L_SetInputFont(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* fontName = luaL_checkstring(L, 1);
     int pointSize = luaL_checkinteger(L, 2);
     int weight = luaL_checkinteger(L, 3);
     int italic = luaL_optinteger(L, 4, 0);
 
-    pDoc->m_input.font_name = QString::fromUtf8(fontName);
+    pDoc->m_input.font_name = luaCheckQString(L, 1);
     pDoc->m_input.font_height = pointSize;
     pDoc->m_input.font_weight = weight;
     pDoc->m_input.font_italic = italic ? 1 : 0;
@@ -741,7 +732,6 @@ int L_MoveWorldWindowX(lua_State* L)
 int L_SetForegroundImage(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* filename = luaL_optstring(L, 1, "");
     qint32 mode = luaL_optinteger(L, 2, 0);
 
     // Validate mode (matches original)
@@ -751,7 +741,7 @@ int L_SetForegroundImage(lua_State* L)
     }
 
     // Store the image path and mode
-    pDoc->m_strForegroundImageName = QString::fromUtf8(filename);
+    pDoc->m_strForegroundImageName = luaOptQString(L, 1);
     pDoc->m_iForegroundMode = mode;
 
     // Tell OutputView to reload the image via interface method

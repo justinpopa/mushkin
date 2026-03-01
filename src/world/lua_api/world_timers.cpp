@@ -72,22 +72,16 @@ int L_AddTimer(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
+    QString qName = luaCheckQString(L, 1);
     int hour = luaL_checkinteger(L, 2);
     int minute = luaL_checkinteger(L, 3);
     double second = luaL_checknumber(L, 4);
-    const char* text = luaL_checkstring(L, 5);
+    QString text = luaCheckQString(L, 5);
     int flags = luaL_checkinteger(L, 6);
-    const char* scriptName = luaL_optstring(L, 7, "");
-
-    QString qName = QString::fromUtf8(name);
+    QString scriptName = luaOptQString(L, 7);
 
     // Validate and normalize timer name
-    qint32 nameStatus = validateObjectName(qName);
-    if (nameStatus != eOK) {
-        lua_pushnumber(L, nameStatus);
-        return 1;
-    }
+    LUA_VALIDATE_NAME(qName);
 
     // Check if timer already exists (check appropriate map based on context)
     // Use plugin(L) to get the plugin from Lua registry - this is reliable even after modal dialogs
@@ -148,8 +142,8 @@ int L_AddTimer(lua_State* L)
     timer->one_shot = (flags & eTimerOneShot) != 0;
     timer->temporary = (flags & eTimerTemporary) != 0;
     timer->active_when_closed = (flags & eTimerActiveWhenClosed) != 0;
-    timer->contents = QString::fromUtf8(text);
-    timer->procedure = QString::fromUtf8(scriptName);
+    timer->contents = text;
+    timer->procedure = scriptName;
 
     // Set timer type and timing fields
     if (flags & eTimerAtTime) {
@@ -242,9 +236,7 @@ int L_AddTimer(lua_State* L)
 int L_DeleteTimer(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
 
     // Check appropriate timer map based on context
     Plugin* currentPlugin = plugin(L);
@@ -289,10 +281,9 @@ int L_DeleteTimer(lua_State* L)
 int L_EnableTimer(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
+    QString qName = luaCheckQString(L, 1);
     bool enabled = lua_toboolean(L, 2);
 
-    QString qName = QString::fromUtf8(name);
     Timer* timer = nullptr;
 
     // Check appropriate timer map based on context
@@ -335,9 +326,7 @@ int L_EnableTimer(lua_State* L)
 int L_IsTimer(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
     Timer* timer = nullptr;
 
     // Check appropriate timer map based on context
@@ -388,9 +377,7 @@ int L_IsTimer(lua_State* L)
 int L_GetTimer(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
     Timer* timer = nullptr;
 
     // Check appropriate timer map based on context
@@ -439,9 +426,9 @@ int L_GetTimer(lua_State* L)
     lua_pushnumber(L, hour);
     lua_pushnumber(L, minute);
     lua_pushnumber(L, second);
-    lua_pushstring(L, timer->contents.toUtf8().constData());
+    luaPushQString(L, timer->contents);
     lua_pushnumber(L, flags);
-    lua_pushstring(L, timer->procedure.toUtf8().constData());
+    luaPushQString(L, timer->procedure);
 
     return 7;
 }
@@ -495,10 +482,9 @@ int L_GetTimer(lua_State* L)
 int L_GetTimerInfo(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
+    QString qName = luaCheckQString(L, 1);
     int info_type = luaL_checkinteger(L, 2);
 
-    QString qName = QString::fromUtf8(name);
     Timer* timer = nullptr;
 
     // Check appropriate timer map based on context
@@ -540,15 +526,11 @@ int L_GetTimerInfo(lua_State* L)
             }
             break;
         case 4: // contents (send text)
-        {
-            QByteArray ba = timer->contents.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
+            luaPushQString(L, timer->contents);
+            break;
         case 5: // procedure (script name)
-        {
-            QByteArray ba = timer->procedure.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
+            luaPushQString(L, timer->procedure);
+            break;
         case 6: // omit_from_log
             lua_pushboolean(L, timer->omit_from_log);
             break;
@@ -589,15 +571,11 @@ int L_GetTimerInfo(lua_State* L)
             lua_pushnumber(L, timer->create_sequence);
             break;
         case 15: // group
-        {
-            QByteArray ba = timer->group.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
+            luaPushQString(L, timer->group);
+            break;
         case 16: // variable
-        {
-            QByteArray ba = timer->variable.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
+            luaPushQString(L, timer->variable);
+            break;
         case 17: // user_option
             lua_pushnumber(L, timer->user_option);
             break;
@@ -640,8 +618,7 @@ int L_GetTimerInfo(lua_State* L)
                                       .arg(timer->at_hour, 2, 10, QChar('0'))
                                       .arg(timer->at_minute, 2, 10, QChar('0'))
                                       .arg(timer->at_second, 5, 'f', 2, QChar('0'));
-                QByteArray ba = timeStr.toUtf8();
-                lua_pushlstring(L, ba.constData(), ba.length());
+                luaPushQString(L, timeStr);
             } else {
                 lua_pushstring(L, "");
             }
@@ -679,8 +656,7 @@ int L_GetTimerList(lua_State* L)
     lua_newtable(L);
     int i = 1;
     for (const auto& [name, timer] : pDoc->m_automationRegistry->m_TimerMap) {
-        QByteArray ba = name.toUtf8();
-        lua_pushlstring(L, ba.constData(), ba.length());
+        luaPushQString(L, name);
         lua_rawseti(L, -2, i++);
     }
 
@@ -708,9 +684,7 @@ int L_GetTimerList(lua_State* L)
 int L_ResetTimer(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
     Timer* timer = nullptr;
 
     // Check appropriate timer map based on context
@@ -791,7 +765,7 @@ int L_DoAfter(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
     double seconds = luaL_checknumber(L, 1);
-    const char* text = luaL_checkstring(L, 2);
+    QString text = luaCheckQString(L, 2);
 
     if (seconds <= 0.0) {
         return luaReturnError(L, eTimeInvalid);
@@ -808,7 +782,7 @@ int L_DoAfter(lua_State* L)
     timer->every_hour = 0;
     timer->every_minute = 0;
     timer->every_second = seconds;
-    timer->contents = QString::fromUtf8(text);
+    timer->contents = text;
     timer->enabled = true;
     timer->one_shot = true; // Delete after firing
     timer->temporary = true;
@@ -864,7 +838,7 @@ int L_DoAfterSpecial(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
     double seconds = luaL_checknumber(L, 1);
-    const char* text = luaL_checkstring(L, 2);
+    QString text = luaCheckQString(L, 2);
     int sendto = luaL_checknumber(L, 3);
 
     if (seconds < 0.1 || seconds > 86399.0) {
@@ -887,7 +861,7 @@ int L_DoAfterSpecial(lua_State* L)
     timer->every_hour = 0;
     timer->every_minute = 0;
     timer->every_second = seconds;
-    timer->contents = QString::fromUtf8(text);
+    timer->contents = text;
     timer->enabled = true;
     timer->one_shot = true; // Delete after firing
     timer->temporary = true;
@@ -936,7 +910,7 @@ int L_DoAfterNote(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
     double seconds = luaL_checknumber(L, 1);
-    const char* text = luaL_checkstring(L, 2);
+    QString text = luaCheckQString(L, 2);
 
     if (seconds <= 0.0) {
         return luaReturnError(L, eTimeInvalid);
@@ -954,7 +928,7 @@ int L_DoAfterNote(lua_State* L)
     timer->every_hour = 0;
     timer->every_minute = 0;
     timer->every_second = seconds;
-    timer->contents = QString::fromUtf8(text);
+    timer->contents = text;
     timer->enabled = true;
     timer->one_shot = true;
     timer->temporary = true;
@@ -991,7 +965,7 @@ int L_DoAfterSpeedWalk(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
     double seconds = luaL_checknumber(L, 1);
-    const char* text = luaL_checkstring(L, 2);
+    QString text = luaCheckQString(L, 2);
 
     if (seconds <= 0.0) {
         return luaReturnError(L, eTimeInvalid);
@@ -1009,7 +983,7 @@ int L_DoAfterSpeedWalk(lua_State* L)
     timer->every_hour = 0;
     timer->every_minute = 0;
     timer->every_second = seconds;
-    timer->contents = QString::fromUtf8(text);
+    timer->contents = text;
     timer->enabled = true;
     timer->one_shot = true;
     timer->temporary = true;
@@ -1044,10 +1018,8 @@ int L_DoAfterSpeedWalk(lua_State* L)
 int L_EnableTimerGroup(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* groupName = luaL_checkstring(L, 1);
+    QString qGroupName = luaCheckQString(L, 1);
     bool enabled = lua_toboolean(L, 2);
-
-    QString qGroupName = QString::fromUtf8(groupName);
     int count = 0;
 
     // Iterate through all timers
@@ -1083,9 +1055,7 @@ int L_EnableTimerGroup(lua_State* L)
 int L_DeleteTimerGroup(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* groupName = luaL_checkstring(L, 1);
-
-    QString qGroupName = QString::fromUtf8(groupName);
+    QString qGroupName = luaCheckQString(L, 1);
     QStringList toDelete;
 
     // Find all timers in this group
@@ -1169,11 +1139,8 @@ int L_DeleteTemporaryTimers(lua_State* L)
 int L_GetTimerOption(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-    const char* optionName = luaL_checkstring(L, 2);
-
-    QString qName = QString::fromUtf8(name);
-    QString qOption = QString::fromUtf8(optionName).toLower();
+    QString qName = luaCheckQString(L, 1);
+    QString qOption = luaCheckQString(L, 2).toLower();
 
     Timer* timer = nullptr;
 
@@ -1225,14 +1192,11 @@ int L_GetTimerOption(lua_State* L)
     } else if (qOption == "send_to") {
         lua_pushnumber(L, static_cast<int>(timer->send_to));
     } else if (qOption == "script") {
-        QByteArray ba = timer->procedure.toUtf8();
-        lua_pushlstring(L, ba.constData(), ba.length());
+        luaPushQString(L, timer->procedure);
     } else if (qOption == "send") {
-        QByteArray ba = timer->contents.toUtf8();
-        lua_pushlstring(L, ba.constData(), ba.length());
+        luaPushQString(L, timer->contents);
     } else if (qOption == "group") {
-        QByteArray ba = timer->group.toUtf8();
-        lua_pushlstring(L, ba.constData(), ba.length());
+        luaPushQString(L, timer->group);
     } else if (qOption == "offset_hour") {
         lua_pushnumber(L, timer->offset_hour);
     } else if (qOption == "offset_minute") {
@@ -1246,8 +1210,7 @@ int L_GetTimerOption(lua_State* L)
     } else if (qOption == "omit_from_log") {
         lua_pushboolean(L, timer->omit_from_log);
     } else if (qOption == "variable") {
-        QByteArray ba = timer->variable.toUtf8();
-        lua_pushlstring(L, ba.constData(), ba.length());
+        luaPushQString(L, timer->variable);
     } else {
         lua_pushnil(L);
     }
@@ -1289,11 +1252,8 @@ int L_GetTimerOption(lua_State* L)
 int L_SetTimerOption(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-    const char* optionName = luaL_checkstring(L, 2);
-
-    QString qName = QString::fromUtf8(name);
-    QString qOption = QString::fromUtf8(optionName).toLower();
+    QString qName = luaCheckQString(L, 1);
+    QString qOption = luaCheckQString(L, 2).toLower();
 
     Timer* timer = nullptr;
 
@@ -1361,14 +1321,11 @@ int L_SetTimerOption(lua_State* L)
     } else if (qOption == "send_to") {
         timer->send_to = static_cast<SendTo>(luaL_checkinteger(L, 3));
     } else if (qOption == "script") {
-        const char* value = luaL_checkstring(L, 3);
-        timer->procedure = QString::fromUtf8(value);
+        timer->procedure = luaCheckQString(L, 3);
     } else if (qOption == "send") {
-        const char* value = luaL_checkstring(L, 3);
-        timer->contents = QString::fromUtf8(value);
+        timer->contents = luaCheckQString(L, 3);
     } else if (qOption == "group") {
-        const char* value = luaL_checkstring(L, 3);
-        timer->group = QString::fromUtf8(value);
+        timer->group = luaCheckQString(L, 3);
     } else if (qOption == "offset_hour") {
         int value = luaL_checkinteger(L, 3);
         if (value < 0 || value > 23) {
@@ -1397,8 +1354,7 @@ int L_SetTimerOption(lua_State* L)
     } else if (qOption == "omit_from_log") {
         timer->omit_from_log = lua_toboolean(L, 3);
     } else if (qOption == "variable") {
-        const char* value = luaL_checkstring(L, 3);
-        timer->variable = QString::fromUtf8(value);
+        timer->variable = luaCheckQString(L, 3);
     } else {
         return luaReturnError(L, eOK); // Unknown option, but don't fail
     }
@@ -1428,16 +1384,14 @@ int L_GetPluginTimerList(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* pluginID = luaL_checkstring(L, 1);
-
-    Plugin* plugin = pDoc->FindPluginByID(QString::fromUtf8(pluginID));
+    Plugin* plugin = pDoc->FindPluginByID(luaCheckQString(L, 1));
 
     lua_newtable(L);
 
     if (plugin) {
         int index = 1;
         for (const auto& [name, timerPtr] : plugin->m_TimerMap) {
-            lua_pushstring(L, name.toUtf8().constData());
+            luaPushQString(L, name);
             lua_rawseti(L, -2, index++);
         }
     }
@@ -1467,11 +1421,9 @@ int L_GetPluginTimerInfo(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* pluginID = luaL_checkstring(L, 1);
-    const char* timerName = luaL_checkstring(L, 2);
+    Plugin* plugin = pDoc->FindPluginByID(luaCheckQString(L, 1));
+    QString tName = luaCheckQString(L, 2);
     int infoType = luaL_checkinteger(L, 3);
-
-    Plugin* plugin = pDoc->FindPluginByID(QString::fromUtf8(pluginID));
 
     if (!plugin) {
         lua_pushnil(L);
@@ -1483,7 +1435,6 @@ int L_GetPluginTimerInfo(lua_State* L)
     pDoc->m_CurrentPlugin = plugin;
 
     // Find timer in plugin's map
-    QString tName = QString::fromUtf8(timerName);
     Timer* timer = nullptr;
     auto it = plugin->m_TimerMap.find(tName);
     if (it != plugin->m_TimerMap.end()) {
@@ -1520,15 +1471,11 @@ int L_GetPluginTimerInfo(lua_State* L)
             }
             break;
         case 4: // contents (send text)
-        {
-            QByteArray ba = timer->contents.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
+            luaPushQString(L, timer->contents);
+            break;
         case 5: // procedure (script name)
-        {
-            QByteArray ba = timer->procedure.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
+            luaPushQString(L, timer->procedure);
+            break;
         case 6: // omit_from_log
             lua_pushboolean(L, timer->omit_from_log);
             break;
@@ -1569,15 +1516,11 @@ int L_GetPluginTimerInfo(lua_State* L)
             lua_pushnumber(L, timer->create_sequence);
             break;
         case 15: // group
-        {
-            QByteArray ba = timer->group.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
+            luaPushQString(L, timer->group);
+            break;
         case 16: // variable
-        {
-            QByteArray ba = timer->variable.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
+            luaPushQString(L, timer->variable);
+            break;
         case 17: // user_option
             lua_pushnumber(L, timer->user_option);
             break;
@@ -1620,8 +1563,7 @@ int L_GetPluginTimerInfo(lua_State* L)
                                       .arg(timer->at_hour, 2, 10, QChar('0'))
                                       .arg(timer->at_minute, 2, 10, QChar('0'))
                                       .arg(timer->at_second, 5, 'f', 2, QChar('0'));
-                QByteArray ba = timeStr.toUtf8();
-                lua_pushlstring(L, ba.constData(), ba.length());
+                luaPushQString(L, timeStr);
             } else {
                 lua_pushstring(L, "");
             }
@@ -1659,11 +1601,9 @@ int L_GetPluginTimerOption(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* pluginID = luaL_checkstring(L, 1);
-    const char* timerName = luaL_checkstring(L, 2);
-    const char* optionName = luaL_checkstring(L, 3);
-
-    Plugin* plugin = pDoc->FindPluginByID(QString::fromUtf8(pluginID));
+    Plugin* plugin = pDoc->FindPluginByID(luaCheckQString(L, 1));
+    QString tName = luaCheckQString(L, 2);
+    QString option = luaCheckQString(L, 3);
 
     if (!plugin) {
         lua_pushnil(L);
@@ -1675,7 +1615,6 @@ int L_GetPluginTimerOption(lua_State* L)
     pDoc->m_CurrentPlugin = plugin;
 
     // Find timer
-    QString tName = QString::fromUtf8(timerName);
     Timer* timer = nullptr;
     auto it = plugin->m_TimerMap.find(tName);
     if (it != plugin->m_TimerMap.end()) {
@@ -1683,7 +1622,6 @@ int L_GetPluginTimerOption(lua_State* L)
     }
 
     if (timer) {
-        QString option = QString::fromUtf8(optionName);
         if (option == "enabled") {
             lua_pushboolean(L, timer->enabled);
         } else if (option == "at_time") {

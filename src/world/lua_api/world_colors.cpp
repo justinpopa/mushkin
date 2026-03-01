@@ -237,8 +237,7 @@ QString RGBColourToName(QRgb bgr)
  */
 int L_ColourNameToRGB(lua_State* L)
 {
-    const char* name = luaL_checkstring(L, 1);
-    QRgb rgb = ColourNameToRGB(QString::fromUtf8(name));
+    QRgb rgb = ColourNameToRGB(luaCheckQString(L, 1));
     lua_pushinteger(L, (lua_Integer)rgb);
     return 1;
 }
@@ -267,7 +266,7 @@ int L_RGBColourToName(lua_State* L)
 {
     lua_Integer rgbValue = luaL_checkinteger(L, 1);
     QString name = RGBColourToName((QRgb)rgbValue);
-    lua_pushstring(L, name.toUtf8().constData());
+    luaPushQString(L, name);
     return 1;
 }
 
@@ -808,23 +807,6 @@ int L_GetCustomColourName(lua_State* L)
         return 1;
     }
 
-    const QString& name = pDoc->m_colors.custom_colour_name[which - 1];
-    QByteArray ba = name.toUtf8();
-    lua_pushlstring(L, ba.constData(), ba.length());
+    luaPushQString(L, pDoc->m_colors.custom_colour_name[which - 1]);
     return 1;
-}
-
-// ========== Registration ==========
-
-void register_world_colors_functions(luaL_Reg*& ptr)
-{
-    *ptr++ = {"ColourNameToRGB", L_ColourNameToRGB};
-    *ptr++ = {"RGBColourToName", L_RGBColourToName};
-    *ptr++ = {"GetNormalColour", L_GetNormalColour};
-    *ptr++ = {"GetBoldColour", L_GetBoldColour};
-    *ptr++ = {"GetCustomColourText", L_GetCustomColourText};
-    *ptr++ = {"GetCustomColourBackground", L_GetCustomColourBackground};
-    *ptr++ = {"SetCustomColourName", L_SetCustomColourName};
-    *ptr++ = {"PickColour", L_PickColour};
-    *ptr++ = {"AdjustColour", L_AdjustColour};
 }

@@ -412,9 +412,8 @@ int L_SetSpeedWalkDelay(lua_State* L)
 int L_EvaluateSpeedwalk(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* speedwalk = luaL_checkstring(L, 1);
-    QString result = speedwalk::evaluate(QString::fromUtf8(speedwalk), pDoc->m_speedwalk.filler);
-    lua_pushstring(L, result.toUtf8().constData());
+    QString result = speedwalk::evaluate(luaCheckQString(L, 1), pDoc->m_speedwalk.filler);
+    luaPushQString(L, result);
     return 1;
 }
 
@@ -441,9 +440,8 @@ int L_EvaluateSpeedwalk(lua_State* L)
 int L_ReverseSpeedwalk(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* speedwalk = luaL_checkstring(L, 1);
-    QString result = speedwalk::reverse(QString::fromUtf8(speedwalk));
-    lua_pushstring(L, result.toUtf8().constData());
+    QString result = speedwalk::reverse(luaCheckQString(L, 1));
+    luaPushQString(L, result);
     return 1;
 }
 
@@ -474,9 +472,7 @@ int L_ReverseSpeedwalk(lua_State* L)
 int L_RemoveBacktracks(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* speedwalk = luaL_checkstring(L, 1);
-    QString result =
-        speedwalk::removeBacktracks(QString::fromUtf8(speedwalk), pDoc->m_speedwalk.filler);
-    lua_pushstring(L, result.toUtf8().constData());
+    QString result = speedwalk::removeBacktracks(luaCheckQString(L, 1), pDoc->m_speedwalk.filler);
+    luaPushQString(L, result);
     return 1;
 }

@@ -52,12 +52,11 @@ LuaDatabase::~LuaDatabase()
 int L_DatabaseOpen(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-    const char* filename = luaL_checkstring(L, 2);
-    lua_Integer flags = luaL_optinteger(L, 3, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE);
-
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
+    const char* filename =
+        luaL_checkstring(L, 2); // passed to sqlite3_open_v2 — keep as const char*
     QString qFilename = QString::fromUtf8(filename);
+    lua_Integer flags = luaL_optinteger(L, 3, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE);
 
     // Check if database name already exists
     auto it = pDoc->m_DatabaseMap.find(qName);
@@ -112,8 +111,7 @@ int L_DatabaseOpen(lua_State* L)
 int L_DatabaseClose(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
 
     auto it = pDoc->m_DatabaseMap.find(qName);
     if (it == pDoc->m_DatabaseMap.end()) {
@@ -166,9 +164,8 @@ int L_DatabaseClose(lua_State* L)
 int L_DatabasePrepare(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-    const char* sql = luaL_checkstring(L, 2);
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
+    const char* sql = luaL_checkstring(L, 2); // passed to sqlite3_prepare_v2 — keep as const char*
 
     auto it = pDoc->m_DatabaseMap.find(qName);
     if (it == pDoc->m_DatabaseMap.end()) {
@@ -231,8 +228,7 @@ int L_DatabasePrepare(lua_State* L)
 int L_DatabaseStep(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
 
     auto it = pDoc->m_DatabaseMap.find(qName);
     if (it == pDoc->m_DatabaseMap.end()) {
@@ -283,8 +279,7 @@ int L_DatabaseStep(lua_State* L)
 int L_DatabaseFinalize(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
 
     auto it = pDoc->m_DatabaseMap.find(qName);
     if (it == pDoc->m_DatabaseMap.end()) {
@@ -349,9 +344,8 @@ int L_DatabaseFinalize(lua_State* L)
 int L_DatabaseExec(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-    const char* sql = luaL_checkstring(L, 2);
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
+    const char* sql = luaL_checkstring(L, 2); // passed to sqlite3_exec — keep as const char*
 
     auto it = pDoc->m_DatabaseMap.find(qName);
     if (it == pDoc->m_DatabaseMap.end()) {
@@ -399,8 +393,7 @@ int L_DatabaseExec(lua_State* L)
 int L_DatabaseColumns(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
 
     auto it = pDoc->m_DatabaseMap.find(qName);
     if (it == pDoc->m_DatabaseMap.end()) {
@@ -452,9 +445,8 @@ int L_DatabaseColumns(lua_State* L)
 int L_DatabaseColumnType(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
+    QString qName = luaCheckQString(L, 1);
     lua_Integer column = luaL_checkinteger(L, 2);
-    QString qName = QString::fromUtf8(name);
 
     auto it = pDoc->m_DatabaseMap.find(qName);
     if (it == pDoc->m_DatabaseMap.end()) {
@@ -512,8 +504,7 @@ int L_DatabaseColumnType(lua_State* L)
 int L_DatabaseReset(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
 
     auto it = pDoc->m_DatabaseMap.find(qName);
     if (it == pDoc->m_DatabaseMap.end()) {
@@ -557,8 +548,7 @@ int L_DatabaseReset(lua_State* L)
 int L_DatabaseChanges(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
 
     auto it = pDoc->m_DatabaseMap.find(qName);
     if (it == pDoc->m_DatabaseMap.end()) {
@@ -594,8 +584,7 @@ int L_DatabaseChanges(lua_State* L)
 int L_DatabaseTotalChanges(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
 
     auto it = pDoc->m_DatabaseMap.find(qName);
     if (it == pDoc->m_DatabaseMap.end()) {
@@ -634,8 +623,7 @@ int L_DatabaseTotalChanges(lua_State* L)
 int L_DatabaseError(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
 
     auto it = pDoc->m_DatabaseMap.find(qName);
     if (it == pDoc->m_DatabaseMap.end() || it->second->db == nullptr) {
@@ -670,9 +658,8 @@ int L_DatabaseError(lua_State* L)
 int L_DatabaseColumnName(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
+    QString qName = luaCheckQString(L, 1);
     lua_Integer column = luaL_checkinteger(L, 2);
-    QString qName = QString::fromUtf8(name);
 
     auto it = pDoc->m_DatabaseMap.find(qName);
     if (it == pDoc->m_DatabaseMap.end() || it->second->db == nullptr ||
@@ -706,9 +693,8 @@ int L_DatabaseColumnName(lua_State* L)
 int L_DatabaseColumnText(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
+    QString qName = luaCheckQString(L, 1);
     lua_Integer column = luaL_checkinteger(L, 2);
-    QString qName = QString::fromUtf8(name);
 
     auto it = pDoc->m_DatabaseMap.find(qName);
     if (it == pDoc->m_DatabaseMap.end() || it->second->db == nullptr ||
@@ -787,9 +773,8 @@ static void pushDatabaseColumnValue(lua_State* L, sqlite3_stmt* pStmt, int colum
 int L_DatabaseColumnValue(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
+    QString qName = luaCheckQString(L, 1);
     lua_Integer column = luaL_checkinteger(L, 2);
-    QString qName = QString::fromUtf8(name);
 
     auto it = pDoc->m_DatabaseMap.find(qName);
     if (it == pDoc->m_DatabaseMap.end() || it->second->db == nullptr ||
@@ -823,8 +808,7 @@ int L_DatabaseColumnValue(lua_State* L)
 int L_DatabaseColumnNames(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
 
     lua_newtable(L);
 
@@ -864,8 +848,7 @@ int L_DatabaseColumnNames(lua_State* L)
 int L_DatabaseColumnValues(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
 
     lua_newtable(L);
 
@@ -907,9 +890,8 @@ int L_DatabaseColumnValues(lua_State* L)
 int L_DatabaseGetField(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-    const char* sql = luaL_checkstring(L, 2);
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
+    const char* sql = luaL_checkstring(L, 2); // passed to sqlite3_prepare_v2 — keep as const char*
 
     auto it = pDoc->m_DatabaseMap.find(qName);
     if (it == pDoc->m_DatabaseMap.end() || it->second->db == nullptr) {
@@ -976,9 +958,8 @@ int L_DatabaseGetField(lua_State* L)
 int L_DatabaseInfo(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
+    QString qName = luaCheckQString(L, 1);
     lua_Integer infoType = luaL_checkinteger(L, 2);
-    QString qName = QString::fromUtf8(name);
 
     auto it = pDoc->m_DatabaseMap.find(qName);
     if (it == pDoc->m_DatabaseMap.end()) {
@@ -990,7 +971,7 @@ int L_DatabaseInfo(lua_State* L)
 
     switch (infoType) {
         case 1: // disk filename
-            lua_pushstring(L, pDatabase->db_name.toUtf8().constData());
+            luaPushQString(L, pDatabase->db_name);
             break;
         case 2: // has prepared statement
             lua_pushboolean(L, pDatabase->pStmt != nullptr);
@@ -1029,8 +1010,7 @@ int L_DatabaseInfo(lua_State* L)
 int L_DatabaseLastInsertRowid(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
 
     auto it = pDoc->m_DatabaseMap.find(qName);
     if (it == pDoc->m_DatabaseMap.end() || it->second->db == nullptr) {
@@ -1039,8 +1019,7 @@ int L_DatabaseLastInsertRowid(lua_State* L)
     }
 
     sqlite3_int64 rowid = sqlite3_last_insert_rowid(it->second->db);
-    QString rowidStr = QString::number(rowid);
-    lua_pushstring(L, rowidStr.toUtf8().constData());
+    luaPushQString(L, QString::number(rowid));
     return 1;
 }
 
@@ -1068,7 +1047,7 @@ int L_DatabaseList(lua_State* L)
 
     int index = 1;
     for (const auto& pair : pDoc->m_DatabaseMap) {
-        lua_pushstring(L, pair.first.toUtf8().constData());
+        luaPushQString(L, pair.first);
         lua_rawseti(L, -2, index++);
     }
 

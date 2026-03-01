@@ -75,8 +75,7 @@ int L_ColourNote(lua_State* L)
 
         QRgb foreColor = getColor(L, i, BGR(255, 255, 255));
         QRgb backColor = getColor(L, i + 1, BGR(0, 0, 0));
-        const char* text = luaL_checkstring(L, i + 2);
-        QString qtext = QString::fromUtf8(text);
+        QString qtext = luaCheckQString(L, i + 2);
 
         // Use ColourTell for all but the last block
         if (i + 3 <= n) {
@@ -161,7 +160,7 @@ int L_ANSI(lua_State* L)
     }
 
     QString ansi = QString("\033[%1m").arg(codes.join(";"));
-    lua_pushstring(L, ansi.toUtf8().constData());
+    luaPushQString(L, ansi);
     return 1;
 }
 
@@ -188,8 +187,7 @@ int L_ANSI(lua_State* L)
 int L_AnsiNote(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* text = luaL_checkstring(L, 1);
-    QString qtext = QString::fromUtf8(text);
+    QString qtext = luaCheckQString(L, 1);
 
     // Standard ANSI color palette (first 8 colors) - BGR format for colourTell()
     static const QRgb ansiColors[8] = {
@@ -392,8 +390,7 @@ int L_Hyperlink(lua_State* L)
 int L_Simulate(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* text = luaL_checkstring(L, 1);
-    pDoc->simulate(QString::fromUtf8(text));
+    pDoc->simulate(luaCheckQString(L, 1));
     return 0;
 }
 
@@ -430,8 +427,7 @@ int L_ColourTell(lua_State* L)
 
         QRgb foreColor = getColor(L, i, BGR(255, 255, 255));
         QRgb backColor = getColor(L, i + 1, BGR(0, 0, 0));
-        const char* text = luaL_checkstring(L, i + 2);
-        QString qtext = QString::fromUtf8(text);
+        QString qtext = luaCheckQString(L, i + 2);
 
         pDoc->colourTell(foreColor, backColor, qtext);
     }
@@ -656,21 +652,21 @@ int L_GetStyleInfo(lua_State* L)
         }
         case 5: // action (what to send)
             if (style->pAction) {
-                lua_pushstring(L, style->pAction->m_strAction.toUtf8().constData());
+                luaPushQString(L, style->pAction->m_strAction);
             } else {
                 lua_pushstring(L, "");
             }
             break;
         case 6: // hint (tooltip)
             if (style->pAction) {
-                lua_pushstring(L, style->pAction->m_strHint.toUtf8().constData());
+                luaPushQString(L, style->pAction->m_strHint);
             } else {
                 lua_pushstring(L, "");
             }
             break;
         case 7: // variable (MXP)
             if (style->pAction) {
-                lua_pushstring(L, style->pAction->m_strVariable.toUtf8().constData());
+                luaPushQString(L, style->pAction->m_strVariable);
             } else {
                 lua_pushstring(L, "");
             }
@@ -756,8 +752,7 @@ int L_GetRecentLines(lua_State* L)
         result += pDoc->m_recentLines[static_cast<size_t>(i)];
     }
 
-    QByteArray utf8 = result.toUtf8();
-    lua_pushlstring(L, utf8.constData(), utf8.size());
+    luaPushQString(L, result);
     return 1;
 }
 
@@ -792,7 +787,8 @@ int L_NoteColour(lua_State* L)
         lua_pushinteger(L, -1);
     } else {
         // SAMECOLOUR is typically -1 or 65535
-        lua_pushinteger(L, pDoc->m_colors.note_text_colour == 65535 ? 0 : pDoc->m_colors.note_text_colour + 1);
+        lua_pushinteger(
+            L, pDoc->m_colors.note_text_colour == 65535 ? 0 : pDoc->m_colors.note_text_colour + 1);
     }
     return 1;
 }
@@ -893,8 +889,6 @@ int L_NoteColourRGB(lua_State* L)
 int L_NoteColourName(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* foreName = luaL_checkstring(L, 1);
-    const char* backName = luaL_checkstring(L, 2);
 
     pDoc->m_bNotesInRGB = true;
     pDoc->m_iNoteColourFore = getColor(L, 1, pDoc->m_iNoteColourFore);
@@ -1219,8 +1213,7 @@ int L_NoteHr(lua_State* L)
 int L_Info(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* text = luaL_optstring(L, 1, "");
-    pDoc->m_infoBarText.append(QString::fromUtf8(text));
+    pDoc->m_infoBarText.append(luaOptQString(L, 1));
     emit pDoc->infoBarChanged();
     return 0;
 }
@@ -1279,8 +1272,7 @@ int L_InfoClear(lua_State* L)
 int L_InfoColour(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-    QRgb color = ColourNameToRGB(QString::fromUtf8(name));
+    QRgb color = ColourNameToRGB(luaCheckQString(L, 1));
     pDoc->m_infoBarTextColor = color;
     emit pDoc->infoBarChanged();
     return 0;
@@ -1307,8 +1299,7 @@ int L_InfoColour(lua_State* L)
 int L_InfoBackground(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-    QRgb color = ColourNameToRGB(QString::fromUtf8(name));
+    QRgb color = ColourNameToRGB(luaCheckQString(L, 1));
     pDoc->m_infoBarBackColor = color;
     emit pDoc->infoBarChanged();
     return 0;
@@ -1347,13 +1338,13 @@ int L_InfoBackground(lua_State* L)
 int L_InfoFont(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* fontName = luaL_optstring(L, 1, "");
+    QString fontName = luaOptQString(L, 1);
     int size = luaL_optinteger(L, 2, 0);
     int style = luaL_optinteger(L, 3, 0);
 
     // Font name (if provided and not empty)
-    if (fontName[0] != '\0') {
-        pDoc->m_infoBarFontName = QString::fromUtf8(fontName);
+    if (!fontName.isEmpty()) {
+        pDoc->m_infoBarFontName = fontName;
     }
 
     // Size (if positive)
@@ -1424,8 +1415,7 @@ int L_ShowInfoBar(lua_State* L)
 int L_GetEntity(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-    QString entityName = QString::fromUtf8(name).toLower();
+    QString entityName = luaCheckQString(L, 1).toLower();
 
     // Look up in the custom entity map only (built-in entities via GetXMLEntity)
     auto& customMap = pDoc->m_mxpEngine->m_customEntityMap;
@@ -1436,8 +1426,7 @@ int L_GetEntity(lua_State* L)
             entity->strValue.isEmpty()
                 ? QString::fromUcs4(reinterpret_cast<const char32_t*>(&entity->iCodepoint), 1)
                 : entity->strValue;
-        QByteArray ba = value.toUtf8();
-        lua_pushlstring(L, ba.constData(), ba.length());
+        luaPushQString(L, value);
         return 1;
     }
 
@@ -1468,15 +1457,12 @@ int L_GetEntity(lua_State* L)
 int L_GetXMLEntity(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* entity = luaL_checkstring(L, 1);
-    QString entityName = QString::fromUtf8(entity);
 
     // Delegate to the MXP engine's entity resolver which handles
     // both numeric (&#65;, &#x41;) and named standard entities.
-    QString resolved = pDoc->m_mxpEngine->MXP_GetEntity(entityName);
+    QString resolved = pDoc->m_mxpEngine->MXP_GetEntity(luaCheckQString(L, 1));
 
-    QByteArray ba = resolved.toUtf8();
-    lua_pushlstring(L, ba.constData(), ba.length());
+    luaPushQString(L, resolved);
     return 1;
 }
 
@@ -1505,11 +1491,8 @@ int L_GetXMLEntity(lua_State* L)
 int L_SetEntity(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-    const char* value = luaL_optstring(L, 2, "");
-
-    QString entityName = QString::fromUtf8(name).toLower();
-    QString entityValue = QString::fromUtf8(value);
+    QString entityName = luaCheckQString(L, 1).toLower();
+    QString entityValue = luaOptQString(L, 2);
 
     auto& customMap = pDoc->m_mxpEngine->m_customEntityMap;
 
@@ -1594,9 +1577,10 @@ int L_DeleteLines(lua_State* L)
     }
 
     if (needNewLine || pDoc->m_lineList.empty()) {
-        pDoc->m_lineList.push_back(std::make_unique<Line>(
-            pDoc->m_total_lines + 1, pDoc->m_display.wrap_column, 0, pDoc->m_colors.normal_colour[7],
-            pDoc->m_colors.normal_colour[0], pDoc->m_display.utf8));
+        pDoc->m_lineList.push_back(
+            std::make_unique<Line>(pDoc->m_total_lines + 1, pDoc->m_display.wrap_column, 0,
+                                   pDoc->m_colors.normal_colour[7], pDoc->m_colors.normal_colour[0],
+                                   pDoc->m_display.utf8));
     }
 
     pDoc->Repaint();
@@ -1624,8 +1608,9 @@ int L_DeleteOutput(lua_State* L)
     pDoc->m_lineList.clear();
     pDoc->m_total_lines = 0;
 
-    pDoc->m_currentLine = std::make_unique<Line>(1, pDoc->m_display.wrap_column, 0, pDoc->m_colors.normal_colour[7],
-                                                 pDoc->m_colors.normal_colour[0], pDoc->m_display.utf8);
+    pDoc->m_currentLine =
+        std::make_unique<Line>(1, pDoc->m_display.wrap_column, 0, pDoc->m_colors.normal_colour[7],
+                               pDoc->m_colors.normal_colour[0], pDoc->m_display.utf8);
 
     pDoc->m_selectionStartLine = 0;
     pDoc->m_selectionStartChar = 0;
@@ -1799,28 +1784,4 @@ int L_Transparency(lua_State* L)
     }
 
     return 1;
-}
-
-// ========== Registration ==========
-
-void register_world_output_functions(luaL_Reg*& ptr)
-{
-    *ptr++ = {"Note", L_Note};
-    *ptr++ = {"ColourNote", L_ColourNote};
-    *ptr++ = {"ColourTell", L_ColourTell};
-    *ptr++ = {"Tell", L_Tell};
-    *ptr++ = {"ANSI", L_ANSI};
-    *ptr++ = {"AnsiNote", L_AnsiNote};
-    *ptr++ = {"Hyperlink", L_Hyperlink};
-    *ptr++ = {"Simulate", L_Simulate};
-    *ptr++ = {"GetLineInfo", L_GetLineInfo};
-    *ptr++ = {"GetStyleInfo", L_GetStyleInfo};
-    *ptr++ = {"GetRecentLines", L_GetRecentLines};
-    // Info Bar functions
-    *ptr++ = {"Info", L_Info};
-    *ptr++ = {"InfoClear", L_InfoClear};
-    *ptr++ = {"InfoColour", L_InfoColour};
-    *ptr++ = {"InfoBackground", L_InfoBackground};
-    *ptr++ = {"InfoFont", L_InfoFont};
-    *ptr++ = {"ShowInfoBar", L_ShowInfoBar};
 }

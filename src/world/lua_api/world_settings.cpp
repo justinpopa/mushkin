@@ -337,351 +337,292 @@ int L_GetInfo(lua_State* L)
     switch (type) {
         case 1: // Server address (hostname/IP)
         {
-            QByteArray ba = pDoc->m_server.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_server);
         } break;
 
         case 2: // World name
         {
-            QByteArray ba = pDoc->m_mush_name.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_mush_name);
         } break;
 
         case 3: // Character name
         {
-            QByteArray ba = pDoc->m_name.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_name);
         } break;
 
         case 4: // Logging file preamble
         {
-            QByteArray ba = pDoc->m_paste.file_preamble.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_paste.file_preamble);
         } break;
 
         case 5: // Logging file postamble
         {
-            QByteArray ba = pDoc->m_paste.file_postamble.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_paste.file_postamble);
         } break;
 
         case 6: // Logging line preamble
         {
-            QByteArray ba = pDoc->m_paste.line_preamble.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_paste.line_preamble);
         } break;
 
         case 7: // Logging line postamble
         {
-            QByteArray ba = pDoc->m_paste.line_postamble.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_paste.line_postamble);
         } break;
 
         case 8: // Notes
         {
-            QByteArray ba = pDoc->m_notes.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_notes);
         } break;
 
         case 9: // New activity sound
         {
-            QByteArray ba = pDoc->m_sound.new_activity_sound.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_sound.new_activity_sound);
         } break;
 
         case 10: // Script editor
         {
-            QByteArray ba = pDoc->m_scripting.editor.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_scripting.editor);
         } break;
 
         case 11: // Log file preamble
         {
-            QByteArray ba = pDoc->m_logging.file_preamble.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_logging.file_preamble);
         } break;
 
         case 12: // Log file postamble
         {
-            QByteArray ba = pDoc->m_logging.file_postamble.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_logging.file_postamble);
         } break;
 
         case 13: // Log line preamble (input)
         {
-            QByteArray ba = pDoc->m_logging.line_preamble_input.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_logging.line_preamble_input);
         } break;
 
         case 14: // Log line preamble (notes)
         {
-            QByteArray ba = pDoc->m_logging.line_preamble_notes.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_logging.line_preamble_notes);
         } break;
 
         case 15: // Log line preamble (output)
         {
-            QByteArray ba = pDoc->m_logging.line_preamble_output.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_logging.line_preamble_output);
         } break;
 
         case 16: // Log line postamble (input)
         {
-            QByteArray ba = pDoc->m_logging.line_postamble_input.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_logging.line_postamble_input);
         } break;
 
         case 17: // Log line postamble (notes)
         {
-            QByteArray ba = pDoc->m_logging.line_postamble_notes.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_logging.line_postamble_notes);
         } break;
 
         case 18: // Log line postamble (output)
         {
-            QByteArray ba = pDoc->m_logging.line_postamble_output.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_logging.line_postamble_output);
         } break;
 
         case 19: // Speed walk filler
         {
-            QByteArray ba = pDoc->m_speedwalk.filler.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_speedwalk.filler);
         } break;
 
         case 20: // Output font name
         {
-            QByteArray ba = pDoc->m_output.font_name.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_output.font_name);
         } break;
 
         case 21: // Speed walk prefix
         {
-            QByteArray ba = pDoc->m_speedwalk.prefix.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_speedwalk.prefix);
         } break;
 
         case 22: // Connect text
         {
-            QByteArray ba = pDoc->m_connect_text.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_connect_text);
         } break;
 
         case 23: // Input font name
         {
-            QByteArray ba = pDoc->m_input.font_name.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_input.font_name);
         } break;
 
         case 24: // Paste postamble
         {
-            QByteArray ba = pDoc->m_paste.paste_postamble.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_paste.paste_postamble);
         } break;
 
         case 25: // Paste preamble
         {
-            QByteArray ba = pDoc->m_paste.paste_preamble.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_paste.paste_preamble);
         } break;
 
         case 26: // Paste line postamble
         {
-            QByteArray ba = pDoc->m_paste.pasteline_postamble.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_paste.pasteline_postamble);
         } break;
 
         case 27: // Paste line preamble
         {
-            QByteArray ba = pDoc->m_paste.pasteline_preamble.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_paste.pasteline_preamble);
         } break;
 
         case 28: // Script language
         {
-            QByteArray ba = pDoc->m_scripting.language.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_scripting.language);
         } break;
 
         case 29: // OnWorldOpen callback
         {
-            QByteArray ba = pDoc->m_scripting.on_world_open.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_scripting.on_world_open);
         } break;
 
         case 30: // OnWorldClose callback
         {
-            QByteArray ba = pDoc->m_scripting.on_world_close.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_scripting.on_world_close);
         } break;
 
         case 31: // OnWorldConnect callback
         {
-            QByteArray ba = pDoc->m_scripting.on_world_connect.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_scripting.on_world_connect);
         } break;
 
         case 32: // OnWorldDisconnect callback
         {
-            QByteArray ba = pDoc->m_scripting.on_world_disconnect.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_scripting.on_world_disconnect);
         } break;
 
         case 33: // OnWorldGetFocus callback
         {
-            QByteArray ba = pDoc->m_scripting.on_world_get_focus.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_scripting.on_world_get_focus);
         } break;
 
         case 34: // OnWorldLoseFocus callback
         {
-            QByteArray ba = pDoc->m_scripting.on_world_lose_focus.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_scripting.on_world_lose_focus);
         } break;
 
         case 35: // Script filename
         {
-            QByteArray ba = pDoc->m_scripting.filename.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_scripting.filename);
         } break;
 
         case 36: // Script prefix
         {
-            QByteArray ba = pDoc->m_scripting.prefix.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_scripting.prefix);
         } break;
 
         case 37: // Auto-say string
         {
-            QByteArray ba = pDoc->m_auto_say.say_string.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_auto_say.say_string);
         } break;
 
         case 38: // Override prefix
         {
-            QByteArray ba = pDoc->m_auto_say.override_prefix.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_auto_say.override_prefix);
         } break;
 
         case 39: // Tab completion defaults
         {
-            QByteArray ba = pDoc->m_command_window.tab_completion_defaults.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_command_window.tab_completion_defaults);
         } break;
 
         case 40: // Auto-log filename
         {
-            QByteArray ba = pDoc->m_logging.auto_log_file_name.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_logging.auto_log_file_name);
         } break;
 
         case 41: // Recall line preamble
         {
-            QByteArray ba = pDoc->m_output.recall_line_preamble.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_output.recall_line_preamble);
         } break;
 
         case 42: // Terminal identification
         {
-            QByteArray ba = pDoc->m_strTerminalIdentification.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_strTerminalIdentification);
         } break;
 
         case 43: // Mapping failure message
         {
-            QByteArray ba = pDoc->m_mapping.failure_message.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_mapping.failure_message);
         } break;
 
         case 44: // OnMXP_Start callback
         {
-            QByteArray ba = pDoc->m_strOnMXP_Start.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_strOnMXP_Start);
         } break;
 
         case 45: // OnMXP_Stop callback
         {
-            QByteArray ba = pDoc->m_strOnMXP_Stop.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_strOnMXP_Stop);
         } break;
 
         case 46: // OnMXP_Error callback
         {
-            QByteArray ba = pDoc->m_strOnMXP_Error.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_strOnMXP_Error);
         } break;
 
         case 47: // OnMXP_OpenTag callback
         {
-            QByteArray ba = pDoc->m_strOnMXP_OpenTag.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_strOnMXP_OpenTag);
         } break;
 
         case 48: // OnMXP_CloseTag callback
         {
-            QByteArray ba = pDoc->m_strOnMXP_CloseTag.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_strOnMXP_CloseTag);
         } break;
 
         case 49: // OnMXP_SetVariable callback
         {
-            QByteArray ba = pDoc->m_strOnMXP_SetVariable.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_strOnMXP_SetVariable);
         } break;
 
         case 50: // Beep sound
         {
-            QByteArray ba = pDoc->m_sound.beep_sound.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_sound.beep_sound);
         } break;
 
         case 51: // Log filename
         {
-            QByteArray ba = pDoc->m_logfile_name.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_logfile_name);
         } break;
 
         case 52: // Last immediate expression
         {
-            QByteArray ba = pDoc->m_strLastImmediateExpression.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_strLastImmediateExpression);
         } break;
 
         case 53: // Status message
         {
-            QByteArray ba = pDoc->m_strStatusMessage.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_strStatusMessage);
         } break;
 
         case 54: // World file path (GetPathName)
         {
-            QByteArray ba = pDoc->m_strWorldFilePath.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_strWorldFilePath);
         } break;
 
         case 55: // Window title (GetTitle)
         {
-            QByteArray ba = pDoc->m_strWindowTitle.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_strWindowTitle);
         } break;
 
         case 56: // MUSHclient executable path
         {
-            QString appPath = QCoreApplication::applicationFilePath();
-            QByteArray ba = appPath.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, QCoreApplication::applicationFilePath());
         } break;
 
         case 57: // Default world file directory
         {
-            QByteArray ba = GlobalOptions::instance().defaultWorldFileDirectory().toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, GlobalOptions::instance().defaultWorldFileDirectory());
         } break;
 
         case 58: // Default log file directory
         {
-            QByteArray ba = GlobalOptions::instance().defaultLogFileDirectory().toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, GlobalOptions::instance().defaultLogFileDirectory());
         } break;
 
         case 59: // Scripts directory (application directory)
@@ -690,8 +631,7 @@ int L_GetInfo(lua_State* L)
             if (!appDir.isEmpty() && !appDir.endsWith("/")) {
                 appDir += "/";
             }
-            QByteArray ba = appDir.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, appDir);
         } break;
 
         case 60: // Plugins directory (global)
@@ -713,16 +653,13 @@ int L_GetInfo(lua_State* L)
                 pluginsDir += '/';
             }
 
-            QByteArray ba = pluginsDir.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pluginsDir);
         } break;
 
         case 61: // IP address from socket connection
         {
             if (pDoc->m_connectionManager->isConnected() && pDoc->m_connectionManager->m_pSocket) {
-                QString addr = pDoc->m_connectionManager->m_pSocket->peerAddress();
-                QByteArray ba = addr.toUtf8();
-                lua_pushlstring(L, ba.constData(), ba.length());
+                luaPushQString(L, pDoc->m_connectionManager->m_pSocket->peerAddress());
             } else {
                 lua_pushstring(L, "");
             }
@@ -730,15 +667,12 @@ int L_GetInfo(lua_State* L)
 
         case 62: // Proxy server
         {
-            QByteArray ba = pDoc->m_proxy.server.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_proxy.server);
         } break;
 
         case 63: // Hostname
         {
-            QString hostname = QHostInfo::localHostName();
-            QByteArray ba = hostname.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, QHostInfo::localHostName());
         } break;
 
         case 64: // Current directory with trailing slash
@@ -747,14 +681,12 @@ int L_GetInfo(lua_State* L)
             if (!currentDir.isEmpty() && !currentDir.endsWith("/")) {
                 currentDir += "/";
             }
-            QByteArray ba = currentDir.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, currentDir);
         } break;
 
         case 65: // OnWorldSave callback
         {
-            QByteArray ba = pDoc->m_scripting.on_world_save.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_scripting.on_world_save);
         } break;
 
         case 66: // MUSHclient application directory
@@ -767,8 +699,7 @@ int L_GetInfo(lua_State* L)
             if (!appDir.isEmpty() && !appDir.endsWith("/")) {
                 appDir += "/";
             }
-            QByteArray ba = appDir.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, appDir);
         } break;
 
         case 67: // World file directory
@@ -778,8 +709,7 @@ int L_GetInfo(lua_State* L)
                 if (!dir.endsWith("/")) {
                     dir += "/";
                 }
-                QByteArray ba = dir.toUtf8();
-                lua_pushlstring(L, ba.constData(), ba.length());
+                luaPushQString(L, dir);
             } else {
                 lua_pushstring(L, "");
             }
@@ -787,9 +717,7 @@ int L_GetInfo(lua_State* L)
 
         case 68: // Working directory
         {
-            QString cwd = QDir::currentPath();
-            QByteArray ba = cwd.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, QDir::currentPath());
         } break;
 
         case 69: // Translator file
@@ -800,15 +728,12 @@ int L_GetInfo(lua_State* L)
 
         case 70: // Locale
         {
-            QString locale = QLocale::system().name();
-            QByteArray ba = locale.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, QLocale::system().name());
         } break;
 
         case 71: // Fixed pitch font
         {
-            QByteArray ba = GlobalOptions::instance().fixedPitchFont().toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, GlobalOptions::instance().fixedPitchFont());
         } break;
 
         case 72: // Version
@@ -819,9 +744,7 @@ int L_GetInfo(lua_State* L)
 
         case 73: // Build date/time
         {
-            QString buildDateTime = QString("%1 %2").arg(__DATE__).arg(__TIME__);
-            QByteArray ba = buildDateTime.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, QString("%1 %2").arg(__DATE__).arg(__TIME__));
         } break;
 
         case 74: // Sounds directory
@@ -831,8 +754,7 @@ int L_GetInfo(lua_State* L)
                 soundsDir += "/";
             }
             soundsDir += "sounds/";
-            QByteArray ba = soundsDir.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, soundsDir);
         } break;
 
         case 75: // IAC subnegotiation data
@@ -850,21 +772,17 @@ int L_GetInfo(lua_State* L)
 
         case 77: // OS version
         {
-            QString osVersion = QSysInfo::prettyProductName();
-            QByteArray ba = osVersion.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, QSysInfo::prettyProductName());
         } break;
 
         case 78: // Foreground image
         {
-            QByteArray ba = pDoc->m_strForegroundImageName.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_strForegroundImageName);
         } break;
 
         case 79: // Background image
         {
-            QByteArray ba = pDoc->m_strBackgroundImageName.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_strBackgroundImageName);
         } break;
 
         case 80: // PNG library version
@@ -883,9 +801,7 @@ int L_GetInfo(lua_State* L)
         {
             // QSettings uses platform-native storage (plist on macOS, registry on Windows, conf on
             // Linux). Return the settings file path where available.
-            QString settingsPath = QSettings().fileName();
-            QByteArray ba = settingsPath.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, QSettings().fileName());
         } break;
 
         case 83: // SQLite version
@@ -902,32 +818,27 @@ int L_GetInfo(lua_State* L)
 
         case 85: // Default state files directory
         {
-            QByteArray ba = GlobalOptions::instance().stateFilesDirectory().toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, GlobalOptions::instance().stateFilesDirectory());
         } break;
 
         case 86: // Word under menu
         {
-            QByteArray ba = pDoc->m_strWordUnderMenu.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_strWordUnderMenu);
         } break;
 
         case 87: // Last command sent
         {
-            QByteArray ba = pDoc->m_strLastCommandSent.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_strLastCommandSent);
         } break;
 
         case 88: // Window title (individual world)
         {
-            QByteArray ba = pDoc->m_strWindowTitle.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_strWindowTitle);
         } break;
 
         case 89: // Main window title
         {
-            QByteArray ba = pDoc->m_strMainWindowTitle.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_strMainWindowTitle);
         } break;
 
         // Boolean flags (101-125)
@@ -1643,8 +1554,7 @@ int L_GetInfo(lua_State* L)
 int L_GetWorldName(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    QByteArray ba = pDoc->m_mush_name.toUtf8();
-    lua_pushlstring(L, ba.constData(), ba.length());
+    luaPushQString(L, pDoc->m_mush_name);
     return 1;
 }
 
@@ -1662,8 +1572,6 @@ int L_SetOption(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* optionName = luaL_checkstring(L, 1);
-
     // Convert boolean to 0 or 1, nil to 0
     double value;
     if (lua_isboolean(L, 2)) {
@@ -1676,7 +1584,7 @@ int L_SetOption(lua_State* L)
 
     // Find the option in OptionsTable
     int optionIndex = -1;
-    QString optionNameStr = QString::fromUtf8(optionName);
+    QString optionNameStr = luaCheckQString(L, 1);
     for (int i = 0; OptionsTable[i].pName != nullptr; i++) {
         if (optionNameStr.compare(OptionsTable[i].pName, Qt::CaseInsensitive) == 0) {
             optionIndex = i;
@@ -1738,7 +1646,7 @@ int L_GetOption(lua_State* L)
         const tConfigurationAlphaOption& opt = AlphaOptionsTable[i];
 
         if (strcmp(opt.pName, optionName) == 0) {
-            lua_pushstring(L, opt.getter(*pDoc).toUtf8().constData());
+            luaPushQString(L, opt.getter(*pDoc));
             return 1;
         }
     }
@@ -1761,10 +1669,9 @@ int L_GetOption(lua_State* L)
 int L_GetAlphaOption(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* optionName = luaL_checkstring(L, 1);
 
     // Normalize option name: lowercase, trimmed (matches original)
-    QString normalizedName = QString::fromUtf8(optionName).toLower().trimmed();
+    QString normalizedName = luaCheckQString(L, 1).toLower().trimmed();
 
     // Search alpha (string) options table only
     for (int i = 0; AlphaOptionsTable[i].pName != nullptr; i++) {
@@ -1777,7 +1684,7 @@ int L_GetAlphaOption(lua_State* L)
                 return 1;
             }
 
-            lua_pushstring(L, opt.getter(*pDoc).toUtf8().constData());
+            luaPushQString(L, opt.getter(*pDoc));
             return 1;
         }
     }
@@ -1797,8 +1704,7 @@ int L_GetAlphaOption(lua_State* L)
 int L_GetCurrentValue(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* optionName = luaL_checkstring(L, 1);
-    QString normalizedName = QString::fromUtf8(optionName).toLower().trimmed();
+    QString normalizedName = luaCheckQString(L, 1).toLower().trimmed();
 
     // Search numeric options table first
     for (int i = 0; OptionsTable[i].pName != nullptr; i++) {
@@ -1826,7 +1732,7 @@ int L_GetCurrentValue(lua_State* L)
                 return 1;
             }
 
-            lua_pushstring(L, opt.getter(*pDoc).toUtf8().constData());
+            luaPushQString(L, opt.getter(*pDoc));
             return 1;
         }
     }
@@ -1845,8 +1751,7 @@ int L_GetCurrentValue(lua_State* L)
 int L_GetDefaultValue(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* optionName = luaL_checkstring(L, 1);
-    QString normalizedName = QString::fromUtf8(optionName).toLower().trimmed();
+    QString normalizedName = luaCheckQString(L, 1).toLower().trimmed();
 
     // Search numeric options table first
     for (int i = 0; OptionsTable[i].pName != nullptr; i++) {
@@ -1896,8 +1801,7 @@ int L_GetDefaultValue(lua_State* L)
 int L_GetLoadedValue(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* optionName = luaL_checkstring(L, 1);
-    QString normalizedName = QString::fromUtf8(optionName).toLower().trimmed();
+    QString normalizedName = luaCheckQString(L, 1).toLower().trimmed();
 
     // Search numeric options table first
     for (int i = 0; OptionsTable[i].pName != nullptr; i++) {
@@ -1932,7 +1836,7 @@ int L_GetLoadedValue(lua_State* L)
 
             auto it = pDoc->m_loadedAlphaOptions.find(normalizedName);
             if (it != pDoc->m_loadedAlphaOptions.end()) {
-                lua_pushstring(L, it->second.toUtf8().constData());
+                luaPushQString(L, it->second);
             } else {
                 lua_pushnil(L);
             }
@@ -1958,12 +1862,10 @@ int L_GetLoadedValue(lua_State* L)
 int L_SetAlphaOption(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* optionName = luaL_checkstring(L, 1);
-    const char* value = luaL_checkstring(L, 2);
 
     // Normalize option name: lowercase, trimmed (matches original)
-    QString normalizedName = QString::fromUtf8(optionName).toLower().trimmed();
-    QString strValue = QString::fromUtf8(value);
+    QString normalizedName = luaCheckQString(L, 1).toLower().trimmed();
+    QString strValue = luaCheckQString(L, 2);
 
     // Search alpha (string) options table
     for (int i = 0; AlphaOptionsTable[i].pName != nullptr; i++) {
@@ -2041,9 +1943,7 @@ int L_SetAlphaOption(lua_State* L)
 int L_SetStatus(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* text = luaL_checkstring(L, 1);
-
-    pDoc->m_strStatusMessage = QString::fromUtf8(text);
+    pDoc->m_strStatusMessage = luaCheckQString(L, 1);
     pDoc->m_tStatusDisplayed = QDateTime::currentDateTime();
 
     return 0;
@@ -2149,7 +2049,6 @@ int L_TextRectangle(lua_State* L)
 int L_SetBackgroundImage(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* filename = luaL_optstring(L, 1, "");
     qint32 mode = luaL_optinteger(L, 2, 0);
 
     // Validate mode (matches original)
@@ -2159,7 +2058,7 @@ int L_SetBackgroundImage(lua_State* L)
     }
 
     // Store the image path and mode
-    pDoc->m_strBackgroundImageName = QString::fromUtf8(filename);
+    pDoc->m_strBackgroundImageName = luaOptQString(L, 1);
     pDoc->m_iBackgroundMode = mode;
 
     // Tell OutputView to reload the image via interface method
@@ -2183,9 +2082,7 @@ int L_SetBackgroundImage(lua_State* L)
 int L_GetCommand(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    QString command = pDoc->GetCommand();
-    QByteArray ba = command.toUtf8();
-    lua_pushlstring(L, ba.constData(), ba.length());
+    luaPushQString(L, pDoc->GetCommand());
     return 1;
 }
 

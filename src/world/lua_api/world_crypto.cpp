@@ -30,8 +30,7 @@ int L_Hash(lua_State* L)
     QByteArray hash = QCryptographicHash::hash(data, QCryptographicHash::Sha256);
     QString hexHash = hash.toHex();
 
-    QByteArray ba = hexHash.toUtf8();
-    lua_pushlstring(L, ba.constData(), ba.length());
+    luaPushQString(L, hexHash);
     return 1;
 }
 
@@ -60,8 +59,7 @@ int L_Utils_MD5(lua_State* L)
     QByteArray hash = QCryptographicHash::hash(data, QCryptographicHash::Md5);
     QString hexHash = hash.toHex();
 
-    QByteArray ba = hexHash.toUtf8();
-    lua_pushlstring(L, ba.constData(), ba.length());
+    luaPushQString(L, hexHash);
     return 1;
 }
 
@@ -90,8 +88,7 @@ int L_Utils_SHA256(lua_State* L)
     QByteArray hash = QCryptographicHash::hash(data, QCryptographicHash::Sha256);
     QString hexHash = hash.toHex();
 
-    QByteArray ba = hexHash.toUtf8();
-    lua_pushlstring(L, ba.constData(), ba.length());
+    luaPushQString(L, hexHash);
     return 1;
 }
 
@@ -242,8 +239,7 @@ int L_GetUniqueNumber(lua_State* L)
 int L_GetUniqueID(lua_State* L)
 {
     QString uniqueID = generateUniqueID();
-    QByteArray ba = uniqueID.toUtf8();
-    lua_pushlstring(L, ba.constData(), ba.length());
+    luaPushQString(L, uniqueID);
     return 1;
 }
 
@@ -267,8 +263,7 @@ int L_GetUniqueID(lua_State* L)
 int L_CreateGUID(lua_State* L)
 {
     QString guid = createGUID();
-    QByteArray ba = guid.toUtf8();
-    lua_pushlstring(L, ba.constData(), ba.length());
+    luaPushQString(L, guid);
     return 1;
 }
 
@@ -298,8 +293,7 @@ int L_GenerateName(lua_State* L)
         lua_pushnil(L);
         return 1;
     }
-    QByteArray ba = name.toUtf8();
-    lua_pushlstring(L, ba.constData(), ba.length());
+    luaPushQString(L, name);
     return 1;
 }
 

@@ -61,7 +61,7 @@ int L_WindowRectOp(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
+    QString windowName = luaCheckQString(L, 1);
     qint16 action = luaL_checkinteger(L, 2);
     qint32 left = luaL_checkinteger(L, 3);
     qint32 top = luaL_checkinteger(L, 4);
@@ -70,7 +70,6 @@ int L_WindowRectOp(lua_State* L)
     QRgb penColor = luaL_checkinteger(L, 7);
     QRgb brushColor = luaL_optinteger(L, 8, 0); // Optional, default to black
 
-    QString windowName = QString::fromUtf8(name);
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         return luaReturnError(L, eNoSuchWindow);
@@ -133,7 +132,7 @@ int L_WindowCircleOp(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
+    QString windowName = luaCheckQString(L, 1);
     qint16 action = luaL_checkinteger(L, 2);
     qint32 left = luaL_checkinteger(L, 3);
     qint32 top = luaL_checkinteger(L, 4);
@@ -149,7 +148,6 @@ int L_WindowCircleOp(lua_State* L)
     qint32 extra3 = luaL_optinteger(L, 14, 0);
     qint32 extra4 = luaL_optinteger(L, 15, 0);
 
-    QString windowName = QString::fromUtf8(name);
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         return luaReturnError(L, eNoSuchWindow);
@@ -194,7 +192,7 @@ int L_WindowLine(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
+    QString windowName = luaCheckQString(L, 1);
     qint32 x1 = luaL_checkinteger(L, 2);
     qint32 y1 = luaL_checkinteger(L, 3);
     qint32 x2 = luaL_checkinteger(L, 4);
@@ -203,7 +201,6 @@ int L_WindowLine(lua_State* L)
     qint32 penStyle = luaL_checkinteger(L, 7);
     qint32 penWidth = luaL_checkinteger(L, 8);
 
-    QString windowName = QString::fromUtf8(name);
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         return luaReturnError(L, eNoSuchWindow);
@@ -251,8 +248,8 @@ int L_WindowPolygon(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
-    const char* points = luaL_checkstring(L, 2);
+    QString windowName = luaCheckQString(L, 1);
+    QString pointsStr = luaCheckQString(L, 2);
     QRgb penColor = luaL_checkinteger(L, 3);
     qint32 penStyle = luaL_checkinteger(L, 4);
     qint32 penWidth = luaL_checkinteger(L, 5);
@@ -260,9 +257,6 @@ int L_WindowPolygon(lua_State* L)
     qint32 brushStyle = luaL_checkinteger(L, 7);
     bool close = lua_toboolean(L, 8);
     bool winding = lua_toboolean(L, 9);
-
-    QString windowName = QString::fromUtf8(name);
-    QString pointsStr = QString::fromUtf8(points);
 
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
@@ -310,7 +304,7 @@ int L_WindowGradient(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
+    QString windowName = luaCheckQString(L, 1);
     qint32 left = luaL_checkinteger(L, 2);
     qint32 top = luaL_checkinteger(L, 3);
     qint32 right = luaL_checkinteger(L, 4);
@@ -319,7 +313,6 @@ int L_WindowGradient(lua_State* L)
     QRgb color2 = luaL_checkinteger(L, 7);
     qint32 mode = luaL_checkinteger(L, 8);
 
-    QString windowName = QString::fromUtf8(name);
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         return luaReturnError(L, eNoSuchWindow);
@@ -359,12 +352,11 @@ int L_WindowSetPixel(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
+    QString windowName = luaCheckQString(L, 1);
     qint32 x = luaL_checkinteger(L, 2);
     qint32 y = luaL_checkinteger(L, 3);
     QRgb color = luaL_checkinteger(L, 4);
 
-    QString windowName = QString::fromUtf8(name);
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         return luaReturnError(L, eNoSuchWindow);
@@ -402,11 +394,10 @@ int L_WindowGetPixel(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
+    QString windowName = luaCheckQString(L, 1);
     qint32 x = luaL_checkinteger(L, 2);
     qint32 y = luaL_checkinteger(L, 3);
 
-    QString windowName = QString::fromUtf8(name);
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         lua_pushnumber(L, 0);
@@ -454,7 +445,7 @@ int L_WindowArc(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
+    QString windowName = luaCheckQString(L, 1);
     qint32 left = luaL_checkinteger(L, 2);
     qint32 top = luaL_checkinteger(L, 3);
     qint32 right = luaL_checkinteger(L, 4);
@@ -467,7 +458,6 @@ int L_WindowArc(lua_State* L)
     qint32 penStyle = luaL_checkinteger(L, 11);
     qint32 penWidth = luaL_checkinteger(L, 12);
 
-    QString windowName = QString::fromUtf8(name);
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         return luaReturnError(L, eNoSuchWindow);
@@ -512,14 +502,11 @@ int L_WindowBezier(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
-    const char* points = luaL_checkstring(L, 2);
+    QString windowName = luaCheckQString(L, 1);
+    QString pointsStr = luaCheckQString(L, 2);
     QRgb penColor = luaL_checkinteger(L, 3);
     qint32 penStyle = luaL_checkinteger(L, 4);
     qint32 penWidth = luaL_checkinteger(L, 5);
-
-    QString windowName = QString::fromUtf8(name);
-    QString pointsStr = QString::fromUtf8(points);
 
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
@@ -566,23 +553,21 @@ int L_WindowFont(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
-    const char* fontId = luaL_checkstring(L, 2);
-    const char* fontName = luaL_checkstring(L, 3);
+    QString windowName = luaCheckQString(L, 1);
+    QString fontId = luaCheckQString(L, 2);
+    QString fontName = luaCheckQString(L, 3);
     double size = luaL_checknumber(L, 4);
     bool bold = lua_toboolean(L, 5);
     bool italic = lua_toboolean(L, 6);
     bool underline = lua_toboolean(L, 7);
     bool strikeout = lua_toboolean(L, 8);
 
-    QString windowName = QString::fromUtf8(name);
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         return luaReturnError(L, eNoSuchWindow);
     }
 
-    qint32 result = win->Font(QString::fromUtf8(fontId), QString::fromUtf8(fontName), size, bold,
-                              italic, underline, strikeout);
+    qint32 result = win->Font(fontId, fontName, size, bold, italic, underline, strikeout);
     lua_pushnumber(L, result);
     return 1;
 }
@@ -625,9 +610,9 @@ int L_WindowText(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
-    const char* fontId = luaL_checkstring(L, 2);
-    const char* text = luaL_checkstring(L, 3);
+    QString windowName = luaCheckQString(L, 1);
+    QString fontId = luaCheckQString(L, 2);
+    QString text = luaCheckQString(L, 3);
     qint32 left = luaL_checkinteger(L, 4);
     qint32 top = luaL_checkinteger(L, 5);
     qint32 right = luaL_checkinteger(L, 6);
@@ -635,14 +620,12 @@ int L_WindowText(lua_State* L)
     QRgb color = luaL_checkinteger(L, 8);
     bool unicode = lua_toboolean(L, 9);
 
-    QString windowName = QString::fromUtf8(name);
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         return luaReturnError(L, eNoSuchWindow);
     }
 
-    qint32 result = win->Text(QString::fromUtf8(fontId), QString::fromUtf8(text), left, top, right,
-                              bottom, color, unicode);
+    qint32 result = win->Text(fontId, text, left, top, right, bottom, color, unicode);
     lua_pushnumber(L, result);
     return 1;
 }
@@ -673,19 +656,18 @@ int L_WindowTextWidth(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
-    const char* fontId = luaL_checkstring(L, 2);
-    const char* text = luaL_checkstring(L, 3);
+    QString windowName = luaCheckQString(L, 1);
+    QString fontId = luaCheckQString(L, 2);
+    QString text = luaCheckQString(L, 3);
     bool unicode = lua_toboolean(L, 4);
 
-    QString windowName = QString::fromUtf8(name);
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         lua_pushnumber(L, 0);
         return 1;
     }
 
-    qint32 width = win->TextWidth(QString::fromUtf8(fontId), QString::fromUtf8(text), unicode);
+    qint32 width = win->TextWidth(fontId, text, unicode);
     lua_pushnumber(L, width);
     return 1;
 }
@@ -731,18 +713,17 @@ int L_WindowFontInfo(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
-    const char* fontId = luaL_checkstring(L, 2);
+    QString windowName = luaCheckQString(L, 1);
+    QString fontId = luaCheckQString(L, 2);
     qint32 infoType = luaL_checkinteger(L, 3);
 
-    QString windowName = QString::fromUtf8(name);
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         lua_pushnil(L);
         return 1;
     }
 
-    QVariant info = win->FontInfo(QString::fromUtf8(fontId), infoType);
+    QVariant info = win->FontInfo(fontId, infoType);
 
     if (!info.isValid()) {
         lua_pushnil(L);
@@ -752,7 +733,7 @@ int L_WindowFontInfo(lua_State* L)
     // Convert QVariant to Lua value
     switch (info.typeId()) {
         case QMetaType::QString:
-            lua_pushstring(L, info.toString().toUtf8().constData());
+            luaPushQString(L, info.toString());
             break;
         case QMetaType::Int:
             lua_pushnumber(L, info.toInt());
@@ -794,9 +775,8 @@ int L_WindowFontList(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
+    QString windowName = luaCheckQString(L, 1);
 
-    QString windowName = QString::fromUtf8(name);
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         lua_newtable(L); // Return empty table if window not found
@@ -804,13 +784,7 @@ int L_WindowFontList(lua_State* L)
     }
 
     QStringList fontList = win->FontList();
-
-    // Create Lua table
-    lua_newtable(L);
-    for (int i = 0; i < fontList.size(); i++) {
-        lua_pushstring(L, fontList[i].toUtf8().constData());
-        lua_rawseti(L, -2, i + 1); // Lua arrays are 1-indexed
-    }
+    luaPushQStringList(L, fontList);
 
     return 1;
 }
@@ -842,16 +816,15 @@ int L_WindowWrite(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
-    const char* filename = luaL_checkstring(L, 2);
+    QString windowName = luaCheckQString(L, 1);
+    QString filename = luaCheckQString(L, 2);
 
-    QString windowName = QString::fromUtf8(name);
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         return luaReturnError(L, eNoSuchWindow);
     }
 
-    qint32 result = win->Write(QString::fromUtf8(filename));
+    qint32 result = win->Write(filename);
     lua_pushnumber(L, result);
     return 1;
 }
@@ -904,7 +877,7 @@ int L_WindowFilter(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
+    QString windowName = luaCheckQString(L, 1);
     qint32 left = luaL_checkinteger(L, 2);
     qint32 top = luaL_checkinteger(L, 3);
     qint32 right = luaL_checkinteger(L, 4);
@@ -912,7 +885,6 @@ int L_WindowFilter(lua_State* L)
     qint16 operation = luaL_checkinteger(L, 6);
     double options = luaL_checknumber(L, 7);
 
-    QString windowName = QString::fromUtf8(name);
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         return luaReturnError(L, eNoSuchWindow);

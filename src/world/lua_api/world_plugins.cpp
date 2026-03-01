@@ -100,7 +100,7 @@ int L_CallPlugin(lua_State* L)
     if (!pPlugin) {
         lua_pushnumber(L, eNoSuchPlugin);
         QString errorMsg = QString("Plugin ID (%1) is not installed").arg(pluginID);
-        lua_pushstring(L, errorMsg.toUtf8().constData());
+        luaPushQString(L, errorMsg);
         return 2;
     }
 
@@ -108,7 +108,7 @@ int L_CallPlugin(lua_State* L)
     if (!pPlugin->enabled()) {
         lua_pushnumber(L, ePluginDisabled);
         QString errorMsg = QString("Plugin '%1' (%2) disabled").arg(pPlugin->name(), pluginID);
-        lua_pushstring(L, errorMsg.toUtf8().constData());
+        luaPushQString(L, errorMsg);
         return 2;
     }
 
@@ -118,7 +118,7 @@ int L_CallPlugin(lua_State* L)
         lua_pushnumber(L, eNoSuchRoutine);
         QString errorMsg =
             QString("Scripting not enabled in plugin '%1' (%2)").arg(pPlugin->name(), pluginID);
-        lua_pushstring(L, errorMsg.toUtf8().constData());
+        luaPushQString(L, errorMsg);
         return 2;
     }
 
@@ -134,7 +134,7 @@ int L_CallPlugin(lua_State* L)
         lua_pushnumber(L, eNoSuchRoutine);
         QString errorMsg =
             QString("No function '%1' in plugin '%2' (%3)").arg(routine, pPlugin->name(), pluginID);
-        lua_pushstring(L, errorMsg.toUtf8().constData());
+        luaPushQString(L, errorMsg);
         return 2;
     }
 
@@ -169,7 +169,7 @@ int L_CallPlugin(lua_State* L)
                     QString errorMsg = QString("Cannot pass argument #%1 (%2 type) to CallPlugin")
                                            .arg(i + 2) // +2 because we removed pluginID and routine
                                            .arg(luaL_typename(L, i));
-                    lua_pushstring(L, errorMsg.toUtf8().constData());
+                    luaPushQString(L, errorMsg);
                     return 2;
             }
         }
@@ -203,8 +203,8 @@ int L_CallPlugin(lua_State* L)
         lua_pushnumber(L, eErrorCallingPluginRoutine);
         QString errorMsg = QString("Runtime error in function '%1', plugin '%2' (%3)")
                                .arg(routine, pPlugin->name(), pluginID);
-        lua_pushstring(L, errorMsg.toUtf8().constData());
-        lua_pushstring(L, strLuaError.toUtf8().constData());
+        luaPushQString(L, errorMsg);
+        luaPushQString(L, strLuaError);
         return 3;
     }
 
@@ -250,7 +250,7 @@ int L_CallPlugin(lua_State* L)
                                        .arg(i)
                                        .arg(luaL_typename(pL, i))
                                        .arg(routine, pPlugin->name(), pluginID);
-                lua_pushstring(L, errorMsg.toUtf8().constData());
+                luaPushQString(L, errorMsg);
                 lua_settop(pL, 0);
                 return 2;
         }
@@ -288,7 +288,7 @@ int L_GetPluginID(lua_State* L)
         qCDebug(lcScript) << "GetPluginID: plugin(L) is NULL, returning empty string";
     }
 
-    lua_pushstring(L, pluginID.toUtf8().constData());
+    luaPushQString(L, pluginID);
     return 1;
 }
 
@@ -316,7 +316,7 @@ int L_GetPluginName(lua_State* L)
         pluginName = currentPlugin->m_strName;
     }
 
-    lua_pushstring(L, pluginName.toUtf8().constData());
+    luaPushQString(L, pluginName);
     return 1;
 }
 
@@ -346,7 +346,7 @@ int L_GetPluginList(lua_State* L)
     int index = 1;
     for (const auto& plugin : pDoc->m_PluginList) {
         if (plugin) {
-            lua_pushstring(L, plugin->m_strID.toUtf8().constData());
+            luaPushQString(L, plugin->m_strID);
             lua_rawseti(L, -2, index++);
         }
     }
@@ -377,9 +377,7 @@ int L_IsPluginInstalled(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* pluginID = luaL_checkstring(L, 1);
-
-    Plugin* plugin = pDoc->FindPluginByID(QString::fromUtf8(pluginID));
+    Plugin* plugin = pDoc->FindPluginByID(luaCheckQString(L, 1));
 
     lua_pushboolean(L, plugin != nullptr);
     return 1;
@@ -440,12 +438,12 @@ int L_GetPluginInfo(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* pluginID = luaL_checkstring(L, 1);
+    QString pluginID = luaCheckQString(L, 1);
     int infoType = luaL_checkinteger(L, 2);
 
     qCDebug(lcScript) << "GetPluginInfo called: pluginID=" << pluginID << "infoType=" << infoType;
 
-    Plugin* plugin = pDoc->FindPluginByID(QString::fromUtf8(pluginID));
+    Plugin* plugin = pDoc->FindPluginByID(pluginID);
 
     if (!plugin) {
         qCDebug(lcScript) << "GetPluginInfo: plugin not found for ID" << pluginID;
@@ -457,35 +455,35 @@ int L_GetPluginInfo(lua_State* L)
 
     switch (infoType) {
         case 1: // Name
-            lua_pushstring(L, plugin->m_strName.toUtf8().constData());
+            luaPushQString(L, plugin->m_strName);
             break;
 
         case 2: // Author
-            lua_pushstring(L, plugin->m_strAuthor.toUtf8().constData());
+            luaPushQString(L, plugin->m_strAuthor);
             break;
 
         case 3: // Description
-            lua_pushstring(L, plugin->m_strDescription.toUtf8().constData());
+            luaPushQString(L, plugin->m_strDescription);
             break;
 
         case 4: // Script
-            lua_pushstring(L, plugin->m_strScript.toUtf8().constData());
+            luaPushQString(L, plugin->m_strScript);
             break;
 
         case 5: // Language
-            lua_pushstring(L, plugin->m_strLanguage.toUtf8().constData());
+            luaPushQString(L, plugin->m_strLanguage);
             break;
 
         case 6: // Source (file path)
-            lua_pushstring(L, plugin->m_strSource.toUtf8().constData());
+            luaPushQString(L, plugin->m_strSource);
             break;
 
         case 7: // ID (GUID)
-            lua_pushstring(L, plugin->m_strID.toUtf8().constData());
+            luaPushQString(L, plugin->m_strID);
             break;
 
         case 8: // Purpose
-            lua_pushstring(L, plugin->m_strPurpose.toUtf8().constData());
+            luaPushQString(L, plugin->m_strPurpose);
             break;
 
         case 9: // Trigger count
@@ -506,8 +504,7 @@ int L_GetPluginInfo(lua_State* L)
 
         case 13: // Date written
             if (plugin->m_tDateWritten.isValid()) {
-                lua_pushstring(L,
-                               plugin->m_tDateWritten.toString(Qt::ISODate).toUtf8().constData());
+                luaPushQString(L, plugin->m_tDateWritten.toString(Qt::ISODate));
             } else {
                 lua_pushnil(L);
             }
@@ -515,8 +512,7 @@ int L_GetPluginInfo(lua_State* L)
 
         case 14: // Date modified
             if (plugin->m_tDateModified.isValid()) {
-                lua_pushstring(L,
-                               plugin->m_tDateModified.toString(Qt::ISODate).toUtf8().constData());
+                luaPushQString(L, plugin->m_tDateModified.toString(Qt::ISODate));
             } else {
                 lua_pushnil(L);
             }
@@ -551,7 +547,7 @@ int L_GetPluginInfo(lua_State* L)
                 dir += "/";
             }
             qCDebug(lcScript) << "GetPluginInfo(20): returning:" << dir;
-            lua_pushstring(L, dir.toUtf8().constData());
+            luaPushQString(L, dir);
         } break;
 
         case 21: // Load order (recalculated from list position)
@@ -560,15 +556,14 @@ int L_GetPluginInfo(lua_State* L)
 
         case 22: // Date installed
             if (plugin->m_tDateInstalled.isValid()) {
-                lua_pushstring(L,
-                               plugin->m_tDateInstalled.toString(Qt::ISODate).toUtf8().constData());
+                luaPushQString(L, plugin->m_tDateInstalled.toString(Qt::ISODate));
             } else {
                 lua_pushnil(L);
             }
             break;
 
         case 23: // Calling plugin ID
-            lua_pushstring(L, plugin->m_strCallingPluginID.toUtf8().constData());
+            luaPushQString(L, plugin->m_strCallingPluginID);
             break;
 
         case 24: // Script time taken (in seconds)
@@ -612,15 +607,13 @@ int L_LoadPlugin(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* filepath = luaL_checkstring(L, 1);
-
     // Save current plugin context (don't let plugin load itself)
     Plugin* savedPlugin = pDoc->m_CurrentPlugin;
     pDoc->m_CurrentPlugin = nullptr;
 
     // Try to load plugin
     QString errorMsg;
-    Plugin* plugin = pDoc->LoadPlugin(QString::fromUtf8(filepath), errorMsg);
+    Plugin* plugin = pDoc->LoadPlugin(luaCheckQString(L, 1), errorMsg);
 
     // Restore context
     pDoc->m_CurrentPlugin = savedPlugin;
@@ -666,9 +659,9 @@ int L_ReloadPlugin(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* pluginID = luaL_checkstring(L, 1);
+    QString pluginID = luaCheckQString(L, 1);
 
-    Plugin* plugin = pDoc->FindPluginByID(QString::fromUtf8(pluginID));
+    Plugin* plugin = pDoc->FindPluginByID(pluginID);
 
     if (!plugin) {
         return luaReturnError(L, eNoSuchPlugin);
@@ -683,7 +676,7 @@ int L_ReloadPlugin(lua_State* L)
     QString filepath = plugin->m_strSource;
 
     // Unload plugin
-    if (!pDoc->UnloadPlugin(QString::fromUtf8(pluginID))) {
+    if (!pDoc->UnloadPlugin(pluginID)) {
         return luaReturnError(L, eProblemsLoadingPlugin);
     }
 
@@ -728,9 +721,9 @@ int L_UnloadPlugin(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* pluginID = luaL_checkstring(L, 1);
+    QString pluginID = luaCheckQString(L, 1);
 
-    Plugin* plugin = pDoc->FindPluginByID(QString::fromUtf8(pluginID));
+    Plugin* plugin = pDoc->FindPluginByID(pluginID);
 
     if (!plugin) {
         return luaReturnError(L, eNoSuchPlugin);
@@ -742,7 +735,7 @@ int L_UnloadPlugin(lua_State* L)
     }
 
     // Unload plugin
-    if (pDoc->UnloadPlugin(QString::fromUtf8(pluginID))) {
+    if (pDoc->UnloadPlugin(pluginID)) {
         lua_pushnumber(L, eOK);
     } else {
         lua_pushnumber(L, eProblemsLoadingPlugin);
@@ -777,17 +770,17 @@ int L_EnablePlugin(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* pluginID = luaL_checkstring(L, 1);
+    QString pluginID = luaCheckQString(L, 1);
     bool enabled = lua_toboolean(L, 2);
 
-    Plugin* plugin = pDoc->FindPluginByID(QString::fromUtf8(pluginID));
+    Plugin* plugin = pDoc->FindPluginByID(pluginID);
 
     if (!plugin) {
         return luaReturnError(L, eNoSuchPlugin);
     }
 
     // Enable/disable plugin
-    if (pDoc->EnablePlugin(QString::fromUtf8(pluginID), enabled)) {
+    if (pDoc->EnablePlugin(pluginID, enabled)) {
         lua_pushnumber(L, eOK);
     } else {
         lua_pushnumber(L, eProblemsLoadingPlugin);
@@ -821,10 +814,8 @@ int L_PluginSupports(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* pluginID = luaL_checkstring(L, 1);
+    Plugin* plugin = pDoc->FindPluginByID(luaCheckQString(L, 1));
     const char* routine = luaL_checkstring(L, 2);
-
-    Plugin* plugin = pDoc->FindPluginByID(QString::fromUtf8(pluginID));
 
     if (!plugin) {
         return luaReturnError(L, eNoSuchPlugin);
@@ -883,7 +874,7 @@ int L_BroadcastPlugin(lua_State* L)
     WorldDocument* pDoc = doc(L);
 
     int message = luaL_checkinteger(L, 1);
-    const char* text = luaL_optstring(L, 2, "");
+    QString text = luaOptQString(L, 2);
 
     Plugin* savedPlugin = pDoc->m_CurrentPlugin;
     int count = 0;
@@ -911,8 +902,7 @@ int L_BroadcastPlugin(lua_State* L)
         pDoc->m_CurrentPlugin = plugin.get();
 
         // Call OnPluginBroadcast(message, senderID, senderName, text)
-        plugin->ExecutePluginScript(ON_PLUGIN_BROADCAST, message, senderID, senderName,
-                                    QString::fromUtf8(text));
+        plugin->ExecutePluginScript(ON_PLUGIN_BROADCAST, message, senderID, senderName, text);
 
         count++;
     }
@@ -1040,10 +1030,8 @@ int L_GetPluginVariable(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* pluginID = luaL_checkstring(L, 1);
-    const char* variableName = luaL_checkstring(L, 2);
-
-    Plugin* plugin = pDoc->FindPluginByID(QString::fromUtf8(pluginID));
+    Plugin* plugin = pDoc->FindPluginByID(luaCheckQString(L, 1));
+    QString varName = luaCheckQString(L, 2);
 
     if (!plugin) {
         lua_pushnil(L);
@@ -1053,12 +1041,9 @@ int L_GetPluginVariable(lua_State* L)
     // Switch to plugin context
     Plugin* savedPlugin = pDoc->m_CurrentPlugin;
     pDoc->m_CurrentPlugin = plugin;
-
-    // Get variable from plugin's map
-    QString varName = QString::fromUtf8(variableName);
     auto it = plugin->m_VariableMap.find(varName);
     if (it != plugin->m_VariableMap.end()) {
-        lua_pushstring(L, it->second->contents.toUtf8().constData());
+        luaPushQString(L, it->second->contents);
     } else {
         lua_pushnil(L);
     }
@@ -1093,16 +1078,14 @@ int L_GetPluginVariableList(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* pluginID = luaL_checkstring(L, 1);
-
-    Plugin* plugin = pDoc->FindPluginByID(QString::fromUtf8(pluginID));
+    Plugin* plugin = pDoc->FindPluginByID(luaCheckQString(L, 1));
 
     lua_newtable(L);
 
     if (plugin) {
         int index = 1;
         for (const auto& [name, var] : plugin->m_VariableMap) {
-            lua_pushstring(L, name.toUtf8().constData());
+            luaPushQString(L, name);
             lua_rawseti(L, -2, index++);
         }
     }

@@ -31,8 +31,7 @@
 int L_GetVariable(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
 
     // Use plugin(L) to get the plugin from Lua registry
     Plugin* currentPlugin = plugin(L);
@@ -51,7 +50,7 @@ int L_GetVariable(lua_State* L)
     if (value.isEmpty()) {
         lua_pushnil(L);
     } else {
-        lua_pushstring(L, value.toUtf8().constData());
+        luaPushQString(L, value);
     }
 
     return 1;
@@ -82,10 +81,8 @@ int L_GetVariable(lua_State* L)
 int L_SetVariable(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-    const char* value = luaL_checkstring(L, 2);
-
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
+    QString qValue = luaCheckQString(L, 2);
 
     // Validate and trim the name
     qint32 status = validateObjectName(qName);
@@ -103,17 +100,17 @@ int L_SetVariable(lua_State* L)
         auto it = currentPlugin->m_VariableMap.find(qName);
         if (it != currentPlugin->m_VariableMap.end()) {
             // Update existing variable
-            it->second->contents = QString::fromUtf8(value);
+            it->second->contents = qValue;
         } else {
             // Create new variable
             auto var = std::make_unique<Variable>();
             var->label = qName;
-            var->contents = QString::fromUtf8(value);
+            var->contents = qValue;
             currentPlugin->m_VariableMap[qName] = std::move(var);
         }
         result = eOK;
     } else {
-        result = pDoc->setVariable(qName, QString::fromUtf8(value));
+        result = pDoc->setVariable(qName, qValue);
     }
 
     lua_pushnumber(L, result);
@@ -146,9 +143,7 @@ int L_SetVariable(lua_State* L)
 int L_DeleteVariable(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
 
     // Validate and trim the name
     qint32 status = validateObjectName(qName);
@@ -218,21 +213,7 @@ int L_GetVariableList(lua_State* L)
         names = pDoc->getVariableList();
     }
 
-    lua_newtable(L);
-    for (int i = 0; i < names.size(); i++) {
-        lua_pushstring(L, names[i].toUtf8().constData());
-        lua_rawseti(L, -2, i + 1);
-    }
+    luaPushQStringList(L, names);
 
     return 1;
-}
-
-// ========== Registration ==========
-
-void register_world_variables_functions(luaL_Reg*& ptr)
-{
-    *ptr++ = {"GetVariable", L_GetVariable};
-    *ptr++ = {"SetVariable", L_SetVariable};
-    *ptr++ = {"DeleteVariable", L_DeleteVariable};
-    *ptr++ = {"GetVariableList", L_GetVariableList};
 }

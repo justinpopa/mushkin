@@ -37,7 +37,7 @@ int L_OpenLog(lua_State* L)
 
     QString filename;
     if (lua_gettop(L) >= 1 && !lua_isnil(L, 1)) {
-        filename = QString::fromUtf8(luaL_checkstring(L, 1));
+        filename = luaCheckQString(L, 1);
     }
 
     bool append = false;
@@ -99,7 +99,7 @@ int L_WriteLog(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    QString message = QString::fromUtf8(luaL_checkstring(L, 1));
+    QString message = luaCheckQString(L, 1);
 
     qint32 result = pDoc->WriteLog(message);
 
@@ -187,16 +187,4 @@ int L_OmitFromLogFile(lua_State* L)
     WorldDocument* pDoc = doc(L);
     pDoc->m_bOmitCurrentLineFromLog = true;
     return luaReturnOK(L);
-}
-
-// ========== Registration ==========
-
-void register_world_logging_functions(luaL_Reg*& ptr)
-{
-    *ptr++ = {"OpenLog", L_OpenLog};
-    *ptr++ = {"CloseLog", L_CloseLog};
-    *ptr++ = {"WriteLog", L_WriteLog};
-    *ptr++ = {"FlushLog", L_FlushLog};
-    *ptr++ = {"IsLogOpen", L_IsLogOpen};
-    *ptr++ = {"OmitFromLogFile", L_OmitFromLogFile};
 }

@@ -67,21 +67,14 @@ int L_AddAlias(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
-    const char* match = luaL_checkstring(L, 2);
-    const char* response = luaL_checkstring(L, 3);
+    QString qName = luaCheckQString(L, 1);
+    QString qMatch = luaCheckQString(L, 2);
+    QString qResponse = luaCheckQString(L, 3);
     int flags = luaL_checkinteger(L, 4);
-    const char* script = luaL_optstring(L, 5, "");
-
-    QString qName = QString::fromUtf8(name);
-    QString qMatch = QString::fromUtf8(match);
+    QString qScript = luaOptQString(L, 5);
 
     // Validate and normalize alias name
-    qint32 nameStatus = validateObjectName(qName);
-    if (nameStatus != eOK) {
-        lua_pushnumber(L, nameStatus);
-        return 1;
-    }
+    LUA_VALIDATE_NAME(qName);
 
     // Check if alias already exists (check appropriate map based on context)
     // Use plugin(L) to get the plugin from Lua registry - this is reliable even after modal dialogs
@@ -124,7 +117,7 @@ int L_AddAlias(lua_State* L)
     alias->label = qName;
     alias->internal_name = qName;
     alias->name = qMatch;
-    alias->contents = QString::fromUtf8(response);
+    alias->contents = qResponse;
     alias->enabled = (flags & eEnabled) != 0;
     alias->ignore_case = (flags & eIgnoreAliasCase) != 0;
     alias->omit_from_log = (flags & eOmitFromLogFile) != 0;
@@ -140,7 +133,7 @@ int L_AddAlias(lua_State* L)
         alias->keep_evaluating = true;
     }
     // else: keep the default from Alias constructor (true)
-    alias->procedure = QString::fromUtf8(script);
+    alias->procedure = qScript;
     alias->sequence = 100; // Default sequence
 
     // Handle special send-to flags
@@ -193,9 +186,8 @@ int L_AddAlias(lua_State* L)
 int L_DeleteAlias(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
 
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
 
     if (!pDoc->deleteAlias(qName).has_value()) {
         return luaReturnError(L, eAliasNotFound);
@@ -227,9 +219,8 @@ int L_DeleteAlias(lua_State* L)
 int L_IsAlias(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
 
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
     Alias* alias = pDoc->getAlias(qName);
 
     lua_pushnumber(L, alias ? eOK : eAliasNotFound);
@@ -263,9 +254,8 @@ int L_IsAlias(lua_State* L)
 int L_GetAlias(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
 
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
     Alias* alias = pDoc->getAlias(qName);
 
     if (!alias) {
@@ -293,10 +283,10 @@ int L_GetAlias(lua_State* L)
 
     // Return: error_code, match, response, flags, script
     lua_pushnumber(L, eOK);
-    lua_pushstring(L, alias->name.toUtf8().constData());
-    lua_pushstring(L, alias->contents.toUtf8().constData());
+    luaPushQString(L, alias->name);
+    luaPushQString(L, alias->contents);
     lua_pushnumber(L, flags);
-    lua_pushstring(L, alias->procedure.toUtf8().constData());
+    luaPushQString(L, alias->procedure);
 
     return 5;
 }
@@ -327,10 +317,9 @@ int L_GetAlias(lua_State* L)
 int L_EnableAlias(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
     bool enabled = lua_toboolean(L, 2);
 
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
     Alias* alias = pDoc->getAlias(qName);
 
     if (!alias) {
@@ -403,10 +392,9 @@ int L_EnableAlias(lua_State* L)
 int L_GetAliasInfo(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
     int info_type = luaL_checkinteger(L, 2);
 
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
     Alias* alias = pDoc->getAlias(qName);
 
     if (!alias) {
@@ -416,20 +404,14 @@ int L_GetAliasInfo(lua_State* L)
 
     switch (info_type) {
         case 1: // name (match pattern)
-        {
-            QByteArray ba = alias->name.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
+            luaPushQString(L, alias->name);
+            break;
         case 2: // contents (send text)
-        {
-            QByteArray ba = alias->contents.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
+            luaPushQString(L, alias->contents);
+            break;
         case 3: // procedure (script name)
-        {
-            QByteArray ba = alias->procedure.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
+            luaPushQString(L, alias->procedure);
+            break;
         case 4: // omit_from_log
             lua_pushboolean(L, alias->omit_from_log);
             break;
@@ -472,15 +454,11 @@ int L_GetAliasInfo(lua_State* L)
             lua_pushboolean(L, alias->included);
             break;
         case 16: // group
-        {
-            QByteArray ba = alias->group.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
+            luaPushQString(L, alias->group);
+            break;
         case 17: // variable
-        {
-            QByteArray ba = alias->variable.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
+            luaPushQString(L, alias->variable);
+            break;
         case 18: // send_to
             lua_pushnumber(L, static_cast<int>(alias->send_to));
             break;
@@ -510,8 +488,7 @@ int L_GetAliasInfo(lua_State* L)
         case 25: // last matching string
             if (!alias->wildcards.isEmpty()) {
                 // wildcards[0] is the entire match
-                QByteArray ba = alias->wildcards[0].toUtf8();
-                lua_pushlstring(L, ba.constData(), ba.length());
+                luaPushQString(L, alias->wildcards[0]);
             } else {
                 lua_pushstring(L, "");
             }
@@ -551,8 +528,7 @@ int L_GetAliasInfo(lua_State* L)
         case 110: {
             int wildcard_index = (info_type == 110) ? 0 : (info_type - 100);
             if (wildcard_index < alias->wildcards.size()) {
-                QByteArray ba = alias->wildcards[wildcard_index].toUtf8();
-                lua_pushlstring(L, ba.constData(), ba.length());
+                luaPushQString(L, alias->wildcards[wildcard_index]);
             } else {
                 lua_pushstring(L, "");
             }
@@ -590,8 +566,7 @@ int L_GetAliasList(lua_State* L)
     lua_newtable(L);
     int i = 1;
     for (const auto& [name, aliasPtr] : pDoc->m_automationRegistry->m_AliasMap) {
-        QByteArray ba = name.toUtf8();
-        lua_pushlstring(L, ba.constData(), ba.length());
+        luaPushQString(L, name);
         lua_rawseti(L, -2, i++);
     }
 
@@ -620,16 +595,16 @@ int L_GetPluginAliasList(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* pluginID = luaL_checkstring(L, 1);
+    QString pluginID = luaCheckQString(L, 1);
 
-    Plugin* plugin = pDoc->FindPluginByID(QString::fromUtf8(pluginID));
+    Plugin* plugin = pDoc->FindPluginByID(pluginID);
 
     lua_newtable(L);
 
     if (plugin) {
         int index = 1;
         for (const auto& [name, aliasPtr] : plugin->m_AliasMap) {
-            lua_pushstring(L, name.toUtf8().constData());
+            luaPushQString(L, name);
             lua_rawseti(L, -2, index++);
         }
     }
@@ -659,11 +634,9 @@ int L_GetPluginAliasInfo(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* pluginID = luaL_checkstring(L, 1);
-    const char* aliasName = luaL_checkstring(L, 2);
     int infoType = luaL_checkinteger(L, 3);
 
-    Plugin* plugin = pDoc->FindPluginByID(QString::fromUtf8(pluginID));
+    Plugin* plugin = pDoc->FindPluginByID(luaCheckQString(L, 1));
 
     if (!plugin) {
         lua_pushnil(L);
@@ -675,7 +648,7 @@ int L_GetPluginAliasInfo(lua_State* L)
     pDoc->m_CurrentPlugin = plugin;
 
     // Find alias in plugin's map
-    QString aName = QString::fromUtf8(aliasName);
+    QString aName = luaCheckQString(L, 2);
     Alias* alias = nullptr;
     auto it = plugin->m_AliasMap.find(aName);
     if (it != plugin->m_AliasMap.end()) {
@@ -691,20 +664,14 @@ int L_GetPluginAliasInfo(lua_State* L)
 
     switch (infoType) {
         case 1: // name (match pattern)
-        {
-            QByteArray ba = alias->name.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
+            luaPushQString(L, alias->name);
+            break;
         case 2: // contents (send text)
-        {
-            QByteArray ba = alias->contents.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
+            luaPushQString(L, alias->contents);
+            break;
         case 3: // procedure (script name)
-        {
-            QByteArray ba = alias->procedure.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
+            luaPushQString(L, alias->procedure);
+            break;
         case 4: // omit_from_log
             lua_pushboolean(L, alias->omit_from_log);
             break;
@@ -746,15 +713,11 @@ int L_GetPluginAliasInfo(lua_State* L)
             lua_pushboolean(L, alias->included);
             break;
         case 16: // group
-        {
-            QByteArray ba = alias->group.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
+            luaPushQString(L, alias->group);
+            break;
         case 17: // variable
-        {
-            QByteArray ba = alias->variable.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
+            luaPushQString(L, alias->variable);
+            break;
         case 18: // send_to
             lua_pushnumber(L, static_cast<int>(alias->send_to));
             break;
@@ -782,8 +745,7 @@ int L_GetPluginAliasInfo(lua_State* L)
             break;
         case 25: // last matching string
             if (!alias->wildcards.isEmpty()) {
-                QByteArray ba = alias->wildcards[0].toUtf8();
-                lua_pushlstring(L, ba.constData(), ba.length());
+                luaPushQString(L, alias->wildcards[0]);
             } else {
                 lua_pushstring(L, "");
             }
@@ -820,8 +782,7 @@ int L_GetPluginAliasInfo(lua_State* L)
         case 110: {
             int wildcard_index = (infoType == 110) ? 0 : (infoType - 100);
             if (wildcard_index < alias->wildcards.size()) {
-                QByteArray ba = alias->wildcards[wildcard_index].toUtf8();
-                lua_pushlstring(L, ba.constData(), ba.length());
+                luaPushQString(L, alias->wildcards[wildcard_index]);
             } else {
                 lua_pushstring(L, "");
             }
@@ -859,11 +820,8 @@ int L_GetPluginAliasOption(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* pluginID = luaL_checkstring(L, 1);
-    const char* aliasName = luaL_checkstring(L, 2);
-    const char* optionName = luaL_checkstring(L, 3);
-
-    Plugin* plugin = pDoc->FindPluginByID(QString::fromUtf8(pluginID));
+    Plugin* plugin = pDoc->FindPluginByID(luaCheckQString(L, 1));
+    QString aName = luaCheckQString(L, 2);
 
     if (!plugin) {
         lua_pushnil(L);
@@ -875,7 +833,6 @@ int L_GetPluginAliasOption(lua_State* L)
     pDoc->m_CurrentPlugin = plugin;
 
     // Find alias
-    QString aName = QString::fromUtf8(aliasName);
     Alias* alias = nullptr;
     auto it = plugin->m_AliasMap.find(aName);
     if (it != plugin->m_AliasMap.end()) {
@@ -883,7 +840,7 @@ int L_GetPluginAliasOption(lua_State* L)
     }
 
     if (alias) {
-        QString option = QString::fromUtf8(optionName);
+        QString option = luaCheckQString(L, 3);
         if (option == "enabled") {
             lua_pushboolean(L, alias->enabled);
         } else if (option == "keep_evaluating") {
@@ -935,11 +892,9 @@ int L_GetPluginAliasOption(lua_State* L)
 int L_GetAliasOption(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* aliasName = luaL_checkstring(L, 1);
-    const char* optionName = luaL_checkstring(L, 2);
 
-    QString qName = QString::fromUtf8(aliasName);
-    QString qOption = QString::fromUtf8(optionName).toLower().trimmed();
+    QString qName = luaCheckQString(L, 1);
+    QString qOption = luaCheckQString(L, 2).toLower().trimmed();
 
     Alias* alias = pDoc->getAlias(qName);
     if (!alias) {
@@ -983,20 +938,15 @@ int L_GetAliasOption(lua_State* L)
     }
     // String options
     else if (qOption == "group") {
-        QByteArray ba = alias->group.toUtf8();
-        lua_pushlstring(L, ba.constData(), ba.length());
+        luaPushQString(L, alias->group);
     } else if (qOption == "match") {
-        QByteArray ba = alias->name.toUtf8();
-        lua_pushlstring(L, ba.constData(), ba.length());
+        luaPushQString(L, alias->name);
     } else if (qOption == "script") {
-        QByteArray ba = alias->procedure.toUtf8();
-        lua_pushlstring(L, ba.constData(), ba.length());
+        luaPushQString(L, alias->procedure);
     } else if (qOption == "send") {
-        QByteArray ba = alias->contents.toUtf8();
-        lua_pushlstring(L, ba.constData(), ba.length());
+        luaPushQString(L, alias->contents);
     } else if (qOption == "variable") {
-        QByteArray ba = alias->variable.toUtf8();
-        lua_pushlstring(L, ba.constData(), ba.length());
+        luaPushQString(L, alias->variable);
     } else {
         lua_pushnil(L);
     }
@@ -1042,11 +992,8 @@ int L_GetAliasOption(lua_State* L)
 int L_SetAliasOption(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* aliasName = luaL_checkstring(L, 1);
-    const char* optionName = luaL_checkstring(L, 2);
-
-    QString qName = QString::fromUtf8(aliasName);
-    QString qOption = QString::fromUtf8(optionName).toLower().trimmed();
+    QString qName = luaCheckQString(L, 1);
+    QString qOption = luaCheckQString(L, 2).toLower().trimmed();
 
     Alias* alias = pDoc->getAlias(qName);
     if (!alias) {
@@ -1104,8 +1051,7 @@ int L_SetAliasOption(lua_State* L)
     // String options
     else if (qOption == "group" || qOption == "match" || qOption == "script" || qOption == "send" ||
              qOption == "variable") {
-        const char* value = luaL_checkstring(L, 3);
-        QString qValue = QString::fromUtf8(value);
+        QString qValue = luaCheckQString(L, 3);
 
         if (qOption == "group") {
             alias->group = qValue;
@@ -1155,10 +1101,8 @@ int L_SetAliasOption(lua_State* L)
 int L_EnableAliasGroup(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* groupName = luaL_checkstring(L, 1);
     bool enabled = lua_toboolean(L, 2);
-
-    QString qGroupName = QString::fromUtf8(groupName);
+    QString qGroupName = luaCheckQString(L, 1);
     int count = 0;
 
     // Iterate through all aliases
@@ -1194,9 +1138,7 @@ int L_EnableAliasGroup(lua_State* L)
 int L_DeleteAliasGroup(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* groupName = luaL_checkstring(L, 1);
-
-    QString qGroupName = QString::fromUtf8(groupName);
+    QString qGroupName = luaCheckQString(L, 1);
     QStringList toDelete;
 
     // Find all aliases in this group

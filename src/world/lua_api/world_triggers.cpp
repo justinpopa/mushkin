@@ -71,26 +71,19 @@ int L_AddTrigger(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
-    const char* match = luaL_checkstring(L, 2);
-    const char* response = luaL_checkstring(L, 3);
+    QString qName = luaCheckQString(L, 1);
+    QString qMatch = luaCheckQString(L, 2);
+    QString response = luaCheckQString(L, 3);
     int flags = luaL_checkinteger(L, 4);
     int color = luaL_optinteger(L, 5, 0);
     // int wildcard = luaL_optinteger(L, 6, 0);  // Unused
-    const char* sound_file = luaL_optstring(L, 7, "");
-    const char* script = luaL_optstring(L, 8, "");
+    QString sound_file = luaOptQString(L, 7);
+    QString script = luaOptQString(L, 8);
     int send_to = luaL_optinteger(L, 9, 0);
     int sequence = luaL_optinteger(L, 10, 100);
 
-    QString qName = QString::fromUtf8(name);
-    QString qMatch = QString::fromUtf8(match);
-
     // Validate and normalize trigger name
-    qint32 nameStatus = validateObjectName(qName);
-    if (nameStatus != eOK) {
-        lua_pushnumber(L, nameStatus);
-        return 1;
-    }
+    LUA_VALIDATE_NAME(qName);
 
     // Check if trigger already exists (check appropriate map based on context)
     // Use plugin(L) to get the plugin from Lua registry - this is reliable even after modal dialogs
@@ -143,7 +136,7 @@ int L_AddTrigger(lua_State* L)
     trigger->label = qName;
     trigger->internal_name = qName;
     trigger->trigger = qMatch;
-    trigger->contents = QString::fromUtf8(response);
+    trigger->contents = response;
     trigger->enabled = (flags & eEnabled) != 0;
     trigger->omit_from_output = (flags & eAliasOmitFromOutput) != 0;
     trigger->omit_from_log = (flags & eOmitFromLogFile) != 0;
@@ -160,8 +153,8 @@ int L_AddTrigger(lua_State* L)
     trigger->temporary = (flags & eTemporary) != 0;
     trigger->one_shot = (flags & eAliasOneShot) != 0;
     trigger->colour = color;
-    trigger->sound_to_play = QString::fromUtf8(sound_file);
-    trigger->procedure = QString::fromUtf8(script);
+    trigger->sound_to_play = sound_file;
+    trigger->procedure = script;
     trigger->send_to = static_cast<SendTo>(send_to);
     trigger->sequence = sequence;
 
@@ -204,9 +197,7 @@ int L_AddTrigger(lua_State* L)
 int L_DeleteTrigger(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
 
     if (!pDoc->deleteTrigger(qName).has_value()) {
         return luaReturnError(L, eTriggerNotFound);
@@ -238,9 +229,7 @@ int L_DeleteTrigger(lua_State* L)
 int L_IsTrigger(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
     Trigger* trigger = pDoc->getTrigger(qName);
 
     lua_pushnumber(L, trigger ? eOK : eTriggerNotFound);
@@ -277,9 +266,7 @@ int L_IsTrigger(lua_State* L)
 int L_GetTrigger(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
     Trigger* trigger = pDoc->getTrigger(qName);
 
     if (!trigger) {
@@ -307,13 +294,13 @@ int L_GetTrigger(lua_State* L)
 
     // Return: error_code, match, response, flags, colour, wildcard, sound, script
     lua_pushnumber(L, eOK);
-    lua_pushstring(L, trigger->trigger.toUtf8().constData());
-    lua_pushstring(L, trigger->contents.toUtf8().constData());
+    luaPushQString(L, trigger->trigger);
+    luaPushQString(L, trigger->contents);
     lua_pushnumber(L, flags);
     lua_pushnumber(L, trigger->colour);
     lua_pushnumber(L, trigger->clipboard_arg);
-    lua_pushstring(L, trigger->sound_to_play.toUtf8().constData());
-    lua_pushstring(L, trigger->procedure.toUtf8().constData());
+    luaPushQString(L, trigger->sound_to_play);
+    luaPushQString(L, trigger->procedure);
 
     return 8;
 }
@@ -344,10 +331,8 @@ int L_GetTrigger(lua_State* L)
 int L_EnableTrigger(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
+    QString qName = luaCheckQString(L, 1);
     bool enabled = lua_toboolean(L, 2);
-
-    QString qName = QString::fromUtf8(name);
     Trigger* trigger = pDoc->getTrigger(qName);
 
     if (!trigger) {
@@ -427,10 +412,8 @@ int L_EnableTrigger(lua_State* L)
 int L_GetTriggerInfo(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
+    QString qName = luaCheckQString(L, 1);
     int info_type = luaL_checkinteger(L, 2);
-
-    QString qName = QString::fromUtf8(name);
     Trigger* trigger = pDoc->getTrigger(qName);
 
     if (!trigger) {
@@ -440,25 +423,17 @@ int L_GetTriggerInfo(lua_State* L)
 
     switch (info_type) {
         case 1: // trigger pattern
-        {
-            QByteArray ba = trigger->trigger.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
+            luaPushQString(L, trigger->trigger);
+            break;
         case 2: // contents (send text)
-        {
-            QByteArray ba = trigger->contents.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
+            luaPushQString(L, trigger->contents);
+            break;
         case 3: // sound_to_play
-        {
-            QByteArray ba = trigger->sound_to_play.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
+            luaPushQString(L, trigger->sound_to_play);
+            break;
         case 4: // procedure (script name)
-        {
-            QByteArray ba = trigger->procedure.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
+            luaPushQString(L, trigger->procedure);
+            break;
         case 5: // omit_from_log
             lua_pushboolean(L, trigger->omit_from_log);
             break;
@@ -528,15 +503,11 @@ int L_GetTriggerInfo(lua_State* L)
             lua_pushboolean(L, trigger->lowercase_wildcard);
             break;
         case 26: // group
-        {
-            QByteArray ba = trigger->group.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
+            luaPushQString(L, trigger->group);
+            break;
         case 27: // variable
-        {
-            QByteArray ba = trigger->variable.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
+            luaPushQString(L, trigger->variable);
+            break;
         case 28: // user_option
             lua_pushnumber(L, trigger->user_option);
             break;
@@ -557,8 +528,7 @@ int L_GetTriggerInfo(lua_State* L)
         case 32: // last matching string
             if (!trigger->wildcards.isEmpty()) {
                 // wildcards[0] is the entire match
-                QByteArray ba = trigger->wildcards[0].toUtf8();
-                lua_pushlstring(L, ba.constData(), ba.length());
+                luaPushQString(L, trigger->wildcards[0]);
             } else {
                 lua_pushstring(L, "");
             }
@@ -598,8 +568,7 @@ int L_GetTriggerInfo(lua_State* L)
         case 110: {
             int wildcard_index = (info_type == 110) ? 0 : (info_type - 100);
             if (wildcard_index < trigger->wildcards.size()) {
-                QByteArray ba = trigger->wildcards[wildcard_index].toUtf8();
-                lua_pushlstring(L, ba.constData(), ba.length());
+                luaPushQString(L, trigger->wildcards[wildcard_index]);
             } else {
                 lua_pushstring(L, "");
             }
@@ -637,8 +606,7 @@ int L_GetTriggerList(lua_State* L)
     lua_newtable(L);
     int i = 1;
     for (const auto& [name, triggerPtr] : pDoc->m_automationRegistry->m_TriggerMap) {
-        QByteArray ba = name.toUtf8();
-        lua_pushlstring(L, ba.constData(), ba.length());
+        luaPushQString(L, name);
         lua_rawseti(L, -2, i++);
     }
 
@@ -667,16 +635,14 @@ int L_GetPluginTriggerList(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* pluginID = luaL_checkstring(L, 1);
-
-    Plugin* plugin = pDoc->FindPluginByID(QString::fromUtf8(pluginID));
+    Plugin* plugin = pDoc->FindPluginByID(luaCheckQString(L, 1));
 
     lua_newtable(L);
 
     if (plugin) {
         int index = 1;
         for (const auto& [name, triggerPtr] : plugin->m_TriggerMap) {
-            lua_pushstring(L, name.toUtf8().constData());
+            luaPushQString(L, name);
             lua_rawseti(L, -2, index++);
         }
     }
@@ -706,11 +672,9 @@ int L_GetPluginTriggerInfo(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* pluginID = luaL_checkstring(L, 1);
-    const char* triggerName = luaL_checkstring(L, 2);
+    Plugin* plugin = pDoc->FindPluginByID(luaCheckQString(L, 1));
+    QString tName = luaCheckQString(L, 2);
     int infoType = luaL_checkinteger(L, 3);
-
-    Plugin* plugin = pDoc->FindPluginByID(QString::fromUtf8(pluginID));
 
     if (!plugin) {
         lua_pushnil(L);
@@ -722,7 +686,6 @@ int L_GetPluginTriggerInfo(lua_State* L)
     pDoc->m_CurrentPlugin = plugin;
 
     // Find trigger in plugin's map
-    QString tName = QString::fromUtf8(triggerName);
     Trigger* trigger = nullptr;
     auto it = plugin->m_TriggerMap.find(tName);
     if (it != plugin->m_TriggerMap.end()) {
@@ -738,25 +701,17 @@ int L_GetPluginTriggerInfo(lua_State* L)
 
     switch (infoType) {
         case 1: // trigger pattern
-        {
-            QByteArray ba = trigger->trigger.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
+            luaPushQString(L, trigger->trigger);
+            break;
         case 2: // contents (send text)
-        {
-            QByteArray ba = trigger->contents.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
+            luaPushQString(L, trigger->contents);
+            break;
         case 3: // sound_to_play
-        {
-            QByteArray ba = trigger->sound_to_play.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
+            luaPushQString(L, trigger->sound_to_play);
+            break;
         case 4: // procedure (script name)
-        {
-            QByteArray ba = trigger->procedure.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
+            luaPushQString(L, trigger->procedure);
+            break;
         case 5: // omit_from_log
             lua_pushboolean(L, trigger->omit_from_log);
             break;
@@ -825,15 +780,11 @@ int L_GetPluginTriggerInfo(lua_State* L)
             lua_pushboolean(L, trigger->lowercase_wildcard);
             break;
         case 26: // group
-        {
-            QByteArray ba = trigger->group.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
+            luaPushQString(L, trigger->group);
+            break;
         case 27: // variable
-        {
-            QByteArray ba = trigger->variable.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
+            luaPushQString(L, trigger->variable);
+            break;
         case 28: // user_option
             lua_pushnumber(L, trigger->user_option);
             break;
@@ -852,8 +803,7 @@ int L_GetPluginTriggerInfo(lua_State* L)
             break;
         case 32: // last matching string
             if (!trigger->wildcards.isEmpty()) {
-                QByteArray ba = trigger->wildcards[0].toUtf8();
-                lua_pushlstring(L, ba.constData(), ba.length());
+                luaPushQString(L, trigger->wildcards[0]);
             } else {
                 lua_pushstring(L, "");
             }
@@ -890,8 +840,7 @@ int L_GetPluginTriggerInfo(lua_State* L)
         case 110: {
             int wildcard_index = (infoType == 110) ? 0 : (infoType - 100);
             if (wildcard_index < trigger->wildcards.size()) {
-                QByteArray ba = trigger->wildcards[wildcard_index].toUtf8();
-                lua_pushlstring(L, ba.constData(), ba.length());
+                luaPushQString(L, trigger->wildcards[wildcard_index]);
             } else {
                 lua_pushstring(L, "");
             }
@@ -929,11 +878,9 @@ int L_GetPluginTriggerOption(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* pluginID = luaL_checkstring(L, 1);
-    const char* triggerName = luaL_checkstring(L, 2);
-    const char* optionName = luaL_checkstring(L, 3);
-
-    Plugin* plugin = pDoc->FindPluginByID(QString::fromUtf8(pluginID));
+    Plugin* plugin = pDoc->FindPluginByID(luaCheckQString(L, 1));
+    QString tName = luaCheckQString(L, 2);
+    QString option = luaCheckQString(L, 3);
 
     if (!plugin) {
         lua_pushnil(L);
@@ -945,7 +892,6 @@ int L_GetPluginTriggerOption(lua_State* L)
     pDoc->m_CurrentPlugin = plugin;
 
     // Find trigger
-    QString tName = QString::fromUtf8(triggerName);
     Trigger* trigger = nullptr;
     auto it = plugin->m_TriggerMap.find(tName);
     if (it != plugin->m_TriggerMap.end()) {
@@ -953,7 +899,6 @@ int L_GetPluginTriggerOption(lua_State* L)
     }
 
     if (trigger) {
-        QString option = QString::fromUtf8(optionName);
         if (option == "enabled") {
             lua_pushboolean(L, trigger->enabled);
         } else if (option == "keep_evaluating") {
@@ -1041,10 +986,8 @@ int L_EnableTriggerGroup(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* groupName = luaL_checkstring(L, 1);
+    QString qGroupName = luaCheckQString(L, 1);
     bool enabled = lua_isnone(L, 2) ? true : lua_toboolean(L, 2);
-
-    QString qGroupName = QString::fromUtf8(groupName);
 
     // Empty group name affects nothing
     if (qGroupName.isEmpty()) {
@@ -1112,11 +1055,8 @@ int L_EnableTriggerGroup(lua_State* L)
 int L_GetTriggerOption(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* triggerName = luaL_checkstring(L, 1);
-    const char* optionName = luaL_checkstring(L, 2);
-
-    QString qName = QString::fromUtf8(triggerName);
-    QString qOption = QString::fromUtf8(optionName).toLower().trimmed();
+    QString qName = luaCheckQString(L, 1);
+    QString qOption = luaCheckQString(L, 2).toLower().trimmed();
 
     Trigger* trigger = pDoc->getTrigger(qName);
     if (!trigger) {
@@ -1178,23 +1118,17 @@ int L_GetTriggerOption(lua_State* L)
     }
     // String options
     else if (qOption == "group") {
-        QByteArray ba = trigger->group.toUtf8();
-        lua_pushlstring(L, ba.constData(), ba.length());
+        luaPushQString(L, trigger->group);
     } else if (qOption == "match") {
-        QByteArray ba = trigger->trigger.toUtf8();
-        lua_pushlstring(L, ba.constData(), ba.length());
+        luaPushQString(L, trigger->trigger);
     } else if (qOption == "script") {
-        QByteArray ba = trigger->procedure.toUtf8();
-        lua_pushlstring(L, ba.constData(), ba.length());
+        luaPushQString(L, trigger->procedure);
     } else if (qOption == "sound") {
-        QByteArray ba = trigger->sound_to_play.toUtf8();
-        lua_pushlstring(L, ba.constData(), ba.length());
+        luaPushQString(L, trigger->sound_to_play);
     } else if (qOption == "send") {
-        QByteArray ba = trigger->contents.toUtf8();
-        lua_pushlstring(L, ba.constData(), ba.length());
+        luaPushQString(L, trigger->contents);
     } else if (qOption == "variable") {
-        QByteArray ba = trigger->variable.toUtf8();
-        lua_pushlstring(L, ba.constData(), ba.length());
+        luaPushQString(L, trigger->variable);
     } else {
         lua_pushnil(L);
     }
@@ -1242,11 +1176,8 @@ int L_GetTriggerOption(lua_State* L)
 int L_SetTriggerOption(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* triggerName = luaL_checkstring(L, 1);
-    const char* optionName = luaL_checkstring(L, 2);
-
-    QString qName = QString::fromUtf8(triggerName);
-    QString qOption = QString::fromUtf8(optionName).toLower().trimmed();
+    QString qName = luaCheckQString(L, 1);
+    QString qOption = luaCheckQString(L, 2).toLower().trimmed();
 
     Trigger* trigger = pDoc->getTrigger(qName);
     if (!trigger) {
@@ -1327,8 +1258,7 @@ int L_SetTriggerOption(lua_State* L)
     // String options
     else if (qOption == "group" || qOption == "match" || qOption == "script" ||
              qOption == "sound" || qOption == "send" || qOption == "variable") {
-        const char* value = luaL_checkstring(L, 3);
-        QString qValue = QString::fromUtf8(value);
+        QString qValue = luaCheckQString(L, 3);
 
         if (qOption == "group") {
             trigger->group = qValue;
@@ -1397,19 +1327,16 @@ int L_AddTriggerEx(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
-    const char* match = luaL_checkstring(L, 2);
-    const char* response = luaL_checkstring(L, 3);
+    QString qName = luaCheckQString(L, 1);
+    QString qMatch = luaCheckQString(L, 2);
+    QString response = luaCheckQString(L, 3);
     int flags = luaL_checkinteger(L, 4);
     int color = luaL_checkinteger(L, 5);
     int wildcard = luaL_checkinteger(L, 6);
-    const char* sound_file = luaL_checkstring(L, 7);
-    const char* script = luaL_checkstring(L, 8);
+    QString sound_file = luaCheckQString(L, 7);
+    QString script = luaCheckQString(L, 8);
     int send_to = luaL_checkinteger(L, 9);
     int sequence = luaL_checkinteger(L, 10);
-
-    QString qName = QString::fromUtf8(name);
-    QString qMatch = QString::fromUtf8(match);
 
     // Check if trigger already exists (check appropriate map based on context)
     // Use plugin(L) to get the plugin from Lua registry - this is reliable even after modal dialogs
@@ -1462,7 +1389,7 @@ int L_AddTriggerEx(lua_State* L)
     trigger->label = qName;
     trigger->internal_name = qName;
     trigger->trigger = qMatch;
-    trigger->contents = QString::fromUtf8(response);
+    trigger->contents = response;
     trigger->enabled = (flags & eEnabled) != 0;
     trigger->omit_from_output = (flags & eOmitFromOutput) != 0;
     trigger->omit_from_log = (flags & eOmitFromLog) != 0;
@@ -1481,8 +1408,8 @@ int L_AddTriggerEx(lua_State* L)
     trigger->one_shot = (flags & eTriggerOneShot) != 0;
     trigger->colour = color;
     trigger->clipboard_arg = wildcard;
-    trigger->sound_to_play = QString::fromUtf8(sound_file);
-    trigger->procedure = QString::fromUtf8(script);
+    trigger->sound_to_play = sound_file;
+    trigger->procedure = script;
     trigger->send_to = static_cast<SendTo>(send_to);
     trigger->sequence = sequence;
     trigger->variable = qName; // kludge from original
@@ -1531,9 +1458,7 @@ int L_AddTriggerEx(lua_State* L)
 int L_DeleteTriggerGroup(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* groupName = luaL_checkstring(L, 1);
-
-    QString qGroupName = QString::fromUtf8(groupName);
+    QString qGroupName = luaCheckQString(L, 1);
     QStringList toDelete;
 
     // Find all triggers in this group

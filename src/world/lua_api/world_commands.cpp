@@ -45,10 +45,10 @@
 int L_Queue(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* message = luaL_checkstring(L, 1);
+    QString message = luaCheckQString(L, 1);
     bool echo = lua_isboolean(L, 2) ? lua_toboolean(L, 2) : true;
 
-    qint32 result = pDoc->Queue(QString::fromUtf8(message), echo);
+    qint32 result = pDoc->Queue(message, echo);
     lua_pushnumber(L, result);
     return 1;
 }
@@ -691,15 +691,4 @@ int L_Help(lua_State* L)
     // silently and return eOK for plugin compatibility.
     (void)L;
     return luaReturnOK(L);
-}
-
-// ========== Registration ==========
-
-void register_world_command_functions(luaL_Reg*& ptr)
-{
-    *ptr++ = {"Queue", L_Queue};
-    *ptr++ = {"DiscardQueue", L_DiscardQueue};
-    *ptr++ = {"DoCommand", L_DoCommand};
-    *ptr++ = {"GetInternalCommandsList", L_GetInternalCommandsList};
-    *ptr++ = {"Help", L_Help};
 }

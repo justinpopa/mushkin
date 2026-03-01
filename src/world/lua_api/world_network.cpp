@@ -28,7 +28,7 @@
 int L_Send(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* text = luaL_checkstring(L, 1);
+    QString text = luaCheckQString(L, 1);
 
     // Check if connected
     if (pDoc->m_connectionManager->m_iConnectPhase != eConnectConnectedToMud) {
@@ -41,7 +41,7 @@ int L_Send(lua_State* L)
     }
 
     // Send the message
-    pDoc->sendToMud(QString::fromUtf8(text));
+    pDoc->sendToMud(text);
 
     return luaReturnOK(L);
 }
@@ -155,7 +155,7 @@ int L_IsConnected(lua_State* L)
 int L_SendImmediate(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* text = luaL_checkstring(L, 1);
+    QString text = luaCheckQString(L, 1);
 
     // Check if connected
     if (pDoc->m_connectionManager->m_iConnectPhase != eConnectConnectedToMud) {
@@ -168,7 +168,7 @@ int L_SendImmediate(lua_State* L)
     }
 
     // Send immediately (bypasses queue) using world's display/log settings
-    pDoc->DoSendMsg(QString::fromUtf8(text), pDoc->m_display_my_input, pDoc->m_logging.log_input);
+    pDoc->DoSendMsg(text, pDoc->m_display_my_input, pDoc->m_logging.log_input);
 
     return luaReturnOK(L);
 }
@@ -195,7 +195,7 @@ int L_SendImmediate(lua_State* L)
 int L_SendNoEcho(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* text = luaL_checkstring(L, 1);
+    QString text = luaCheckQString(L, 1);
 
     // Check if connected
     if (pDoc->m_connectionManager->m_iConnectPhase != eConnectConnectedToMud) {
@@ -208,7 +208,7 @@ int L_SendNoEcho(lua_State* L)
     }
 
     // Send with no echo, no queue, no log
-    pDoc->SendMsg(QString::fromUtf8(text), false, false, false);
+    pDoc->SendMsg(text, false, false, false);
 
     return luaReturnOK(L);
 }
@@ -236,7 +236,7 @@ int L_SendNoEcho(lua_State* L)
 int L_SendPush(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* text = luaL_checkstring(L, 1);
+    QString text = luaCheckQString(L, 1);
 
     // Check if connected
     if (pDoc->m_connectionManager->m_iConnectPhase != eConnectConnectedToMud) {
@@ -249,10 +249,10 @@ int L_SendPush(lua_State* L)
     }
 
     // Send using world's display setting, no queue, no log
-    pDoc->SendMsg(QString::fromUtf8(text), pDoc->m_display_my_input, false, false);
+    pDoc->SendMsg(text, pDoc->m_display_my_input, false, false);
 
     // Add to command history for recall
-    pDoc->addToCommandHistory(QString::fromUtf8(text));
+    pDoc->addToCommandHistory(text);
 
     return luaReturnOK(L);
 }
@@ -288,7 +288,7 @@ int L_SendPush(lua_State* L)
 int L_SendSpecial(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* text = luaL_checkstring(L, 1);
+    QString text = luaCheckQString(L, 1);
     bool echo = lua_toboolean(L, 2);
     bool queue = lua_toboolean(L, 3);
     bool log = lua_toboolean(L, 4);
@@ -305,26 +305,12 @@ int L_SendSpecial(lua_State* L)
     }
 
     // Send with specified options
-    pDoc->SendMsg(QString::fromUtf8(text), echo, queue, log);
+    pDoc->SendMsg(text, echo, queue, log);
 
     // Add to history if requested
     if (history) {
-        pDoc->addToCommandHistory(QString::fromUtf8(text));
+        pDoc->addToCommandHistory(text);
     }
 
     return luaReturnOK(L);
-}
-
-// ========== Registration ==========
-
-void register_world_network_functions(luaL_Reg*& ptr)
-{
-    *ptr++ = {"Send", L_Send};
-    *ptr++ = {"SendImmediate", L_SendImmediate};
-    *ptr++ = {"SendNoEcho", L_SendNoEcho};
-    *ptr++ = {"SendPush", L_SendPush};
-    *ptr++ = {"SendSpecial", L_SendSpecial};
-    *ptr++ = {"Connect", L_Connect};
-    *ptr++ = {"Disconnect", L_Disconnect};
-    *ptr++ = {"IsConnected", L_IsConnected};
 }

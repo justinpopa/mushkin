@@ -127,8 +127,7 @@ int L_GetConnectDuration(lua_State* L)
 int L_WorldAddress(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    QByteArray ba = pDoc->m_server.toUtf8();
-    lua_pushlstring(L, ba.constData(), ba.length());
+    luaPushQString(L, pDoc->m_server);
     return 1;
 }
 
@@ -167,8 +166,7 @@ int L_WorldPort(lua_State* L)
 int L_WorldName(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    QByteArray ba = pDoc->m_mush_name.toUtf8();
-    lua_pushlstring(L, ba.constData(), ba.length());
+    luaPushQString(L, pDoc->m_mush_name);
     return 1;
 }
 
@@ -677,27 +675,4 @@ int L_GetSelectionEndColumn(lua_State* L)
     WorldDocument* pDoc = doc(L);
     lua_pushnumber(L, pDoc->GetSelectionEndColumn());
     return 1;
-}
-
-// ========== Registration ==========
-
-void register_world_info_functions(luaL_Reg*& ptr)
-{
-    *ptr++ = {"GetLineCount", L_GetLineCount};
-    *ptr++ = {"GetSentBytes", L_GetSentBytes};
-    *ptr++ = {"GetReceivedBytes", L_GetReceivedBytes};
-    *ptr++ = {"GetConnectDuration", L_GetConnectDuration};
-    *ptr++ = {"WorldAddress", L_WorldAddress};
-    *ptr++ = {"WorldPort", L_WorldPort};
-    *ptr++ = {"WorldName", L_WorldName};
-    *ptr++ = {"Version", L_Version};
-    *ptr++ = {"GetLinesInBufferCount", L_GetLinesInBufferCount};
-    *ptr++ = {"GetSysColor", L_GetSysColor};
-    *ptr++ = {"GetSystemMetrics", L_GetSystemMetrics};
-    *ptr++ = {"GetDeviceCaps", L_GetDeviceCaps};
-    *ptr++ = {"GetFrame", L_GetFrame};
-    *ptr++ = {"GetSelectionStartLine", L_GetSelectionStartLine};
-    *ptr++ = {"GetSelectionEndLine", L_GetSelectionEndLine};
-    *ptr++ = {"GetSelectionStartColumn", L_GetSelectionStartColumn};
-    *ptr++ = {"GetSelectionEndColumn", L_GetSelectionEndColumn};
 }

@@ -36,13 +36,12 @@ int L_PlaySound(lua_State* L)
 
     // Get parameters
     qint16 buffer = luaL_checkinteger(L, 1);
-    const char* filename = luaL_checkstring(L, 2);
     bool loop = lua_toboolean(L, 3);
     double volume = luaL_optnumber(L, 4, 0.0); // Default: full volume
     double pan = luaL_optnumber(L, 5, 0.0);    // Default: center
 
     // Call PlaySound
-    qint32 result = pDoc->PlaySound(buffer, QString::fromUtf8(filename), loop, volume, pan);
+    qint32 result = pDoc->PlaySound(buffer, luaCheckQString(L, 2), loop, volume, pan);
 
     lua_pushinteger(L, result);
     return 1;
@@ -99,11 +98,8 @@ int L_Sound(lua_State* L)
         return luaL_error(L, "No world document");
     }
 
-    // Get filename parameter
-    const char* filename = luaL_checkstring(L, 1);
-
     // Call PlaySoundFile (finds first available buffer)
-    bool success = pDoc->PlaySoundFile(QString::fromUtf8(filename));
+    bool success = pDoc->PlaySoundFile(luaCheckQString(L, 1));
 
     // Return error code (eOK or eCannotPlaySound) for API compatibility
     lua_pushinteger(L, success ? eOK : eCannotPlaySound);

@@ -64,7 +64,7 @@ int L_WindowCreate(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
+    QString windowName = luaCheckQString(L, 1);
     qint32 left = luaL_checkinteger(L, 2);
     qint32 top = luaL_checkinteger(L, 3);
     qint32 width = luaL_checkinteger(L, 4);
@@ -72,8 +72,6 @@ int L_WindowCreate(lua_State* L)
     qint16 position = luaL_checkinteger(L, 6);
     qint32 flags = luaL_checkinteger(L, 7);
     QRgb bgColor = luaL_checkinteger(L, 8);
-
-    QString windowName = QString::fromUtf8(name);
 
     // Allow 0x0 windows for initial font setup (common pattern in MUSHclient plugins)
     // They'll call WindowCreate again with proper dimensions after setting up fonts
@@ -150,10 +148,8 @@ int L_WindowShow(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
+    QString windowName = luaCheckQString(L, 1);
     bool show = lua_toboolean(L, 2);
-
-    QString windowName = QString::fromUtf8(name);
 
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
@@ -207,13 +203,11 @@ int L_WindowPosition(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
+    QString windowName = luaCheckQString(L, 1);
     qint32 left = luaL_checkinteger(L, 2);
     qint32 top = luaL_checkinteger(L, 3);
     qint16 position = luaL_checkinteger(L, 4);
     qint32 flags = luaL_checkinteger(L, 5);
-
-    QString windowName = QString::fromUtf8(name);
 
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
@@ -259,10 +253,8 @@ int L_WindowSetZOrder(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
+    QString windowName = luaCheckQString(L, 1);
     qint32 zOrder = luaL_checkinteger(L, 2);
-
-    QString windowName = QString::fromUtf8(name);
 
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
@@ -308,8 +300,7 @@ int L_WindowDelete(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
-    QString windowName = QString::fromUtf8(name);
+    QString windowName = luaCheckQString(L, 1);
 
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
@@ -384,10 +375,8 @@ int L_WindowInfo(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
+    QString windowName = luaCheckQString(L, 1);
     int infoType = luaL_checkinteger(L, 2);
-
-    QString windowName = QString::fromUtf8(name);
 
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
@@ -472,7 +461,7 @@ int L_WindowInfo(lua_State* L)
             if (win->mouseOverHotspot.isEmpty()) {
                 lua_pushstring(L, "");
             } else {
-                lua_pushstring(L, win->mouseOverHotspot.toUtf8().constData());
+                luaPushQString(L, win->mouseOverHotspot);
             }
             break;
 
@@ -480,7 +469,7 @@ int L_WindowInfo(lua_State* L)
             if (win->mouseDownHotspot.isEmpty()) {
                 lua_pushstring(L, "");
             } else {
-                lua_pushstring(L, win->mouseDownHotspot.toUtf8().constData());
+                luaPushQString(L, win->mouseDownHotspot);
             }
             break;
 
@@ -527,12 +516,10 @@ int L_WindowResize(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
+    QString windowName = luaCheckQString(L, 1);
     qint32 width = luaL_checkinteger(L, 2);
     qint32 height = luaL_checkinteger(L, 3);
     QRgb bgColor = luaL_checkinteger(L, 4);
-
-    QString windowName = QString::fromUtf8(name);
 
     qCDebug(lcScript) << "WindowResize: Resizing miniwindow" << windowName << "to size:" << width
                       << "x" << height;
@@ -577,7 +564,7 @@ int L_WindowList(lua_State* L)
 
     int index = 1;
     for (auto it = pDoc->m_MiniWindowMap.begin(); it != pDoc->m_MiniWindowMap.end(); ++it) {
-        lua_pushstring(L, it->first.toUtf8().constData());
+        luaPushQString(L, it->first);
         lua_rawseti(L, -2, index++);
     }
 
@@ -608,8 +595,7 @@ int L_WindowHotspotList(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
-    QString windowName = QString::fromUtf8(name);
+    QString windowName = luaCheckQString(L, 1);
 
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
@@ -618,12 +604,7 @@ int L_WindowHotspotList(lua_State* L)
     }
 
     QStringList list = win->HotspotList();
-
-    lua_newtable(L);
-    for (int i = 0; i < list.size(); i++) {
-        lua_pushstring(L, list[i].toUtf8().constData());
-        lua_rawseti(L, -2, i + 1);
-    }
+    luaPushQStringList(L, list);
 
     return 1;
 }
