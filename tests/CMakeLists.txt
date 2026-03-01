@@ -895,6 +895,21 @@ gtest_discover_tests(test-ansi-formatter-gtest
     DISCOVERY_TIMEOUT 30
 )
 
+add_executable(test-lua-registration-gtest
+    test_lua_registration_gtest.cpp
+)
+
+target_link_libraries(test-lua-registration-gtest PRIVATE
+    test_main_core
+    Qt6::Gui
+    Qt6::Widgets
+    ui
+)
+
+gtest_discover_tests(test-lua-registration-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
 # World serialization test
 add_executable(test-world-serialization-gtest
     test_world_serialization_gtest.cpp
