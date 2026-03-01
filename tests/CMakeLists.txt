@@ -910,6 +910,22 @@ gtest_discover_tests(test-lua-registration-gtest
     DISCOVERY_TIMEOUT 30
 )
 
+# World output Lua API test
+add_executable(test-world-output-gtest
+    test_world_output_gtest.cpp
+)
+
+target_link_libraries(test-world-output-gtest PRIVATE
+    test_main_core
+    Qt6::Gui
+    Qt6::Widgets
+    ui
+)
+
+gtest_discover_tests(test-world-output-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
 # World serialization test
 add_executable(test-world-serialization-gtest
     test_world_serialization_gtest.cpp

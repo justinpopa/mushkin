@@ -223,11 +223,8 @@ void OutputFormatter::noteHr()
         m_doc.StartNewLine(true, 0);
     }
 
-    // Mark line as HR line
-    if (m_doc.m_currentLine) {
-        m_doc.m_currentLine->flags = HORIZ_RULE;
-    }
-
-    // Finish this line
-    m_doc.StartNewLine(true, 0);
+    // Finish this line as a horizontal rule.
+    // Pass HORIZ_RULE as iFlags — StartNewLine sets m_currentLine->flags = iFlags
+    // before pushing the line, so setting flags beforehand would be overwritten.
+    m_doc.StartNewLine(true, HORIZ_RULE);
 }

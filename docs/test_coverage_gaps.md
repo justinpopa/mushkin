@@ -2,14 +2,14 @@
 
 **Date:** 2026-03-01
 **Method:** Cross-reference of all `src/` files (>200 lines) against `tests/` test files. Counts are direct GTest `TEST`/`TEST_F` only.
-**Current baseline:** 903 tests across 52 executables.
+**Current baseline:** 954 tests across 53 executables.
 
 ## Critical — Zero Tests, High Risk
 
 | Source File | Lines | Module | Rationale |
 |:---|---:|:---|:---|
 | `ui/main_window.cpp` | 5461 | ui | Entire app shell, menu handling, world lifecycle dispatch |
-| `world/lua_api/world_output.cpp` | 1767 | world | All Note/Tell/AnsiNote/ColourNote/SetClipboard Lua API — never directly tested |
+| `world/lua_api/world_output.cpp` | 1767 | world | **51 tests added** (Tell, ANSI, AnsiNote, Simulate, GetLineInfo, GetStyleInfo, NoteColour, NoteStyle, NoteHr, entities, DeleteLines/Output, Bookmark, info bar, SetSelection, Hyperlink) — moved to Well-Covered |
 | `world/world_serialization.cpp` | 1427 | world | **20 tests added** (timer at-time, variables, ExportXML/ImportXML, accelerator/macro/keypad, temporary items, CDATA, option snapshots) — moved to Well-Covered |
 | `world/lua_api/lua_registration.cpp` | 1429 | world | **19 tests added** (completeness count, spot checks, global aliases, constant tables, modules, getLuaFunctionNames) — moved to Well-Covered |
 
@@ -76,6 +76,7 @@
 | `world/xml_serialization.cpp` | 1103 | `test_xml_serialization_gtest.cpp`, `test_xml_roundtrip_gtest.cpp`, `test_world_serialization_gtest.cpp` | 35 |
 | `network/ansi_formatter.cpp` | 249 | `test_ansi_formatter_gtest.cpp` | 39 |
 | `world/lua_api/lua_registration.cpp` | 1429 | `test_lua_registration_gtest.cpp` | 23 |
+| `world/lua_api/world_output.cpp` | 1767 | `test_world_output_gtest.cpp` | 51 |
 
 ## Recommended Next Targets
 
@@ -84,5 +85,5 @@ Prioritized by testability (no UI needed) and risk:
 1. ~~**`world_serialization.cpp`** — DONE. 20 tests added covering timer at-time, variables, ExportXML/ImportXML, accelerator/macro/keypad, temporary items, CDATA, option snapshots.~~
 2. ~~**`ansi_formatter.cpp`** — DONE. 39 tests added covering null/empty lines, text attributes (bold/underline/italic/inverse/strikeout), ANSI color indices (standard/bright/256), RGB truecolor, custom palette colors, multi-style lines, state caching, and edge cases.~~
 3. ~~**`lua_registration.cpp`** — DONE. 23 tests covering world table completeness (428 functions), 90+ spot checks, 35 global aliases, 9 constant tables, utils/rex modules, getLuaFunctionNames helper, and British/American spelling aliases. Duplicate registrations (Trim, SetStatus) cleaned up.~~
-4. **`world_output.cpp`** — Note/Tell/ColourNote are the most-used Lua functions. Testable via WorldDocument fixture.
+4. ~~**`world_output.cpp`** — DONE. 51 tests covering Tell, ANSI, AnsiNote, Simulate, GetLineInfo, GetStyleInfo, NoteColour getters/setters, NoteStyle, NoteHr, entity functions, DeleteLines/DeleteOutput, Bookmark, info bar (Info/InfoClear/InfoColour/InfoBackground/InfoFont/ShowInfoBar), SetSelection, SetUnseenLines, ResetStatusTime, Hyperlink. Also fixed NoteHr bug: HORIZ_RULE flag was overwritten by StartNewLine's iFlags parameter.~~
 5. **`world_protocol.cpp`** — Telnet negotiation dispatch. TelnetParser handles the state machine, but the WorldDocument-level protocol logic is untested.
