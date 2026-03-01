@@ -21,6 +21,7 @@
 #include "world_error.h"          // WorldError, WorldErrorType
 #include "world_socket.h"         // For m_doc.m_pSocket->send()
 #include <QDateTime>
+#include <QElapsedTimer>
 #include <QStringDecoder>
 #include <zlib.h>
 
@@ -61,6 +62,88 @@ void TelnetParser::reset()
     m_bCompress = false;
     m_subnegotiation_type = 0;
     m_IAC_subnegotiation_data.clear();
+}
+
+// ========== MCCP Decompression ==========
+
+std::optional<std::vector<unsigned char>>
+TelnetParser::decompressData(std::span<const char> compressedData)
+{
+    z_stream& zs = m_zlibStream.stream;
+
+    // Check if we have space in the input buffer for the new data
+    if ((TELNET_COMPRESS_BUFFER_LENGTH - zs.avail_in) < static_cast<uInt>(compressedData.size())) {
+        qCDebug(lcWorld) << "Insufficient space in compression input buffer";
+        m_bCompress = false;
+        return std::nullopt;
+    }
+
+    // Shuffle any remaining unconsumed data to the start of the vector
+    if (zs.avail_in > 0) {
+        memmove(m_CompressInput.data(), zs.next_in, zs.avail_in);
+    }
+    zs.next_in = m_CompressInput.data();
+
+    // Append new compressed data to the staging buffer
+    memcpy(m_CompressInput.data() + zs.avail_in, compressedData.data(), compressedData.size());
+    zs.avail_in += static_cast<uInt>(compressedData.size());
+    m_nTotalCompressed += static_cast<qint64>(compressedData.size());
+
+    std::vector<unsigned char> result;
+
+    // Keep decompressing until all input is consumed
+    do {
+        // Set up output buffer
+        zs.next_out = m_CompressOutput.data();
+        zs.avail_out = static_cast<uInt>(m_CompressOutput.size());
+
+        // Decompress
+        QElapsedTimer timer;
+        timer.start();
+        int izError = inflate(&zs, Z_SYNC_FLUSH);
+        m_iCompressionTimeTaken += timer.elapsed();
+
+        // Handle Z_BUF_ERROR by growing the output buffer
+        if (izError == Z_BUF_ERROR) {
+            const std::size_t newSize = m_CompressOutput.size() * 2;
+            m_CompressOutput.resize(newSize);
+            qCDebug(lcWorld) << "Grew compression output buffer to" << newSize << "bytes";
+
+            zs.next_out = m_CompressOutput.data();
+            zs.avail_out = static_cast<uInt>(newSize);
+
+            timer.start();
+            izError = inflate(&zs, Z_SYNC_FLUSH);
+            m_iCompressionTimeTaken += timer.elapsed();
+        }
+
+        if (izError != Z_OK && izError != Z_STREAM_END) {
+            qCDebug(lcWorld) << "MCCP decompression error:" << izError;
+            if (zs.msg) {
+                qCDebug(lcWorld) << "  zlib message:" << zs.msg;
+            }
+            m_bCompress = false;
+            return std::nullopt;
+        }
+
+        // Calculate how many bytes were decompressed
+        const auto nDecompressed = static_cast<std::size_t>(m_CompressOutput.size()) - zs.avail_out;
+        m_nTotalUncompressed += static_cast<qint64>(nDecompressed);
+
+        // Append decompressed bytes to result
+        result.insert(result.end(), m_CompressOutput.data(),
+                      m_CompressOutput.data() + nDecompressed);
+
+        // If we hit stream end, compression is done
+        if (izError == Z_STREAM_END) {
+            qCDebug(lcWorld) << "MCCP stream ended";
+            m_bCompress = false;
+            break;
+        }
+
+    } while (zs.avail_in > 0);
+
+    return result;
 }
 
 // ========== zlib lifecycle (internal helper) ==========

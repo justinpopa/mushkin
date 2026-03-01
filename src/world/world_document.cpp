@@ -20,7 +20,6 @@
 #include <QColor>
 #include <QCoreApplication>
 #include <QDebug>
-#include <QElapsedTimer>
 #include <QFile>
 #include <QFileInfo>
 #include <QGuiApplication>
@@ -34,6 +33,7 @@
 #include <array>   // for std::array
 #include <cstring> // for memcpy, strlen
 
+#include "../utils/url_linkifier.h"
 #include "color_utils.h"
 
 // Default ANSI colors in BGR format (Windows COLORREF)
@@ -757,84 +757,18 @@ void WorldDocument::ReceiveMsg()
     // Check if we need to decompress the data
     auto& tp = *m_telnetParser;
     if (tp.m_bCompress) {
-        // MCCP decompression with staging buffer
-        // Check if we have space in the input buffer for the new data
-        z_stream& zs = tp.m_zlibStream.stream;
-        if ((TELNET_COMPRESS_BUFFER_LENGTH - zs.avail_in) < static_cast<uInt>(nRead)) {
-            qCDebug(lcWorld) << "Insufficient space in compression input buffer";
+        auto decompressed = tp.decompressData(std::span<const char>(buffer.data(), nRead));
+        if (!decompressed) {
             OnConnectionDisconnect();
             return;
         }
-
-        // Shuffle any remaining unconsumed data to the start of the vector
-        if (zs.avail_in > 0) {
-            memmove(tp.m_CompressInput.data(), zs.next_in, zs.avail_in);
+        for (unsigned char c : *decompressed) {
+            ProcessIncomingByte(c);
         }
-        zs.next_in = tp.m_CompressInput.data();
-
-        // Append new compressed data to the staging buffer
-        memcpy(tp.m_CompressInput.data() + zs.avail_in, buffer.data(), nRead);
-        zs.avail_in += static_cast<uInt>(nRead);
-        tp.m_nTotalCompressed += nRead;
-
-        // Keep decompressing until all input is consumed
-        do {
-            // Set up output buffer — z_stream.next_out points into the vector's storage
-            zs.next_out = tp.m_CompressOutput.data();
-            zs.avail_out = static_cast<uInt>(tp.m_CompressOutput.size());
-
-            // Decompress
-            QElapsedTimer timer;
-            timer.start();
-            int izError = inflate(&zs, Z_SYNC_FLUSH);
-            tp.m_iCompressionTimeTaken += timer.elapsed();
-
-            // Handle Z_BUF_ERROR by growing the output buffer
-            if (izError == Z_BUF_ERROR) {
-                const std::size_t newSize = tp.m_CompressOutput.size() * 2;
-                tp.m_CompressOutput.resize(newSize);
-                qCDebug(lcWorld) << "Grew compression output buffer to" << newSize << "bytes";
-
-                zs.next_out = tp.m_CompressOutput.data();
-                zs.avail_out = static_cast<uInt>(newSize);
-
-                timer.start();
-                izError = inflate(&zs, Z_SYNC_FLUSH);
-                tp.m_iCompressionTimeTaken += timer.elapsed();
-            }
-
-            if (izError != Z_OK && izError != Z_STREAM_END) {
-                qCDebug(lcWorld) << "MCCP decompression error:" << izError;
-                if (zs.msg) {
-                    qCDebug(lcWorld) << "  zlib message:" << zs.msg;
-                }
-                tp.m_bCompress = false;
-                OnConnectionDisconnect();
-                return;
-            }
-
-            // Calculate how many bytes were decompressed
-            const qint64 nDecompressed =
-                static_cast<qint64>(tp.m_CompressOutput.size()) - zs.avail_out;
-            tp.m_nTotalUncompressed += nDecompressed;
-
-            // Process each decompressed byte through the telnet state machine
-            for (qint64 i = 0; i < nDecompressed; i++) {
-                ProcessIncomingByte(tp.m_CompressOutput[static_cast<std::size_t>(i)]);
-            }
-
-            // If we hit stream end, compression is done
-            if (izError == Z_STREAM_END) {
-                qCDebug(lcWorld) << "MCCP stream ended";
-                tp.m_bCompress = false;
-                break;
-            }
-
-        } while (zs.avail_in > 0);
     } else {
         // No compression - process each byte directly through the telnet state machine
         for (qint64 i = 0; i < nRead; i++) {
-            ProcessIncomingByte((unsigned char)buffer[i]);
+            ProcessIncomingByte(static_cast<unsigned char>(buffer[i]));
         }
     }
 
@@ -2080,7 +2014,7 @@ void WorldDocument::StartNewLine(bool bNewLine, unsigned char iFlags)
         }
 
         // Detect and linkify URLs in the completed line
-        DetectAndLinkifyURLs(m_currentLine.get());
+        URLLinkifier::detectAndLinkifyURLs(m_currentLine.get(), this);
 
         // Notify plugins about the line being displayed (for accessibility/screen readers)
         // type: 0 = MUD output, 1 = COMMENT (note), 2 = USER_INPUT (command)
@@ -2147,158 +2081,6 @@ void WorldDocument::StartNewLine(bool bNewLine, unsigned char iFlags)
 
     // Emit signal to update display
     emit linesAdded();
-}
-
-/**
- * DetectAndLinkifyURLs - Detect URLs in completed line and convert to hyperlinks
- *
- * Scans the text of a completed line for URL patterns (http://, https://, ftp://, mailto:)
- * and creates hyperlink Actions for them. This function:
- * - Uses regex to find all URLs in the line text
- * - Splits existing Style objects at URL boundaries
- * - Creates Action objects with ACTION_HYPERLINK flag for each URL
- *
- * This integrates with the existing MXP hyperlink infrastructure.
- */
-void WorldDocument::DetectAndLinkifyURLs(Line* line)
-{
-    if (!line || line->len() == 0) {
-        return;
-    }
-
-    // Convert line text to QString for regex matching
-    QString lineText = QString::fromUtf8(line->text().data(), line->text().size());
-
-    // URL regex pattern - matches http://, https://, ftp://, mailto:
-    // Excludes common punctuation that shouldn't be part of URLs
-    static QRegularExpression urlPattern(R"((https?://|ftp://|mailto:)[^\s<>"{}|\\^`\[\]]+)",
-                                         QRegularExpression::CaseInsensitiveOption);
-
-    // Find all URL matches
-    QRegularExpressionMatchIterator matches = urlPattern.globalMatch(lineText);
-    if (!matches.hasNext()) {
-        return; // No URLs found
-    }
-
-    // Collect all matches first (we'll process them in reverse to avoid offset issues)
-    QList<QRegularExpressionMatch> matchList;
-    while (matches.hasNext()) {
-        matchList.append(matches.next());
-    }
-
-    // Process URLs in reverse order (right to left) to maintain correct positions
-    // when splitting styles
-    for (int i = matchList.size() - 1; i >= 0; --i) {
-        const QRegularExpressionMatch& match = matchList[i];
-        int urlStart = match.capturedStart();
-        int urlLength = match.capturedLength();
-        QString url = match.captured();
-
-        // Find which style(s) this URL spans
-        quint16 currentPos = 0;
-        for (size_t styleIdx = 0; styleIdx < line->styleList.size(); ++styleIdx) {
-            Style* style = line->styleList[styleIdx].get();
-            quint16 styleEnd = currentPos + style->iLength;
-
-            // Check if URL overlaps with this style
-            if (urlStart < styleEnd && urlStart + urlLength > currentPos) {
-                // URL overlaps this style - we need to split it
-
-                // Calculate positions relative to this style
-                int relativeStart = urlStart - currentPos;
-                int relativeEnd = urlStart + urlLength - currentPos;
-
-                // Clamp to style boundaries
-                if (relativeStart < 0)
-                    relativeStart = 0;
-                if (relativeEnd > style->iLength)
-                    relativeEnd = style->iLength;
-
-                // Split style into three parts: before URL, URL, after URL
-                SplitStyleForURL(line, styleIdx, relativeStart, relativeEnd - relativeStart, url);
-
-                // After splitting, we've inserted new styles, so we need to adjust our iteration
-                // The split function handles updating the style list
-                break; // Move to next URL
-            }
-
-            currentPos = styleEnd;
-        }
-    }
-}
-
-/**
- * SplitStyleForURL - Split a style to create a hyperlink section
- *
- * Given a style that contains a URL, splits it into up to three parts:
- * 1. Before URL (if any) - original style
- * 2. URL section - original style + ACTION_HYPERLINK + Action object
- * 3. After URL (if any) - original style
- *
- * @param line The line being processed
- * @param styleIdx Index of the style to split
- * @param urlStart Start position of URL within this style
- * @param urlLength Length of URL
- * @param url The URL string
- */
-void WorldDocument::SplitStyleForURL(Line* line, size_t styleIdx, int urlStart, int urlLength,
-                                     const QString& url)
-{
-    Style* originalStyle = line->styleList[styleIdx].get();
-
-    // Create Action object for the URL
-    auto action = std::make_shared<Action>(url,       // action = URL to open
-                                           url,       // hint = show URL in tooltip
-                                           QString(), // variable = none for auto-detected URLs
-                                           this);     // world document
-
-    // Three cases:
-    // 1. URL at start: [URL][rest]
-    // 2. URL in middle: [before][URL][after]
-    // 3. URL at end: [before][URL]
-
-    std::vector<std::unique_ptr<Style>> newStyles;
-
-    // Part 1: Before URL (if URL doesn't start at position 0)
-    if (urlStart > 0) {
-        auto beforeStyle = std::make_unique<Style>();
-        beforeStyle->iLength = urlStart;
-        beforeStyle->iFlags = originalStyle->iFlags;
-        beforeStyle->iForeColour = originalStyle->iForeColour;
-        beforeStyle->iBackColour = originalStyle->iBackColour;
-        beforeStyle->pAction = originalStyle->pAction; // Keep original action if any
-        newStyles.push_back(std::move(beforeStyle));
-    }
-
-    // Part 2: URL section with hyperlink
-    auto urlStyle = std::make_unique<Style>();
-    urlStyle->iLength = urlLength;
-    urlStyle->iFlags = originalStyle->iFlags | ACTION_HYPERLINK | UNDERLINE;
-    urlStyle->iForeColour = BGR(0, 0, 255); // Blue for URLs
-    urlStyle->iBackColour = originalStyle->iBackColour;
-    urlStyle->pAction = action;
-    newStyles.push_back(std::move(urlStyle));
-
-    // Part 3: After URL (if there's text after the URL)
-    int afterLength = originalStyle->iLength - (urlStart + urlLength);
-    if (afterLength > 0) {
-        auto afterStyle = std::make_unique<Style>();
-        afterStyle->iLength = afterLength;
-        afterStyle->iFlags = originalStyle->iFlags;
-        afterStyle->iForeColour = originalStyle->iForeColour;
-        afterStyle->iBackColour = originalStyle->iBackColour;
-        afterStyle->pAction = originalStyle->pAction; // Keep original action if any
-        newStyles.push_back(std::move(afterStyle));
-    }
-
-    // Replace the original style with the split styles
-    // Erase the original
-    line->styleList.erase(line->styleList.begin() + styleIdx);
-
-    // Insert the new styles at the same position
-    line->styleList.insert(line->styleList.begin() + styleIdx,
-                           std::make_move_iterator(newStyles.begin()),
-                           std::make_move_iterator(newStyles.end()));
 }
 
 /**

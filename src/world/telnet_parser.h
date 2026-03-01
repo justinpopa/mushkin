@@ -14,6 +14,8 @@
 #include <array>
 #include <cstdint>
 #include <expected>
+#include <optional>
+#include <span>
 #include <vector>
 #include <zlib.h>
 
@@ -227,6 +229,11 @@ class TelnetParser {
 
     // ========== Public API called from WorldDocument ==========
     void sendWindowSizes(int width);
+
+    // ========== MCCP Decompression ==========
+    // Decompress MCCP data. Returns decompressed bytes on success, std::nullopt on fatal error.
+    // On Z_STREAM_END, sets m_bCompress = false and returns final bytes.
+    std::optional<std::vector<unsigned char>> decompressData(std::span<const char> compressedData);
 
     // ========== Phase handlers — called from WorldDocument::ProcessIncomingByte ==========
     void Phase_ESC(unsigned char c);

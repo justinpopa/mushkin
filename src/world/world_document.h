@@ -1432,12 +1432,6 @@ class WorldDocument : public QObject, public IWorldContext {
     void StartNewLine(bool bNewLine,
                       unsigned char iFlags); // Complete current line and start new one
 
-    // URL Detection and Linkification
-    void DetectAndLinkifyURLs(Line* line); // Detect URLs and convert to hyperlinks
-    void SplitStyleForURL(Line* line, size_t styleIdx,
-                          int urlStart, // Split style to create URL hyperlink
-                          int urlLength, const QString& url);
-
     // ========== Command Window Helpers ==========
     void setActiveInputView(IInputView* inputView);
     void setActiveOutputView(IOutputView* outputView);

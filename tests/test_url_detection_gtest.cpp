@@ -10,6 +10,7 @@
 #include "../src/text/action.h"
 #include "../src/text/line.h"
 #include "../src/text/style.h"
+#include "../src/utils/url_linkifier.h"
 #include "../src/world/color_utils.h"
 #include "../src/world/world_document.h"
 #include "fixtures/world_fixtures.h"
@@ -93,7 +94,7 @@ TEST_F(URLDetectionTest, SimpleHTTPURL)
     EXPECT_GT(line->len(), 0);            // Just check that there's text
 
     // Run URL detection
-    m_doc->DetectAndLinkifyURLs(line.get());
+    URLLinkifier::detectAndLinkifyURLs(line.get(), m_doc.get());
 
     // Should split into 3 styles: before, URL, after
     ASSERT_EQ(line->styleList.size(), 3);
@@ -118,7 +119,7 @@ TEST_F(URLDetectionTest, HTTPSURL)
 {
     auto line = createTestLine("Secure site: https://secure.example.com/path");
 
-    m_doc->DetectAndLinkifyURLs(line.get());
+    URLLinkifier::detectAndLinkifyURLs(line.get(), m_doc.get());
 
     ASSERT_GE(line->styleList.size(), 2);
     int hyperlinkCount = countHyperlinkStyles(line.get());
@@ -140,7 +141,7 @@ TEST_F(URLDetectionTest, FTPURL)
 {
     auto line = createTestLine("Download from ftp://files.example.com/file.zip");
 
-    m_doc->DetectAndLinkifyURLs(line.get());
+    URLLinkifier::detectAndLinkifyURLs(line.get(), m_doc.get());
 
     int hyperlinkCount = countHyperlinkStyles(line.get());
     EXPECT_EQ(hyperlinkCount, 1);
@@ -151,7 +152,7 @@ TEST_F(URLDetectionTest, MailtoURL)
 {
     auto line = createTestLine("Contact mailto:support@example.com");
 
-    m_doc->DetectAndLinkifyURLs(line.get());
+    URLLinkifier::detectAndLinkifyURLs(line.get(), m_doc.get());
 
     int hyperlinkCount = countHyperlinkStyles(line.get());
     EXPECT_EQ(hyperlinkCount, 1);
@@ -171,7 +172,7 @@ TEST_F(URLDetectionTest, MultipleURLs)
 {
     auto line = createTestLine("Visit http://example.com or https://other.com");
 
-    m_doc->DetectAndLinkifyURLs(line.get());
+    URLLinkifier::detectAndLinkifyURLs(line.get(), m_doc.get());
 
     int hyperlinkCount = countHyperlinkStyles(line.get());
     EXPECT_EQ(hyperlinkCount, 2);
@@ -182,7 +183,7 @@ TEST_F(URLDetectionTest, URLAtStart)
 {
     auto line = createTestLine("http://example.com is our website");
 
-    m_doc->DetectAndLinkifyURLs(line.get());
+    URLLinkifier::detectAndLinkifyURLs(line.get(), m_doc.get());
 
     // Should split into 2 styles: URL, after
     ASSERT_GE(line->styleList.size(), 2);
@@ -197,7 +198,7 @@ TEST_F(URLDetectionTest, URLAtEnd)
 {
     auto line = createTestLine("Visit us at http://example.com");
 
-    m_doc->DetectAndLinkifyURLs(line.get());
+    URLLinkifier::detectAndLinkifyURLs(line.get(), m_doc.get());
 
     // Should split into 2 styles: before, URL
     ASSERT_GE(line->styleList.size(), 2);
@@ -214,7 +215,7 @@ TEST_F(URLDetectionTest, NoURLs)
     auto line = createTestLine("This line has no URLs at all");
 
     size_t originalStyleCount = line->styleList.size();
-    m_doc->DetectAndLinkifyURLs(line.get());
+    URLLinkifier::detectAndLinkifyURLs(line.get(), m_doc.get());
 
     // Should not change style count
     EXPECT_EQ(line->styleList.size(), originalStyleCount);
@@ -228,7 +229,7 @@ TEST_F(URLDetectionTest, URLWithQueryParams)
 {
     auto line = createTestLine("Search: https://example.com/search?q=test&lang=en");
 
-    m_doc->DetectAndLinkifyURLs(line.get());
+    URLLinkifier::detectAndLinkifyURLs(line.get(), m_doc.get());
 
     int hyperlinkCount = countHyperlinkStyles(line.get());
     EXPECT_EQ(hyperlinkCount, 1);
@@ -249,7 +250,7 @@ TEST_F(URLDetectionTest, URLWithPort)
 {
     auto line = createTestLine("Connect to http://example.com:8080/api");
 
-    m_doc->DetectAndLinkifyURLs(line.get());
+    URLLinkifier::detectAndLinkifyURLs(line.get(), m_doc.get());
 
     int hyperlinkCount = countHyperlinkStyles(line.get());
     EXPECT_EQ(hyperlinkCount, 1);
@@ -269,7 +270,7 @@ TEST_F(URLDetectionTest, URLWithPunctuation)
 {
     auto line = createTestLine("Visit (http://example.com).");
 
-    m_doc->DetectAndLinkifyURLs(line.get());
+    URLLinkifier::detectAndLinkifyURLs(line.get(), m_doc.get());
 
     int hyperlinkCount = countHyperlinkStyles(line.get());
     EXPECT_EQ(hyperlinkCount, 1);
@@ -291,7 +292,7 @@ TEST_F(URLDetectionTest, EmptyLine)
 {
     auto line = std::make_unique<Line>(1, 80, 0, qRgb(255, 255, 255), qRgb(0, 0, 0), false);
 
-    m_doc->DetectAndLinkifyURLs(line.get());
+    URLLinkifier::detectAndLinkifyURLs(line.get(), m_doc.get());
 
     // Should handle empty line gracefully
     EXPECT_EQ(line->len(), 0);
@@ -302,7 +303,7 @@ TEST_F(URLDetectionTest, HyperlinkStyleAttributes)
 {
     auto line = createTestLine("Link: http://example.com");
 
-    m_doc->DetectAndLinkifyURLs(line.get());
+    URLLinkifier::detectAndLinkifyURLs(line.get(), m_doc.get());
 
     // Find the hyperlink style
     for (size_t i = 0; i < line->styleList.size(); ++i) {

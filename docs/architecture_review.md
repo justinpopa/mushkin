@@ -237,8 +237,8 @@ Note: Lua API boundary functions intentionally return integers (Lua convention).
 
 **Targets:**
 - [x] Group related fields into config structs — 15 structs extracted (~180 fields total), all with default member initializers and snake_case naming: `RemoteAccessConfig` (7 → `m_remote`), `LoggingConfig` (19 → `m_logging`), `ProxyConfig` (5 → `m_proxy`), `ScriptConfig` (22 → `m_scripting`), `DisplayConfig` (21 → `m_display`), `AutomationDefaultsConfig` (13 → `m_automation_defaults`), `PasteSendConfig` (17 → `m_paste`), `AutoSayConfig` (7 → `m_auto_say`), `InputConfig` (19 → `m_input`), `OutputConfig` (19 → `m_output`), `SpamPreventionConfig` (6 → `m_spam`), `CommandWindowConfig` (11 → `m_command_window`), `SpeedwalkConfig` (4 → `m_speedwalk`), `ColorConfig` (8 → `m_colors`), `SoundConfig` (6 → `m_sound`), `MappingConfig` (6 → `m_mapping`).
-- [ ] Extract URL linkification (~152 lines) — `DetectAndLinkifyURLs()` + `SplitStyleForURL()` are pure text-processing algorithms with no WorldDocument state coupling. Move to a `URLLinkifier` utility class.
-- [ ] Move MCCP decompression (~76 lines from `ReceiveMsg()`) into `TelnetParser` — the zlib inflate loop already uses TelnetParser's stream state but lives in WorldDocument. TelnetParser should own its own decompression.
+- [x] Extract URL linkification (~152 lines) — `DetectAndLinkifyURLs()` + `SplitStyleForURL()` moved to `URLLinkifier` namespace in `src/utils/url_linkifier.h/.cpp`. WorldDocument passes `this` as explicit `doc` parameter.
+- [x] Move MCCP decompression (~76 lines from `ReceiveMsg()`) into `TelnetParser::decompressData()` — returns `std::optional<std::vector<unsigned char>>`, owns the entire inflate loop. ReceiveMsg() reduced to ~10-line caller.
 
 **Status:** world_document.cpp is now ~2,855 lines. After extractions above, ~2,600. Remaining code is genuinely WorldDocument orchestration (constructor, command pipeline, line completion hub, text accumulation). Diminishing returns beyond this point.
 
