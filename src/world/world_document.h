@@ -824,11 +824,10 @@ class WorldDocument : public QObject, public IWorldContext {
     struct RemoteAccessConfig {
         bool enabled = false;           // enable remote access server?
         quint16 port = 0;               // port to listen on (0 = disabled)
-        QString password;               // password for authentication (required)
+        QString password;               // password for authentication
+        QString authorized_keys_file;   // path to authorized_keys for pubkey auth
         quint16 scrollback_lines = 100; // lines to send on connect
         quint16 max_clients = 5;        // max simultaneous clients
-        quint16 lockout_attempts = 3;   // failed attempts before lockout
-        quint16 lockout_seconds = 300;  // lockout duration
     } m_remote;
 
     // ========== Spam Prevention / Protocol Behavior Configuration ==========

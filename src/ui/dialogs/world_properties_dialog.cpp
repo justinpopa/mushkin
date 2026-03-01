@@ -2,12 +2,14 @@
 #include "world/world_document.h"
 
 #include "logging.h"
+#include "network/ssh_host_key_manager.h"
 #include <QCheckBox>
 #include <QColor>
 #include <QColorDialog>
 #include <QComboBox>
 #include <QDebug>
 #include <QDialogButtonBox>
+#include <QFileDialog>
 #include <QFontDialog>
 #include <QFormLayout>
 #include <QGridLayout>
@@ -442,27 +444,53 @@ void WorldPropertiesDialog::setupRemoteAccessTab()
     // Info label
     QLabel* infoLabel =
         new QLabel("Remote Access allows you to connect to this world from another device "
-                   "(phone, tablet, SSH session) via telnet while away from your computer.");
+                   "(phone, tablet) via SSH while away from your computer.");
     infoLabel->setWordWrap(true);
     layout->addRow(infoLabel);
 
     // Enable remote access
-    m_enableRemoteAccessCheck = new QCheckBox("Enable remote access server");
+    m_enableRemoteAccessCheck = new QCheckBox("Enable SSH remote access server");
     layout->addRow("", m_enableRemoteAccessCheck);
 
     // Port
     m_remotePortSpin = new QSpinBox();
     m_remotePortSpin->setRange(1, 65535);
     m_remotePortSpin->setValue(4001);
-    m_remotePortSpin->setToolTip("Port to listen on for remote connections");
+    m_remotePortSpin->setToolTip("Port to listen on for SSH connections");
     layout->addRow("Port:", m_remotePortSpin);
 
     // Password
     m_remotePasswordEdit = new QLineEdit();
     m_remotePasswordEdit->setEchoMode(QLineEdit::Password);
-    m_remotePasswordEdit->setPlaceholderText("Required for security");
-    m_remotePasswordEdit->setToolTip("Password required to authenticate remote clients");
+    m_remotePasswordEdit->setPlaceholderText("For password authentication");
+    m_remotePasswordEdit->setToolTip(
+        "Password for SSH password authentication (optional if using public keys)");
     layout->addRow("Password:", m_remotePasswordEdit);
+
+    // Authorized keys file
+    m_remoteAuthorizedKeysEdit = new QLineEdit();
+    m_remoteAuthorizedKeysEdit->setPlaceholderText("Path to authorized_keys file (optional)");
+    m_remoteAuthorizedKeysEdit->setToolTip(
+        "Path to an authorized_keys file for public key authentication");
+    auto* browseBtn = new QPushButton("Browse...");
+    auto* keysLayout = new QHBoxLayout();
+    keysLayout->addWidget(m_remoteAuthorizedKeysEdit);
+    keysLayout->addWidget(browseBtn);
+    layout->addRow("Authorized keys:", keysLayout);
+    connect(browseBtn, &QPushButton::clicked, this, [this]() {
+        QString path = QFileDialog::getOpenFileName(this, "Select authorized_keys file");
+        if (!path.isEmpty()) {
+            m_remoteAuthorizedKeysEdit->setText(path);
+        }
+    });
+
+    // Host key fingerprint (read-only)
+    m_hostKeyFingerprintLabel = new QLabel();
+    m_hostKeyFingerprintLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    m_hostKeyFingerprintLabel->setStyleSheet("font-family: monospace; color: gray;");
+    auto fp = SshHostKeyManager::fingerprint();
+    m_hostKeyFingerprintLabel->setText(fp ? *fp : "No host key generated yet");
+    layout->addRow("Host key:", m_hostKeyFingerprintLabel);
 
     // Scrollback lines
     m_remoteScrollbackSpin = new QSpinBox();
@@ -476,19 +504,16 @@ void WorldPropertiesDialog::setupRemoteAccessTab()
     m_remoteMaxClientsSpin = new QSpinBox();
     m_remoteMaxClientsSpin->setRange(1, 100);
     m_remoteMaxClientsSpin->setValue(5);
-    m_remoteMaxClientsSpin->setToolTip("Maximum simultaneous remote client connections");
+    m_remoteMaxClientsSpin->setToolTip("Maximum simultaneous SSH client connections");
     layout->addRow("Max clients:", m_remoteMaxClientsSpin);
 
     // Usage hint
     QLabel* usageLabel =
-        new QLabel("To connect: telnet yourhost <port>\n"
+        new QLabel("To connect: ssh -p <port> user@yourhost\n"
                    "The server starts when you connect to a MUD and stops when you disconnect.");
     usageLabel->setWordWrap(true);
     usageLabel->setStyleSheet("color: gray; font-style: italic;");
     layout->addRow("", usageLabel);
-
-    // Add some spacing
-    layout->addRow("", new QWidget()); // Spacer
 
     m_tabWidget->addTab(tab, "Remote Access");
 }
@@ -515,8 +540,8 @@ void WorldPropertiesDialog::loadSettings()
         QString("%1, %2pt").arg(m_outputFont.family()).arg(m_outputFont.pointSize()));
 
     // TODO(feature): Wire ANSI color picker to WorldDocument m_normalColour/m_boldColour arrays.
-    // WorldDocument has m_colors.normal_colour[8] and m_colors.bold_colour[8] — initialize from them here.
-    // For now, initialize with default colors
+    // WorldDocument has m_colors.normal_colour[8] and m_colors.bold_colour[8] — initialize from
+    // them here. For now, initialize with default colors
     const std::array<QRgb, 16> defaultColors = {
         qRgb(0, 0, 0),       // Black
         qRgb(128, 0, 0),     // Red
@@ -600,6 +625,7 @@ void WorldPropertiesDialog::loadSettings()
     m_enableRemoteAccessCheck->setChecked(m_doc->m_remote.enabled);
     m_remotePortSpin->setValue(m_doc->m_remote.port > 0 ? m_doc->m_remote.port : 4001);
     m_remotePasswordEdit->setText(m_doc->m_remote.password);
+    m_remoteAuthorizedKeysEdit->setText(m_doc->m_remote.authorized_keys_file);
     m_remoteScrollbackSpin->setValue(m_doc->m_remote.scrollback_lines);
     m_remoteMaxClientsSpin->setValue(m_doc->m_remote.max_clients);
 
@@ -630,7 +656,8 @@ void WorldPropertiesDialog::saveSettings()
     m_doc->m_output.font_height = m_outputFont.pointSize(); // Store as points
     m_doc->m_output.font_weight = m_outputFont.weight();
     // TODO(feature): Wire ANSI color picker to WorldDocument m_normalColour/m_boldColour arrays.
-    // WorldDocument has m_colors.normal_colour[8] and m_colors.bold_colour[8] — save m_ansiColors[] to them here.
+    // WorldDocument has m_colors.normal_colour[8] and m_colors.bold_colour[8] — save m_ansiColors[]
+    // to them here.
 
     // Activity settings
     m_doc->m_display.flash_icon = m_flashIconCheck->isChecked();
@@ -685,6 +712,7 @@ void WorldPropertiesDialog::saveSettings()
     m_doc->m_remote.enabled = m_enableRemoteAccessCheck->isChecked();
     m_doc->m_remote.port = m_remotePortSpin->value();
     m_doc->m_remote.password = m_remotePasswordEdit->text();
+    m_doc->m_remote.authorized_keys_file = m_remoteAuthorizedKeysEdit->text();
     m_doc->m_remote.scrollback_lines = m_remoteScrollbackSpin->value();
     m_doc->m_remote.max_clients = m_remoteMaxClientsSpin->value();
 

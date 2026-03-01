@@ -166,6 +166,8 @@ class WorldPropertiesDialog : public QDialog {
     QCheckBox* m_enableRemoteAccessCheck;
     QSpinBox* m_remotePortSpin;
     QLineEdit* m_remotePasswordEdit;
+    QLineEdit* m_remoteAuthorizedKeysEdit;
+    QLabel* m_hostKeyFingerprintLabel;
     QSpinBox* m_remoteScrollbackSpin;
     QSpinBox* m_remoteMaxClientsSpin;
 };

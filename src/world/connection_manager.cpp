@@ -103,9 +103,9 @@ void ConnectionManager::onConnect(int errorCode)
 
         // Create initial line if needed.
         if (!m_doc.m_currentLine) {
-            m_doc.m_currentLine =
-                std::make_unique<Line>(1, m_doc.m_display.wrap_column, m_doc.m_iFlags, m_doc.m_iForeColour,
-                                       m_doc.m_iBackColour, m_doc.m_display.utf8);
+            m_doc.m_currentLine = std::make_unique<Line>(1, m_doc.m_display.wrap_column,
+                                                         m_doc.m_iFlags, m_doc.m_iForeColour,
+                                                         m_doc.m_iBackColour, m_doc.m_display.utf8);
 
             auto initial_style = std::make_unique<Style>();
             initial_style->iLength = 0;
@@ -123,15 +123,16 @@ void ConnectionManager::onConnect(int errorCode)
         m_doc.SendToAllPluginCallbacks(ON_PLUGIN_CONNECT);
 
         // Start remote access server if configured.
+        const bool hasAuth =
+            !m_doc.m_remote.password.isEmpty() || !m_doc.m_remote.authorized_keys_file.isEmpty();
         qCDebug(lcWorld) << "Remote access check: enabled=" << m_doc.m_remote.enabled
-                         << "port=" << m_doc.m_remote.port
-                         << "password_set=" << !m_doc.m_remote.password.isEmpty();
-        if (m_doc.m_remote.enabled && m_doc.m_remote.port > 0 &&
-            !m_doc.m_remote.password.isEmpty()) {
+                         << "port=" << m_doc.m_remote.port << "has_auth=" << hasAuth;
+        if (m_doc.m_remote.enabled && m_doc.m_remote.port > 0 && hasAuth) {
             if (!m_doc.m_pRemoteServer) {
                 m_doc.m_pRemoteServer = std::make_unique<RemoteAccessServer>(&m_doc);
             }
             m_doc.m_pRemoteServer->setPassword(m_doc.m_remote.password);
+            m_doc.m_pRemoteServer->setAuthorizedKeysFile(m_doc.m_remote.authorized_keys_file);
             m_doc.m_pRemoteServer->setScrollbackLines(m_doc.m_remote.scrollback_lines);
             m_doc.m_pRemoteServer->setMaxClients(m_doc.m_remote.max_clients);
             if (auto result = m_doc.m_pRemoteServer->start(m_doc.m_remote.port); result) {

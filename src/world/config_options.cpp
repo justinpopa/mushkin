@@ -309,8 +309,6 @@ const tConfigurationNumericOption OptionsTable[] = {
     {"remote_port", 0, O(m_remote.port), 0, 65535, 0},
     {"remote_scrollback_lines", 100, O(m_remote.scrollback_lines), 0, 10000, 0},
     {"remote_max_clients", 5, O(m_remote.max_clients), 1, 100, 0},
-    {"remote_lockout_attempts", 3, O(m_remote.lockout_attempts), 0, 100, 0},
-    {"remote_lockout_seconds", 300, O(m_remote.lockout_seconds), 0, 86400, 0},
 
     {nullptr} // NULL sentinel - end of table marker
 };
@@ -392,6 +390,7 @@ const tConfigurationAlphaOption AlphaOptionsTable[] = {
 
     // Remote Access Server settings
     {"remote_password", "", A(m_remote.password), OPT_PASSWORD | OPT_PLUGIN_CANNOT_RW},
+    {"remote_authorized_keys", "", A(m_remote.authorized_keys_file), OPT_PLUGIN_CANNOT_RW},
 
     {nullptr} // NULL sentinel - end of table marker
 };
