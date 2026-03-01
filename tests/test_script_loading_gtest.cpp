@@ -13,56 +13,21 @@
  */
 
 #include "../src/automation/script_language.h"
-#include "../src/text/line.h"
-#include "../src/text/style.h"
-#include "../src/world/script_engine.h"
-#include "../src/world/world_document.h"
-#include <QCoreApplication>
+#include "fixtures/world_fixtures.h"
 #include <QDir>
-#include <gtest/gtest.h>
-#include <memory>
-
-extern "C" {
-#include <lauxlib.h>
-#include <lua.h>
-#include <lualib.h>
-}
 
 // Test fixture for script loading tests
-class ScriptLoadingTest : public ::testing::Test {
+class ScriptLoadingTest : public ConnectedWorldTest {
   protected:
     void SetUp() override
     {
-        doc = std::make_unique<WorldDocument>();
-
-        // Initialize basic state
-        doc->m_mush_name = "Test World";
-        doc->m_server = "test.mud.com";
-        doc->m_port = 4000;
-        doc->m_connectionManager->m_iConnectPhase = eConnectConnectedToMud;
-        doc->m_display.utf8 = true;
+        ConnectedWorldTest::SetUp();
 
         // Initialize note() settings
         doc->m_bNotesInRGB = true;
         doc->m_iNoteColourFore = qRgb(255, 255, 255); // White
         doc->m_iNoteColourBack = qRgb(0, 0, 0);       // Black
         doc->m_iNoteStyle = 0;                        // No special styling
-
-        // Create initial line (needed for note() to work)
-        doc->m_currentLine =
-            std::make_unique<Line>(1, 80, 0, qRgb(192, 192, 192), qRgb(0, 0, 0), true);
-        auto initialStyle = std::make_unique<Style>();
-        initialStyle->iLength = 0;
-        initialStyle->iFlags = COLOUR_RGB;
-        initialStyle->iForeColour = qRgb(192, 192, 192);
-        initialStyle->iBackColour = qRgb(0, 0, 0);
-        initialStyle->pAction = nullptr;
-        doc->m_currentLine->styleList.push_back(std::move(initialStyle));
-
-        // Set current style
-        doc->m_iFlags = COLOUR_RGB;
-        doc->m_iForeColour = qRgb(192, 192, 192);
-        doc->m_iBackColour = qRgb(0, 0, 0);
 
         // Initialize script timing
         doc->m_iScriptTimeTaken = 0;
@@ -79,10 +44,6 @@ class ScriptLoadingTest : public ::testing::Test {
         testDir = QDir::currentPath() + "/tests";
     }
 
-    void TearDown() override
-    {
-    }
-
     // Helper method to reset Lua state between tests
     void resetLuaState()
     {
@@ -90,7 +51,6 @@ class ScriptLoadingTest : public ::testing::Test {
         doc->m_ScriptEngine->openLua();
     }
 
-    std::unique_ptr<WorldDocument> doc;
     QString testDir;
 };
 
@@ -630,17 +590,4 @@ TEST_F(ScriptLoadingTest, MoonScriptErrorHandling)
     QString transpiled =
         doc->m_ScriptEngine->transpileMoonScript(invalidMoon, "Invalid MoonScript");
     EXPECT_TRUE(transpiled.isEmpty()) << "Invalid MoonScript should return empty string";
-}
-
-// GoogleTest main function
-int main(int argc, char** argv)
-{
-    // Initialize Qt application (required for Qt types)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

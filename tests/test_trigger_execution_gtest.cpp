@@ -11,21 +11,8 @@
  */
 
 #include "../src/automation/trigger.h"
-#include "../src/text/line.h"
-#include "../src/text/style.h"
-#include "../src/world/script_engine.h"
-#include "../src/world/world_document.h"
-#include <QCoreApplication>
+#include "fixtures/world_fixtures.h"
 #include <cstring>
-#include <gtest/gtest.h>
-#include <memory>
-
-// Lua headers for script execution tests
-extern "C" {
-#include <lauxlib.h>
-#include <lua.h>
-#include <lualib.h>
-}
 
 // Test fixture for trigger execution tests
 class TriggerExecutionTest : public ::testing::Test {
@@ -257,17 +244,4 @@ end
 
     // Verify invocation count incremented
     EXPECT_EQ(t->invocation_count, 1) << "Invocation count should be incremented";
-}
-
-// Main function required for GoogleTest
-int main(int argc, char** argv)
-{
-    // Initialize Qt (required for Qt objects like WorldDocument)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

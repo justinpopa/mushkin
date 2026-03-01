@@ -10,25 +10,17 @@
 #include "../src/automation/alias.h"
 #include "../src/automation/sendto.h"
 #include "../src/world/world_document.h"
-#include <QCoreApplication>
+#include "fixtures/world_fixtures.h"
 #include <QFile>
 #include <QTemporaryDir>
-#include <gtest/gtest.h>
-#include <memory>
 
-class SendToIntegrationTest : public ::testing::Test {
+class SendToIntegrationTest : public WorldDocumentTest {
   protected:
     void SetUp() override
     {
-        doc = std::make_unique<WorldDocument>();
+        WorldDocumentTest::SetUp();
         doc->setWorldName("TestWorld");
     }
-
-    void TearDown() override
-    {
-    }
-
-    std::unique_ptr<WorldDocument> doc;
 };
 
 /**
@@ -164,17 +156,4 @@ TEST_F(SendToIntegrationTest, SendToOutputAppendsToString)
 
     EXPECT_TRUE(output.contains("First line"));
     EXPECT_TRUE(output.contains("Second line"));
-}
-
-// GoogleTest main function
-int main(int argc, char** argv)
-{
-    // Initialize Qt application (required for Qt types)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

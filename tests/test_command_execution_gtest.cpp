@@ -17,24 +17,13 @@
  */
 
 #include "../src/world/world_document.h"
-#include <QCoreApplication>
+#include "fixtures/world_fixtures.h"
 #include <QFile>
-#include <gtest/gtest.h>
-#include <memory>
 
 // Test fixture for command execution tests
 // Provides common setup/teardown and helper methods
-class CommandExecutionTest : public ::testing::Test {
+class CommandExecutionTest : public WorldDocumentTest {
   protected:
-    void SetUp() override
-    {
-        doc = std::make_unique<WorldDocument>();
-    }
-
-    void TearDown() override
-    {
-    }
-
     // Helper to delete test file
     void deleteFile(const QString& path)
     {
@@ -42,8 +31,6 @@ class CommandExecutionTest : public ::testing::Test {
             QFile::remove(path);
         }
     }
-
-    std::unique_ptr<WorldDocument> doc;
 };
 
 /**
@@ -241,18 +228,4 @@ TEST_F(CommandExecutionTest, ImmediateSending)
     // For now, just verify queue is empty
     EXPECT_TRUE(doc->m_connectionManager->m_CommandQueue.isEmpty())
         << "Queue should remain empty with no speedwalk delay";
-}
-
-// Main function required for GoogleTest
-// Note: QCoreApplication must be created before any Qt objects
-int main(int argc, char** argv)
-{
-    // Initialize Qt (required for Qt objects like WorldDocument)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

@@ -9,25 +9,14 @@
  */
 
 #include "../src/ui/views/input_view.h"
-#include "../src/world/script_engine.h"
-#include "../src/world/world_document.h"
-#include <QApplication>
-#include <gtest/gtest.h>
-#include <memory>
-
-extern "C" {
-#include <lauxlib.h>
-#include <lua.h>
-#include <lualib.h>
-}
+#include "fixtures/world_fixtures.h"
 
 // Test fixture for command/color API tests
-class CommandColorAPITest : public ::testing::Test {
+class CommandColorAPITest : public LuaWorldTest {
   protected:
     void SetUp() override
     {
-        doc = std::make_unique<WorldDocument>();
-        L = doc->m_ScriptEngine->L;
+        LuaWorldTest::SetUp();
 
         // Load test script file (relative to build/tests directory)
         if (luaL_dofile(L, "tests/test_api.lua") != 0) {
@@ -58,8 +47,6 @@ class CommandColorAPITest : public ::testing::Test {
         EXPECT_EQ(result, 0) << functionName << " should succeed";
     }
 
-    std::unique_ptr<WorldDocument> doc;
-    lua_State* L = nullptr;
     InputView* inputView = nullptr;
 };
 
@@ -259,17 +246,4 @@ TEST_F(CommandColorAPITest, GetUdpPort)
     callLuaTest("test_get_udp_port");
 
     // No C++ side effects to verify (function always returns 0)
-}
-
-// GoogleTest main function
-int main(int argc, char** argv)
-{
-    // Initialize Qt application (required for QWidget types like InputView)
-    QApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

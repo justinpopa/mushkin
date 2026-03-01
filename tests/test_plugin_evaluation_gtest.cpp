@@ -13,20 +13,8 @@
 #include "../src/automation/plugin.h"
 #include "../src/automation/sendto.h"
 #include "../src/automation/trigger.h"
-#include "../src/text/line.h"
-#include "../src/text/style.h"
-#include "../src/world/script_engine.h"
-#include "../src/world/world_document.h"
-#include <QCoreApplication>
+#include "fixtures/world_fixtures.h"
 #include <QTemporaryFile>
-#include <gtest/gtest.h>
-#include <memory>
-
-extern "C" {
-#include <lauxlib.h>
-#include <lua.h>
-#include <lualib.h>
-}
 
 // Lua 5.1 compatibility: lua_rawlen is Lua 5.2+, use lua_objlen for 5.1
 #if LUA_VERSION_NUM < 502
@@ -593,17 +581,4 @@ TEST_F(PluginEvaluationTest, MultiplePluginsInSamePhaseEvaluatedInSequenceOrder)
 
     plugin4File.close();
     plugin5File.close();
-}
-
-// GoogleTest main function
-int main(int argc, char** argv)
-{
-    // Initialize Qt application (required for Qt types)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

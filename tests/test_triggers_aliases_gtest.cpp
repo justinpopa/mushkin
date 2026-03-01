@@ -19,24 +19,9 @@
 #include "../src/automation/alias.h"
 #include "../src/automation/trigger.h"
 #include "../src/world/world_document.h"
-#include <QCoreApplication>
-#include <gtest/gtest.h>
-#include <memory>
+#include "fixtures/world_fixtures.h"
 
-// Test fixture for trigger/alias tests
-class TriggersAliasesTest : public ::testing::Test {
-  protected:
-    void SetUp() override
-    {
-        doc = std::make_unique<WorldDocument>();
-    }
-
-    void TearDown() override
-    {
-    }
-
-    std::unique_ptr<WorldDocument> doc;
-};
+class TriggersAliasesTest : public WorldDocumentTest {};
 
 // Test 1: Trigger creation with defaults
 TEST_F(TriggersAliasesTest, TriggerDefaults)
@@ -346,17 +331,4 @@ TEST_F(TriggersAliasesTest, TriggerFieldPreservation)
     EXPECT_EQ(verified->send_to, eSendToScript) << "send_to field should be preserved";
     EXPECT_EQ(verified->group, "Currency") << "group field should be preserved";
     EXPECT_EQ(verified->user_option, 42) << "user_option field should be preserved";
-}
-
-// GoogleTest main function
-int main(int argc, char** argv)
-{
-    // Initialize Qt application (required for Qt types)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

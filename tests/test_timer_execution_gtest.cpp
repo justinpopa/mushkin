@@ -28,18 +28,8 @@
 
 #include "../src/automation/sendto.h"
 #include "../src/automation/timer.h"
-#include "../src/world/script_engine.h"
-#include "../src/world/world_document.h"
-#include <QCoreApplication>
+#include "fixtures/world_fixtures.h"
 #include <QDateTime>
-#include <gtest/gtest.h>
-#include <memory>
-
-extern "C" {
-#include <lauxlib.h>
-#include <lua.h>
-#include <lualib.h>
-}
 
 // Test fixture for timer execution tests
 class TimerExecutionTest : public ::testing::Test {
@@ -301,17 +291,4 @@ end
     lua_pop(L, 1);
 
     EXPECT_EQ(nameReceived, internalName) << "Unlabelled timer should use internal name";
-}
-
-// GoogleTest main function
-int main(int argc, char** argv)
-{
-    // Initialize Qt application (required for Qt types)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

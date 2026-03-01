@@ -12,51 +12,15 @@
 #include "../src/world/lua_api/lua_common.h"
 #include "../src/world/script_engine.h"
 #include "../src/world/world_document.h"
-#include <QCoreApplication>
-#include <gtest/gtest.h>
-#include <memory>
-
-extern "C" {
-#include <lauxlib.h>
-#include <lua.h>
-#include <lualib.h>
-}
+#include "fixtures/world_fixtures.h"
 
 // Test fixture for Sound API tests
-class SoundApiTest : public ::testing::Test {
+class SoundApiTest : public LuaWorldTest {
   protected:
     void SetUp() override
     {
-        doc = std::make_unique<WorldDocument>();
-
-        // Get Lua state
-        ASSERT_NE(doc->m_ScriptEngine, nullptr) << "ScriptEngine should exist";
-        ASSERT_NE(doc->m_ScriptEngine->L, nullptr) << "Lua state should exist";
-        L = doc->m_ScriptEngine->L;
+        LuaWorldTest::SetUp();
     }
-
-    void TearDown() override
-    {
-    }
-
-    // Helper to execute Lua code
-    void executeLua(const char* code)
-    {
-        ASSERT_EQ(luaL_loadstring(L, code), 0) << "Lua code should compile: " << code;
-        ASSERT_EQ(lua_pcall(L, 0, 0, 0), 0) << "Lua code should execute: " << code;
-    }
-
-    // Helper to get global number value
-    int getGlobalInt(const char* name)
-    {
-        lua_getglobal(L, name);
-        int result = lua_tointeger(L, -1);
-        lua_pop(L, 1);
-        return result;
-    }
-
-    std::unique_ptr<WorldDocument> doc;
-    lua_State* L = nullptr;
 };
 
 /**
@@ -162,17 +126,4 @@ TEST_F(SoundApiTest, PlaySoundWithParameters)
     int result = getGlobalInt("result");
     EXPECT_EQ(result, eFileNotFound)
         << "PlaySound should return eFileNotFound for nonexistent file";
-}
-
-// GoogleTest main function
-int main(int argc, char** argv)
-{
-    // Initialize Qt application (required for Qt types)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

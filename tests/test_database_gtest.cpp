@@ -13,11 +13,10 @@
  */
 
 #include "../src/storage/database.h"
-#include <QCoreApplication>
+#include "fixtures/world_fixtures.h"
 #include <QDebug>
 #include <QFile>
 #include <QTemporaryDir>
-#include <gtest/gtest.h>
 
 class DatabaseTest : public ::testing::Test {
   protected:
@@ -338,11 +337,4 @@ TEST_F(DatabaseTest, CannotAddEmptyPath)
 TEST_F(DatabaseTest, OperationsSucceedWhenDatabaseOpen)
 {
     EXPECT_TRUE(db.open().has_value());
-}
-
-int main(int argc, char** argv)
-{
-    QCoreApplication app(argc, argv);
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
 }

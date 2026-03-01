@@ -9,9 +9,7 @@
 #include "../src/text/action.h"
 #include "../src/text/line.h"
 #include "../src/text/style.h"
-#include <QCoreApplication>
-#include <gtest/gtest.h>
-#include <memory>
+#include "fixtures/world_fixtures.h"
 
 // Test fixture for Action tests
 class ActionTest : public ::testing::Test {
@@ -222,17 +220,4 @@ TEST_F(ActionTest, MultipleStylesSharingAction)
 
     style2.reset();
     EXPECT_EQ(testAction.use_count(), 1);
-}
-
-// GoogleTest main entry point
-int main(int argc, char** argv)
-{
-    // Initialize Qt application (required for Qt types)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

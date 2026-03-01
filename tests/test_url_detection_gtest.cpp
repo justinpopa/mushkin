@@ -12,9 +12,7 @@
 #include "../src/text/style.h"
 #include "../src/world/color_utils.h"
 #include "../src/world/world_document.h"
-#include <QCoreApplication>
-#include <gtest/gtest.h>
-#include <memory>
+#include "fixtures/world_fixtures.h"
 
 // Test fixture for URL detection tests
 class URLDetectionTest : public ::testing::Test {
@@ -321,11 +319,4 @@ TEST_F(URLDetectionTest, HyperlinkStyleAttributes)
             break;
         }
     }
-}
-
-int main(int argc, char** argv)
-{
-    QCoreApplication app(argc, argv);
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
 }

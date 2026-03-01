@@ -17,24 +17,13 @@
 
 #include "../src/world/world_document.h"
 #include "../src/world/xml_serialization.h"
-#include <QCoreApplication>
+#include "fixtures/world_fixtures.h"
 #include <QFile>
-#include <gtest/gtest.h>
-#include <memory>
 
 // Test fixture for command history navigation tests
 // Provides common setup/teardown and helper methods
-class CommandHistoryNavigationTest : public ::testing::Test {
+class CommandHistoryNavigationTest : public WorldDocumentTest {
   protected:
-    void SetUp() override
-    {
-        doc = std::make_unique<WorldDocument>();
-    }
-
-    void TearDown() override
-    {
-    }
-
     // Helper to delete test file
     void deleteFile(const QString& path)
     {
@@ -42,8 +31,6 @@ class CommandHistoryNavigationTest : public ::testing::Test {
             QFile::remove(path);
         }
     }
-
-    std::unique_ptr<WorldDocument> doc;
 };
 
 /**
@@ -286,18 +273,4 @@ TEST_F(CommandHistoryNavigationTest, HistoryPositionAfterAdding)
     // Add new command - should reset to end
     doc->addToCommandHistory("east");
     EXPECT_EQ(doc->m_historyPosition, 3) << "Position should reset to end after adding";
-}
-
-// Main function required for GoogleTest
-// Note: QCoreApplication must be created before any Qt objects
-int main(int argc, char** argv)
-{
-    // Initialize Qt (required for Qt objects like WorldDocument)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

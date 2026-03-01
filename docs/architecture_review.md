@@ -374,3 +374,107 @@ Note: Lua API boundary functions intentionally return integers (Lua convention).
 | GPT o4-mini | Codex CLI | 4 | SoundManager async UAF (deepest single find), timer offset bug, fractional seconds, volume clamp |
 | Kimi K2.5 | OpenRouter | 13 | QVariant dispid inconsistency |
 | Claude Opus 4.6 | Orchestrator | — | Synthesis and consensus ranking |
+
+---
+
+## DRY Audit (2026-02-28)
+
+**Reviewer:** Gemini Pro 3.1 (via OpenRouter)
+**Scope:** Full codebase — boilerplate, duplication, developer experience
+
+---
+
+### D1 — Lua API boilerplate (~75% of 27K LOC) [HIGH]
+
+**Risk:** ~428 `L_*` functions across `src/world/lua_api/*.cpp` follow near-identical patterns: `doc(L)` lookup, `luaL_check*` argument extraction, call through to WorldDocument, `luaReturnOK`/`luaReturnError`. ~75% of this code is mechanical boilerplate, only ~25% is actual logic.
+
+A declarative binding/macro system could reduce ~27K LOC to ~5K while improving consistency and making it easier for new contributors to add API functions.
+
+**Targets:**
+- [ ] Design declarative Lua binding macro/template system
+- [ ] Prototype with one API category (e.g., `world_variables.cpp` — simple get/set pattern)
+- [ ] Migrate remaining categories incrementally
+
+**Acceptance:** New Lua API functions can be added with <10 lines of boilerplate. Existing functions compile and pass tests after migration.
+
+---
+
+### D2 — Test infrastructure duplication [HIGH] ✅ DONE
+
+**Risk:** 49 separate test executables, many with duplicated `QCoreApplication` setup, similar `WorldDocument` fixture construction, and repeated helper utilities. Each executable has its own `main()` with identical GoogleTest + Qt initialization.
+
+Consolidating to fewer binaries with shared test fixtures would reduce build times, simplify CI, and make it easier to add new tests.
+
+**Targets:**
+- [x] Create shared test fixture library (`tests/fixtures/`) with common `WorldDocument` setup
+- [x] Create shared `main()` — `test_main_core` (QCoreApplication) and `test_main_gui` (QApplication) OBJECT libraries
+- [x] Consolidate related test executables where sensible (bit + lfs + progress → `test_lua_libraries_gtest`)
+
+**Acceptance:** Shared fixture library exists. New tests can be added without duplicating setup code. Build + test pass. 785/785 tests pass.
+
+---
+
+### D3 — Config option O(N) linear scan [HIGH]
+
+**Risk:** `GetOption`/`SetOption` in `config_options.cpp` performs linear search through option arrays for every lookup. With ~233 options, this is measurably slow for scripts that query options frequently.
+
+**Targets:**
+- [ ] Replace linear scan with `std::unordered_map<QString, OptionEntry>` or similar O(1) lookup
+- [ ] Maintain backward compatibility with existing option name strings
+
+**Acceptance:** Option lookup is O(1). Build + test pass.
+
+---
+
+### D4 — Forwarding wrapper inconsistency [MEDIUM]
+
+**Risk:** WorldDocument has 16+ inline forwarding wrappers to companion objects (OutputFormatter, ConnectionManager, etc.). Some callers use the wrapper, others go directly to the companion — inconsistent access patterns confuse new contributors.
+
+**Targets:**
+- [ ] Audit all forwarding wrappers and their call sites
+- [ ] Establish convention: callers always go through WorldDocument wrappers (companions are implementation details)
+- [ ] Document convention in CLAUDE.md or a CONTRIBUTING guide
+
+**Acceptance:** Consistent access pattern documented and followed.
+
+---
+
+### D5 — Repeated `std::expected` error handling in Lua API [MEDIUM]
+
+**Risk:** Every `L_*` function that calls an `std::expected`-returning method repeats the same unwrap-and-return pattern:
+```cpp
+auto result = pDoc->doSomething(...);
+if (!result) return luaReturnError(L, result.error().message());
+```
+
+A helper macro or function could reduce this to a single line.
+
+**Targets:**
+- [ ] Create `luaUnwrapOrReturn(L, expr)` macro/helper
+- [ ] Apply to existing `L_*` functions opportunistically
+
+**Acceptance:** Common unwrap pattern has a reusable helper. Build + test pass.
+
+---
+
+### D6 — God-include chain (`world_document.h` — 43 includes) [MEDIUM]
+
+**Risk:** `world_document.h` transitively pulls in 43 headers. Most translation units that include it get far more than they need, slowing compilation and increasing coupling.
+
+**Targets:**
+- [ ] Forward-declare where possible instead of including
+- [ ] Move implementation details to `.cpp` files
+- [ ] Consider opaque pointer (pimpl) for rarely-accessed subsystems
+
+**Acceptance:** Measurable reduction in include count. Build + test pass.
+
+---
+
+### D7 — Duplicate `BGR()` macro [LOW]
+
+**Risk:** `BGR()` defined in both `color_utils.h` and `world_protocol.cpp`. Minor ODR/maintenance hazard.
+
+**Targets:**
+- [ ] Remove duplicate from `world_protocol.cpp`, use `color_utils.h` version
+
+**Acceptance:** Single definition of `BGR()`. Build + test pass.

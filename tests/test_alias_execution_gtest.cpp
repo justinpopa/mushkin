@@ -13,18 +13,7 @@
  */
 
 #include "../src/automation/alias.h"
-#include "../src/world/script_engine.h"
-#include "../src/world/world_document.h"
-#include <QCoreApplication>
-#include <gtest/gtest.h>
-#include <memory>
-
-// Lua headers for script execution tests
-extern "C" {
-#include <lauxlib.h>
-#include <lua.h>
-#include <lualib.h>
-}
+#include "fixtures/world_fixtures.h"
 
 // Test fixture for alias execution tests
 class AliasExecutionTest : public ::testing::Test {
@@ -315,17 +304,4 @@ end
 
     // Verify invocation count incremented
     EXPECT_EQ(a->invocation_count, 1) << "Invocation count should be 1";
-}
-
-// GoogleTest main function
-int main(int argc, char** argv)
-{
-    // Initialize Qt application (required for Qt types)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

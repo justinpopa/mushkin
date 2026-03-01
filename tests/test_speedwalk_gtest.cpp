@@ -10,8 +10,7 @@
  */
 
 #include "../src/world/speedwalk_engine.h"
-#include <QCoreApplication>
-#include <gtest/gtest.h>
+#include "fixtures/world_fixtures.h"
 
 // Default filler (empty) for most tests
 static const QString kNoFiller;
@@ -234,17 +233,4 @@ TEST(SpeedwalkTest, ComplexSpeedwalk)
 
     EXPECT_FALSE(result.startsWith("*")) << "Should not return an error";
     EXPECT_EQ(result, "open north\neast\neast\neast\nclose south\nportal\nportal\nup\n");
-}
-
-// Main function required for GoogleTest
-int main(int argc, char** argv)
-{
-    // Initialize Qt (required for Qt string types)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

@@ -13,25 +13,11 @@
  */
 
 #include "../src/world/world_document.h"
-#include <QCoreApplication>
-#include <gtest/gtest.h>
-#include <memory>
+#include "fixtures/world_fixtures.h"
 
 // Test fixture for variable expansion tests
 // Provides a fresh WorldDocument for each test
-class VariableExpansionTest : public ::testing::Test {
-  protected:
-    void SetUp() override
-    {
-        doc = std::make_unique<WorldDocument>();
-    }
-
-    void TearDown() override
-    {
-    }
-
-    std::unique_ptr<WorldDocument> doc;
-};
+class VariableExpansionTest : public WorldDocumentTest {};
 
 // Test 1: Basic Variable Expansion
 TEST_F(VariableExpansionTest, BasicVariableExpansion)
@@ -173,18 +159,4 @@ TEST_F(VariableExpansionTest, VariableNamesWithUnderscore)
     QString result = doc->expandVariables("@my_var and @_private");
 
     EXPECT_EQ(result, "works and also_works") << "Variable names with underscores should work";
-}
-
-// Main function required for GoogleTest
-// Note: QCoreApplication must be created before any Qt objects
-int main(int argc, char** argv)
-{
-    // Initialize Qt (required for Qt objects like WorldDocument)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

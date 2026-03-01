@@ -11,18 +11,15 @@
 #include "../src/text/line.h"
 #include "../src/text/style.h"
 #include "../src/world/world_document.h"
-#include <QCoreApplication>
-#include <gtest/gtest.h>
-#include <memory>
+#include "fixtures/world_fixtures.h"
 
 // Test fixture for pipeline tests
 // Provides common setup/teardown and helper methods
-class PipelineTest : public ::testing::Test {
+class PipelineTest : public WorldDocumentTest {
   protected:
     void SetUp() override
     {
-        // Create world document
-        doc = std::make_unique<WorldDocument>();
+        WorldDocumentTest::SetUp();
 
         // Initialize connection state (normally done by OnConnect)
         doc->m_telnetParser->m_phase = Phase::NONE;
@@ -42,10 +39,6 @@ class PipelineTest : public ::testing::Test {
         initialStyle->iBackColour = BLACK;
         initialStyle->pAction = nullptr;
         doc->m_currentLine->styleList.push_back(std::move(initialStyle));
-    }
-
-    void TearDown() override
-    {
     }
 
     // Helper method to process a string byte by byte
@@ -73,8 +66,6 @@ class PipelineTest : public ::testing::Test {
         Line* line = doc->m_lineList[index].get();
         return QString::fromUtf8(line->text().data(), line->text().size());
     }
-
-    std::unique_ptr<WorldDocument> doc;
 };
 
 // Test 1: Simple ASCII text processing
@@ -392,18 +383,4 @@ TEST_F(PipelineTest, TrueColorGradient)
 
     // Should have multiple styles (one for each color change)
     EXPECT_GE(line->styleList.size(), 3) << "Should have at least 3 styles for color changes";
-}
-
-// Main function required for GoogleTest
-// Note: QCoreApplication must be created before any Qt objects
-int main(int argc, char** argv)
-{
-    // Initialize Qt (required for Qt objects like WorldDocument)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

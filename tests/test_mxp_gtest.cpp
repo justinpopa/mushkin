@@ -14,17 +14,14 @@
  */
 
 #include "../src/world/mxp_types.h"
-#include "../src/world/world_document.h"
-#include <QApplication>
-#include <gtest/gtest.h>
-#include <memory>
+#include "fixtures/world_fixtures.h"
 
 // Test fixture for MXP tests
-class MXPTest : public ::testing::Test {
+class MXPTest : public WorldDocumentTest {
   protected:
     void SetUp() override
     {
-        doc = std::make_unique<WorldDocument>();
+        WorldDocumentTest::SetUp();
 
         // Initialize basic state
         doc->m_mush_name = "Test World";
@@ -35,12 +32,6 @@ class MXPTest : public ::testing::Test {
         // Enable MXP - this triggers initialization
         doc->MXP_On();
     }
-
-    void TearDown() override
-    {
-    }
-
-    std::unique_ptr<WorldDocument> doc;
 };
 
 // ========== Story 1: Element Collection and Parsing ==========
@@ -1046,12 +1037,4 @@ TEST_F(MXPTest, HighTagIncreasesColorValues)
     // Should set high intensity flag
     // (Implementation specific)
     SUCCEED();
-}
-
-// Main test runner
-int main(int argc, char** argv)
-{
-    QApplication app(argc, argv);
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
 }

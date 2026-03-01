@@ -16,19 +16,16 @@
 
 #include "../src/text/line.h"
 #include "../src/ui/views/input_view.h"
-#include "../src/world/world_document.h"
-#include <QApplication>
+#include "fixtures/world_fixtures.h"
 #include <cstring>
-#include <gtest/gtest.h>
-#include <memory>
 
 // Test fixture for tab completion tests
 // Provides common setup/teardown and helper methods
-class TabCompletionTest : public ::testing::Test {
+class TabCompletionTest : public WorldDocumentTest {
   protected:
     void SetUp() override
     {
-        doc = std::make_unique<WorldDocument>();
+        WorldDocumentTest::SetUp();
         input = new InputView(doc.get());
     }
 
@@ -65,7 +62,6 @@ class TabCompletionTest : public ::testing::Test {
         doc->m_lineList.push_back(std::move(line));
     }
 
-    std::unique_ptr<WorldDocument> doc;
     InputView* input = nullptr;
 };
 
@@ -365,18 +361,4 @@ TEST_F(TabCompletionTest, CompletionNotAtEnd)
 
     // Should complete "ar" to "archer" and keep " south"
     EXPECT_EQ(input->text(), "archer south") << "Completion should work when cursor not at end";
-}
-
-// Main function required for GoogleTest
-// Note: QApplication must be created before any Qt objects
-int main(int argc, char** argv)
-{
-    // Initialize Qt (required for Qt objects like WorldDocument and InputView)
-    QApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

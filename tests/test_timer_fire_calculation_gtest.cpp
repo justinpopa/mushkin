@@ -8,26 +8,19 @@
 
 #include "../src/automation/timer.h"
 #include "../src/world/world_document.h"
-#include <QCoreApplication>
+#include "fixtures/world_fixtures.h"
 #include <QDateTime>
 #include <QTime>
-#include <gtest/gtest.h>
-#include <memory>
 
 // Test fixture for timer fire calculation tests
-class TimerFireCalculationTest : public ::testing::Test {
+class TimerFireCalculationTest : public WorldDocumentTest {
   protected:
     void SetUp() override
     {
-        doc = std::make_unique<WorldDocument>();
+        WorldDocumentTest::SetUp();
         testStart = QDateTime::currentDateTime();
     }
 
-    void TearDown() override
-    {
-    }
-
-    std::unique_ptr<WorldDocument> doc;
     QDateTime testStart;
 };
 
@@ -291,17 +284,4 @@ TEST_F(TimerFireCalculationTest, SubSecondIntervalPreservesMilliseconds)
     EXPECT_GT(timer->fire_time, before) << "Sub-second timer fire_time must be in the future";
     EXPECT_GE(actualMs, 500LL) << "500 ms interval must produce >= 500 ms delay";
     EXPECT_LE(actualMs, 550LL) << "500 ms interval must produce <= 550 ms delay";
-}
-
-// GoogleTest main function
-int main(int argc, char** argv)
-{
-    // Initialize Qt application (required for Qt types)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

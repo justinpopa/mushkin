@@ -8,27 +8,16 @@
  * fixtures, and assertion messages.
  */
 
-#include "../src/text/line.h"
-#include "../src/text/style.h"
-#include "../src/world/world_document.h"
-#include <QCoreApplication>
+#include "fixtures/world_fixtures.h"
 #include <QDir>
 #include <QFile>
 #include <QTextStream>
 #include <cstring>
-#include <gtest/gtest.h>
-#include <memory>
 
 // Test fixture for retrospective logging tests
 // Provides common setup/teardown and helper methods
-class RetrospectiveLoggingTest : public ::testing::Test {
+class RetrospectiveLoggingTest : public WorldDocumentTest {
   protected:
-    void SetUp() override
-    {
-        // Create world document
-        doc = std::make_unique<WorldDocument>();
-    }
-
     void TearDown() override
     {
         // Clean up any test log files
@@ -75,7 +64,6 @@ class RetrospectiveLoggingTest : public ::testing::Test {
         return line;
     }
 
-    std::unique_ptr<WorldDocument> doc;
     QStringList tempLogFiles;
 };
 
@@ -269,18 +257,4 @@ TEST_F(RetrospectiveLoggingTest, MixedLineTypesRetrospectiveLogging)
     EXPECT_LT(notePos, cmdPos) << "Note line should come before input line";
 
     // Note: Don't delete lines - WorldDocument destructor handles them
-}
-
-// Main function required for GoogleTest
-// Note: QCoreApplication must be created before any Qt objects
-int main(int argc, char** argv)
-{
-    // Initialize Qt (required for Qt objects like WorldDocument)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

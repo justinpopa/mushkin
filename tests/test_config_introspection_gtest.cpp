@@ -14,90 +14,10 @@
  * 9. Option name matching is case-insensitive
  */
 
-#include "../src/text/line.h"
-#include "../src/text/style.h"
 #include "../src/world/config_options.h"
-#include "../src/world/script_engine.h"
-#include "../src/world/world_document.h"
-#include <QCoreApplication>
-#include <gtest/gtest.h>
-#include <memory>
+#include "fixtures/world_fixtures.h"
 
-extern "C" {
-#include <lauxlib.h>
-#include <lua.h>
-#include <lualib.h>
-}
-
-class ConfigIntrospectionTest : public ::testing::Test {
-  protected:
-    void SetUp() override
-    {
-        doc = std::make_unique<WorldDocument>();
-
-        doc->m_mush_name = "Test World";
-        doc->m_server = "test.mud.com";
-        doc->m_port = 4000;
-        doc->m_connectionManager->m_iConnectPhase = eConnectConnectedToMud;
-        doc->m_display.utf8 = true;
-
-        doc->m_currentLine =
-            std::make_unique<Line>(1, 80, 0, qRgb(192, 192, 192), qRgb(0, 0, 0), true);
-        auto initialStyle = std::make_unique<Style>();
-        initialStyle->iLength = 0;
-        initialStyle->iFlags = COLOUR_RGB;
-        initialStyle->iForeColour = qRgb(192, 192, 192);
-        initialStyle->iBackColour = qRgb(0, 0, 0);
-        initialStyle->pAction = nullptr;
-        doc->m_currentLine->styleList.push_back(std::move(initialStyle));
-
-        doc->m_iFlags = COLOUR_RGB;
-        doc->m_iForeColour = qRgb(192, 192, 192);
-        doc->m_iBackColour = qRgb(0, 0, 0);
-
-        ASSERT_NE(doc->m_ScriptEngine, nullptr) << "ScriptEngine should exist";
-        ASSERT_NE(doc->m_ScriptEngine->L, nullptr) << "Lua state should exist";
-        L = doc->m_ScriptEngine->L;
-    }
-
-    void TearDown() override
-    {
-    }
-
-    void executeLua(const char* code)
-    {
-        ASSERT_EQ(luaL_loadstring(L, code), 0) << "Lua compile: " << code;
-        ASSERT_EQ(lua_pcall(L, 0, 0, 0), 0) << "Lua exec: " << code;
-    }
-
-    double getGlobalNumber(const char* name)
-    {
-        lua_getglobal(L, name);
-        double result = lua_tonumber(L, -1);
-        lua_pop(L, 1);
-        return result;
-    }
-
-    QString getGlobalString(const char* name)
-    {
-        lua_getglobal(L, name);
-        const char* str = lua_tostring(L, -1);
-        QString result = str ? QString::fromUtf8(str) : QString();
-        lua_pop(L, 1);
-        return result;
-    }
-
-    bool isGlobalNil(const char* name)
-    {
-        lua_getglobal(L, name);
-        bool result = lua_isnil(L, -1);
-        lua_pop(L, 1);
-        return result;
-    }
-
-    std::unique_ptr<WorldDocument> doc;
-    lua_State* L = nullptr;
-};
+class ConfigIntrospectionTest : public ConnectedWorldTest {};
 
 // Test 1: GetDefaultValue returns the static default for a numeric option
 TEST_F(ConfigIntrospectionTest, GetDefaultValueNumeric)
@@ -195,11 +115,4 @@ TEST_F(ConfigIntrospectionTest, CaseInsensitiveMatching)
     double upperPort = getGlobalNumber("upper_port");
     EXPECT_EQ(upperPort, lowerPort)
         << "GetCurrentValue should match option names case-insensitively";
-}
-
-int main(int argc, char** argv)
-{
-    QCoreApplication app(argc, argv);
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
 }

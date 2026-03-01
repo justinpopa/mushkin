@@ -20,12 +20,9 @@
  */
 
 #include "../src/automation/timer.h"
-#include "../src/world/world_document.h"
-#include <QCoreApplication>
+#include "fixtures/world_fixtures.h"
 #include <QDateTime>
 #include <QThread>
-#include <gtest/gtest.h>
-#include <memory>
 
 // Test fixture for timer evaluation tests
 class TimerEvaluationTest : public ::testing::Test {
@@ -305,17 +302,4 @@ TEST_F(TimerEvaluationTest, MultipleTimersFireCorrectly)
     EXPECT_EQ(timer1->matched, 1) << "timer1 (past) should have fired";
     EXPECT_EQ(timer2->matched, 1) << "timer2 (past) should have fired";
     EXPECT_EQ(timer3->matched, 0) << "timer3 (future) should not have fired";
-}
-
-// GoogleTest main function
-int main(int argc, char** argv)
-{
-    // Initialize Qt application (required for Qt types)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

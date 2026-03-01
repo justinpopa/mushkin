@@ -12,25 +12,11 @@
  */
 
 #include "../src/world/world_document.h"
-#include <QCoreApplication>
-#include <gtest/gtest.h>
-#include <memory>
+#include "fixtures/world_fixtures.h"
 
 // Test fixture for command stacking tests
 // Provides common setup/teardown and helper methods
-class CommandStackingTest : public ::testing::Test {
-  protected:
-    void SetUp() override
-    {
-        doc = std::make_unique<WorldDocument>();
-    }
-
-    void TearDown() override
-    {
-    }
-
-    std::unique_ptr<WorldDocument> doc;
-};
+class CommandStackingTest : public WorldDocumentTest {};
 
 /**
  * Test 1: Basic command stacking
@@ -224,18 +210,4 @@ TEST_F(CommandStackingTest, CustomDelimiterBypass)
     ASSERT_EQ(doc->m_commandHistory.size(), 1) << "Should have 1 command in history";
     EXPECT_EQ(doc->m_commandHistory[0], "north|south")
         << "Leading delimiter should bypass stacking with custom delimiter";
-}
-
-// Main function required for GoogleTest
-// Note: QCoreApplication must be created before any Qt objects
-int main(int argc, char** argv)
-{
-    // Initialize Qt (required for Qt objects like WorldDocument)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

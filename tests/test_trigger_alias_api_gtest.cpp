@@ -8,25 +8,14 @@
  * - trigger_flag, alias_flag, sendto constant tables
  */
 
-#include "../src/world/script_engine.h"
-#include "../src/world/world_document.h"
-#include <QCoreApplication>
-#include <gtest/gtest.h>
-#include <memory>
-
-extern "C" {
-#include <lauxlib.h>
-#include <lua.h>
-#include <lualib.h>
-}
+#include "fixtures/world_fixtures.h"
 
 // Test fixture for trigger/alias API tests
-class TriggerAliasAPITest : public ::testing::Test {
+class TriggerAliasAPITest : public LuaWorldTest {
   protected:
     void SetUp() override
     {
-        doc = std::make_unique<WorldDocument>();
-        L = doc->m_ScriptEngine->L;
+        LuaWorldTest::SetUp();
 
         // Load test script file (relative to build/tests directory)
         if (luaL_dofile(L, "tests/test_api.lua") != 0) {
@@ -39,9 +28,6 @@ class TriggerAliasAPITest : public ::testing::Test {
     void TearDown() override
     {
     }
-
-    std::unique_ptr<WorldDocument> doc;
-    lua_State* L = nullptr;
 };
 
 // Test 1: trigger_flag constant table
@@ -289,17 +275,4 @@ TEST_F(TriggerAliasAPITest, DeleteAlias)
 
     // Verify alias was deleted from document
     EXPECT_EQ(doc->getAlias("test_alias"), nullptr) << "Alias should be deleted from document";
-}
-
-// GoogleTest main function
-int main(int argc, char** argv)
-{
-    // Initialize Qt application (required for Qt types)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

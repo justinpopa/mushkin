@@ -8,11 +8,9 @@
 
 #include "../src/world/config_options.h"
 #include "../src/world/world_document.h"
-#include <QCoreApplication>
+#include "fixtures/world_fixtures.h"
 #include <QSet>
 #include <QString>
-#include <gtest/gtest.h>
-#include <memory>
 
 // Test fixture for OptionsTable tests
 class OptionsTableTest : public ::testing::Test {
@@ -246,17 +244,4 @@ TEST_F(AlphaOptionsTableTest, CanFindSpecificAlphaOptions)
             SUCCEED() << "Found alpha option: " << optName.toStdString();
         }
     }
-}
-
-// GoogleTest main entry point
-int main(int argc, char** argv)
-{
-    // Initialize Qt application (required for Qt types)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

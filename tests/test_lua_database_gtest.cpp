@@ -11,17 +11,10 @@
 
 #include "../src/world/script_engine.h"
 #include "../src/world/world_document.h"
-#include <QCoreApplication>
+#include "fixtures/world_fixtures.h"
 #include <QFile>
 #include <QTemporaryDir>
-#include <gtest/gtest.h>
-#include <memory>
 #include <sqlite3.h>
-
-extern "C" {
-#include <lauxlib.h>
-#include <lua.h>
-}
 
 // Test fixture for Lua database API tests
 class LuaDatabaseTest : public ::testing::Test {
@@ -563,17 +556,4 @@ TEST_F(LuaDatabaseTest, DatabaseColumnTypeReturnsCorrectType)
 
     int type2 = getIntResult();
     EXPECT_EQ(type2, SQLITE_TEXT);
-}
-
-// GoogleTest main function
-int main(int argc, char** argv)
-{
-    // Initialize Qt application (required for Qt types)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

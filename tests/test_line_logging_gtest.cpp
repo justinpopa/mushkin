@@ -8,24 +8,18 @@
  * fixtures, and assertion messages.
  */
 
-#include "../src/text/line.h"
-#include "../src/text/style.h"
 #include "../src/world/color_utils.h"
-#include "../src/world/world_document.h"
-#include <QCoreApplication>
+#include "fixtures/world_fixtures.h"
 #include <QFile>
 #include <QTextStream>
-#include <gtest/gtest.h>
-#include <memory>
 
 // Test fixture for line logging tests
 // Provides common setup/teardown and helper methods
-class LineLoggingTest : public ::testing::Test {
+class LineLoggingTest : public WorldDocumentTest {
   protected:
     void SetUp() override
     {
-        // Create world document
-        doc = std::make_unique<WorldDocument>();
+        WorldDocumentTest::SetUp();
 
         // Initialize default logging settings
         doc->m_logging.log_output = false;
@@ -95,8 +89,6 @@ class LineLoggingTest : public ::testing::Test {
             QFile::remove(filename);
         }
     }
-
-    std::unique_ptr<WorldDocument> doc;
 };
 
 /**
@@ -487,18 +479,4 @@ TEST_F(LineLoggingTest, HTMLColorLogging)
     // Test 6: Content is preserved
     EXPECT_TRUE(content.contains("Red") && content.contains("Yellow"))
         << "Text content should be preserved";
-}
-
-// Main function required for GoogleTest
-// Note: QCoreApplication must be created before any Qt objects
-int main(int argc, char** argv)
-{
-    // Initialize Qt (required for Qt objects like WorldDocument)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

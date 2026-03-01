@@ -11,50 +11,27 @@
  * 6. Unicode text handling
  */
 
-#include "../src/text/line.h"
-#include "../src/text/style.h"
-#include "../src/world/world_document.h"
-#include <QCoreApplication>
-#include <gtest/gtest.h>
-#include <memory>
+#include "fixtures/world_fixtures.h"
 
 // Test fixture for note methods tests
-class NoteMethodsTest : public ::testing::Test {
+class NoteMethodsTest : public ConnectedWorldTest {
   protected:
     void SetUp() override
     {
-        doc = std::make_unique<WorldDocument>();
+        ConnectedWorldTest::SetUp();
 
-        // Initialize basic state
+        // Additional state beyond ConnectedWorldTest defaults
         doc->m_telnetParser->m_phase = Phase::NONE;
-        doc->m_display.utf8 = true; // UTF-8 mode
         doc->m_bNotesInRGB = true;
         doc->m_iNoteColourFore = qRgb(255, 255, 255); // White
         doc->m_iNoteColourBack = qRgb(0, 0, 0);       // Black
         doc->m_iNoteStyle = 0;                        // No special styling
 
-        // Create initial line (simulating active connection)
-        doc->m_currentLine =
-            std::make_unique<Line>(1, 80, 0, qRgb(192, 192, 192), qRgb(0, 0, 0), true);
-        auto initialStyle = std::make_unique<Style>();
-        initialStyle->iLength = 0;
-        initialStyle->iFlags = COLOUR_RGB;
-        initialStyle->iForeColour = qRgb(192, 192, 192);
-        initialStyle->iBackColour = qRgb(0, 0, 0);
-        initialStyle->pAction = nullptr;
-        doc->m_currentLine->styleList.push_back(std::move(initialStyle));
-
-        // Set current style (simulating MUD output in progress)
+        // Override current style to simulate MUD output in progress (bold red)
         doc->m_iFlags = COLOUR_RGB | HILITE;  // Bold text
         doc->m_iForeColour = qRgb(255, 0, 0); // Red
         doc->m_iBackColour = qRgb(0, 0, 0);   // Black
     }
-
-    void TearDown() override
-    {
-    }
-
-    std::unique_ptr<WorldDocument> doc;
 };
 
 // Test 1: Basic note() functionality
@@ -210,17 +187,4 @@ TEST_F(NoteMethodsTest, UnicodeTextHandling)
     EXPECT_TRUE(text.contains("☕")) << "Coffee emoji should be preserved";
     EXPECT_TRUE(text.contains("你好")) << "Chinese characters should be preserved";
     EXPECT_TRUE(text.contains("")) << "Emoji should be preserved";
-}
-
-// GoogleTest main function
-int main(int argc, char** argv)
-{
-    // Initialize Qt application (required for Qt types)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

@@ -11,14 +11,12 @@
 #include "../src/world/color_utils.h"
 #include "../src/world/world_document.h"
 #include "../src/world/xml_serialization.h"
-#include <QCoreApplication>
+#include "fixtures/world_fixtures.h"
 #include <QDebug>
 #include <QDir>
 #include <QFile>
 #include <QTemporaryFile>
 #include <QUuid>
-#include <gtest/gtest.h>
-#include <memory>
 
 // Helper to clean up all files related to SaveWorldXML atomic save
 // (main file, .tmp, and .bak files)
@@ -449,17 +447,4 @@ TEST_F(XmlRoundtripTest, TimerIntervalRoundtrip)
     EXPECT_EQ(loaded->omit_from_log, timer->omit_from_log);
     EXPECT_EQ(loaded->group, timer->group);
     EXPECT_EQ(loaded->user_option, timer->user_option);
-}
-
-// Main function required for GoogleTest
-int main(int argc, char** argv)
-{
-    // Initialize Qt (required for Qt objects)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

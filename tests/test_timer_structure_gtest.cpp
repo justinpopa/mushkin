@@ -4,10 +4,8 @@
 // Verifies Timer class fields and basic operations
 
 #include "../src/automation/timer.h"
-#include <QCoreApplication>
+#include "fixtures/world_fixtures.h"
 #include <QDateTime>
-#include <gtest/gtest.h>
-#include <memory>
 
 // Test fixture for timer structure tests
 class TimerStructureTest : public ::testing::Test {
@@ -144,17 +142,4 @@ TEST_F(TimerStructureTest, AllFieldsAccessible)
     EXPECT_EQ(timer->matched, 5);
     EXPECT_TRUE(timer->fire_time.isValid());
     EXPECT_TRUE(timer->when_fired.isValid());
-}
-
-// Main function required for GoogleTest
-int main(int argc, char** argv)
-{
-    // Initialize Qt (required for Qt objects)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

@@ -11,20 +11,16 @@
  * m_display.wrap_column controls the column width at which wrapping occurs.
  */
 
-#include "../src/text/line.h"
-#include "../src/text/style.h"
 #include "../src/world/color_utils.h"
-#include "../src/world/world_document.h"
-#include <QCoreApplication>
-#include <gtest/gtest.h>
-#include <memory>
+#include "fixtures/world_fixtures.h"
 
 // Test fixture for word wrap tests
-class WordWrapTest : public ::testing::Test {
+class WordWrapTest : public WorldDocumentTest {
   protected:
     void SetUp() override
     {
-        doc = std::make_unique<WorldDocument>();
+        WorldDocumentTest::SetUp();
+
         // Set a small wrap column for easier testing
         doc->m_display.wrap_column = 20;
         // Enable word wrap by default
@@ -32,9 +28,9 @@ class WordWrapTest : public ::testing::Test {
 
         // Create initial line for AddToLine to work
         // (normally done when connecting to a MUD)
-        doc->m_currentLine = std::make_unique<Line>(1,                   // line number
-                                                    doc->m_display.wrap_column,  // wrap column
-                                                    0,                   // flags
+        doc->m_currentLine = std::make_unique<Line>(1,                          // line number
+                                                    doc->m_display.wrap_column, // wrap column
+                                                    0,                          // flags
                                                     qRgb(255, 255, 255), // foreground (white)
                                                     qRgb(0, 0, 0),       // background (black)
                                                     false);              // UTF-8 mode
@@ -47,10 +43,6 @@ class WordWrapTest : public ::testing::Test {
         initialStyle->iBackColour = qRgb(0, 0, 0);
         initialStyle->pAction = nullptr;
         doc->m_currentLine->styleList.push_back(std::move(initialStyle));
-    }
-
-    void TearDown() override
-    {
     }
 
     // Helper to get the current line text
@@ -78,8 +70,6 @@ class WordWrapTest : public ::testing::Test {
         }
         return QString();
     }
-
-    std::unique_ptr<WorldDocument> doc;
 };
 
 /**
@@ -306,12 +296,4 @@ TEST_F(WordWrapTest, MultipleSpacesHandled)
 
     // Should wrap and spaces should be preserved
     EXPECT_GE(getLineCount(), 1) << "Should have at least one line after wrap";
-}
-
-// Main function required for GoogleTest
-int main(int argc, char** argv)
-{
-    QCoreApplication app(argc, argv);
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
 }

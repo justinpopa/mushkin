@@ -16,13 +16,8 @@
  */
 
 #include "../src/automation/trigger.h"
-#include "../src/text/line.h"
-#include "../src/text/style.h"
-#include "../src/world/world_document.h"
-#include <QCoreApplication>
+#include "fixtures/world_fixtures.h"
 #include <cstring>
-#include <gtest/gtest.h>
-#include <memory>
 
 // Test fixture for trigger matching tests
 class TriggerMatchingTest : public ::testing::Test {
@@ -256,17 +251,4 @@ TEST_F(TriggerMatchingTest, DisabledTrigger)
 
     EXPECT_EQ(disabledMatchedAfter, disabledMatchedBefore) << "Disabled trigger should not match";
     EXPECT_EQ(t8->matched, 0) << "Disabled trigger match count should be 0";
-}
-
-// Main function required for GoogleTest
-int main(int argc, char** argv)
-{
-    // Initialize Qt (required for Qt objects like WorldDocument)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

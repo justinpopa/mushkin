@@ -20,59 +20,43 @@
 
 #include "../src/automation/sendto.h"
 #include "../src/automation/timer.h"
-#include "../src/world/script_engine.h"
-#include "../src/world/world_document.h"
-#include <QCoreApplication>
+#include "fixtures/world_fixtures.h"
 #include <QDateTime>
-#include <gtest/gtest.h>
-#include <memory>
-
-extern "C" {
-#include <lauxlib.h>
-#include <lua.h>
-#include <lualib.h>
-}
 
 // Test fixture for timer API tests
-class TimerApiTest : public ::testing::Test {
+class TimerApiTest : public LuaWorldTest {
   protected:
     void SetUp() override
     {
-        doc = std::make_unique<WorldDocument>();
+        LuaWorldTest::SetUp();
         doc->m_mush_name = "Test World";
         doc->m_server = "localhost";
         doc->m_port = 4000;
-
-        // Verify script engine is available
-        ASSERT_NE(doc->m_ScriptEngine, nullptr) << "Script engine should be initialized";
-        ASSERT_NE(doc->m_ScriptEngine->L, nullptr) << "Lua state should be initialized";
     }
 
     void TearDown() override
     {
     }
 
-    // Helper to execute Lua code
+    // Helper to execute Lua code (takes QString, uses parseLua)
     void executeLua(const QString& code)
     {
         bool hasError = doc->m_ScriptEngine->parseLua(code, "test");
         ASSERT_FALSE(hasError) << "Lua execution should succeed";
     }
 
-    // Helper to get Lua global number
+    // Helper to get Lua global number (takes QString)
     double getLuaNumber(const QString& varName)
     {
-        lua_State* L = doc->m_ScriptEngine->L;
         lua_getglobal(L, varName.toUtf8().constData());
         double value = lua_tonumber(L, -1);
         lua_pop(L, 1);
         return value;
     }
 
-    // Helper to get Lua global string
+    // Helper to get Lua global string (takes QString)
     QString getLuaString(const QString& varName)
     {
-        lua_State* L = doc->m_ScriptEngine->L;
         lua_getglobal(L, varName.toUtf8().constData());
         const char* value = lua_tostring(L, -1);
         QString result = value ? QString::fromUtf8(value) : QString();
@@ -80,17 +64,14 @@ class TimerApiTest : public ::testing::Test {
         return result;
     }
 
-    // Helper to get Lua global boolean
+    // Helper to get Lua global boolean (takes QString)
     bool getLuaBoolean(const QString& varName)
     {
-        lua_State* L = doc->m_ScriptEngine->L;
         lua_getglobal(L, varName.toUtf8().constData());
         bool value = lua_toboolean(L, -1);
         lua_pop(L, 1);
         return value;
     }
-
-    std::unique_ptr<WorldDocument> doc;
 };
 
 // Test 1: AddTimer - Create interval timer
@@ -441,17 +422,4 @@ TEST_F(TimerApiTest, DeleteTimer)
     // Verify timers are deleted
     EXPECT_EQ(doc->getTimer("test_timer1"), nullptr) << "test_timer1 should be deleted";
     EXPECT_EQ(doc->getTimer("test_timer2"), nullptr) << "test_timer2 should be deleted";
-}
-
-// GoogleTest main function
-int main(int argc, char** argv)
-{
-    // Initialize Qt application (required for Qt types)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

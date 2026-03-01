@@ -13,15 +13,7 @@
 
 #include "../src/world/script_engine.h"
 #include "../src/world/world_document.h"
-#include <QCoreApplication>
-#include <gtest/gtest.h>
-#include <memory>
-
-extern "C" {
-#include <lauxlib.h>
-#include <lua.h>
-#include <lualib.h>
-}
+#include "fixtures/world_fixtures.h"
 
 // Error code constants (from lua_common.h)
 #define eOK 0
@@ -409,13 +401,4 @@ TEST_F(ArrayAPITest, ExportImportRoundtrip)
     EXPECT_EQ(getString("v1"), "John Doe") << "Roundtrip should preserve name";
     EXPECT_EQ(getString("v2"), "New York") << "Roundtrip should preserve city";
     EXPECT_EQ(getString("v3"), "42") << "Roundtrip should preserve count";
-}
-
-// Main entry point
-int main(int argc, char** argv)
-{
-    // Qt requires QCoreApplication even for non-GUI tests
-    QCoreApplication app(argc, argv);
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
 }

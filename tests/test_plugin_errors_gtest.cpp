@@ -11,12 +11,9 @@
 
 #include "../src/automation/plugin.h"
 #include "../src/storage/global_options.h"
-#include "../src/world/world_document.h"
-#include <QCoreApplication>
+#include "fixtures/world_fixtures.h"
 #include <QFile>
 #include <QTemporaryDir>
-#include <gtest/gtest.h>
-#include <memory>
 
 // Error codes from methods_plugins.cpp
 #define eOK 0
@@ -293,17 +290,4 @@ end
     auto saveResult = recursionPlugin->SaveState();
 
     EXPECT_TRUE(saveResult.has_value()) << "SaveState should succeed (recursion prevention works)";
-}
-
-// GoogleTest main function
-int main(int argc, char** argv)
-{
-    // Initialize Qt application (required for Qt types)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

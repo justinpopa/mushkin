@@ -10,22 +10,11 @@
 
 #include "../src/automation/alias.h"
 #include "../src/world/world_document.h"
-#include <QCoreApplication>
-#include <gtest/gtest.h>
-#include <memory>
+#include "fixtures/world_fixtures.h"
 
 // Test fixture for alias integration tests
-class AliasIntegrationTest : public ::testing::Test {
+class AliasIntegrationTest : public WorldDocumentTest {
   protected:
-    void SetUp() override
-    {
-        doc = std::make_unique<WorldDocument>();
-    }
-
-    void TearDown() override
-    {
-    }
-
     // Helper to add and enable an alias
     Alias* addAlias(const QString& label, const QString& pattern)
     {
@@ -42,8 +31,6 @@ class AliasIntegrationTest : public ::testing::Test {
 
         return aliasPtr;
     }
-
-    std::unique_ptr<WorldDocument> doc;
 };
 
 // Test 1: Alias Intercepts Command (Prevents MUD Send)
@@ -200,17 +187,4 @@ TEST_F(AliasIntegrationTest, ExactMatchPrecedence)
     EXPECT_EQ(a2->matched, 1) << "Exact match should execute";
     // Wildcard should not execute
     EXPECT_EQ(a1->matched, 0) << "Wildcard match should not execute";
-}
-
-// GoogleTest main function
-int main(int argc, char** argv)
-{
-    // Initialize Qt application (required for Qt types)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

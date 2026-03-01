@@ -12,89 +12,9 @@
  * 7. error_code table exists
  */
 
-#include "../src/text/line.h"
-#include "../src/text/style.h"
-#include "../src/world/script_engine.h"
-#include "../src/world/world_document.h"
-#include <QCoreApplication>
-#include <gtest/gtest.h>
-#include <memory>
+#include "fixtures/world_fixtures.h"
 
-extern "C" {
-#include <lauxlib.h>
-#include <lua.h>
-#include <lualib.h>
-}
-
-// Test fixture for Lua API tests
-class LuaApiTest : public ::testing::Test {
-  protected:
-    void SetUp() override
-    {
-        doc = std::make_unique<WorldDocument>();
-
-        // Initialize basic state
-        doc->m_mush_name = "Test World";
-        doc->m_server = "test.mud.com";
-        doc->m_port = 4000;
-        doc->m_connectionManager->m_iConnectPhase = eConnectConnectedToMud;
-        doc->m_display.utf8 = true;
-
-        // Create initial line (needed for note() to work)
-        doc->m_currentLine =
-            std::make_unique<Line>(1, 80, 0, qRgb(192, 192, 192), qRgb(0, 0, 0), true);
-        auto initialStyle = std::make_unique<Style>();
-        initialStyle->iLength = 0;
-        initialStyle->iFlags = COLOUR_RGB;
-        initialStyle->iForeColour = qRgb(192, 192, 192);
-        initialStyle->iBackColour = qRgb(0, 0, 0);
-        initialStyle->pAction = nullptr;
-        doc->m_currentLine->styleList.push_back(std::move(initialStyle));
-
-        // Set current style
-        doc->m_iFlags = COLOUR_RGB;
-        doc->m_iForeColour = qRgb(192, 192, 192);
-        doc->m_iBackColour = qRgb(0, 0, 0);
-
-        // Get Lua state
-        ASSERT_NE(doc->m_ScriptEngine, nullptr) << "ScriptEngine should exist";
-        ASSERT_NE(doc->m_ScriptEngine->L, nullptr) << "Lua state should exist";
-        L = doc->m_ScriptEngine->L;
-    }
-
-    void TearDown() override
-    {
-    }
-
-    // Helper to execute Lua code
-    void executeLua(const char* code)
-    {
-        ASSERT_EQ(luaL_loadstring(L, code), 0) << "Lua code should compile: " << code;
-        ASSERT_EQ(lua_pcall(L, 0, 0, 0), 0) << "Lua code should execute: " << code;
-    }
-
-    // Helper to get global string value
-    QString getGlobalString(const char* name)
-    {
-        lua_getglobal(L, name);
-        const char* str = lua_tostring(L, -1);
-        QString result = str ? QString::fromUtf8(str) : QString();
-        lua_pop(L, 1);
-        return result;
-    }
-
-    // Helper to get global number value
-    double getGlobalNumber(const char* name)
-    {
-        lua_getglobal(L, name);
-        double result = lua_tonumber(L, -1);
-        lua_pop(L, 1);
-        return result;
-    }
-
-    std::unique_ptr<WorldDocument> doc;
-    lua_State* L = nullptr;
-};
+class LuaApiTest : public ConnectedWorldTest {};
 
 // Test 1: world table exists
 TEST_F(LuaApiTest, WorldTableExists)
@@ -336,17 +256,4 @@ TEST_F(LuaApiTest, DisconnectErrorCodes)
     double resultDisconnecting = getGlobalNumber("result_disconnecting");
     EXPECT_EQ(resultDisconnecting, 30002.0)
         << "Disconnect() should return eWorldClosed (30002) when already disconnecting";
-}
-
-// GoogleTest main function
-int main(int argc, char** argv)
-{
-    // Initialize Qt application (required for Qt types)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

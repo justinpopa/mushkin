@@ -13,51 +13,10 @@
  * 7. Spot-checks: North, CascadeWindows, Find, MacroF1, ConfigureAliases, AltA
  */
 
-#include "../src/world/script_engine.h"
-#include "../src/world/world_document.h"
-#include <QApplication>
-#include <gtest/gtest.h>
-#include <memory>
-
-extern "C" {
-#include <lauxlib.h>
-#include <lua.h>
-#include <lualib.h>
-}
+#include "fixtures/world_fixtures.h"
 
 // Test fixture for DoCommand / GetInternalCommandsList tests
-class DoCommandTest : public ::testing::Test {
-  protected:
-    void SetUp() override
-    {
-        doc = std::make_unique<WorldDocument>();
-        ASSERT_NE(doc->m_ScriptEngine, nullptr) << "ScriptEngine should be initialised";
-        ASSERT_NE(doc->m_ScriptEngine->L, nullptr) << "Lua state should be initialised";
-        L = doc->m_ScriptEngine->L;
-    }
-
-    void TearDown() override
-    {
-        // WorldDocument owns the Lua state — nothing extra to clean up here.
-    }
-
-    // Helper: check that tableName.funcName is a function
-    bool functionExists(const char* tableName, const char* funcName)
-    {
-        lua_getglobal(L, tableName);
-        if (!lua_istable(L, -1)) {
-            lua_pop(L, 1);
-            return false;
-        }
-        lua_getfield(L, -1, funcName);
-        bool exists = lua_isfunction(L, -1);
-        lua_pop(L, 2);
-        return exists;
-    }
-
-    std::unique_ptr<WorldDocument> doc;
-    lua_State* L = nullptr;
-};
+class DoCommandTest : public LuaWorldTest {};
 
 // ========== Registration tests ==========
 
@@ -311,11 +270,4 @@ TEST_F(DoCommandTest, GetInternalCommandsListContainsAltA)
     ASSERT_EQ(rc, 0) << lua_tostring(L, -1);
     EXPECT_TRUE(lua_toboolean(L, -1)) << "'AltA' should be in GetInternalCommandsList()";
     lua_pop(L, 1);
-}
-
-int main(int argc, char** argv)
-{
-    ::testing::InitGoogleTest(&argc, argv);
-    QApplication app(argc, argv);
-    return RUN_ALL_TESTS();
 }

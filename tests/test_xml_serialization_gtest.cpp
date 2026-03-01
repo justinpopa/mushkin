@@ -9,13 +9,11 @@
 #include "../src/automation/trigger.h"
 #include "../src/world/world_document.h"
 #include "../src/world/xml_serialization.h"
-#include <QCoreApplication>
+#include "fixtures/world_fixtures.h"
 #include <QDir>
 #include <QFile>
 #include <QTemporaryFile>
 #include <QUuid>
-#include <gtest/gtest.h>
-#include <memory>
 
 // Helper to clean up all files related to SaveWorldXML atomic save
 // (main file, .tmp, and .bak files)
@@ -466,12 +464,4 @@ TEST_F(XmlSerializationTest, MultipleTriggersAndAliases)
     }
 
     cleanupSaveFiles(filename);
-}
-
-// GoogleTest main function
-int main(int argc, char** argv)
-{
-    QCoreApplication app(argc, argv);
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
 }

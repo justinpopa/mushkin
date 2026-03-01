@@ -14,19 +14,9 @@
 #include "../src/automation/plugin.h"
 #include "../src/automation/variable.h"
 #include "../src/storage/global_options.h"
-#include "../src/world/script_engine.h"
-#include "../src/world/world_document.h"
-#include <QCoreApplication>
+#include "fixtures/world_fixtures.h"
 #include <QFile>
 #include <QTemporaryDir>
-#include <gtest/gtest.h>
-#include <memory>
-
-extern "C" {
-#include <lauxlib.h>
-#include <lua.h>
-#include <lualib.h>
-}
 
 // Helper to create test plugin XML
 QString createTestPluginXML(const QString& id, const QString& name, const QString& script)
@@ -699,17 +689,4 @@ TEST_F(PluginApiTest, ReloadPlugin)
     ASSERT_NE(plugin1, nullptr) << "ReloadPlugin should succeed: " << errorMsg.toStdString();
     EXPECT_EQ(plugin1->m_strName, QString("TestPlugin1"))
         << "Reloaded plugin should have correct name";
-}
-
-// GoogleTest main function
-int main(int argc, char** argv)
-{
-    // Initialize Qt application (required for Qt types)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

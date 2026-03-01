@@ -10,19 +10,9 @@
  */
 
 #include "../src/automation/plugin.h"
-#include "../src/world/script_engine.h"
-#include "../src/world/world_document.h"
-#include <QCoreApplication>
+#include "fixtures/world_fixtures.h"
 #include <QFile>
 #include <QTemporaryFile>
-#include <gtest/gtest.h>
-#include <memory>
-
-extern "C" {
-#include <lauxlib.h>
-#include <lua.h>
-#include <lualib.h>
-}
 
 // Test fixture for plugin callback tests
 class PluginCallbacksTest : public ::testing::Test {
@@ -286,17 +276,4 @@ TEST_F(PluginCallbacksTest, ExecutePluginScript_NonExistentCallback)
     doc->m_CurrentPlugin = nullptr;
 
     EXPECT_TRUE(result) << "Non-existent callback should return true (default = continue)";
-}
-
-// GoogleTest main function
-int main(int argc, char** argv)
-{
-    // Initialize Qt application (required for Qt types)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }
