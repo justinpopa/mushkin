@@ -89,31 +89,7 @@ MainWindow::MainWindow(QWidget* parent)
     m_mdiArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     m_mdiArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
 
-#ifdef Q_OS_MACOS
-    // On macOS, wrap MDI area in a container with minimized bar at bottom
-    // since frameless MDI subwindows don't show a visible minimized representation
-    QWidget* centralContainer = new QWidget(this);
-    QVBoxLayout* centralLayout = new QVBoxLayout(centralContainer);
-    centralLayout->setContentsMargins(0, 0, 0, 0);
-    centralLayout->setSpacing(0);
-    centralLayout->addWidget(m_mdiArea, 1);
-
-    // Create minimized bar container (hidden until windows are minimized)
-    m_minimizedBarContainer = new QWidget(centralContainer);
-    m_minimizedBarContainer->setFixedHeight(28);
-    m_minimizedBarContainer->setStyleSheet(
-        "QWidget { background: #2a2a2a; border-top: 1px solid #444; }");
-    m_minimizedBarLayout = new QHBoxLayout(m_minimizedBarContainer);
-    m_minimizedBarLayout->setContentsMargins(4, 2, 4, 2);
-    m_minimizedBarLayout->setSpacing(4);
-    m_minimizedBarLayout->addStretch();
-    m_minimizedBarContainer->hide();
-
-    centralLayout->addWidget(m_minimizedBarContainer);
-    setCentralWidget(centralContainer);
-#else
     setCentralWidget(m_mdiArea);
-#endif
 
     // Connect MDI area signals
     connect(m_mdiArea, &QMdiArea::subWindowActivated, this, &MainWindow::updateMenus);
@@ -2031,22 +2007,6 @@ void MainWindow::newWorld()
     subWindow->setAttribute(Qt::WA_DeleteOnClose);
     subWindow->setWindowTitle(worldWidget->worldName());
 
-    // Remove the system menu (that extra menu bar inside the MDI area)
-    subWindow->setSystemMenu(nullptr);
-
-#ifdef Q_OS_MACOS
-    // On macOS, use frameless subwindow - WorldWidget has its own custom title bar
-    subWindow->setWindowFlags(Qt::FramelessWindowHint);
-    // Connect to window state changes to update minimized bar
-    connect(subWindow, &QMdiSubWindow::windowStateChanged, this,
-            &MainWindow::onSubWindowStateChanged);
-    // Connect to window state changes to update WorldWidget frame (hide border when maximized)
-    connect(subWindow, &QMdiSubWindow::windowStateChanged, worldWidget,
-            [worldWidget](Qt::WindowStates, Qt::WindowStates newState) {
-                worldWidget->updateFrameForWindowState(newState);
-            });
-#endif
-
     // Connect window title changes
     connect(worldWidget, &WorldWidget::windowTitleChanged, subWindow,
             &QMdiSubWindow::setWindowTitle);
@@ -2059,15 +2019,6 @@ void MainWindow::newWorld()
 
     // Connect to subwindow's destroyed signal to save geometry (newWorld)
     connect(subWindow, &QObject::destroyed, [this, worldWidget, subWindow]() {
-#ifdef Q_OS_MACOS
-        // Remove from minimized bars if it exists
-        if (m_minimizedBars.contains(subWindow)) {
-            QWidget* bar = m_minimizedBars.take(subWindow);
-            m_minimizedBarLayout->removeWidget(bar);
-            delete bar;
-            updateMinimizedBar();
-        }
-#endif
         if (!worldWidget || worldWidget->worldName().isEmpty()) {
             return;
         }
@@ -2126,22 +2077,6 @@ void MainWindow::openWorld(const QString& filename)
     subWindow->setAttribute(Qt::WA_DeleteOnClose);
     subWindow->setWindowTitle(worldWidget->worldName());
 
-    // Remove the system menu (that extra menu bar inside the MDI area)
-    subWindow->setSystemMenu(nullptr);
-
-#ifdef Q_OS_MACOS
-    // On macOS, use frameless subwindow - WorldWidget has its own custom title bar
-    subWindow->setWindowFlags(Qt::FramelessWindowHint);
-    // Connect to window state changes to update minimized bar
-    connect(subWindow, &QMdiSubWindow::windowStateChanged, this,
-            &MainWindow::onSubWindowStateChanged);
-    // Connect to window state changes to update WorldWidget frame (hide border when maximized)
-    connect(subWindow, &QMdiSubWindow::windowStateChanged, worldWidget,
-            [worldWidget](Qt::WindowStates, Qt::WindowStates newState) {
-                worldWidget->updateFrameForWindowState(newState);
-            });
-#endif
-
     // Connect window title changes
     connect(worldWidget, &WorldWidget::windowTitleChanged, subWindow,
             &QMdiSubWindow::setWindowTitle);
@@ -2155,15 +2090,6 @@ void MainWindow::openWorld(const QString& filename)
     // Connect to subwindow's destroyed signal to save geometry
     // This ensures we save before the window is deleted
     connect(subWindow, &QObject::destroyed, [this, worldWidget, subWindow]() {
-#ifdef Q_OS_MACOS
-        // Remove from minimized bars if it exists
-        if (m_minimizedBars.contains(subWindow)) {
-            QWidget* bar = m_minimizedBars.take(subWindow);
-            m_minimizedBarLayout->removeWidget(bar);
-            delete bar;
-            updateMinimizedBar();
-        }
-#endif
         if (!worldWidget || worldWidget->worldName().isEmpty()) {
             return;
         }
@@ -4978,26 +4904,6 @@ void MainWindow::createNotepadWindow(NotepadWidget* notepad)
     subWindow->setAttribute(Qt::WA_DeleteOnClose);
     subWindow->setWindowTitle(notepad->m_strTitle);
 
-    // Remove the system menu (that extra menu bar inside the MDI area)
-    subWindow->setSystemMenu(nullptr);
-
-#ifdef Q_OS_MACOS
-    // On macOS, use frameless subwindow for consistency with world windows
-    subWindow->setWindowFlags(Qt::FramelessWindowHint);
-    // Connect to window state changes to update minimized bar
-    connect(subWindow, &QMdiSubWindow::windowStateChanged, this,
-            &MainWindow::onSubWindowStateChanged);
-    // Clean up minimized bar when destroyed
-    connect(subWindow, &QObject::destroyed, [this, subWindow]() {
-        if (m_minimizedBars.contains(subWindow)) {
-            QWidget* bar = m_minimizedBars.take(subWindow);
-            m_minimizedBarLayout->removeWidget(bar);
-            delete bar;
-            updateMinimizedBar();
-        }
-    });
-#endif
-
     // Store reference to MDI subwindow in notepad
     notepad->m_pMdiSubWindow = subWindow;
 
@@ -5553,77 +5459,3 @@ void MainWindow::onWorldNameIndicatorClicked()
     m_activityWindow->show();
     m_activityWindow->raise();
 }
-
-#ifdef Q_OS_MACOS
-void MainWindow::onSubWindowStateChanged(Qt::WindowStates oldState, Qt::WindowStates newState)
-{
-    Q_UNUSED(oldState);
-
-    QMdiSubWindow* subWindow = qobject_cast<QMdiSubWindow*>(sender());
-    if (!subWindow) {
-        return;
-    }
-
-    bool wasMinimized = m_minimizedBars.contains(subWindow);
-    bool isMinimized = (newState & Qt::WindowMinimized);
-
-    if (isMinimized && !wasMinimized) {
-        // Window was just minimized - create a bar for it
-        QWidget* bar = new QWidget(m_minimizedBarContainer);
-        bar->setFixedHeight(24);
-        bar->setStyleSheet(
-            "QWidget { background: #3a3a3a; border: 1px solid #555; border-radius: 3px; }");
-
-        QHBoxLayout* barLayout = new QHBoxLayout(bar);
-        barLayout->setContentsMargins(6, 2, 4, 2);
-        barLayout->setSpacing(4);
-
-        // Window title
-        QLabel* titleLabel = new QLabel(subWindow->windowTitle(), bar);
-        titleLabel->setStyleSheet("QLabel { color: #ccc; border: none; background: transparent; }");
-        titleLabel->setMaximumWidth(150);
-        barLayout->addWidget(titleLabel);
-
-        // Restore button
-        QToolButton* restoreBtn = new QToolButton(bar);
-        restoreBtn->setText("□");
-        restoreBtn->setFixedSize(18, 18);
-        restoreBtn->setStyleSheet("QToolButton { border: 1px solid #666; border-radius: 2px; "
-                                  "background: #444; color: #aaa; }"
-                                  "QToolButton:hover { background: #555; }");
-        connect(restoreBtn, &QToolButton::clicked, [subWindow]() { subWindow->showNormal(); });
-        barLayout->addWidget(restoreBtn);
-
-        // Close button
-        QToolButton* closeBtn = new QToolButton(bar);
-        closeBtn->setText("×");
-        closeBtn->setFixedSize(18, 18);
-        closeBtn->setStyleSheet("QToolButton { border: 1px solid #666; border-radius: 2px; "
-                                "background: #444; color: #aaa; }"
-                                "QToolButton:hover { background: #744; color: #fcc; }");
-        connect(closeBtn, &QToolButton::clicked, [subWindow]() { subWindow->close(); });
-        barLayout->addWidget(closeBtn);
-
-        // Insert before the stretch
-        m_minimizedBarLayout->insertWidget(m_minimizedBarLayout->count() - 1, bar);
-        m_minimizedBars.insert(subWindow, bar);
-
-    } else if (!isMinimized && wasMinimized) {
-        // Window was just restored - remove its bar
-        QWidget* bar = m_minimizedBars.take(subWindow);
-        if (bar) {
-            m_minimizedBarLayout->removeWidget(bar);
-            delete bar;
-        }
-    }
-
-    updateMinimizedBar();
-}
-
-void MainWindow::updateMinimizedBar()
-{
-    // Show/hide the container based on whether there are any minimized windows
-    bool hasMinimized = !m_minimizedBars.isEmpty();
-    m_minimizedBarContainer->setVisible(hasMinimized);
-}
-#endif

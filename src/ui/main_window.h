@@ -288,12 +288,6 @@ class MainWindow : public QMainWindow {
     // System tray
     void trayIconActivated(QSystemTrayIcon::ActivationReason reason);
 
-#ifdef Q_OS_MACOS
-    // Minimized bar management (macOS only)
-    void onSubWindowStateChanged(Qt::WindowStates oldState, Qt::WindowStates newState);
-    void updateMinimizedBar();
-#endif
-
   private:
     /**
      * Open worlds queued from command line or startup list
@@ -374,13 +368,6 @@ class MainWindow : public QMainWindow {
 
     // UI Components
     QMdiArea* m_mdiArea;
-
-#ifdef Q_OS_MACOS
-    // Minimized bar (macOS only - frameless MDI windows need custom minimized representation)
-    QWidget* m_minimizedBarContainer;
-    QHBoxLayout* m_minimizedBarLayout;
-    QMap<QMdiSubWindow*, QWidget*> m_minimizedBars; // Maps subwindow to its minimized bar widget
-#endif
 
     // Toolbars
     QToolBar* m_mainToolBar;
