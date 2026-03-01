@@ -52,8 +52,8 @@
 // BGR format is used for MUSHclient compatibility - plugins may use hardcoded color values
 QRgb xterm_256_colours[256];
 
-// BGR macro for Windows COLORREF compatibility (0x00BBGGRR)
-#define BGR(r, g, b) (static_cast<QRgb>((r) | ((g) << 8) | ((b) << 16)))
+// BGR macro from color_utils.h (Windows COLORREF compatibility: 0x00BBGGRR)
+#include "color_utils.h"
 
 // Initialize the xterm 256-color palette in BGR format
 static void initializeXterm256Colors()

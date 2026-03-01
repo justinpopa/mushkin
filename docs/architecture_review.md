@@ -477,11 +477,11 @@ A helper macro or function could reduce this to a single line.
 
 ---
 
-### D7 — Duplicate `BGR()` macro [LOW]
+### D7 — Duplicate `BGR()` macro [LOW] ✅
 
 **Risk:** `BGR()` defined in both `color_utils.h` and `world_protocol.cpp`. Minor ODR/maintenance hazard.
 
 **Targets:**
-- [ ] Remove duplicate from `world_protocol.cpp`, use `color_utils.h` version
+- [x] Remove duplicate from `world_protocol.cpp`, use `color_utils.h` version
 
 **Acceptance:** Single definition of `BGR()`. Build + test pass.
