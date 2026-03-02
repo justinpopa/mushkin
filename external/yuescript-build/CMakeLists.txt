@@ -46,7 +46,7 @@ if(MSVC)
         # Required for utf8cpp.h to enable the C++11+ string overloads
         /Zc:__cplusplus
     )
-else()
+elseif(NOT WIN32)
     target_compile_options(yue_static PRIVATE
         $<$<CONFIG:Release>:-O3>
         -fPIC
