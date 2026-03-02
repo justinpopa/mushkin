@@ -83,7 +83,7 @@ plugins/
 # Qt installations (from aqt)
 6.*/
 aqtinstall.log
-docs/wiki/
+docs/
 
 # Reference copies of original MUSHclient source (not part of this project)
 reference/
