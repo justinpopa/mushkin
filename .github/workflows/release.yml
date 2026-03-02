@@ -34,17 +34,28 @@ jobs:
 
   build-macos:
     name: Build macOS
-    runs-on: macos-latest
+    runs-on: [self-hosted, "macos"]
     needs: version
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
+      - name: Setup Homebrew
+        run: |
+          if [ -x /opt/homebrew/bin/brew ]; then
+            eval "$(/opt/homebrew/bin/brew shellenv)"
+          elif [ -x /usr/local/bin/brew ]; then
+            eval "$(/usr/local/bin/brew shellenv)"
+          fi
+          echo "$(brew --prefix)/bin" >> $GITHUB_PATH
+          echo "$(brew --prefix)/sbin" >> $GITHUB_PATH
+
       - name: Install dependencies
         run: |
-          brew install cmake ninja pcre luajit sqlite openssl aqtinstall
+          brew install cmake ninja pcre luajit sqlite openssl libssh aqtinstall
 
       - name: Cache Qt Static
         id: cache-qt
@@ -72,26 +83,10 @@ jobs:
 
   build-linux:
     name: Build Linux
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, "linux"]
     needs: version
+    timeout-minutes: 45
     steps:
-      - name: Free up disk space
-        run: |
-          # Remove large unused tools to free ~30GB+
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          sudo rm -rf /opt/hostedtoolcache/go
-          sudo rm -rf /opt/hostedtoolcache/node
-          sudo rm -rf /opt/hostedtoolcache/Python
-          sudo rm -rf /opt/hostedtoolcache/Ruby
-          sudo rm -rf /usr/local/share/boost
-          sudo rm -rf /usr/share/swift
-          sudo rm -rf /usr/local/.ghcup
-          sudo apt-get clean
-          df -h
-
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -103,7 +98,7 @@ jobs:
           sudo apt-get install -y \
             build-essential cmake ninja-build pkg-config \
             libpcre3-dev libsqlite3-dev luajit libluajit-5.1-dev \
-            libssl-dev zlib1g-dev libgl1-mesa-dev libglu1-mesa-dev \
+            libssl-dev zlib1g-dev libssh-dev libgl1-mesa-dev libglu1-mesa-dev \
             libxkbcommon-dev libxcb1-dev libxcb-cursor-dev libxcb-icccm4-dev \
             libxcb-keysyms1-dev libxcb-shape0-dev libxcb-xfixes0-dev \
             libxcb-sync-dev libxcb-randr0-dev libxcb-render-util0-dev \
@@ -140,26 +135,37 @@ jobs:
 
   build-windows:
     name: Build Windows
-    runs-on: windows-latest
+    runs-on: [self-hosted, "windows"]
     needs: version
+    timeout-minutes: 45
     steps:
+      - name: Bootstrap (Windows)
+        run: |
+          # Install Chocolatey if missing
+          if (!(Get-Command choco -ErrorAction SilentlyContinue)) {
+            Set-ExecutionPolicy Bypass -Scope Process -Force
+            [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+            Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+            $env:PATH = "C:\ProgramData\chocolatey\bin;$env:PATH"
+            echo "C:\ProgramData\chocolatey\bin" >> $env:GITHUB_PATH
+          }
+          # Install git if missing
+          if (!(Get-Command git -ErrorAction SilentlyContinue)) {
+            choco install git -y
+            $env:PATH = "C:\Program Files\Git\cmd;$env:PATH"
+            echo "C:\Program Files\Git\cmd" >> $env:GITHUB_PATH
+          }
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Enable Long Paths
-        run: |
-          Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' -Name 'LongPathsEnabled' -Value 1 -Type DWord
-
       - name: Install dependencies
         run: |
           choco install ninja -y
           pip install aqtinstall
-          vcpkg install pcre:x64-windows luajit:x64-windows sqlite3:x64-windows openssl:x64-windows zlib:x64-windows
-
-      - name: Setup MSVC
-        uses: ilammy/msvc-dev-cmd@v1
+          vcpkg install pcre:x64-windows luajit:x64-windows sqlite3:x64-windows openssl:x64-windows zlib:x64-windows libssh:x64-windows
 
       - name: Cache Qt Static
         id: cache-qt
@@ -239,7 +245,7 @@ jobs:
             ### Linux
             First install dependencies:
             ```bash
-            sudo apt install libpcre3 libluajit-5.1-2 libsqlite3-0 libssl3 zlib1g
+            sudo apt install libpcre3 libluajit-5.1-2 libsqlite3-0 libssl3 zlib1g libssh-4
             ```
             Then:
             ```bash
@@ -250,7 +256,7 @@ jobs:
             ### macOS
             First install dependencies:
             ```bash
-            brew install pcre luajit sqlite openssl
+            brew install pcre luajit sqlite openssl libssh
             ```
             Then:
             1. Extract the ZIP file

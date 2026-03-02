@@ -7,7 +7,7 @@
 # Prerequisites (Debian/Ubuntu):
 #   sudo apt install cmake ninja-build build-essential pkg-config \
 #       libpcre3-dev libsqlite3-dev luajit libluajit-5.1-dev \
-#       libssl-dev zlib1g-dev libgl1-mesa-dev libglu1-mesa-dev \
+#       libssl-dev zlib1g-dev libssh-dev libgl1-mesa-dev libglu1-mesa-dev \
 #       libxkbcommon-dev libxcb1-dev libxcb-cursor-dev libxcb-icccm4-dev \
 #       libxcb-keysyms1-dev libxcb-shape0-dev libxcb-xfixes0-dev \
 #       libxcb-sync-dev libxcb-randr0-dev libxcb-render-util0-dev \
@@ -65,13 +65,14 @@ check_prerequisites() {
     pkg-config --exists luajit 2>/dev/null || missing+=("libluajit-5.1-dev")
     pkg-config --exists openssl 2>/dev/null || missing+=("libssl-dev")
     pkg-config --exists zlib 2>/dev/null || missing+=("zlib1g-dev")
+    pkg-config --exists libssh 2>/dev/null || missing+=("libssh-dev")
     pkg-config --exists xcb 2>/dev/null || missing+=("libxcb1-dev")
     pkg-config --exists xkbcommon 2>/dev/null || missing+=("libxkbcommon-dev")
 
     if [ ${#missing[@]} -gt 0 ]; then
         echo_error "Missing: ${missing[*]}"
         echo_error "Install with: sudo apt install cmake ninja-build build-essential pkg-config \\"
-        echo_error "    libpcre3-dev libsqlite3-dev luajit libluajit-5.1-dev libssl-dev zlib1g-dev \\"
+        echo_error "    libpcre3-dev libsqlite3-dev luajit libluajit-5.1-dev libssl-dev zlib1g-dev libssh-dev \\"
         echo_error "    libgl1-mesa-dev libxkbcommon-dev libxcb1-dev libxcb-cursor-dev libxcb-icccm4-dev \\"
         echo_error "    libxcb-keysyms1-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb-sync-dev \\"
         echo_error "    libxcb-randr0-dev libxcb-render-util0-dev libxcb-image0-dev libxcb-glx0-dev \\"

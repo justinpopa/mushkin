@@ -9,7 +9,7 @@
 #
 # Prerequisites:
 #   xcode-select --install
-#   brew install cmake ninja pcre luajit sqlite openssl
+#   brew install cmake ninja pcre luajit sqlite openssl libssh
 #   pip3 install aqtinstall
 #
 # Usage:
@@ -59,10 +59,11 @@ check_prerequisites() {
     [ -f /opt/homebrew/opt/luajit/lib/libluajit-5.1.dylib ] || [ -f /usr/local/opt/luajit/lib/libluajit-5.1.dylib ] || missing+=("luajit")
     [ -f /opt/homebrew/opt/sqlite/lib/libsqlite3.dylib ] || [ -f /usr/local/opt/sqlite/lib/libsqlite3.dylib ] || missing+=("sqlite")
     [ -f /opt/homebrew/opt/openssl/lib/libssl.dylib ] || [ -f /usr/local/opt/openssl/lib/libssl.dylib ] || missing+=("openssl")
+    [ -f /opt/homebrew/opt/libssh/lib/libssh.dylib ] || [ -f /usr/local/opt/libssh/lib/libssh.dylib ] || missing+=("libssh")
 
     if [ ${#missing[@]} -gt 0 ]; then
         echo_error "Missing: ${missing[*]}"
-        echo_error "Install with: brew install cmake ninja pcre luajit sqlite openssl"
+        echo_error "Install with: brew install cmake ninja pcre luajit sqlite openssl libssh"
         exit 1
     fi
     echo_info "Prerequisites OK"

@@ -15,7 +15,7 @@
 #   setx VCPKG_ROOT "C:\vcpkg"
 #
 #   # Install dependencies
-#   C:\vcpkg\vcpkg install pcre:x64-windows luajit:x64-windows sqlite3:x64-windows openssl:x64-windows zlib:x64-windows
+#   C:\vcpkg\vcpkg install pcre:x64-windows luajit:x64-windows sqlite3:x64-windows openssl:x64-windows zlib:x64-windows libssh:x64-windows
 #
 #   # Install aqtinstall
 #   pip install aqtinstall
@@ -68,6 +68,7 @@ function Check-Prerequisites {
         if (-not (Test-Path (Join-Path $vcpkgInstalled "lib\lua51.lib"))) { $missing += "luajit:x64-windows" }
         if (-not (Test-Path (Join-Path $vcpkgInstalled "lib\sqlite3.lib"))) { $missing += "sqlite3:x64-windows" }
         if (-not (Test-Path (Join-Path $vcpkgInstalled "lib\libssl.lib"))) { $missing += "openssl:x64-windows" }
+        if (-not (Test-Path (Join-Path $vcpkgInstalled "lib\ssh.lib"))) { $missing += "libssh:x64-windows" }
     } else {
         $missing += "vcpkg packages not installed"
     }
@@ -75,7 +76,7 @@ function Check-Prerequisites {
     if ($missing.Count -gt 0) {
         Write-Err "Missing: $($missing -join ', ')"
         Write-Err "Install vcpkg packages with:"
-        Write-Err "  $env:VCPKG_ROOT\vcpkg install pcre:x64-windows luajit:x64-windows sqlite3:x64-windows openssl:x64-windows zlib:x64-windows"
+        Write-Err "  $env:VCPKG_ROOT\vcpkg install pcre:x64-windows luajit:x64-windows sqlite3:x64-windows openssl:x64-windows zlib:x64-windows libssh:x64-windows"
         exit 1
     }
     Write-Info "Prerequisites OK"
