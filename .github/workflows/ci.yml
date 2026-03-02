@@ -29,10 +29,19 @@ jobs:
             label: windows
 
     steps:
-      # ===== Bootstrap (install git before checkout) =====
-      - name: Bootstrap git (Windows)
+      # ===== Windows bootstrap (no package manager, no git) =====
+      - name: Bootstrap (Windows)
         if: matrix.os == 'Windows'
         run: |
+          # Install Chocolatey if missing
+          if (!(Get-Command choco -ErrorAction SilentlyContinue)) {
+            Set-ExecutionPolicy Bypass -Scope Process -Force
+            [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+            Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+            $env:PATH = "C:\ProgramData\chocolatey\bin;$env:PATH"
+            echo "C:\ProgramData\chocolatey\bin" >> $env:GITHUB_PATH
+          }
+          # Install git if missing
           if (!(Get-Command git -ErrorAction SilentlyContinue)) {
             choco install git -y
             $env:PATH = "C:\Program Files\Git\cmd;$env:PATH"
@@ -48,7 +57,6 @@ jobs:
       - name: Install toolchain (Linux)
         if: matrix.os == 'Linux'
         run: |
-          # Clang 22 from LLVM apt repo
           if ! clang-${LLVM_VERSION} --version >/dev/null 2>&1; then
             wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
             echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-${LLVM_VERSION} main" | \
@@ -62,17 +70,19 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            cmake ninja-build python3-pip \
+            cmake ninja-build python3-pip python3-venv \
             libgl1-mesa-dev libxkbcommon-dev \
             libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 \
             libluajit-5.1-dev libpcre3-dev libsqlite3-dev \
             libssl-dev zlib1g-dev \
             libpulse-dev libasound2-dev libpipewire-0.3-dev
-          pip3 install --break-system-packages aqtinstall 2>/dev/null || pip3 install aqtinstall
+          python3 -m pip install --break-system-packages aqtinstall
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Install Qt (Linux)
         if: matrix.os == 'Linux'
         run: |
+          export PATH="$HOME/.local/bin:$PATH"
           if [ ! -d "$HOME/Qt/${QT_VERSION}" ]; then
             aqt install-qt linux desktop ${QT_VERSION} linux_gcc_64 -m qtmultimedia --outputdir $HOME/Qt
           fi
@@ -89,17 +99,20 @@ jobs:
             -DCMAKE_CXX_FLAGS="-stdlib=libc++"
 
       # ===== macOS 15 =====
-      - name: Setup Homebrew PATH (macOS)
+      - name: Setup Homebrew (macOS)
         if: matrix.os == 'macOS'
         run: |
-          # Homebrew may be installed but not on PATH for the runner user
           if [ -x /opt/homebrew/bin/brew ]; then
             eval "$(/opt/homebrew/bin/brew shellenv)"
-            echo "$(brew --prefix)/bin" >> $GITHUB_PATH
-            echo "$(brew --prefix)/sbin" >> $GITHUB_PATH
           elif [ -x /usr/local/bin/brew ]; then
             eval "$(/usr/local/bin/brew shellenv)"
-            echo "/usr/local/bin" >> $GITHUB_PATH
+          fi
+          echo "$(brew --prefix)/bin" >> $GITHUB_PATH
+          echo "$(brew --prefix)/sbin" >> $GITHUB_PATH
+          # Fix ownership if runner user doesn't own the Homebrew prefix
+          BREW_PREFIX=$(brew --prefix)
+          if [ ! -w "$BREW_PREFIX/Cellar" ]; then
+            sudo chown -R $(whoami) "$BREW_PREFIX/Cellar" "$BREW_PREFIX/lib" "$BREW_PREFIX/opt" "$BREW_PREFIX/share" "$BREW_PREFIX/Homebrew" 2>/dev/null || true
           fi
 
       - name: Install toolchain (macOS)
@@ -107,7 +120,8 @@ jobs:
         run: |
           eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shellenv)"
           brew install llvm cmake ninja pcre luajit sqlite openssl
-          pip3 install --break-system-packages aqtinstall 2>/dev/null || pip3 install aqtinstall
+          python3 -m pip install --break-system-packages aqtinstall 2>/dev/null || python3 -m pip install aqtinstall
+          echo "$HOME/Library/Python/$(python3 -c 'import sys;print(f"{sys.version_info.major}.{sys.version_info.minor}")')/bin" >> $GITHUB_PATH
 
       - name: Install Qt (macOS)
         if: matrix.os == 'macOS'
@@ -134,7 +148,9 @@ jobs:
         if: matrix.os == 'Windows'
         run: |
           choco install cmake ninja llvm python3 -y
-          pip install aqtinstall
+          # Refresh PATH to pick up newly installed tools
+          $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "User") + ";$env:PATH"
+          python -m pip install aqtinstall
 
       - name: Install dependencies (Windows)
         if: matrix.os == 'Windows'
