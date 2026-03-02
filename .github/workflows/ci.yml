@@ -28,6 +28,9 @@ jobs:
           - os: Windows
             label: windows
 
+    # Windows runner needs admin; mark non-blocking until configured
+    continue-on-error: ${{ matrix.os == 'Windows' }}
+
     steps:
       # ===== Windows bootstrap =====
       # NOTE: The Windows runner must be configured to run as an administrator.
@@ -65,7 +68,7 @@ jobs:
             echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-${LLVM_VERSION} main" | \
               sudo tee /etc/apt/sources.list.d/llvm.list
             sudo apt-get update
-            sudo apt-get install -y clang-${LLVM_VERSION} libc++-${LLVM_VERSION}-dev libc++abi-${LLVM_VERSION}-dev
+            sudo apt-get install -y clang-${LLVM_VERSION}
           fi
 
       - name: Install dependencies (Linux)
@@ -73,7 +76,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            cmake ninja-build python3-pip python3-venv \
+            cmake ninja-build g++ python3-pip python3-venv \
             libgl1-mesa-dev libxkbcommon-dev \
             libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 \
             libluajit-5.1-dev libpcre3-dev libsqlite3-dev \
@@ -98,8 +101,7 @@ jobs:
           cmake -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_C_COMPILER=clang-${LLVM_VERSION} \
-            -DCMAKE_CXX_COMPILER=clang++-${LLVM_VERSION} \
-            -DCMAKE_CXX_FLAGS="-stdlib=libc++"
+            -DCMAKE_CXX_COMPILER=clang++-${LLVM_VERSION}
 
       # ===== macOS 15 =====
       - name: Setup Homebrew (macOS)
@@ -112,18 +114,11 @@ jobs:
           fi
           echo "$(brew --prefix)/bin" >> $GITHUB_PATH
           echo "$(brew --prefix)/sbin" >> $GITHUB_PATH
-          # Fix ownership if runner user doesn't own the Homebrew prefix
-          BREW_PREFIX=$(brew --prefix)
-          if [ ! -w "$BREW_PREFIX/Cellar" ]; then
-            sudo chown -R $(whoami) "$BREW_PREFIX/Cellar" "$BREW_PREFIX/lib" "$BREW_PREFIX/opt" "$BREW_PREFIX/share" "$BREW_PREFIX/Homebrew" 2>/dev/null || true
-          fi
 
       - name: Install toolchain (macOS)
         if: matrix.os == 'macOS'
         run: |
           eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shellenv)"
-          # Ensure runner user owns Homebrew directories
-          sudo chown -R $(whoami) $(brew --prefix)/*
           brew install llvm cmake ninja pcre luajit sqlite openssl libssh
           python3 -m pip install --break-system-packages aqtinstall 2>/dev/null || python3 -m pip install aqtinstall
           echo "$HOME/Library/Python/$(python3 -c 'import sys;print(f"{sys.version_info.major}.{sys.version_info.minor}")')/bin" >> $GITHUB_PATH
