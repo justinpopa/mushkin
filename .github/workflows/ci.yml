@@ -183,6 +183,8 @@ jobs:
       # ===== Build =====
       - name: Build
         run: cmake --build build --config Release --parallel
+        env:
+          QT_QPA_PLATFORM: ${{ matrix.os == 'Linux' && 'offscreen' || '' }}
 
       # ===== Test =====
       - name: Test (Unix)
