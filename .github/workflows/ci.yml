@@ -29,7 +29,10 @@ jobs:
             label: windows
 
     steps:
-      # ===== Windows bootstrap (no package manager, no git) =====
+      # ===== Windows bootstrap =====
+      # NOTE: The Windows runner must be configured to run as an administrator.
+      # Re-configure with: ./config.cmd --replace
+      # and run the service under a local admin account, NOT NetworkService.
       - name: Bootstrap (Windows)
         if: matrix.os == 'Windows'
         run: |
@@ -74,7 +77,7 @@ jobs:
             libgl1-mesa-dev libxkbcommon-dev \
             libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 \
             libluajit-5.1-dev libpcre3-dev libsqlite3-dev \
-            libssl-dev zlib1g-dev \
+            libssl-dev zlib1g-dev libssh-dev \
             libpulse-dev libasound2-dev libpipewire-0.3-dev
           python3 -m pip install --break-system-packages aqtinstall
           echo "$HOME/.local/bin" >> $GITHUB_PATH
@@ -119,7 +122,9 @@ jobs:
         if: matrix.os == 'macOS'
         run: |
           eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shellenv)"
-          brew install llvm cmake ninja pcre luajit sqlite openssl
+          # Ensure runner user owns Homebrew directories
+          sudo chown -R $(whoami) $(brew --prefix)/*
+          brew install llvm cmake ninja pcre luajit sqlite openssl libssh
           python3 -m pip install --break-system-packages aqtinstall 2>/dev/null || python3 -m pip install aqtinstall
           echo "$HOME/Library/Python/$(python3 -c 'import sys;print(f"{sys.version_info.major}.{sys.version_info.minor}")')/bin" >> $GITHUB_PATH
 
