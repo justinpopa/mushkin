@@ -56,6 +56,7 @@ jobs:
       - name: Install dependencies
         run: |
           brew install cmake ninja pcre luajit sqlite openssl libssh aqtinstall
+          brew link --overwrite certifi aqtinstall 2>/dev/null || true
 
       - name: Cache Qt Static
         id: cache-qt
@@ -107,7 +108,7 @@ jobs:
             libxext-dev libxfixes-dev libxi-dev libxrender-dev \
             libatspi2.0-dev libglib2.0-dev \
             libpulse-dev libasound2-dev libpipewire-0.3-dev
-          pip3 install aqtinstall
+          python3 -m pip install --break-system-packages aqtinstall
 
       - name: Cache Qt Static
         id: cache-qt
@@ -165,7 +166,11 @@ jobs:
         run: |
           choco install ninja -y
           pip install aqtinstall
-          vcpkg install pcre:x64-windows luajit:x64-windows sqlite3:x64-windows openssl:x64-windows zlib:x64-windows libssh:x64-windows
+          if (!(Test-Path "C:\vcpkg")) {
+            git clone https://github.com/microsoft/vcpkg.git C:\vcpkg
+            C:\vcpkg\bootstrap-vcpkg.bat
+          }
+          C:\vcpkg\vcpkg install pcre:x64-windows luajit:x64-windows sqlite3:x64-windows openssl:x64-windows zlib:x64-windows libssh:x64-windows
 
       - name: Cache Qt Static
         id: cache-qt
