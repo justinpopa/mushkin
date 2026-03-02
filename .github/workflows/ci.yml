@@ -28,9 +28,6 @@ jobs:
           - os: Windows
             label: windows
 
-    # Windows runner needs admin; mark non-blocking until configured
-    continue-on-error: ${{ matrix.os == 'Windows' }}
-
     steps:
       # ===== Windows bootstrap =====
       # NOTE: The Windows runner must be configured to run as an administrator.
