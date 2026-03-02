@@ -29,6 +29,16 @@ jobs:
             label: windows
 
     steps:
+      # ===== Bootstrap (install git before checkout) =====
+      - name: Bootstrap git (Windows)
+        if: matrix.os == 'Windows'
+        run: |
+          if (!(Get-Command git -ErrorAction SilentlyContinue)) {
+            choco install git -y
+            $env:PATH = "C:\Program Files\Git\cmd;$env:PATH"
+            echo "C:\Program Files\Git\cmd" >> $env:GITHUB_PATH
+          }
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -38,7 +48,7 @@ jobs:
       - name: Install toolchain (Linux)
         if: matrix.os == 'Linux'
         run: |
-          # Clang 19 from LLVM apt repo
+          # Clang 22 from LLVM apt repo
           if ! clang-${LLVM_VERSION} --version >/dev/null 2>&1; then
             wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
             echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-${LLVM_VERSION} main" | \
@@ -52,7 +62,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            cmake ninja-build \
+            cmake ninja-build python3-pip \
             libgl1-mesa-dev libxkbcommon-dev \
             libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 \
             libluajit-5.1-dev libpcre3-dev libsqlite3-dev \
@@ -79,14 +89,24 @@ jobs:
             -DCMAKE_CXX_FLAGS="-stdlib=libc++"
 
       # ===== macOS 15 =====
+      - name: Setup Homebrew PATH (macOS)
+        if: matrix.os == 'macOS'
+        run: |
+          # Homebrew may be installed but not on PATH for the runner user
+          if [ -x /opt/homebrew/bin/brew ]; then
+            eval "$(/opt/homebrew/bin/brew shellenv)"
+            echo "$(brew --prefix)/bin" >> $GITHUB_PATH
+            echo "$(brew --prefix)/sbin" >> $GITHUB_PATH
+          elif [ -x /usr/local/bin/brew ]; then
+            eval "$(/usr/local/bin/brew shellenv)"
+            echo "/usr/local/bin" >> $GITHUB_PATH
+          fi
+
       - name: Install toolchain (macOS)
         if: matrix.os == 'macOS'
         run: |
-          # Install LLVM (Clang 19+) from Homebrew — Apple Clang doesn't support C++26
-          if ! brew list llvm >/dev/null 2>&1; then
-            brew install llvm
-          fi
-          brew install cmake ninja pcre luajit sqlite openssl
+          eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shellenv)"
+          brew install llvm cmake ninja pcre luajit sqlite openssl
           pip3 install --break-system-packages aqtinstall 2>/dev/null || pip3 install aqtinstall
 
       - name: Install Qt (macOS)
@@ -101,6 +121,7 @@ jobs:
       - name: Configure (macOS)
         if: matrix.os == 'macOS'
         run: |
+          eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shellenv)"
           LLVM_PREFIX=$(brew --prefix llvm)
           cmake -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
@@ -112,7 +133,7 @@ jobs:
       - name: Install toolchain (Windows)
         if: matrix.os == 'Windows'
         run: |
-          choco install ninja llvm -y
+          choco install cmake ninja llvm python3 -y
           pip install aqtinstall
 
       - name: Install dependencies (Windows)
