@@ -541,11 +541,15 @@ int L_GetLineInfo(lua_State* L)
 }
 
 /**
- * world.GetStyleInfo(line_number, style_number, info_type)
+ * world.GetStyleInfo(line_number [, style_number [, info_type]])
  *
- * Returns information about a specific style run within a line. A "style run"
+ * Returns information about style runs within a line. A "style run"
  * is a contiguous segment of text with the same formatting (color, bold, etc.).
- * Use GetLineInfo(line, 11) to get the count of style runs on a line.
+ *
+ * Extended forms (matching MUSHclient):
+ * - GetStyleInfo(line) — returns table of tables (all styles, all info)
+ * - GetStyleInfo(line, style) — returns table (all info for one style)
+ * - GetStyleInfo(line, style, type) — returns single value
  *
  * Info types:
  * - 1: Text content of this style run (string)
@@ -565,42 +569,225 @@ int L_GetLineInfo(lua_State* L)
  * - 15: Background color as RGB integer (number)
  *
  * @param line_number (number) Line number in output buffer (1-based)
- * @param style_number (number) Style run index within the line (1-based)
- * @param info_type (number) Type of information to retrieve (1-15)
+ * @param style_number (number, optional) Style run index within the line (1-based). 0 or omitted =
+ * all styles.
+ * @param info_type (number, optional) Type of information to retrieve (1-15). 0 or omitted = all
+ * types as table.
  *
- * @return Requested information (type varies by info_type)
+ * @return Requested information (type varies by call form)
  * @return (nil) If line/style number is out of range or info_type is invalid
  *
  * @example
- * -- Iterate through all style runs on a line
- * local styleCount = GetLineInfo(lineNum, 11)
- * for i = 1, styleCount do
- *     local text = GetStyleInfo(lineNum, i, 1)
- *     local fore = GetStyleInfo(lineNum, i, 14)
- *     print(string.format("Style %d: '%s' color=#%06X", i, text, fore))
+ * -- Get all styles for a line as table of tables
+ * local styles = GetStyleInfo(lineNum)
+ * for i, s in ipairs(styles) do
+ *     print(s.text, s.textcolour)
  * end
  *
  * @see GetLineInfo, GetRecentLines
  */
+
+// Push a table with all 15 info fields for a single style run
+static void pushStyleTable(lua_State* L, Line* line, Style* style, int startCol)
+{
+    lua_newtable(L);
+
+    // 1: text
+    int offset = startCol - 1;
+    int length = style->iLength;
+    if (offset >= 0 && offset + length <= line->len()) {
+        lua_pushlstring(L, line->text().data() + offset, length);
+    } else {
+        lua_pushstring(L, "");
+    }
+    lua_setfield(L, -2, "text");
+
+    // 2: length
+    lua_pushinteger(L, style->iLength);
+    lua_setfield(L, -2, "length");
+
+    // 3: starting column (1-based)
+    lua_pushinteger(L, startCol);
+    lua_setfield(L, -2, "column");
+
+    // 4: action type
+    int actionType = (style->iFlags & ACTIONTYPE);
+    int actionResult = 0;
+    if (actionType == ACTION_SEND)
+        actionResult = 1;
+    else if (actionType == ACTION_HYPERLINK)
+        actionResult = 2;
+    else if (actionType == ACTION_PROMPT)
+        actionResult = 3;
+    lua_pushinteger(L, actionResult);
+    lua_setfield(L, -2, "actiontype");
+
+    // 5: action
+    if (style->pAction) {
+        luaPushQString(L, style->pAction->m_strAction);
+    } else {
+        lua_pushstring(L, "");
+    }
+    lua_setfield(L, -2, "action");
+
+    // 6: hint
+    if (style->pAction) {
+        luaPushQString(L, style->pAction->m_strHint);
+    } else {
+        lua_pushstring(L, "");
+    }
+    lua_setfield(L, -2, "hint");
+
+    // 7: variable
+    if (style->pAction) {
+        luaPushQString(L, style->pAction->m_strVariable);
+    } else {
+        lua_pushstring(L, "");
+    }
+    lua_setfield(L, -2, "variable");
+
+    // 8-13: flags
+    lua_pushboolean(L, (style->iFlags & HILITE) != 0);
+    lua_setfield(L, -2, "bold");
+    lua_pushboolean(L, (style->iFlags & UNDERLINE) != 0);
+    lua_setfield(L, -2, "ul");
+    lua_pushboolean(L, (style->iFlags & BLINK) != 0);
+    lua_setfield(L, -2, "blink");
+    lua_pushboolean(L, (style->iFlags & INVERSE) != 0);
+    lua_setfield(L, -2, "inverse");
+    lua_pushboolean(L, (style->iFlags & CHANGED) != 0);
+    lua_setfield(L, -2, "changed");
+    lua_pushboolean(L, (style->iFlags & START_TAG) != 0);
+    lua_setfield(L, -2, "starttag");
+
+    // 14-15: colours
+    lua_pushinteger(L, style->iForeColour);
+    lua_setfield(L, -2, "textcolour");
+    lua_pushinteger(L, style->iBackColour);
+    lua_setfield(L, -2, "backcolour");
+}
+
+// Push a single info type value for a style run
+static void pushStyleInfoType(lua_State* L, Line* line, Style* style, int startCol, int infoType)
+{
+    switch (infoType) {
+        case 1: { // text of style
+            int offset = startCol - 1;
+            int length = style->iLength;
+            if (offset >= 0 && offset + length <= line->len()) {
+                lua_pushlstring(L, line->text().data() + offset, length);
+            } else {
+                lua_pushstring(L, "");
+            }
+            break;
+        }
+        case 2:
+            lua_pushinteger(L, style->iLength);
+            break;
+        case 3:
+            lua_pushinteger(L, startCol);
+            break;
+        case 4: {
+            int actionType = (style->iFlags & ACTIONTYPE);
+            int result = 0;
+            if (actionType == ACTION_SEND)
+                result = 1;
+            else if (actionType == ACTION_HYPERLINK)
+                result = 2;
+            else if (actionType == ACTION_PROMPT)
+                result = 3;
+            lua_pushinteger(L, result);
+            break;
+        }
+        case 5:
+            if (style->pAction)
+                luaPushQString(L, style->pAction->m_strAction);
+            else
+                lua_pushstring(L, "");
+            break;
+        case 6:
+            if (style->pAction)
+                luaPushQString(L, style->pAction->m_strHint);
+            else
+                lua_pushstring(L, "");
+            break;
+        case 7:
+            if (style->pAction)
+                luaPushQString(L, style->pAction->m_strVariable);
+            else
+                lua_pushstring(L, "");
+            break;
+        case 8:
+            lua_pushboolean(L, (style->iFlags & HILITE) != 0);
+            break;
+        case 9:
+            lua_pushboolean(L, (style->iFlags & UNDERLINE) != 0);
+            break;
+        case 10:
+            lua_pushboolean(L, (style->iFlags & BLINK) != 0);
+            break;
+        case 11:
+            lua_pushboolean(L, (style->iFlags & INVERSE) != 0);
+            break;
+        case 12:
+            lua_pushboolean(L, (style->iFlags & CHANGED) != 0);
+            break;
+        case 13:
+            lua_pushboolean(L, (style->iFlags & START_TAG) != 0);
+            break;
+        case 14:
+            lua_pushinteger(L, style->iForeColour);
+            break;
+        case 15:
+            lua_pushinteger(L, style->iBackColour);
+            break;
+        default:
+            lua_pushnil(L);
+            break;
+    }
+}
+
 int L_GetStyleInfo(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    auto [lineNumber, styleNumber, infoType] = luaArgs<int, int, int>(L);
+    int lineNumber = luaL_checkinteger(L, 1);
+    int styleNumber = luaL_optinteger(L, 2, 0);
+    int infoType = luaL_optinteger(L, 3, 0);
 
     // Check line exists (1-based index)
     if (lineNumber <= 0 || lineNumber > static_cast<int>(pDoc->m_lineList.size())) {
-        lua_pushnil(L);
-        return 1;
+        return 0; // no result for invalid line (matches MUSHclient)
     }
 
     Line* line = pDoc->m_lineList.at(lineNumber - 1).get();
     if (!line) {
-        lua_pushnil(L);
+        return 0;
+    }
+
+    // Extended form: styleNumber == 0 means all styles
+    if (styleNumber == 0) {
+        lua_newtable(L); // outer table, one entry per style
+        int col = 1;
+        for (int i = 0; i < static_cast<int>(line->styleList.size()); i++) {
+            Style* style = line->styleList[i].get();
+            if (!style)
+                continue;
+
+            if (infoType == 0) {
+                // All types: push a sub-table with all 15 fields
+                pushStyleTable(L, line, style, col);
+            } else {
+                // Single type per style
+                pushStyleInfoType(L, line, style, col, infoType);
+            }
+            lua_rawseti(L, -2, i + 1);
+            col += style->iLength;
+        }
         return 1;
     }
 
-    // Check style exists (1-based index)
-    if (styleNumber <= 0 || styleNumber > (int)line->styleList.size()) {
+    // Single style requested
+    if (styleNumber < 0 || styleNumber > static_cast<int>(line->styleList.size())) {
         lua_pushnil(L);
         return 1;
     }
@@ -617,86 +804,14 @@ int L_GetStyleInfo(lua_State* L)
         startCol += line->styleList[i]->iLength;
     }
 
-    switch (infoType) {
-        case 1: { // text of style
-            // Extract text covered by this style
-            int offset = startCol - 1;
-            int length = style->iLength;
-            if (offset >= 0 && offset + length <= line->len()) {
-                lua_pushlstring(L, line->text().data() + offset, length);
-            } else {
-                lua_pushstring(L, "");
-            }
-            break;
-        }
-        case 2: // length of style run
-            lua_pushinteger(L, style->iLength);
-            break;
-        case 3: // starting column (1-based)
-            lua_pushinteger(L, startCol);
-            break;
-        case 4: { // action type
-            int actionType = (style->iFlags & ACTIONTYPE);
-            int result = 0;
-            if (actionType == ACTION_SEND)
-                result = 1;
-            else if (actionType == ACTION_HYPERLINK)
-                result = 2;
-            else if (actionType == ACTION_PROMPT)
-                result = 3;
-            lua_pushinteger(L, result);
-            break;
-        }
-        case 5: // action (what to send)
-            if (style->pAction) {
-                luaPushQString(L, style->pAction->m_strAction);
-            } else {
-                lua_pushstring(L, "");
-            }
-            break;
-        case 6: // hint (tooltip)
-            if (style->pAction) {
-                luaPushQString(L, style->pAction->m_strHint);
-            } else {
-                lua_pushstring(L, "");
-            }
-            break;
-        case 7: // variable (MXP)
-            if (style->pAction) {
-                luaPushQString(L, style->pAction->m_strVariable);
-            } else {
-                lua_pushstring(L, "");
-            }
-            break;
-        case 8: // bold
-            lua_pushboolean(L, (style->iFlags & HILITE) != 0);
-            break;
-        case 9: // underlined
-            lua_pushboolean(L, (style->iFlags & UNDERLINE) != 0);
-            break;
-        case 10: // blinking/italic
-            lua_pushboolean(L, (style->iFlags & BLINK) != 0);
-            break;
-        case 11: // inverse
-            lua_pushboolean(L, (style->iFlags & INVERSE) != 0);
-            break;
-        case 12: // changed by trigger
-            lua_pushboolean(L, (style->iFlags & CHANGED) != 0);
-            break;
-        case 13: // start of tag
-            lua_pushboolean(L, (style->iFlags & START_TAG) != 0);
-            break;
-        case 14: // foreground colour (RGB)
-            lua_pushinteger(L, style->iForeColour);
-            break;
-        case 15: // background colour (RGB)
-            lua_pushinteger(L, style->iBackColour);
-            break;
-        default:
-            lua_pushnil(L);
-            break;
+    // Extended form: infoType == 0 means all types for this one style
+    if (infoType == 0) {
+        pushStyleTable(L, line, style, startCol);
+        return 1;
     }
 
+    // Standard form: single value
+    pushStyleInfoType(L, line, style, startCol, infoType);
     return 1;
 }
 
