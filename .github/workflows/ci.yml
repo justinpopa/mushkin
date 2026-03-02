@@ -184,14 +184,14 @@ jobs:
       - name: Build
         run: cmake --build build --config Release --parallel
         env:
-          QT_QPA_PLATFORM: ${{ matrix.os == 'Linux' && 'offscreen' || '' }}
+          QT_QPA_PLATFORM: ${{ matrix.os != 'Windows' && 'offscreen' || '' }}
 
       # ===== Test =====
       - name: Test (Unix)
         if: matrix.os != 'Windows'
         run: ctest --test-dir build --output-on-failure --build-config Release
         env:
-          QT_QPA_PLATFORM: ${{ matrix.os == 'Linux' && 'offscreen' || '' }}
+          QT_QPA_PLATFORM: offscreen
 
       - name: Test (Windows)
         if: matrix.os == 'Windows'
