@@ -91,8 +91,12 @@ build_static_qt() {
     local QT_SRC_DIR="$QT_BASE_DIR/$QT_VERSION/Src"
     local QT_BUILD_DIR="$QT_SRC_DIR/build-static"
 
-    # Download Qt source
-    if [ ! -d "$QT_SRC_DIR" ]; then
+    # Download Qt source (verify required submodules exist)
+    if [ ! -d "$QT_SRC_DIR" ] || [ ! -d "$QT_SRC_DIR/qtmultimedia" ]; then
+        if [ -d "$QT_SRC_DIR" ]; then
+            echo_warn "Incomplete Qt source detected, re-downloading..."
+            rm -rf "$QT_SRC_DIR"
+        fi
         echo_info "Downloading Qt source..."
         mkdir -p "$QT_BASE_DIR"
         aqt install-src mac "$QT_VERSION" --outputdir "$QT_BASE_DIR"

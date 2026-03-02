@@ -104,8 +104,13 @@ function Build-StaticQt {
     $QtSrcDir = Join-Path $QtBaseDir "$QtVersion\Src"
     $QtBuildDir = Join-Path $QtSrcDir "build-static"
 
-    # Download Qt source
-    if (-not (Test-Path $QtSrcDir)) {
+    # Download Qt source (verify required submodules exist)
+    $QtMultimediaDir = Join-Path $QtSrcDir "qtmultimedia"
+    if (-not (Test-Path $QtSrcDir) -or -not (Test-Path $QtMultimediaDir)) {
+        if (Test-Path $QtSrcDir) {
+            Write-Warn "Incomplete Qt source detected, re-downloading..."
+            Remove-Item -Recurse -Force $QtSrcDir
+        }
         Write-Info "Downloading Qt source..."
         New-Item -ItemType Directory -Force -Path $QtBaseDir | Out-Null
         Push-Location $QtBaseDir
