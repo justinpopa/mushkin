@@ -46,6 +46,25 @@ echo_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
 NUM_CORES=$(nproc)
 
+# Find the highest available clang version (C++26 requires clang 19+)
+find_clang() {
+    for ver in 22 21 20 19; do
+        if command -v "clang-$ver" &>/dev/null; then
+            echo "$ver"
+            return
+        fi
+    done
+    echo ""
+}
+
+CLANG_VER=$(find_clang)
+if [ -n "$CLANG_VER" ]; then
+    export CC="clang-$CLANG_VER"
+    export CXX="clang++-$CLANG_VER"
+else
+    echo_warn "No clang 19+ found, falling back to system compiler"
+fi
+
 # ============================================================
 # Prerequisites
 # ============================================================
@@ -149,10 +168,19 @@ build_mushkin() {
     mkdir -p "$BUILD_DIR"
     cd "$BUILD_DIR"
 
-    cmake "$PROJECT_ROOT" \
-        -DSTATIC_BUILD=ON \
-        -DCMAKE_BUILD_TYPE=Release \
+    local cmake_args=(
+        -DSTATIC_BUILD=ON
+        -DCMAKE_BUILD_TYPE=Release
         -DCMAKE_PREFIX_PATH="$QT_STATIC_DIR"
+    )
+    if [ -n "$CLANG_VER" ]; then
+        cmake_args+=(
+            -DCMAKE_C_COMPILER="clang-$CLANG_VER"
+            -DCMAKE_CXX_COMPILER="clang++-$CLANG_VER"
+        )
+    fi
+
+    cmake "$PROJECT_ROOT" "${cmake_args[@]}"
 
     cmake --build . --target mushkin -j"$NUM_CORES"
 }

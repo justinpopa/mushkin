@@ -138,7 +138,8 @@ function Build-StaticQt {
         -skip qtdeclarative -skip qtquick3d `
         -nomake examples -nomake tests `
         -no-pch `
-        -- -DSQLite3_ROOT="$vcpkgInstalled" -DFEATURE_system_sqlite=ON -DCMAKE_OBJECT_PATH_MAX=350
+        -- -DSQLite3_ROOT="$vcpkgInstalled" -DFEATURE_system_sqlite=ON -DCMAKE_OBJECT_PATH_MAX=350 `
+        -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl
 
     if ($LASTEXITCODE -ne 0) { throw "Qt configure failed" }
 
@@ -174,7 +175,9 @@ function Build-Mushkin {
         -DCMAKE_BUILD_TYPE=Release `
         -DCMAKE_PREFIX_PATH="$QtStaticDir" `
         -DCMAKE_TOOLCHAIN_FILE="$vcpkgToolchain" `
-        -DVCPKG_TARGET_TRIPLET=x64-windows
+        -DVCPKG_TARGET_TRIPLET=x64-windows `
+        -DCMAKE_C_COMPILER=clang-cl `
+        -DCMAKE_CXX_COMPILER=clang-cl
 
     if ($LASTEXITCODE -ne 0) { throw "CMake configure failed" }
 
