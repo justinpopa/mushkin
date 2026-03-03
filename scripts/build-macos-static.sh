@@ -42,6 +42,15 @@ echo_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 NUM_CORES=$(sysctl -n hw.ncpu)
 NATIVE_ARCH=$(uname -m)
 
+# Use Homebrew LLVM — Apple's clang doesn't support C++26
+if [ -x /opt/homebrew/opt/llvm/bin/clang ]; then
+    export CC=/opt/homebrew/opt/llvm/bin/clang
+    export CXX=/opt/homebrew/opt/llvm/bin/clang++
+elif [ -x /usr/local/opt/llvm/bin/clang ]; then
+    export CC=/usr/local/opt/llvm/bin/clang
+    export CXX=/usr/local/opt/llvm/bin/clang++
+fi
+
 # ============================================================
 # Prerequisites
 # ============================================================
@@ -54,6 +63,13 @@ check_prerequisites() {
     command -v ninja &>/dev/null || missing+=("ninja")
     command -v aqt &>/dev/null || missing+=("aqtinstall (pip3 install aqtinstall)")
 
+    # Require Homebrew LLVM for C++26 support
+    if [ -z "$CC" ] || [ -z "$CXX" ]; then
+        missing+=("llvm (brew install llvm)")
+    else
+        echo_info "Using compiler: $CXX"
+    fi
+
     # Check Homebrew dependencies
     [ -f /opt/homebrew/opt/pcre/lib/libpcre.dylib ] || [ -f /usr/local/opt/pcre/lib/libpcre.dylib ] || missing+=("pcre")
     [ -f /opt/homebrew/opt/luajit/lib/libluajit-5.1.dylib ] || [ -f /usr/local/opt/luajit/lib/libluajit-5.1.dylib ] || missing+=("luajit")
@@ -63,7 +79,7 @@ check_prerequisites() {
 
     if [ ${#missing[@]} -gt 0 ]; then
         echo_error "Missing: ${missing[*]}"
-        echo_error "Install with: brew install cmake ninja pcre luajit sqlite openssl libssh"
+        echo_error "Install with: brew install cmake ninja llvm pcre luajit sqlite openssl libssh"
         exit 1
     fi
     echo_info "Prerequisites OK"
@@ -139,7 +155,9 @@ build_mushkin() {
     cmake "$PROJECT_ROOT" \
         -DSTATIC_BUILD=ON \
         -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_PREFIX_PATH="$QT_STATIC_DIR"
+        -DCMAKE_PREFIX_PATH="$QT_STATIC_DIR" \
+        -DCMAKE_C_COMPILER="$CC" \
+        -DCMAKE_CXX_COMPILER="$CXX"
 
     cmake --build . -j"$NUM_CORES"
 }

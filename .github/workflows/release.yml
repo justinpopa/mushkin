@@ -55,7 +55,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install cmake ninja pcre luajit sqlite openssl libssh aqtinstall
+          brew install cmake ninja llvm pcre luajit sqlite openssl libssh aqtinstall
           brew link --overwrite certifi aqtinstall 2>/dev/null || true
 
       - name: Cache Qt Static
@@ -143,6 +143,14 @@ jobs:
     needs: version
     timeout-minutes: 45
     steps:
+      - name: Enable Long Paths
+        run: |
+          # Enable Win32 long paths (>260 chars) — required for Qt source builds
+          Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' `
+            -Name 'LongPathsEnabled' -Value 1 -Type DWord
+          # Also enable git long paths
+          git config --system core.longpaths true
+
       - name: Bootstrap (Windows)
         run: |
           # Install Chocolatey if missing
@@ -180,7 +188,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: C:/Users/runneradmin/AppData/Local/mushkin/Qt-static
-          key: qt-static-6.9.3-windows-x64-v6
+          key: qt-static-6.9.3-windows-x64-v7
 
       - name: Build Static Binary
         run: |

@@ -118,6 +118,12 @@ function Build-StaticQt {
         Pop-Location
     }
 
+    # Clean stale build dir from previous failed attempt
+    if (Test-Path $QtBuildDir) {
+        Write-Warn "Removing stale Qt build directory..."
+        Remove-Item -Recurse -Force $QtBuildDir
+    }
+
     # Configure
     New-Item -ItemType Directory -Force -Path $QtBuildDir | Out-Null
     Push-Location $QtBuildDir
