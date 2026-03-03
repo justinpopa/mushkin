@@ -13,29 +13,18 @@
  */
 
 #include "../src/automation/alias.h"
-#include "../src/world/script_engine.h"
-#include "../src/world/world_document.h"
-#include <QCoreApplication>
-#include <gtest/gtest.h>
-
-// Lua headers for script execution tests
-extern "C" {
-#include <lauxlib.h>
-#include <lua.h>
-#include <lualib.h>
-}
+#include "fixtures/world_fixtures.h"
 
 // Test fixture for alias execution tests
 class AliasExecutionTest : public ::testing::Test {
   protected:
     void SetUp() override
     {
-        doc = new WorldDocument();
+        doc = std::make_unique<WorldDocument>();
     }
 
     void TearDown() override
     {
-        delete doc;
     }
 
     // Helper to add and enable an alias
@@ -43,17 +32,18 @@ class AliasExecutionTest : public ::testing::Test {
     {
         auto alias = std::make_unique<Alias>();
         alias->name = pattern;
-        alias->bEnabled = true;
-        alias->strLabel = label;
-        alias->strInternalName = label;
+        alias->enabled = true;
+        alias->label = label;
+        alias->internal_name = label;
 
         Alias* aliasPtr = alias.get();
-        doc->addAlias(label, std::move(alias));
+        auto addResult = doc->addAlias(label, std::move(alias));
+        EXPECT_TRUE(addResult.has_value());
 
         return aliasPtr;
     }
 
-    WorldDocument* doc = nullptr;
+    std::unique_ptr<WorldDocument> doc;
 };
 
 // Test 1: Wildcard Pattern Matching - "n*" matches "north"
@@ -61,9 +51,9 @@ TEST_F(AliasExecutionTest, WildcardPatternMatching)
 {
     Alias* a = addAlias("north_alias", "n*");
     a->contents = "walk north";
-    a->bRegexp = false; // Wildcard mode
-    a->bIgnoreCase = false;
-    a->iSequence = 100;
+    a->use_regexp = false; // Wildcard mode
+    a->ignore_case = false;
+    a->sequence = 100;
 
     // Test matching "north"
     EXPECT_TRUE(a->match("north")) << "Pattern 'n*' should match 'north'";
@@ -85,9 +75,9 @@ TEST_F(AliasExecutionTest, CaseSensitiveMatching)
 {
     Alias* a = addAlias("go_sensitive", "go*");
     a->contents = "walk %1";
-    a->bRegexp = false;
-    a->bIgnoreCase = false; // Case-sensitive
-    a->iSequence = 200;
+    a->use_regexp = false;
+    a->ignore_case = false; // Case-sensitive
+    a->sequence = 200;
 
     // Should match "gonorth"
     EXPECT_TRUE(a->match("gonorth")) << "'go*' should match 'gonorth' (case-sensitive)";
@@ -101,9 +91,9 @@ TEST_F(AliasExecutionTest, CaseInsensitiveMatching)
 {
     Alias* a = addAlias("go_insensitive", "GO*");
     a->contents = "walk %1";
-    a->bRegexp = false;
-    a->bIgnoreCase = true; // Case-insensitive
-    a->iSequence = 300;
+    a->use_regexp = false;
+    a->ignore_case = true; // Case-insensitive
+    a->sequence = 300;
 
     // Should match "gonorth" (case-insensitive)
     EXPECT_TRUE(a->match("gonorth")) << "'GO*' should match 'gonorth' (case-insensitive)";
@@ -117,9 +107,9 @@ TEST_F(AliasExecutionTest, MultipleWildcards)
 {
     Alias* a = addAlias("tell_alias", "tell * *");
     a->contents = "say Telling %1: %2";
-    a->bRegexp = false;
-    a->bIgnoreCase = false;
-    a->iSequence = 400;
+    a->use_regexp = false;
+    a->ignore_case = false;
+    a->sequence = 400;
 
     EXPECT_TRUE(a->match("tell Bob hello there"))
         << "Pattern 'tell * *' should match 'tell Bob hello there'";
@@ -136,8 +126,8 @@ TEST_F(AliasExecutionTest, SendToWorld)
 {
     Alias* a = addAlias("n_alias", "n");
     a->contents = "north";
-    a->iSendTo = 0; // eSendToWorld
-    a->iSequence = 100;
+    a->send_to = eSendToWorld;
+    a->sequence = 100;
 
     // Evaluate alias
     bool executed = doc->evaluateAliases("n");
@@ -145,7 +135,7 @@ TEST_F(AliasExecutionTest, SendToWorld)
     EXPECT_TRUE(executed) << "Alias should have executed";
 
     // Verify statistics updated
-    EXPECT_EQ(a->nMatched, 1) << "Match count should be 1";
+    EXPECT_EQ(a->matched, 1) << "Match count should be 1";
 }
 
 // Test 6: One-Shot Alias
@@ -153,8 +143,8 @@ TEST_F(AliasExecutionTest, OneShotAlias)
 {
     Alias* a = addAlias("quickheal_alias", "quickheal");
     a->contents = "cast heal self";
-    a->iSendTo = 0;     // eSendToWorld
-    a->bOneShot = true; // Delete after first use
+    a->send_to = eSendToWorld;
+    a->one_shot = true; // Delete after first use
 
     // Verify alias exists
     ASSERT_NE(doc->getAlias("quickheal_alias"), nullptr) << "One-shot alias should be created";
@@ -173,22 +163,22 @@ TEST_F(AliasExecutionTest, KeepEvaluatingTrue)
     // First alias: matches "go north" but keeps evaluating
     Alias* a1 = addAlias("go_walk", "go *");
     a1->contents = "walk %1";
-    a1->iSendTo = 0;
-    a1->bKeepEvaluating = true; // Keep evaluating other aliases
-    a1->iSequence = 100;
+    a1->send_to = eSendToWorld;
+    a1->keep_evaluating = true; // Keep evaluating other aliases
+    a1->sequence = 100;
 
     // Second alias: also matches "go north", lower priority (higher sequence)
     Alias* a2 = addAlias("go_north_shortcut", "go north");
     a2->contents = "north";
-    a2->iSendTo = 0;
-    a2->bKeepEvaluating = false; // Stop after this one
-    a2->iSequence = 200;
+    a2->send_to = eSendToWorld;
+    a2->keep_evaluating = false; // Stop after this one
+    a2->sequence = 200;
 
-    // Evaluate aliases - both should execute due to bKeepEvaluating
+    // Evaluate aliases - both should execute due to keep_evaluating
     doc->evaluateAliases("go north");
 
-    EXPECT_EQ(a1->nMatched, 1) << "First alias should execute";
-    EXPECT_EQ(a2->nMatched, 1) << "Second alias should also execute (bKeepEvaluating = true)";
+    EXPECT_EQ(a1->matched, 1) << "First alias should execute";
+    EXPECT_EQ(a2->matched, 1) << "Second alias should also execute (keep_evaluating = true)";
 }
 
 // Test 8: Keep Evaluating Flag - only first alias executes
@@ -196,20 +186,20 @@ TEST_F(AliasExecutionTest, KeepEvaluatingFalse)
 {
     Alias* a1 = addAlias("test_first", "test *");
     a1->contents = "first %1";
-    a1->iSendTo = 0;
-    a1->bKeepEvaluating = false; // Stop after this one
-    a1->iSequence = 100;
+    a1->send_to = eSendToWorld;
+    a1->keep_evaluating = false; // Stop after this one
+    a1->sequence = 100;
 
     Alias* a2 = addAlias("test_second", "test command");
     a2->contents = "second";
-    a2->iSendTo = 0;
-    a2->bKeepEvaluating = false;
-    a2->iSequence = 200;
+    a2->send_to = eSendToWorld;
+    a2->keep_evaluating = false;
+    a2->sequence = 200;
 
     doc->evaluateAliases("test command");
 
-    EXPECT_EQ(a1->nMatched, 1) << "First alias should execute";
-    EXPECT_EQ(a2->nMatched, 0) << "Second alias should not execute (bKeepEvaluating = false)";
+    EXPECT_EQ(a1->matched, 1) << "First alias should execute";
+    EXPECT_EQ(a2->matched, 0) << "Second alias should not execute (keep_evaluating = false)";
 }
 
 // Test 9: Regular Expression Alias
@@ -217,9 +207,9 @@ TEST_F(AliasExecutionTest, RegularExpressionAlias)
 {
     Alias* a = addAlias("north_regex", "^(n|north)$");
     a->contents = "walk north";
-    a->bRegexp = true; // Regular expression mode
-    a->bIgnoreCase = false;
-    a->iSequence = 100;
+    a->use_regexp = true; // Regular expression mode
+    a->ignore_case = false;
+    a->sequence = 100;
 
     // Should match "n"
     EXPECT_TRUE(a->match("n")) << "Regex '^(n|north)$' should match 'n'";
@@ -271,8 +261,8 @@ end
 
     // Create an alias that calls the Lua function
     Alias* a = addAlias("speedwalk_alias", "run *");
-    a->strProcedure = "on_speedwalk_alias"; // Lua function to call
-    a->iSendTo = 12;                        // eSendToScript
+    a->procedure = "on_speedwalk_alias"; // Lua function to call
+    a->send_to = eSendToScript;
 
     // Execute alias (should call Lua function)
     doc->evaluateAliases("run 3n2e");
@@ -313,18 +303,5 @@ end
     EXPECT_EQ(wildcard1, "3n2e") << "wildcards[1] should be '3n2e'";
 
     // Verify invocation count incremented
-    EXPECT_EQ(a->nInvocationCount, 1) << "Invocation count should be 1";
-}
-
-// GoogleTest main function
-int main(int argc, char** argv)
-{
-    // Initialize Qt application (required for Qt types)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
+    EXPECT_EQ(a->invocation_count, 1) << "Invocation count should be 1";
 }

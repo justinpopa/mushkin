@@ -11,21 +11,19 @@
 #include "../src/text/line.h"
 #include "../src/text/style.h"
 #include "../src/world/world_document.h"
-#include <QCoreApplication>
-#include <gtest/gtest.h>
+#include "fixtures/world_fixtures.h"
 
 // Test fixture for pipeline tests
 // Provides common setup/teardown and helper methods
-class PipelineTest : public ::testing::Test {
+class PipelineTest : public WorldDocumentTest {
   protected:
     void SetUp() override
     {
-        // Create world document
-        doc = new WorldDocument();
+        WorldDocumentTest::SetUp();
 
         // Initialize connection state (normally done by OnConnect)
-        doc->m_phase = NONE;
-        doc->m_bUTF_8 = false; // ASCII mode for simplicity
+        doc->m_telnetParser->m_phase = Phase::NONE;
+        doc->m_display.utf8 = false; // ASCII mode for simplicity
 
         // Initialize document style state
         doc->m_iFlags = COLOUR_ANSI;
@@ -33,7 +31,7 @@ class PipelineTest : public ::testing::Test {
         doc->m_iBackColour = BLACK;
 
         // Create initial line
-        doc->m_currentLine = new Line(1, 80, COLOUR_ANSI, WHITE, BLACK, false);
+        doc->m_currentLine = std::make_unique<Line>(1, 80, COLOUR_ANSI, WHITE, BLACK, false);
         auto initialStyle = std::make_unique<Style>();
         initialStyle->iLength = 0;
         initialStyle->iFlags = COLOUR_ANSI;
@@ -41,11 +39,6 @@ class PipelineTest : public ::testing::Test {
         initialStyle->iBackColour = BLACK;
         initialStyle->pAction = nullptr;
         doc->m_currentLine->styleList.push_back(std::move(initialStyle));
-    }
-
-    void TearDown() override
-    {
-        delete doc;
     }
 
     // Helper method to process a string byte by byte
@@ -67,14 +60,12 @@ class PipelineTest : public ::testing::Test {
     // Get text from a line
     QString getLineText(int index) const
     {
-        if (index >= doc->m_lineList.count()) {
+        if (index >= static_cast<int>(doc->m_lineList.size())) {
             return QString();
         }
-        Line* line = doc->m_lineList[index];
-        return QString::fromUtf8(line->text(), line->len());
+        Line* line = doc->m_lineList[index].get();
+        return QString::fromUtf8(line->text().data(), line->text().size());
     }
-
-    WorldDocument* doc = nullptr;
 };
 
 // Test 1: Simple ASCII text processing
@@ -84,9 +75,9 @@ TEST_F(PipelineTest, SimpleASCIIText)
     processString("Hello\n");
 
     // Verify line was added
-    ASSERT_EQ(doc->m_lineList.count(), 1) << "Expected 1 line in buffer";
+    ASSERT_EQ(static_cast<int>(doc->m_lineList.size()), 1) << "Expected 1 line in buffer";
 
-    Line* line = doc->m_lineList[0];
+    Line* line = doc->m_lineList[0].get();
     QString text = getLineText(0);
 
     // Verify text content
@@ -105,9 +96,9 @@ TEST_F(PipelineTest, ANSIColoredText)
     processBytes(ansiRed);
 
     // Verify line was added
-    ASSERT_EQ(doc->m_lineList.count(), 1) << "Expected 1 line in buffer";
+    ASSERT_EQ(static_cast<int>(doc->m_lineList.size()), 1) << "Expected 1 line in buffer";
 
-    Line* line = doc->m_lineList[0];
+    Line* line = doc->m_lineList[0].get();
     QString text = getLineText(0);
 
     // Verify text (ANSI codes should be processed, not included in text)
@@ -124,7 +115,7 @@ TEST_F(PipelineTest, MultipleLines)
     processString("Line1\nLine2\nLine3\n");
 
     // Verify all lines were added
-    ASSERT_EQ(doc->m_lineList.count(), 3) << "Expected 3 lines in buffer";
+    ASSERT_EQ(static_cast<int>(doc->m_lineList.size()), 3) << "Expected 3 lines in buffer";
 
     // Verify each line's content
     EXPECT_EQ(getLineText(0), "Line1") << "First line should be 'Line1'";
@@ -141,14 +132,14 @@ TEST_F(PipelineTest, MultipleLines)
 TEST_F(PipelineTest, UTF8Text)
 {
     // Enable UTF-8 mode
-    doc->m_bUTF_8 = true;
+    doc->m_display.utf8 = true;
 
     // Process "Café\n" = 0x43 0x61 0x66 0xC3 0xA9 0x0A
     const unsigned char utf8Cafe[] = {0x43, 0x61, 0x66, 0xC3, 0xA9, 0x0A, 0};
     processBytes(utf8Cafe);
 
     // Verify line was added
-    ASSERT_EQ(doc->m_lineList.count(), 1) << "Expected 1 line in buffer";
+    ASSERT_EQ(static_cast<int>(doc->m_lineList.size()), 1) << "Expected 1 line in buffer";
 
     QString text = getLineText(0);
 
@@ -161,9 +152,10 @@ TEST_F(PipelineTest, EmptyLine)
 {
     processString("\n");
 
-    ASSERT_EQ(doc->m_lineList.count(), 1) << "Expected 1 line for empty input with newline";
+    ASSERT_EQ(static_cast<int>(doc->m_lineList.size()), 1)
+        << "Expected 1 line for empty input with newline";
 
-    Line* line = doc->m_lineList[0];
+    Line* line = doc->m_lineList[0].get();
     EXPECT_EQ(line->len(), 0) << "Empty line should have length 0";
     EXPECT_TRUE(line->hard_return) << "Empty line should still have hard return";
 }
@@ -174,12 +166,14 @@ TEST_F(PipelineTest, IncompleteLineStaysInBuffer)
     processString("Hello"); // No newline
 
     // Line should still be in current line buffer, not in line list
-    EXPECT_EQ(doc->m_lineList.count(), 0) << "Incomplete line should not be added to line list yet";
+    EXPECT_EQ(static_cast<int>(doc->m_lineList.size()), 0)
+        << "Incomplete line should not be added to line list yet";
 
     // Now send newline to complete it
     processString("\n");
 
-    ASSERT_EQ(doc->m_lineList.count(), 1) << "Line should be completed after newline";
+    ASSERT_EQ(static_cast<int>(doc->m_lineList.size()), 1)
+        << "Line should be completed after newline";
     EXPECT_EQ(getLineText(0), "Hello") << "Completed line should have correct text";
 }
 
@@ -193,7 +187,7 @@ TEST_F(PipelineTest, MixedASCIIAndANSI)
                                    ' ', 'T', 'e', 'x', 't',  '\n', 0};
     processBytes(mixed);
 
-    ASSERT_EQ(doc->m_lineList.count(), 1);
+    ASSERT_EQ(static_cast<int>(doc->m_lineList.size()), 1);
     EXPECT_EQ(getLineText(0), "Normal Bold Text") << "Mixed text should be processed correctly";
 }
 
@@ -205,9 +199,9 @@ TEST_F(PipelineTest, ANSI256ColorForeground)
                                      'm',  'R', 'e', 'd', '2', '5', '6', '\n', 0};
     processBytes(ansi256);
 
-    ASSERT_EQ(doc->m_lineList.count(), 1) << "Expected 1 line in buffer";
+    ASSERT_EQ(static_cast<int>(doc->m_lineList.size()), 1) << "Expected 1 line in buffer";
 
-    Line* line = doc->m_lineList[0];
+    Line* line = doc->m_lineList[0].get();
     QString text = getLineText(0);
 
     EXPECT_EQ(text, "Red256") << "Line text should be 'Red256'";
@@ -241,8 +235,8 @@ TEST_F(PipelineTest, ANSI256ColorBackground)
                                        'B',  'l', 'u', 'e', ' ', 'B', 'G', '\n', 0};
     processBytes(ansi256bg);
 
-    ASSERT_EQ(doc->m_lineList.count(), 1) << "Expected 1 line in buffer";
-    Line* line = doc->m_lineList[0];
+    ASSERT_EQ(static_cast<int>(doc->m_lineList.size()), 1) << "Expected 1 line in buffer";
+    Line* line = doc->m_lineList[0].get();
 
     EXPECT_EQ(getLineText(0), "Blue BG") << "Line text should be 'Blue BG'";
 
@@ -276,9 +270,9 @@ TEST_F(PipelineTest, TrueColorForeground)
                                        'O',  'r', 'a', 'n', 'g', 'e', '\n', 0};
     processBytes(trueColor);
 
-    ASSERT_EQ(doc->m_lineList.count(), 1) << "Expected 1 line in buffer";
+    ASSERT_EQ(static_cast<int>(doc->m_lineList.size()), 1) << "Expected 1 line in buffer";
 
-    Line* line = doc->m_lineList[0];
+    Line* line = doc->m_lineList[0].get();
     QString text = getLineText(0);
 
     EXPECT_EQ(text, "Orange") << "Line text should be 'Orange'";
@@ -311,9 +305,9 @@ TEST_F(PipelineTest, TrueColorBackground)
                                          'P',  'u', 'r', 'p', 'l', 'e', ' ', 'B', 'G', '\n', 0};
     processBytes(trueColorBg);
 
-    ASSERT_EQ(doc->m_lineList.count(), 1) << "Expected 1 line in buffer";
+    ASSERT_EQ(static_cast<int>(doc->m_lineList.size()), 1) << "Expected 1 line in buffer";
 
-    Line* line = doc->m_lineList[0];
+    Line* line = doc->m_lineList[0].get();
     EXPECT_EQ(getLineText(0), "Purple BG") << "Line text should be 'Purple BG'";
 
     // Find the style that actually has text (iLength > 0)
@@ -348,9 +342,9 @@ TEST_F(PipelineTest, TrueColorBothForeAndBack)
                                            'n',  ' ', 'N', 'a', 'v', 'y', '\n', 0};
     processBytes(trueColorBoth);
 
-    ASSERT_EQ(doc->m_lineList.count(), 1) << "Expected 1 line in buffer";
+    ASSERT_EQ(static_cast<int>(doc->m_lineList.size()), 1) << "Expected 1 line in buffer";
 
-    Line* line = doc->m_lineList[0];
+    Line* line = doc->m_lineList[0].get();
     EXPECT_EQ(getLineText(0), "Yellow on Navy") << "Line text should be 'Yellow on Navy'";
 
     // Find the style that actually has text (iLength > 0)
@@ -382,25 +376,11 @@ TEST_F(PipelineTest, TrueColorGradient)
         '\n', 0};
     processBytes(gradient);
 
-    ASSERT_EQ(doc->m_lineList.count(), 1) << "Expected 1 line in buffer";
+    ASSERT_EQ(static_cast<int>(doc->m_lineList.size()), 1) << "Expected 1 line in buffer";
 
-    Line* line = doc->m_lineList[0];
+    Line* line = doc->m_lineList[0].get();
     EXPECT_EQ(getLineText(0), "RGB") << "Line text should be 'RGB'";
 
     // Should have multiple styles (one for each color change)
     EXPECT_GE(line->styleList.size(), 3) << "Should have at least 3 styles for color changes";
-}
-
-// Main function required for GoogleTest
-// Note: QCoreApplication must be created before any Qt objects
-int main(int argc, char** argv)
-{
-    // Initialize Qt (required for Qt objects like WorldDocument)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

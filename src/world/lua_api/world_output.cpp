@@ -5,8 +5,9 @@
  * colored text, hyperlinks, ANSI processing, and info bar management.
  */
 
-#include "lua_common.h"
 #include "../color_utils.h"
+#include "../view_interfaces.h"
+#include "lua_common.h"
 
 /**
  * world.Note(text, ...)
@@ -74,8 +75,7 @@ int L_ColourNote(lua_State* L)
 
         QRgb foreColor = getColor(L, i, BGR(255, 255, 255));
         QRgb backColor = getColor(L, i + 1, BGR(0, 0, 0));
-        const char* text = luaL_checkstring(L, i + 2);
-        QString qtext = QString::fromUtf8(text);
+        QString qtext = luaCheckQString(L, i + 2);
 
         // Use ColourTell for all but the last block
         if (i + 3 <= n) {
@@ -160,7 +160,7 @@ int L_ANSI(lua_State* L)
     }
 
     QString ansi = QString("\033[%1m").arg(codes.join(";"));
-    lua_pushstring(L, ansi.toUtf8().constData());
+    luaPushQString(L, ansi);
     return 1;
 }
 
@@ -187,8 +187,7 @@ int L_ANSI(lua_State* L)
 int L_AnsiNote(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* text = luaL_checkstring(L, 1);
-    QString qtext = QString::fromUtf8(text);
+    QString qtext = luaCheckQString(L, 1);
 
     // Standard ANSI color palette (first 8 colors) - BGR format for colourTell()
     static const QRgb ansiColors[8] = {
@@ -292,7 +291,8 @@ int L_AnsiNote(lua_State* L)
                 // Bright background colors
                 backColor = ansiBrightColors[code - 100];
             }
-            // TODO: 256-color and RGB modes (38;5;N and 38;2;R;G;B)
+            // TODO(feature): Handle 256-color (38;5;N) and RGB (38;2;R;G;B) ANSI modes in this code
+            // path.
         }
     }
 
@@ -312,7 +312,8 @@ int L_AnsiNote(lua_State* L)
  * @param hint (string) Tooltip text on hover (optional, defaults to action)
  * @param forecolour (string|number) Text color (optional, defaults to hyperlink color)
  * @param backcolour (string|number) Background color (optional, defaults to note background)
- * @param url (boolean) If true, opens in browser instead of sending to MUD (optional, defaults to false)
+ * @param url (boolean) If true, opens in browser instead of sending to MUD (optional, defaults to
+ * false)
  *
  * @return Nothing
  *
@@ -343,7 +344,7 @@ int L_Hyperlink(lua_State* L)
     const char* hint = lua_isstring(L, 3) ? lua_tostring(L, 3) : "";
 
     // forecolour is optional, defaults to hyperlink color
-    QRgb foreColor = pDoc->m_iHyperlinkColour;
+    QRgb foreColor = pDoc->m_colors.hyperlink_colour;
     if (!lua_isnoneornil(L, 4)) {
         foreColor = getColor(L, 4, foreColor);
     }
@@ -389,8 +390,7 @@ int L_Hyperlink(lua_State* L)
 int L_Simulate(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* text = luaL_checkstring(L, 1);
-    pDoc->simulate(QString::fromUtf8(text));
+    pDoc->simulate(luaCheckQString(L, 1));
     return 0;
 }
 
@@ -427,8 +427,7 @@ int L_ColourTell(lua_State* L)
 
         QRgb foreColor = getColor(L, i, BGR(255, 255, 255));
         QRgb backColor = getColor(L, i + 1, BGR(0, 0, 0));
-        const char* text = luaL_checkstring(L, i + 2);
-        QString qtext = QString::fromUtf8(text);
+        QString qtext = luaCheckQString(L, i + 2);
 
         pDoc->colourTell(foreColor, backColor, qtext);
     }
@@ -484,17 +483,16 @@ int L_ColourTell(lua_State* L)
 int L_GetLineInfo(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    int lineNumber = luaL_checkinteger(L, 1);
-    int infoType = luaL_checkinteger(L, 2);
+    auto [lineNumber, infoType] = luaArgs<int, int>(L);
 
     // Check line exists (1-based index)
-    if (lineNumber <= 0 || lineNumber > pDoc->m_lineList.size()) {
+    if (lineNumber <= 0 || lineNumber > static_cast<int>(pDoc->m_lineList.size())) {
         lua_pushnil(L);
         return 1;
     }
 
     // Get the line (convert to 0-based index)
-    Line* line = pDoc->m_lineList.at(lineNumber - 1);
+    Line* line = pDoc->m_lineList.at(lineNumber - 1).get();
     if (!line) {
         lua_pushnil(L);
         return 1;
@@ -502,7 +500,7 @@ int L_GetLineInfo(lua_State* L)
 
     switch (infoType) {
         case 1: // text of line
-            lua_pushlstring(L, line->text(), line->len());
+            lua_pushlstring(L, line->text().data(), line->text().size());
             break;
         case 2: // length of text
             lua_pushinteger(L, line->len());
@@ -543,11 +541,15 @@ int L_GetLineInfo(lua_State* L)
 }
 
 /**
- * world.GetStyleInfo(line_number, style_number, info_type)
+ * world.GetStyleInfo(line_number [, style_number [, info_type]])
  *
- * Returns information about a specific style run within a line. A "style run"
+ * Returns information about style runs within a line. A "style run"
  * is a contiguous segment of text with the same formatting (color, bold, etc.).
- * Use GetLineInfo(line, 11) to get the count of style runs on a line.
+ *
+ * Extended forms (matching MUSHclient):
+ * - GetStyleInfo(line) — returns table of tables (all styles, all info)
+ * - GetStyleInfo(line, style) — returns table (all info for one style)
+ * - GetStyleInfo(line, style, type) — returns single value
  *
  * Info types:
  * - 1: Text content of this style run (string)
@@ -567,44 +569,225 @@ int L_GetLineInfo(lua_State* L)
  * - 15: Background color as RGB integer (number)
  *
  * @param line_number (number) Line number in output buffer (1-based)
- * @param style_number (number) Style run index within the line (1-based)
- * @param info_type (number) Type of information to retrieve (1-15)
+ * @param style_number (number, optional) Style run index within the line (1-based). 0 or omitted =
+ * all styles.
+ * @param info_type (number, optional) Type of information to retrieve (1-15). 0 or omitted = all
+ * types as table.
  *
- * @return Requested information (type varies by info_type)
+ * @return Requested information (type varies by call form)
  * @return (nil) If line/style number is out of range or info_type is invalid
  *
  * @example
- * -- Iterate through all style runs on a line
- * local styleCount = GetLineInfo(lineNum, 11)
- * for i = 1, styleCount do
- *     local text = GetStyleInfo(lineNum, i, 1)
- *     local fore = GetStyleInfo(lineNum, i, 14)
- *     print(string.format("Style %d: '%s' color=#%06X", i, text, fore))
+ * -- Get all styles for a line as table of tables
+ * local styles = GetStyleInfo(lineNum)
+ * for i, s in ipairs(styles) do
+ *     print(s.text, s.textcolour)
  * end
  *
  * @see GetLineInfo, GetRecentLines
  */
+
+// Push a table with all 15 info fields for a single style run
+static void pushStyleTable(lua_State* L, Line* line, Style* style, int startCol)
+{
+    lua_newtable(L);
+
+    // 1: text
+    int offset = startCol - 1;
+    int length = style->iLength;
+    if (offset >= 0 && offset + length <= line->len()) {
+        lua_pushlstring(L, line->text().data() + offset, length);
+    } else {
+        lua_pushstring(L, "");
+    }
+    lua_setfield(L, -2, "text");
+
+    // 2: length
+    lua_pushinteger(L, style->iLength);
+    lua_setfield(L, -2, "length");
+
+    // 3: starting column (1-based)
+    lua_pushinteger(L, startCol);
+    lua_setfield(L, -2, "column");
+
+    // 4: action type
+    int actionType = (style->iFlags & ACTIONTYPE);
+    int actionResult = 0;
+    if (actionType == ACTION_SEND)
+        actionResult = 1;
+    else if (actionType == ACTION_HYPERLINK)
+        actionResult = 2;
+    else if (actionType == ACTION_PROMPT)
+        actionResult = 3;
+    lua_pushinteger(L, actionResult);
+    lua_setfield(L, -2, "actiontype");
+
+    // 5: action
+    if (style->pAction) {
+        luaPushQString(L, style->pAction->m_strAction);
+    } else {
+        lua_pushstring(L, "");
+    }
+    lua_setfield(L, -2, "action");
+
+    // 6: hint
+    if (style->pAction) {
+        luaPushQString(L, style->pAction->m_strHint);
+    } else {
+        lua_pushstring(L, "");
+    }
+    lua_setfield(L, -2, "hint");
+
+    // 7: variable
+    if (style->pAction) {
+        luaPushQString(L, style->pAction->m_strVariable);
+    } else {
+        lua_pushstring(L, "");
+    }
+    lua_setfield(L, -2, "variable");
+
+    // 8-13: flags
+    lua_pushboolean(L, (style->iFlags & HILITE) != 0);
+    lua_setfield(L, -2, "bold");
+    lua_pushboolean(L, (style->iFlags & UNDERLINE) != 0);
+    lua_setfield(L, -2, "ul");
+    lua_pushboolean(L, (style->iFlags & BLINK) != 0);
+    lua_setfield(L, -2, "blink");
+    lua_pushboolean(L, (style->iFlags & INVERSE) != 0);
+    lua_setfield(L, -2, "inverse");
+    lua_pushboolean(L, (style->iFlags & CHANGED) != 0);
+    lua_setfield(L, -2, "changed");
+    lua_pushboolean(L, (style->iFlags & START_TAG) != 0);
+    lua_setfield(L, -2, "starttag");
+
+    // 14-15: colours
+    lua_pushinteger(L, style->iForeColour);
+    lua_setfield(L, -2, "textcolour");
+    lua_pushinteger(L, style->iBackColour);
+    lua_setfield(L, -2, "backcolour");
+}
+
+// Push a single info type value for a style run
+static void pushStyleInfoType(lua_State* L, Line* line, Style* style, int startCol, int infoType)
+{
+    switch (infoType) {
+        case 1: { // text of style
+            int offset = startCol - 1;
+            int length = style->iLength;
+            if (offset >= 0 && offset + length <= line->len()) {
+                lua_pushlstring(L, line->text().data() + offset, length);
+            } else {
+                lua_pushstring(L, "");
+            }
+            break;
+        }
+        case 2:
+            lua_pushinteger(L, style->iLength);
+            break;
+        case 3:
+            lua_pushinteger(L, startCol);
+            break;
+        case 4: {
+            int actionType = (style->iFlags & ACTIONTYPE);
+            int result = 0;
+            if (actionType == ACTION_SEND)
+                result = 1;
+            else if (actionType == ACTION_HYPERLINK)
+                result = 2;
+            else if (actionType == ACTION_PROMPT)
+                result = 3;
+            lua_pushinteger(L, result);
+            break;
+        }
+        case 5:
+            if (style->pAction)
+                luaPushQString(L, style->pAction->m_strAction);
+            else
+                lua_pushstring(L, "");
+            break;
+        case 6:
+            if (style->pAction)
+                luaPushQString(L, style->pAction->m_strHint);
+            else
+                lua_pushstring(L, "");
+            break;
+        case 7:
+            if (style->pAction)
+                luaPushQString(L, style->pAction->m_strVariable);
+            else
+                lua_pushstring(L, "");
+            break;
+        case 8:
+            lua_pushboolean(L, (style->iFlags & HILITE) != 0);
+            break;
+        case 9:
+            lua_pushboolean(L, (style->iFlags & UNDERLINE) != 0);
+            break;
+        case 10:
+            lua_pushboolean(L, (style->iFlags & BLINK) != 0);
+            break;
+        case 11:
+            lua_pushboolean(L, (style->iFlags & INVERSE) != 0);
+            break;
+        case 12:
+            lua_pushboolean(L, (style->iFlags & CHANGED) != 0);
+            break;
+        case 13:
+            lua_pushboolean(L, (style->iFlags & START_TAG) != 0);
+            break;
+        case 14:
+            lua_pushinteger(L, style->iForeColour);
+            break;
+        case 15:
+            lua_pushinteger(L, style->iBackColour);
+            break;
+        default:
+            lua_pushnil(L);
+            break;
+    }
+}
+
 int L_GetStyleInfo(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
     int lineNumber = luaL_checkinteger(L, 1);
-    int styleNumber = luaL_checkinteger(L, 2);
-    int infoType = luaL_checkinteger(L, 3);
+    int styleNumber = luaL_optinteger(L, 2, 0);
+    int infoType = luaL_optinteger(L, 3, 0);
 
     // Check line exists (1-based index)
-    if (lineNumber <= 0 || lineNumber > pDoc->m_lineList.size()) {
-        lua_pushnil(L);
-        return 1;
+    if (lineNumber <= 0 || lineNumber > static_cast<int>(pDoc->m_lineList.size())) {
+        return 0; // no result for invalid line (matches MUSHclient)
     }
 
-    Line* line = pDoc->m_lineList.at(lineNumber - 1);
+    Line* line = pDoc->m_lineList.at(lineNumber - 1).get();
     if (!line) {
-        lua_pushnil(L);
+        return 0;
+    }
+
+    // Extended form: styleNumber == 0 means all styles
+    if (styleNumber == 0) {
+        lua_newtable(L); // outer table, one entry per style
+        int col = 1;
+        for (int i = 0; i < static_cast<int>(line->styleList.size()); i++) {
+            Style* style = line->styleList[i].get();
+            if (!style)
+                continue;
+
+            if (infoType == 0) {
+                // All types: push a sub-table with all 15 fields
+                pushStyleTable(L, line, style, col);
+            } else {
+                // Single type per style
+                pushStyleInfoType(L, line, style, col, infoType);
+            }
+            lua_rawseti(L, -2, i + 1);
+            col += style->iLength;
+        }
         return 1;
     }
 
-    // Check style exists (1-based index)
-    if (styleNumber <= 0 || styleNumber > (int)line->styleList.size()) {
+    // Single style requested
+    if (styleNumber < 0 || styleNumber > static_cast<int>(line->styleList.size())) {
         lua_pushnil(L);
         return 1;
     }
@@ -621,86 +804,14 @@ int L_GetStyleInfo(lua_State* L)
         startCol += line->styleList[i]->iLength;
     }
 
-    switch (infoType) {
-        case 1: { // text of style
-            // Extract text covered by this style
-            int offset = startCol - 1;
-            int length = style->iLength;
-            if (offset >= 0 && offset + length <= line->len()) {
-                lua_pushlstring(L, line->text() + offset, length);
-            } else {
-                lua_pushstring(L, "");
-            }
-            break;
-        }
-        case 2: // length of style run
-            lua_pushinteger(L, style->iLength);
-            break;
-        case 3: // starting column (1-based)
-            lua_pushinteger(L, startCol);
-            break;
-        case 4: { // action type
-            int actionType = (style->iFlags & ACTIONTYPE);
-            int result = 0;
-            if (actionType == ACTION_SEND)
-                result = 1;
-            else if (actionType == ACTION_HYPERLINK)
-                result = 2;
-            else if (actionType == ACTION_PROMPT)
-                result = 3;
-            lua_pushinteger(L, result);
-            break;
-        }
-        case 5: // action (what to send)
-            if (style->pAction) {
-                lua_pushstring(L, style->pAction->m_strAction.toUtf8().constData());
-            } else {
-                lua_pushstring(L, "");
-            }
-            break;
-        case 6: // hint (tooltip)
-            if (style->pAction) {
-                lua_pushstring(L, style->pAction->m_strHint.toUtf8().constData());
-            } else {
-                lua_pushstring(L, "");
-            }
-            break;
-        case 7: // variable (MXP)
-            if (style->pAction) {
-                lua_pushstring(L, style->pAction->m_strVariable.toUtf8().constData());
-            } else {
-                lua_pushstring(L, "");
-            }
-            break;
-        case 8: // bold
-            lua_pushboolean(L, (style->iFlags & HILITE) != 0);
-            break;
-        case 9: // underlined
-            lua_pushboolean(L, (style->iFlags & UNDERLINE) != 0);
-            break;
-        case 10: // blinking/italic
-            lua_pushboolean(L, (style->iFlags & BLINK) != 0);
-            break;
-        case 11: // inverse
-            lua_pushboolean(L, (style->iFlags & INVERSE) != 0);
-            break;
-        case 12: // changed by trigger
-            lua_pushboolean(L, (style->iFlags & CHANGED) != 0);
-            break;
-        case 13: // start of tag
-            lua_pushboolean(L, (style->iFlags & START_TAG) != 0);
-            break;
-        case 14: // foreground colour (RGB)
-            lua_pushinteger(L, style->iForeColour);
-            break;
-        case 15: // background colour (RGB)
-            lua_pushinteger(L, style->iBackColour);
-            break;
-        default:
-            lua_pushnil(L);
-            break;
+    // Extended form: infoType == 0 means all types for this one style
+    if (infoType == 0) {
+        pushStyleTable(L, line, style, startCol);
+        return 1;
     }
 
+    // Standard form: single value
+    pushStyleInfoType(L, line, style, startCol, infoType);
     return 1;
 }
 
@@ -753,9 +864,7 @@ int L_GetRecentLines(lua_State* L)
         result += pDoc->m_recentLines[static_cast<size_t>(i)];
     }
 
-    QByteArray utf8 = result.toUtf8();
-    lua_pushlstring(L, utf8.constData(), utf8.size());
-    return 1;
+    return luaReturn(L, result);
 }
 
 /**
@@ -789,7 +898,8 @@ int L_NoteColour(lua_State* L)
         lua_pushinteger(L, -1);
     } else {
         // SAMECOLOUR is typically -1 or 65535
-        lua_pushinteger(L, pDoc->m_iNoteTextColour == 65535 ? 0 : pDoc->m_iNoteTextColour + 1);
+        lua_pushinteger(
+            L, pDoc->m_colors.note_text_colour == 65535 ? 0 : pDoc->m_colors.note_text_colour + 1);
     }
     return 1;
 }
@@ -809,12 +919,7 @@ int L_NoteColour(lua_State* L)
  *
  * @see NoteColourBack, GetNoteColourFore, NoteColourRGB
  */
-int L_NoteColourFore(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-    lua_pushinteger(L, pDoc->m_iNoteColourFore & 0x00FFFFFF);
-    return 1;
-}
+LUA_DOC_GETTER(L_NoteColourFore, pDoc->m_iNoteColourFore & 0x00FFFFFF)
 
 /**
  * world.NoteColourBack()
@@ -831,12 +936,7 @@ int L_NoteColourFore(lua_State* L)
  *
  * @see NoteColourFore, GetNoteColourBack, NoteColourRGB
  */
-int L_NoteColourBack(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-    lua_pushinteger(L, pDoc->m_iNoteColourBack & 0x00FFFFFF);
-    return 1;
-}
+LUA_DOC_GETTER(L_NoteColourBack, pDoc->m_iNoteColourBack & 0x00FFFFFF)
 
 /**
  * world.NoteColourRGB(foreground, background)
@@ -860,8 +960,7 @@ int L_NoteColourBack(lua_State* L)
 int L_NoteColourRGB(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    lua_Integer fore = luaL_checkinteger(L, 1);
-    lua_Integer back = luaL_checkinteger(L, 2);
+    auto [fore, back] = luaArgs<int, int>(L);
 
     pDoc->m_bNotesInRGB = true;
     pDoc->m_iNoteColourFore = fore & 0x00FFFFFF;
@@ -890,8 +989,6 @@ int L_NoteColourRGB(lua_State* L)
 int L_NoteColourName(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* foreName = luaL_checkstring(L, 1);
-    const char* backName = luaL_checkstring(L, 2);
 
     pDoc->m_bNotesInRGB = true;
     pDoc->m_iNoteColourFore = getColor(L, 1, pDoc->m_iNoteColourFore);
@@ -929,18 +1026,18 @@ int L_GetNoteColourFore(lua_State* L)
 
     if (pDoc->m_bNotesInRGB) {
         lua_pushinteger(L, pDoc->m_iNoteColourFore);
-    } else if (pDoc->m_iNoteTextColour == SAMECOLOUR) {
+    } else if (pDoc->m_colors.note_text_colour == SAMECOLOUR) {
         if (pDoc->m_bCustom16isDefaultColour)
-            lua_pushinteger(L, pDoc->m_customtext[15]);
+            lua_pushinteger(L, pDoc->m_colors.custom_text[15]);
         else
-            lua_pushinteger(L, pDoc->m_normalcolour[ANSI_WHITE]);
+            lua_pushinteger(L, pDoc->m_colors.normal_colour[ANSI_WHITE]);
     } else {
         // Ensure valid index
-        int index = pDoc->m_iNoteTextColour;
+        int index = pDoc->m_colors.note_text_colour;
         if (index >= 0 && index < MAX_CUSTOM)
-            lua_pushinteger(L, pDoc->m_customtext[index]);
+            lua_pushinteger(L, pDoc->m_colors.custom_text[index]);
         else
-            lua_pushinteger(L, pDoc->m_normalcolour[ANSI_WHITE]); // fallback
+            lua_pushinteger(L, pDoc->m_colors.normal_colour[ANSI_WHITE]); // fallback
     }
     return 1;
 }
@@ -971,18 +1068,18 @@ int L_GetNoteColourBack(lua_State* L)
 
     if (pDoc->m_bNotesInRGB) {
         lua_pushinteger(L, pDoc->m_iNoteColourBack);
-    } else if (pDoc->m_iNoteTextColour == SAMECOLOUR) {
+    } else if (pDoc->m_colors.note_text_colour == SAMECOLOUR) {
         if (pDoc->m_bCustom16isDefaultColour)
-            lua_pushinteger(L, pDoc->m_customback[15]);
+            lua_pushinteger(L, pDoc->m_colors.custom_back[15]);
         else
-            lua_pushinteger(L, pDoc->m_normalcolour[ANSI_BLACK]);
+            lua_pushinteger(L, pDoc->m_colors.normal_colour[ANSI_BLACK]);
     } else {
         // Ensure valid index
-        int index = pDoc->m_iNoteTextColour;
+        int index = pDoc->m_colors.note_text_colour;
         if (index >= 0 && index < MAX_CUSTOM)
-            lua_pushinteger(L, pDoc->m_customback[index]);
+            lua_pushinteger(L, pDoc->m_colors.custom_back[index]);
         else
-            lua_pushinteger(L, pDoc->m_normalcolour[ANSI_BLACK]); // fallback
+            lua_pushinteger(L, pDoc->m_colors.normal_colour[ANSI_BLACK]); // fallback
     }
     return 1;
 }
@@ -1013,7 +1110,7 @@ int L_SetNoteColour(lua_State* L)
     lua_Integer colour = luaL_checkinteger(L, 1);
 
     if (colour >= 0 && colour <= MAX_CUSTOM) {
-        pDoc->m_iNoteTextColour =
+        pDoc->m_colors.note_text_colour =
             colour - 1; // Convert 1-based to 0-based (0 becomes -1/SAMECOLOUR)
         pDoc->m_bNotesInRGB = false;
     }
@@ -1045,17 +1142,17 @@ int L_SetNoteColourFore(lua_State* L)
 
     // Convert background to RGB if necessary
     if (!pDoc->m_bNotesInRGB) {
-        if (pDoc->m_iNoteTextColour == SAMECOLOUR) {
+        if (pDoc->m_colors.note_text_colour == SAMECOLOUR) {
             if (pDoc->m_bCustom16isDefaultColour)
-                pDoc->m_iNoteColourBack = pDoc->m_customback[15];
+                pDoc->m_iNoteColourBack = pDoc->m_colors.custom_back[15];
             else
-                pDoc->m_iNoteColourBack = pDoc->m_normalcolour[ANSI_BLACK];
+                pDoc->m_iNoteColourBack = pDoc->m_colors.normal_colour[ANSI_BLACK];
         } else {
-            int index = pDoc->m_iNoteTextColour;
+            int index = pDoc->m_colors.note_text_colour;
             if (index >= 0 && index < MAX_CUSTOM)
-                pDoc->m_iNoteColourBack = pDoc->m_customback[index];
+                pDoc->m_iNoteColourBack = pDoc->m_colors.custom_back[index];
             else
-                pDoc->m_iNoteColourBack = pDoc->m_normalcolour[ANSI_BLACK];
+                pDoc->m_iNoteColourBack = pDoc->m_colors.normal_colour[ANSI_BLACK];
         }
     }
 
@@ -1089,17 +1186,17 @@ int L_SetNoteColourBack(lua_State* L)
 
     // Convert foreground to RGB if necessary
     if (!pDoc->m_bNotesInRGB) {
-        if (pDoc->m_iNoteTextColour == SAMECOLOUR) {
+        if (pDoc->m_colors.note_text_colour == SAMECOLOUR) {
             if (pDoc->m_bCustom16isDefaultColour)
-                pDoc->m_iNoteColourFore = pDoc->m_customtext[15];
+                pDoc->m_iNoteColourFore = pDoc->m_colors.custom_text[15];
             else
-                pDoc->m_iNoteColourFore = pDoc->m_normalcolour[ANSI_WHITE];
+                pDoc->m_iNoteColourFore = pDoc->m_colors.normal_colour[ANSI_WHITE];
         } else {
-            int index = pDoc->m_iNoteTextColour;
+            int index = pDoc->m_colors.note_text_colour;
             if (index >= 0 && index < MAX_CUSTOM)
-                pDoc->m_iNoteColourFore = pDoc->m_customtext[index];
+                pDoc->m_iNoteColourFore = pDoc->m_colors.custom_text[index];
             else
-                pDoc->m_iNoteColourFore = pDoc->m_normalcolour[ANSI_WHITE];
+                pDoc->m_iNoteColourFore = pDoc->m_colors.normal_colour[ANSI_WHITE];
         }
     }
 
@@ -1160,12 +1257,7 @@ int L_NoteStyle(lua_State* L)
  *
  * @see NoteStyle
  */
-int L_GetNoteStyle(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-    lua_pushinteger(L, pDoc->m_iNoteStyle & 0x0F);
-    return 1;
-}
+LUA_DOC_GETTER(L_GetNoteStyle, pDoc->m_iNoteStyle & 0x0F)
 
 /**
  * world.NoteHr()
@@ -1216,8 +1308,7 @@ int L_NoteHr(lua_State* L)
 int L_Info(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* text = luaL_optstring(L, 1, "");
-    pDoc->m_infoBarText.append(QString::fromUtf8(text));
+    pDoc->m_infoBarText.append(luaOptQString(L, 1));
     emit pDoc->infoBarChanged();
     return 0;
 }
@@ -1276,8 +1367,7 @@ int L_InfoClear(lua_State* L)
 int L_InfoColour(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-    QRgb color = ColourNameToRGB(QString::fromUtf8(name));
+    QRgb color = ColourNameToRGB(luaCheckQString(L, 1));
     pDoc->m_infoBarTextColor = color;
     emit pDoc->infoBarChanged();
     return 0;
@@ -1304,8 +1394,7 @@ int L_InfoColour(lua_State* L)
 int L_InfoBackground(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-    QRgb color = ColourNameToRGB(QString::fromUtf8(name));
+    QRgb color = ColourNameToRGB(luaCheckQString(L, 1));
     pDoc->m_infoBarBackColor = color;
     emit pDoc->infoBarChanged();
     return 0;
@@ -1344,13 +1433,13 @@ int L_InfoBackground(lua_State* L)
 int L_InfoFont(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* fontName = luaL_optstring(L, 1, "");
+    QString fontName = luaOptQString(L, 1);
     int size = luaL_optinteger(L, 2, 0);
     int style = luaL_optinteger(L, 3, 0);
 
     // Font name (if provided and not empty)
-    if (fontName[0] != '\0') {
-        pDoc->m_infoBarFontName = QString::fromUtf8(fontName);
+    if (!fontName.isEmpty()) {
+        pDoc->m_infoBarFontName = fontName;
     }
 
     // Size (if positive)
@@ -1397,26 +1486,397 @@ int L_ShowInfoBar(lua_State* L)
     return 0;
 }
 
-// ========== Registration ==========
+// ========== MXP / XML Entity Functions ==========
 
-void register_world_output_functions(luaL_Reg*& ptr)
+/**
+ * world.GetEntity(name)
+ *
+ * Returns the value of a custom MXP entity defined with SetEntity() or
+ * via a <!ENTITY> definition received from the MUD server. Only custom
+ * entities (not the built-in HTML entities) are accessible through this
+ * function; use GetXMLEntity() for standard HTML entities.
+ *
+ * @param name (string) Entity name (without & and ; delimiters)
+ *
+ * @return (string) Entity value, or empty string if not found
+ *
+ * @example
+ * -- After MUD sends: <!ENTITY hp "150">
+ * local hp = GetEntity("hp")
+ * Note("Current HP: " .. hp)
+ *
+ * @see SetEntity, GetXMLEntity
+ */
+int L_GetEntity(lua_State* L)
 {
-    *ptr++ = {"Note", L_Note};
-    *ptr++ = {"ColourNote", L_ColourNote};
-    *ptr++ = {"ColourTell", L_ColourTell};
-    *ptr++ = {"Tell", L_Tell};
-    *ptr++ = {"ANSI", L_ANSI};
-    *ptr++ = {"AnsiNote", L_AnsiNote};
-    *ptr++ = {"Hyperlink", L_Hyperlink};
-    *ptr++ = {"Simulate", L_Simulate};
-    *ptr++ = {"GetLineInfo", L_GetLineInfo};
-    *ptr++ = {"GetStyleInfo", L_GetStyleInfo};
-    *ptr++ = {"GetRecentLines", L_GetRecentLines};
-    // Info Bar functions
-    *ptr++ = {"Info", L_Info};
-    *ptr++ = {"InfoClear", L_InfoClear};
-    *ptr++ = {"InfoColour", L_InfoColour};
-    *ptr++ = {"InfoBackground", L_InfoBackground};
-    *ptr++ = {"InfoFont", L_InfoFont};
-    *ptr++ = {"ShowInfoBar", L_ShowInfoBar};
+    WorldDocument* pDoc = doc(L);
+    QString entityName = luaCheckQString(L, 1).toLower();
+
+    // Look up in the custom entity map only (built-in entities via GetXMLEntity)
+    auto& customMap = pDoc->m_mxpEngine->m_customEntityMap;
+    auto it = customMap.find(entityName);
+    if (it != customMap.end()) {
+        const MXPEntity* entity = it->second.get();
+        QString value =
+            entity->strValue.isEmpty()
+                ? QString::fromUcs4(reinterpret_cast<const char32_t*>(&entity->iCodepoint), 1)
+                : entity->strValue;
+        luaPushQString(L, value);
+        return 1;
+    }
+
+    // Not found — return empty string (original MUSHclient returns "")
+    lua_pushlstring(L, "", 0);
+    return 1;
+}
+
+/**
+ * world.GetXMLEntity(entity)
+ *
+ * Returns the resolved character for a standard XML/HTML entity name.
+ * Handles the built-in named entities (&amp;, &lt;, &gt;, &apos;, &quot;)
+ * as well as numeric entities (&#65; = "A", &#x41; = "A").
+ *
+ * @param entity (string) Entity name without & and ; (e.g., "amp", "lt", "#65", "#x41")
+ *
+ * @return (string) Resolved character(s), or empty string if unknown
+ *
+ * @example
+ * local lt = GetXMLEntity("lt")       -- Returns "<"
+ * local amp = GetXMLEntity("amp")     -- Returns "&"
+ * local A = GetXMLEntity("#65")       -- Returns "A" (decimal)
+ * local B = GetXMLEntity("#x42")      -- Returns "B" (hex)
+ *
+ * @see GetEntity, SetEntity
+ */
+int L_GetXMLEntity(lua_State* L)
+{
+    WorldDocument* pDoc = doc(L);
+
+    // Delegate to the MXP engine's entity resolver which handles
+    // both numeric (&#65;, &#x41;) and named standard entities.
+    QString resolved = pDoc->m_mxpEngine->MXP_GetEntity(luaCheckQString(L, 1));
+
+    return luaReturn(L, resolved);
+}
+
+/**
+ * world.SetEntity(name, value)
+ *
+ * Defines or updates a custom MXP entity. The entity can then be used by
+ * the MXP engine or retrieved with GetEntity(). Passing an empty string as
+ * value removes the entity.
+ *
+ * @param name (string) Entity name (without & and ; delimiters)
+ * @param value (string) Entity value (empty string to delete the entity)
+ *
+ * @return Nothing
+ *
+ * @example
+ * -- Define a custom entity
+ * SetEntity("myname", "Gandalf")
+ * local name = GetEntity("myname")  -- Returns "Gandalf"
+ *
+ * -- Delete the entity
+ * SetEntity("myname", "")
+ *
+ * @see GetEntity, GetXMLEntity
+ */
+int L_SetEntity(lua_State* L)
+{
+    WorldDocument* pDoc = doc(L);
+    QString entityName = luaCheckQString(L, 1).toLower();
+    QString entityValue = luaOptQString(L, 2);
+
+    auto& customMap = pDoc->m_mxpEngine->m_customEntityMap;
+
+    if (entityValue.isEmpty()) {
+        // Delete the entity
+        customMap.erase(entityName);
+        return 0;
+    }
+
+    // Cannot redefine built-in HTML entities
+    auto& stdMap = pDoc->m_mxpEngine->m_entityMap;
+    if (stdMap.count(entityName) > 0) {
+        return 0; // Silently ignore — matches original MUSHclient behaviour
+    }
+
+    // Upsert the custom entity
+    auto entity = std::make_unique<MXPEntity>();
+    entity->strName = entityName;
+    entity->strValue = entityValue;
+    if (entityValue.length() == 1) {
+        entity->iCodepoint = entityValue[0].unicode();
+    } else {
+        entity->iCodepoint = 0;
+    }
+    customMap[entityName] = std::move(entity);
+
+    return 0;
+}
+
+// ========== Text Manipulation Functions ==========
+
+/**
+ * world.DeleteLines(count)
+ *
+ * Deletes the specified number of lines from the end of the output buffer.
+ * If a sentinel (empty, no hard_return) line is present at the back it is
+ * counted as one of the lines to delete so the visible line count decreases
+ * by exactly `count`.
+ *
+ * @param count (integer) Number of lines to delete (no-op if <= 0)
+ *
+ * @return Nothing
+ *
+ * @example
+ * DeleteLines(5)  -- remove the last 5 visible lines
+ *
+ * @see DeleteOutput
+ */
+int L_DeleteLines(lua_State* L)
+{
+    WorldDocument* pDoc = doc(L);
+
+    if (pDoc->m_bInSendToScript) {
+        return 0;
+    }
+
+    int count = static_cast<int>(luaL_checkinteger(L, 1));
+    if (count <= 0) {
+        return 0;
+    }
+
+    // If the last line is an empty sentinel (current line not yet committed),
+    // absorb it into the deletion count so the caller removes exactly `count`
+    // visible lines.
+    if (!pDoc->m_lineList.empty() && pDoc->m_lineList.back()->textBuffer.empty()) {
+        ++count;
+    }
+
+    while (count-- > 0 && !pDoc->m_lineList.empty()) {
+        pDoc->m_lineList.pop_back();
+        --pDoc->m_total_lines;
+    }
+
+    // Decide whether m_currentLine is still usable.
+    // A COMMENT line without hard_return can still receive appended text.
+    bool needNewLine = true;
+    if (!pDoc->m_lineList.empty()) {
+        const Line* back = pDoc->m_lineList.back().get();
+        if ((back->flags & COMMENT) && !back->hard_return) {
+            needNewLine = false;
+        }
+    }
+
+    if (needNewLine || pDoc->m_lineList.empty()) {
+        pDoc->m_lineList.push_back(
+            std::make_unique<Line>(pDoc->m_total_lines + 1, pDoc->m_display.wrap_column, 0,
+                                   pDoc->m_colors.normal_colour[7], pDoc->m_colors.normal_colour[0],
+                                   pDoc->m_display.utf8));
+    }
+
+    pDoc->Repaint();
+    return 0;
+}
+
+/**
+ * world.DeleteOutput()
+ *
+ * Clears the entire output buffer, resetting the display to a blank state.
+ * Resets the line counter, clears recent-lines history, and clears the
+ * current text selection.
+ *
+ * @return Nothing
+ *
+ * @example
+ * DeleteOutput()  -- wipe the output window
+ *
+ * @see DeleteLines
+ */
+int L_DeleteOutput(lua_State* L)
+{
+    WorldDocument* pDoc = doc(L);
+
+    pDoc->m_lineList.clear();
+    pDoc->m_total_lines = 0;
+
+    pDoc->m_currentLine =
+        std::make_unique<Line>(1, pDoc->m_display.wrap_column, 0, pDoc->m_colors.normal_colour[7],
+                               pDoc->m_colors.normal_colour[0], pDoc->m_display.utf8);
+
+    pDoc->m_selectionStartLine = 0;
+    pDoc->m_selectionStartChar = 0;
+    pDoc->m_selectionEndLine = 0;
+    pDoc->m_selectionEndChar = 0;
+
+    pDoc->Repaint();
+    return 0;
+}
+
+/**
+ * world.SetSelection(startLine, endLine, startCol, endCol)
+ *
+ * Sets the current text selection in the output window. All parameters are
+ * 1-based and are converted to 0-based indices internally.
+ *
+ * @param startLine (integer) First line of the selection (1-based)
+ * @param endLine   (integer) Last line of the selection (1-based)
+ * @param startCol  (integer) Start column within startLine (1-based)
+ * @param endCol    (integer) End column within endLine (1-based)
+ *
+ * @return Nothing
+ *
+ * @example
+ * SetSelection(1, 3, 1, 10)  -- select from line 1 col 1 to line 3 col 10
+ *
+ * @see GetSelectionStartLine, GetSelectionEndLine
+ */
+int L_SetSelection(lua_State* L)
+{
+    WorldDocument* pDoc = doc(L);
+
+    auto [rawStartLine, rawEndLine, rawStartCol, rawEndCol] = luaArgs<int, int, int, int>(L);
+    const int startLine = rawStartLine - 1;
+    const int endLine = rawEndLine - 1;
+    const int startCol = rawStartCol - 1;
+    const int endCol = rawEndCol - 1;
+
+    pDoc->m_selectionStartLine = startLine;
+    pDoc->m_selectionEndLine = endLine;
+    pDoc->m_selectionStartChar = startCol;
+    pDoc->m_selectionEndChar = endCol;
+
+    pDoc->Repaint();
+    return 0;
+}
+
+// ========== Display/UI Functions ==========
+
+/**
+ * world.Bookmark(lineNumber [, set])
+ *
+ * Sets or clears the bookmark flag on the specified output line.
+ *
+ * @param lineNumber (integer) 1-based line number
+ * @param set        (boolean, optional) true to set bookmark, false to clear (default: true)
+ *
+ * @return Nothing
+ *
+ * @example
+ * Bookmark(10)         -- bookmark line 10
+ * Bookmark(10, false)  -- remove bookmark from line 10
+ */
+int L_Bookmark(lua_State* L)
+{
+    WorldDocument* pDoc = doc(L);
+
+    const int lineNumber = static_cast<int>(luaL_checkinteger(L, 1));
+    const bool set = lua_isnoneornil(L, 2) ? true : lua_toboolean(L, 2) != 0;
+
+    if (lineNumber <= 0 || lineNumber > static_cast<int>(pDoc->m_lineList.size())) {
+        return 0;
+    }
+
+    Line* line = pDoc->m_lineList[static_cast<std::size_t>(lineNumber - 1)].get();
+    if (set) {
+        line->flags |= static_cast<unsigned char>(BOOKMARK);
+    } else {
+        line->flags &= static_cast<unsigned char>(~BOOKMARK);
+    }
+
+    pDoc->Repaint();
+    return 0;
+}
+
+/**
+ * world.SetUnseenLines(counter)
+ *
+ * Overrides the "unseen lines" counter — the number of lines that have arrived
+ * since the user last scrolled to the bottom of the output window.
+ *
+ * @param counter (integer) New unseen-line count
+ *
+ * @return Nothing
+ *
+ * @example
+ * SetUnseenLines(0)  -- mark all output as seen
+ */
+int L_SetUnseenLines(lua_State* L)
+{
+    WorldDocument* pDoc = doc(L);
+    pDoc->m_new_lines = static_cast<qint32>(luaL_checkinteger(L, 1));
+    return 0;
+}
+
+/**
+ * world.ResetStatusTime()
+ *
+ * Resets the status-bar timestamp to the current date/time. The status time
+ * records when the mouse was last over a particular output line and is
+ * displayed in the world's status bar.
+ *
+ * @return Nothing
+ *
+ * @example
+ * ResetStatusTime()
+ */
+int L_ResetStatusTime(lua_State* L)
+{
+    WorldDocument* pDoc = doc(L);
+    pDoc->m_tStatusTime = QDateTime::currentDateTime();
+    return 0;
+}
+
+/**
+ * world.Transparency(key, amount)
+ *
+ * Sets the opacity of the world's top-level window.
+ *
+ * The `key` parameter exists for MUSHclient API compatibility (color-keyed
+ * transparency) but is ignored under Qt, which only supports alpha-channel
+ * opacity.  `amount` is clamped to [0, 255] where 0 is fully transparent and
+ * 255 is fully opaque.
+ *
+ * @param key    (integer) Ignored (color-key, not supported under Qt)
+ * @param amount (integer) Opacity in [0, 255]
+ *
+ * @return (boolean) true if the window was found and opacity was set, false otherwise
+ *
+ * @example
+ * Transparency(0, 200)  -- set window to ~78% opacity
+ * Transparency(0, 255)  -- fully opaque (default)
+ */
+int L_Transparency(lua_State* L)
+{
+    WorldDocument* pDoc = doc(L);
+
+    // key is accepted for API compatibility but unused under Qt
+    luaL_checkinteger(L, 1);
+    int amount = static_cast<int>(luaL_checkinteger(L, 2));
+
+    // Clamp to [0, 255]
+    if (amount < 0) {
+        amount = 0;
+    } else if (amount > 255) {
+        amount = 255;
+    }
+
+    QWidget* window = nullptr;
+    if (pDoc->m_pActiveOutputView != nullptr) {
+        window = pDoc->m_pActiveOutputView->parentWindow();
+        if (window != nullptr) {
+            window = window->window(); // Ensure we have the actual top-level widget
+        }
+    }
+
+    if (window != nullptr) {
+        window->setWindowOpacity(static_cast<double>(amount) / 255.0);
+        lua_pushboolean(L, 1);
+    } else {
+        lua_pushboolean(L, 0);
+    }
+
+    return 1;
 }

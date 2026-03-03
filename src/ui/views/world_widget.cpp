@@ -14,15 +14,7 @@
 #include <QLabel>
 #include <QMessageBox>
 #include <QSplitter>
-#include <QPainter>
-#include <QStyleOption>
 #include <QVBoxLayout>
-#ifdef Q_OS_MACOS
-#include <QHBoxLayout>
-#include <QMdiSubWindow>
-#include <QMouseEvent>
-#include <QToolButton>
-#endif
 
 /**
  * WorldWidget Constructor
@@ -34,11 +26,7 @@
  */
 WorldWidget::WorldWidget(QWidget* parent)
     : QWidget(parent), m_document(nullptr), m_splitter(nullptr), m_outputView(nullptr),
-      m_inputView(nullptr), m_infoBar(nullptr),
-#ifdef Q_OS_MACOS
-      m_titleBar(nullptr), m_titleLabel(nullptr),
-#endif
-      m_modified(false), m_connected(false)
+      m_inputView(nullptr), m_infoBar(nullptr), m_modified(false), m_connected(false)
 {
     // Create the world document
     m_document = new WorldDocument(this);
@@ -74,80 +62,7 @@ void WorldWidget::setupUi()
     // Create main layout
     QVBoxLayout* layout = new QVBoxLayout(this);
     layout->setSpacing(0);
-
-#ifdef Q_OS_MACOS
-    // On macOS with frameless windows, add margin for resize handles and visible border
-    layout->setContentsMargins(ResizeMargin, ResizeMargin, ResizeMargin, ResizeMargin);
-    setMouseTracking(true);
-    // Windows 2000-style 3D raised border effect
-    setStyleSheet("WorldWidget { "
-                  "border-top: 1px solid #c0c0c0; "
-                  "border-left: 1px solid #c0c0c0; "
-                  "border-bottom: 1px solid #404040; "
-                  "border-right: 1px solid #404040; "
-                  "background: #1a1a1a; }");
-#else
     layout->setContentsMargins(0, 0, 0, 0);
-#endif
-
-#ifdef Q_OS_MACOS
-    // Create custom title bar for macOS (replaces QMdiSubWindow's native title bar)
-    m_titleBar = new QWidget(this);
-    m_titleBar->setFixedHeight(22);
-    m_titleBar->setStyleSheet("background-color: #383838; border: none; border-bottom: 1px solid #555;");
-
-    QHBoxLayout* titleLayout = new QHBoxLayout(m_titleBar);
-    titleLayout->setContentsMargins(8, 0, 4, 0);
-    titleLayout->setSpacing(4);
-
-    // Title label (will be updated in updateWindowTitle)
-    m_titleLabel = new QLabel("New World", m_titleBar);
-    m_titleLabel->setStyleSheet("color: #aaa; font-size: 12px;");
-    titleLayout->addWidget(m_titleLabel);
-    titleLayout->addStretch();
-
-    // Minimize button
-    QToolButton* minBtn = new QToolButton(m_titleBar);
-    minBtn->setFixedSize(16, 16);
-    minBtn->setText("−");
-    minBtn->setStyleSheet("QToolButton { border: 1px solid #555; border-radius: 2px; background: transparent; color: #888; font-size: 14px; } QToolButton:hover { background: #444; }");
-    connect(minBtn, &QToolButton::clicked, this, [this]() {
-        if (QMdiSubWindow* mdi = qobject_cast<QMdiSubWindow*>(parentWidget()))
-            mdi->showMinimized();
-    });
-    titleLayout->addWidget(minBtn);
-
-    // Maximize button
-    QToolButton* maxBtn = new QToolButton(m_titleBar);
-    maxBtn->setFixedSize(16, 16);
-    maxBtn->setText("□");
-    maxBtn->setStyleSheet("QToolButton { border: 1px solid #555; border-radius: 2px; background: transparent; color: #888; font-size: 11px; } QToolButton:hover { background: #444; }");
-    connect(maxBtn, &QToolButton::clicked, this, [this]() {
-        if (QMdiSubWindow* mdi = qobject_cast<QMdiSubWindow*>(parentWidget())) {
-            if (mdi->isMaximized())
-                mdi->showNormal();
-            else
-                mdi->showMaximized();
-        }
-    });
-    titleLayout->addWidget(maxBtn);
-
-    // Close button
-    QToolButton* closeBtn = new QToolButton(m_titleBar);
-    closeBtn->setFixedSize(16, 16);
-    closeBtn->setText("×");
-    closeBtn->setStyleSheet("QToolButton { border: 1px solid #555; border-radius: 2px; background: transparent; color: #888; font-size: 14px; } QToolButton:hover { background: #633; color: #faa; }");
-    connect(closeBtn, &QToolButton::clicked, this, [this]() {
-        if (QMdiSubWindow* mdi = qobject_cast<QMdiSubWindow*>(parentWidget()))
-            mdi->close();
-    });
-    titleLayout->addWidget(closeBtn);
-
-    layout->addWidget(m_titleBar);
-
-    // Install event filter for title bar dragging
-    m_titleBar->installEventFilter(this);
-#endif
 
     // Create info bar (script-controllable status display)
     m_infoBar = new QLabel(this);
@@ -203,7 +118,8 @@ void WorldWidget::setupUi()
 
     // Connect output settings signal
     connect(m_document, &WorldDocument::outputSettingsChanged, this, [this]() {
-        QFont font = createScaledFont(m_document->m_font_name, m_document->m_font_height);
+        QFont font =
+            createScaledFont(m_document->m_output.font_name, m_document->m_output.font_height);
         m_outputView->setOutputFont(font);
     });
 
@@ -237,7 +153,8 @@ void WorldWidget::setupUi()
                 } else {
                     // For other sendTo types, use sendTo() method
                     QString output;
-                    m_document->sendTo(sendTo, action, false, false, QString(), QString(), output);
+                    m_document->sendTo(static_cast<SendTo>(sendTo), action, false, false, QString(),
+                                       QString(), output);
                 }
             });
 
@@ -316,37 +233,7 @@ void WorldWidget::updateWindowTitle()
 
     setWindowTitle(title);
     emit windowTitleChanged(title);
-
-#ifdef Q_OS_MACOS
-    // Update custom title bar label
-    if (m_titleLabel) {
-        m_titleLabel->setText(title);
-    }
-#endif
 }
-
-#ifdef Q_OS_MACOS
-void WorldWidget::updateFrameForWindowState(Qt::WindowStates state)
-{
-    QVBoxLayout* layout = qobject_cast<QVBoxLayout*>(this->layout());
-    if (!layout) return;
-
-    if (state & Qt::WindowMaximized) {
-        // No border/margin when maximized
-        layout->setContentsMargins(0, 0, 0, 0);
-        setStyleSheet("WorldWidget { border: none; background: #1a1a1a; }");
-    } else {
-        // Show Windows 2000-style 3D border and resize margins when restored
-        layout->setContentsMargins(ResizeMargin, ResizeMargin, ResizeMargin, ResizeMargin);
-        setStyleSheet("WorldWidget { "
-                      "border-top: 1px solid #c0c0c0; "
-                      "border-left: 1px solid #c0c0c0; "
-                      "border-bottom: 1px solid #404040; "
-                      "border-right: 1px solid #404040; "
-                      "background: #1a1a1a; }");
-    }
-}
-#endif
 
 /**
  * Update the info bar appearance from document state
@@ -403,15 +290,15 @@ void WorldWidget::updateInfoBar()
  *
  * Uses XML serialization from
  */
-bool WorldWidget::loadFromFile(const QString& filename)
+std::expected<void, QString> WorldWidget::loadFromFile(const QString& filename)
 {
     if (!m_document) {
-        return false;
+        return std::unexpected(QString("No world document available"));
     }
 
     // Load XML
     if (!XmlSerialization::LoadWorldXML(m_document, filename)) {
-        return false;
+        return std::unexpected(QString("Failed to parse world file: %1").arg(filename));
     }
 
     // Store filename (both in widget and document for Lua API access)
@@ -425,7 +312,8 @@ bool WorldWidget::loadFromFile(const QString& filename)
     // Apply loaded settings to views (fonts, colors, etc.)
     // This triggers the output and input views to refresh with the new settings from the XML
     if (m_outputView && m_document) {
-        QFont font = createScaledFont(m_document->m_font_name, m_document->m_font_height);
+        QFont font =
+            createScaledFont(m_document->m_output.font_name, m_document->m_output.font_height);
         m_outputView->setOutputFont(font);
     }
     if (m_inputView && m_document) {
@@ -437,13 +325,13 @@ bool WorldWidget::loadFromFile(const QString& filename)
     m_document->loadScriptFile();
 
     // Set up file watcher for script file changes
-    // This will monitor the script file and reload it based on m_nReloadOption
+    // This will monitor the script file and reload it based on m_scripting.reload_option
     m_document->setupScriptFileWatcher();
 
     // Note: Welcome messages will be shown when OutputView is connected to document
     // Text will appear when StartNewLine() is called from network data
 
-    return true;
+    return {};
 }
 
 /**
@@ -451,15 +339,15 @@ bool WorldWidget::loadFromFile(const QString& filename)
  *
  * Uses XML serialization from
  */
-bool WorldWidget::saveToFile(const QString& filename)
+std::expected<void, QString> WorldWidget::saveToFile(const QString& filename)
 {
     if (!m_document) {
-        return false;
+        return std::unexpected(QString("No world document available"));
     }
 
     // Save XML
     if (!XmlSerialization::SaveWorldXML(m_document, filename)) {
-        return false;
+        return std::unexpected(QString("Failed to write world file: %1").arg(filename));
     }
 
     // Store filename (both in widget and document for Lua API access)
@@ -470,7 +358,7 @@ bool WorldWidget::saveToFile(const QString& filename)
     // Update UI
     updateWindowTitle();
 
-    return true;
+    return {};
 }
 
 /**
@@ -514,18 +402,18 @@ void WorldWidget::sendCommand()
     // This handles all edge cases: override prefix, exclude non-alpha, exclude macros,
     // self-exclusion, multi-line processing, and re-evaluation
 
-    bool bAutoSay = m_document->m_bEnableAutoSay;
+    bool bAutoSay = m_document->m_auto_say.enabled;
 
     // 1. Check for override prefix - if present, disable auto-say and remove prefix
-    if (bAutoSay && !m_document->m_strOverridePrefix.isEmpty()) {
-        if (command.startsWith(m_document->m_strOverridePrefix)) {
+    if (bAutoSay && !m_document->m_auto_say.override_prefix.isEmpty()) {
+        if (command.startsWith(m_document->m_auto_say.override_prefix)) {
             bAutoSay = false;
-            command = command.mid(m_document->m_strOverridePrefix.length());
+            command = command.mid(m_document->m_auto_say.override_prefix.length());
         }
     }
 
     // 2. Exclude non-alphanumeric commands (e.g., "#", ".", etc.) if configured
-    if (!command.isEmpty() && bAutoSay && m_document->m_bExcludeNonAlpha) {
+    if (!command.isEmpty() && bAutoSay && m_document->m_auto_say.exclude_non_alpha) {
         QChar firstChar = command[0];
         if (!firstChar.isLetterOrNumber()) {
             bAutoSay = false;
@@ -533,23 +421,23 @@ void WorldWidget::sendCommand()
     }
 
     // 3. Exclude macro commands if configured
-    if (bAutoSay && m_document->m_bExcludeMacros) {
+    if (bAutoSay && m_document->m_auto_say.exclude_macros) {
         // Check if command starts with any configured macro
         // Note: Macros are stored in m_macros array, checked in original sendvw.cpp
         // For now, we don't have macro support implemented, so this is a placeholder
-        // TODO: Implement macro exclusion when macro system is added
+        // TODO(feature): Exclude macro keys from forwarding when macro system is fully implemented.
     }
 
     // 4. Exclude if command already starts with auto-say string (prevent "say say Hello!")
-    if (bAutoSay && command.startsWith(m_document->m_strAutoSayString)) {
+    if (bAutoSay && command.startsWith(m_document->m_auto_say.say_string)) {
         bAutoSay = false;
     }
 
     // 5. If auto-say still enabled, process with special handling
     if (bAutoSay) {
         // Check connection if not re-evaluating (original sendvw.cpp)
-        if (!m_document->m_bReEvaluateAutoSay &&
-            m_document->m_iConnectPhase != eConnectConnectedToMud) {
+        if (!m_document->m_auto_say.re_evaluate &&
+            m_document->connectPhase() != eConnectConnectedToMud) {
             return; // Don't send if not connected
         }
 
@@ -558,36 +446,37 @@ void WorldWidget::sendCommand()
 
         // Temporarily disable auto-say and command stacking to prevent loops
         // (original sendvw.cpp)
-        bool savedAutoSay = m_document->m_bEnableAutoSay;
-        bool savedCommandStack = m_document->m_enable_command_stack;
-        m_document->m_bEnableAutoSay = false;
-        m_document->m_enable_command_stack = false;
+        bool savedAutoSay = m_document->m_auto_say.enabled;
+        bool savedCommandStack = m_document->m_input.enable_command_stack;
+        m_document->m_auto_say.enabled = false;
+        m_document->m_input.enable_command_stack = false;
 
         // Process each line (original sendvw.cpp)
         for (const QString& line : lines) {
-            if (m_document->m_bReEvaluateAutoSay) {
+            if (m_document->m_auto_say.re_evaluate) {
                 // Re-evaluate mode: prepend auto-say string and call Execute()
                 // This allows aliases/triggers to process the "say" command
                 // (original sendvw.cpp)
                 m_document->m_iExecutionDepth = 0; // Hand-typed command, depth zero
-                QString sayCommand = m_document->m_strAutoSayString + line;
+                QString sayCommand = m_document->m_auto_say.say_string + line;
                 m_document->Execute(sayCommand);
             } else {
                 // Direct send mode: prepend auto-say string and call SendMsg()
                 // This sends directly without alias/trigger processing
                 // (original sendvw.cpp)
-                m_document->SendMsg(m_document->m_strAutoSayString + line,
-                                    m_document->m_display_my_input, false, m_document->m_log_input);
+                m_document->SendMsg(m_document->m_auto_say.say_string + line,
+                                    m_document->m_display_my_input, false,
+                                    m_document->m_logging.log_input);
             }
         }
 
         // Re-enable auto-say and command stacking (original sendvw.cpp)
-        m_document->m_bEnableAutoSay = savedAutoSay;
-        m_document->m_enable_command_stack = savedCommandStack;
+        m_document->m_auto_say.enabled = savedAutoSay;
+        m_document->m_input.enable_command_stack = savedCommandStack;
 
         // Early return - don't execute the normal command path
         // Clear input and return
-        if (m_document->m_bAutoRepeat && !m_document->m_bNoEcho) {
+        if (m_document->m_bAutoRepeat && !m_document->isEchoOff()) {
             m_inputView->selectAll();
         } else {
             m_inputView->clear();
@@ -606,7 +495,7 @@ void WorldWidget::sendCommand()
     // Clear input after sending (configurable)
     // m_bAutoRepeat allows command to stay in field for easy repetition
     // Based on CSendView::SendCommand() from sendvw.cpp
-    if (m_document->m_bAutoRepeat && !m_document->m_bNoEcho) {
+    if (m_document->m_bAutoRepeat && !m_document->isEchoOff()) {
         // Keep command and select all (so typing replaces it)
         m_inputView->selectAll();
     } else {
@@ -731,18 +620,6 @@ void WorldWidget::clearCommandHistory()
 }
 
 /**
- * Paint event - required for QWidget subclasses to render stylesheets
- */
-void WorldWidget::paintEvent(QPaintEvent* event)
-{
-    Q_UNUSED(event);
-    QStyleOption opt;
-    opt.initFrom(this);
-    QPainter p(this);
-    style()->drawPrimitive(QStyle::PE_Widget, &opt, &p, this);
-}
-
-/**
  * Handle keyboard shortcuts
  *
  * Based on: mushview.cpp handling Tab and Escape keys
@@ -777,156 +654,3 @@ void WorldWidget::keyPressEvent(QKeyEvent* event)
     // Pass other keys to base class
     QWidget::keyPressEvent(event);
 }
-
-#ifdef Q_OS_MACOS
-int WorldWidget::getResizeEdges(const QPoint& pos) const
-{
-    int edges = NoEdge;
-
-    if (pos.x() < ResizeMargin)
-        edges |= Left;
-    if (pos.x() >= width() - ResizeMargin)
-        edges |= Right;
-    if (pos.y() < ResizeMargin)
-        edges |= Top;
-    if (pos.y() >= height() - ResizeMargin)
-        edges |= Bottom;
-
-    return edges;
-}
-
-Qt::CursorShape WorldWidget::cursorForEdges(int edges) const
-{
-    // Corners
-    if ((edges & Left) && (edges & Top))
-        return Qt::SizeFDiagCursor;
-    if ((edges & Right) && (edges & Top))
-        return Qt::SizeBDiagCursor;
-    if ((edges & Left) && (edges & Bottom))
-        return Qt::SizeBDiagCursor;
-    if ((edges & Right) && (edges & Bottom))
-        return Qt::SizeFDiagCursor;
-    // Edges
-    if (edges & Left || edges & Right)
-        return Qt::SizeHorCursor;
-    if (edges & Top || edges & Bottom)
-        return Qt::SizeVerCursor;
-    return Qt::ArrowCursor;
-}
-
-void WorldWidget::mousePressEvent(QMouseEvent* event)
-{
-    if (event->button() == Qt::LeftButton) {
-        int edges = getResizeEdges(event->pos());
-        if (edges != NoEdge) {
-            m_resizeEdges = edges;
-            m_resizeStartPos = event->globalPosition().toPoint();
-            if (QMdiSubWindow* mdi = qobject_cast<QMdiSubWindow*>(parentWidget())) {
-                m_resizeStartGeometry = mdi->geometry();
-            }
-            event->accept();
-            return;
-        }
-    }
-    QWidget::mousePressEvent(event);
-}
-
-void WorldWidget::mouseMoveEvent(QMouseEvent* event)
-{
-    if (m_resizeEdges != NoEdge && (event->buttons() & Qt::LeftButton)) {
-        // Actively resizing
-        QMdiSubWindow* mdi = qobject_cast<QMdiSubWindow*>(parentWidget());
-        if (!mdi) {
-            QWidget::mouseMoveEvent(event);
-            return;
-        }
-
-        QPoint delta = event->globalPosition().toPoint() - m_resizeStartPos;
-        QRect newGeometry = m_resizeStartGeometry;
-
-        if (m_resizeEdges & Left) {
-            int newLeft = m_resizeStartGeometry.left() + delta.x();
-            int newWidth = m_resizeStartGeometry.right() - newLeft + 1;
-            if (newWidth >= mdi->minimumWidth()) {
-                newGeometry.setLeft(newLeft);
-            }
-        }
-        if (m_resizeEdges & Right) {
-            newGeometry.setWidth(m_resizeStartGeometry.width() + delta.x());
-        }
-        if (m_resizeEdges & Top) {
-            int newTop = m_resizeStartGeometry.top() + delta.y();
-            int newHeight = m_resizeStartGeometry.bottom() - newTop + 1;
-            if (newHeight >= mdi->minimumHeight()) {
-                newGeometry.setTop(newTop);
-            }
-        }
-        if (m_resizeEdges & Bottom) {
-            newGeometry.setHeight(m_resizeStartGeometry.height() + delta.y());
-        }
-
-        // Apply minimum size constraints
-        if (newGeometry.width() >= mdi->minimumWidth() &&
-            newGeometry.height() >= mdi->minimumHeight()) {
-            mdi->setGeometry(newGeometry);
-        }
-        event->accept();
-        return;
-    }
-
-    // Update cursor based on position
-    int edges = getResizeEdges(event->pos());
-    setCursor(cursorForEdges(edges));
-
-    QWidget::mouseMoveEvent(event);
-}
-
-void WorldWidget::mouseReleaseEvent(QMouseEvent* event)
-{
-    if (event->button() == Qt::LeftButton && m_resizeEdges != NoEdge) {
-        m_resizeEdges = NoEdge;
-        event->accept();
-        return;
-    }
-    QWidget::mouseReleaseEvent(event);
-}
-
-bool WorldWidget::eventFilter(QObject* obj, QEvent* event)
-{
-    // Handle title bar dragging
-    if (obj == m_titleBar) {
-        QMdiSubWindow* mdi = qobject_cast<QMdiSubWindow*>(parentWidget());
-        if (mdi && !mdi->isMaximized()) {
-            if (event->type() == QEvent::MouseButtonPress) {
-                QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
-                if (mouseEvent->button() == Qt::LeftButton) {
-                    m_dragging = true;
-                    m_dragStartPos = mouseEvent->globalPosition().toPoint() - mdi->pos();
-                    return true;
-                }
-            } else if (event->type() == QEvent::MouseMove && m_dragging) {
-                QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
-                mdi->move(mouseEvent->globalPosition().toPoint() - m_dragStartPos);
-                return true;
-            } else if (event->type() == QEvent::MouseButtonRelease) {
-                QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
-                if (mouseEvent->button() == Qt::LeftButton && m_dragging) {
-                    m_dragging = false;
-                    return true;
-                }
-            }
-        }
-    }
-
-    // Handle mouse events that might be consumed by child widgets
-    if (event->type() == QEvent::MouseMove) {
-        QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
-        QPoint localPos = mapFromGlobal(mouseEvent->globalPosition().toPoint());
-        int edges = getResizeEdges(localPos);
-        if (edges != NoEdge) {
-            setCursor(cursorForEdges(edges));
-        }
-    }
-    return QWidget::eventFilter(obj, event);
-}
-#endif

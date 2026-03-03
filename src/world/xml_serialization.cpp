@@ -21,7 +21,8 @@
 #include <QFileInfo>
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
-#include <algorithm> // for std::sort
+#include <algorithm> // for std::sort, std::transform
+#include <string>
 
 namespace {
 
@@ -50,8 +51,8 @@ QString resolvePluginPath(const QString& pluginPath, const QString& worldFilePat
     QString worldDir = worldFileInfo.absolutePath();
 
     // Get plugins directory
-    Database* db = Database::instance();
-    QString pluginsDir = db->getPreference("PluginsDirectory", "./worlds/plugins/");
+    auto& db = Database::instance();
+    QString pluginsDir = db.getPreference("PluginsDirectory", "./worlds/plugins/");
 
     // Convert Windows backslashes in plugins directory path
     pluginsDir.replace('\\', '/');
@@ -267,51 +268,7 @@ bool SaveWorldXML(WorldDocument* doc, const QString& filename)
     for (int i = 0; OptionsTable[i].pName != nullptr; i++) {
         const tConfigurationNumericOption& opt = OptionsTable[i];
 
-        // Calculate pointer to field in document
-        const char* basePtr = reinterpret_cast<const char*>(doc);
-        const char* fieldPtr = basePtr + opt.iOffset;
-
-        double value = 0.0;
-
-        // Read value based on field length
-        switch (opt.iLength) {
-            case 1: // unsigned char or bool
-                if (opt.iMaximum == 0 && opt.iMinimum == 0) {
-                    // Boolean
-                    value = *reinterpret_cast<const bool*>(fieldPtr) ? 1.0 : 0.0;
-                } else {
-                    value = *reinterpret_cast<const unsigned char*>(fieldPtr);
-                }
-                break;
-
-            case 2: // unsigned short or qint16
-                value = *reinterpret_cast<const quint16*>(fieldPtr);
-                break;
-
-            case 4: // qint32, quint32, or float
-                if (opt.iFlags & OPT_DOUBLE) {
-                    value = *reinterpret_cast<const float*>(fieldPtr);
-                } else if (opt.iFlags & OPT_RGB_COLOUR) {
-                    // RGB color stored as QRgb (quint32)
-                    QRgb rgb = *reinterpret_cast<const QRgb*>(fieldPtr);
-                    value = rgb;
-                } else {
-                    value = *reinterpret_cast<const qint32*>(fieldPtr);
-                }
-                break;
-
-            case 8: // qint64 or double
-                if (opt.iFlags & OPT_DOUBLE) {
-                    value = *reinterpret_cast<const double*>(fieldPtr);
-                } else {
-                    value = *reinterpret_cast<const qint64*>(fieldPtr);
-                }
-                break;
-
-            default:
-                qWarning() << "Unknown field length" << opt.iLength << "for option" << opt.pName;
-                continue;
-        }
+        double value = opt.getter(*doc);
 
         // Handle custom color indexing (add 1 when saving)
         double saveValue = value;
@@ -351,13 +308,7 @@ bool SaveWorldXML(WorldDocument* doc, const QString& filename)
     for (int i = 0; AlphaOptionsTable[i].pName != nullptr; i++) {
         const tConfigurationAlphaOption& opt = AlphaOptionsTable[i];
 
-        // Calculate pointer to field in document
-        const char* basePtr = reinterpret_cast<const char*>(doc);
-        const char* fieldPtr = basePtr + opt.iOffset;
-
-        // Read QString value
-        const QString* strPtr = reinterpret_cast<const QString*>(fieldPtr);
-        QString value = *strPtr;
+        QString value = opt.getter(*doc);
 
         // Skip multi-line options in this pass
         if ((opt.iFlags & OPT_MULTLINE) || value.contains('\n')) {
@@ -385,13 +336,7 @@ bool SaveWorldXML(WorldDocument* doc, const QString& filename)
     for (int i = 0; AlphaOptionsTable[i].pName != nullptr; i++) {
         const tConfigurationAlphaOption& opt = AlphaOptionsTable[i];
 
-        // Calculate pointer to field in document
-        const char* basePtr = reinterpret_cast<const char*>(doc);
-        const char* fieldPtr = basePtr + opt.iOffset;
-
-        // Read QString value
-        const QString* strPtr = reinterpret_cast<const QString*>(fieldPtr);
-        QString value = *strPtr;
+        QString value = opt.getter(*doc);
 
         // Only process multi-line options in this pass
         if (!((opt.iFlags & OPT_MULTLINE) || value.contains('\n'))) {
@@ -611,44 +556,11 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
                 }
 
                 // Write value to document
-                char* basePtr = reinterpret_cast<char*>(doc);
-                char* fieldPtr = basePtr + opt.iOffset;
-
-                switch (opt.iLength) {
-                    case 1: // unsigned char or bool
-                        if (opt.iMaximum == 0.0 && opt.iMinimum == 0.0) {
-                            *reinterpret_cast<bool*>(fieldPtr) = (value != 0.0);
-                        } else {
-                            *reinterpret_cast<unsigned char*>(fieldPtr) =
-                                static_cast<unsigned char>(value);
-                        }
-                        break;
-
-                    case 2: // quint16
-                        *reinterpret_cast<quint16*>(fieldPtr) = static_cast<quint16>(value);
-                        break;
-
-                    case 4: // qint32, quint32, float, or QRgb
-                        if (opt.iFlags & OPT_DOUBLE) {
-                            *reinterpret_cast<float*>(fieldPtr) = static_cast<float>(value);
-                        } else if (opt.iFlags & OPT_RGB_COLOUR) {
-                            // For RGB colors, 0 might mean "use default" in old MUSHclient files
-                            // Only set if value is non-zero, otherwise keep the default
-                            if (value != 0.0) {
-                                *reinterpret_cast<QRgb*>(fieldPtr) = static_cast<QRgb>(value);
-                            }
-                        } else {
-                            *reinterpret_cast<qint32*>(fieldPtr) = static_cast<qint32>(value);
-                        }
-                        break;
-
-                    case 8: // qint64 or double
-                        if (opt.iFlags & OPT_DOUBLE) {
-                            *reinterpret_cast<double*>(fieldPtr) = value;
-                        } else {
-                            *reinterpret_cast<qint64*>(fieldPtr) = static_cast<qint64>(value);
-                        }
-                        break;
+                // For RGB colors, 0 might mean "use default" in old MUSHclient files
+                if ((opt.iFlags & OPT_RGB_COLOUR) && value == 0.0) {
+                    // Keep the default
+                } else {
+                    opt.setter(*doc, value);
                 }
             }
 
@@ -673,11 +585,7 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
                     }
                 }
 
-                // Write to document
-                char* basePtr = reinterpret_cast<char*>(doc);
-                char* fieldPtr = basePtr + opt.iOffset;
-                QString* strPtr = reinterpret_cast<QString*>(fieldPtr);
-                *strPtr = value;
+                opt.setter(*doc, value);
             }
 
             // ================================================================
@@ -759,7 +667,7 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
 
                         // Reset history position to end
                         doc->m_historyPosition = doc->m_commandHistory.count();
-                        doc->m_iHistoryStatus = eAtBottom;
+                        doc->m_iHistoryStatus = HistoryStatus::eAtBottom;
 
                         qCDebug(lcWorld)
                             << "Loaded" << doc->m_commandHistory.count() << "commands from history";
@@ -790,11 +698,14 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
                         continue;
                     }
 
-                    // Check if this is a string option in element form
-                    for (int i = 0; AlphaOptionsTable[i].pName != nullptr; i++) {
-                        const tConfigurationAlphaOption& opt = AlphaOptionsTable[i];
-
-                        if (elementName == opt.pName) {
+                    // Check if this is a string option in element form (O(1) lookup)
+                    {
+                        std::string elemKey = elementName.toStdString();
+                        std::transform(elemKey.begin(), elemKey.end(), elemKey.begin(), ::tolower);
+                        auto elemIt = getAlphaOptionMap().find(elemKey);
+                        if (elemIt != getAlphaOptionMap().end()) {
+                            const tConfigurationAlphaOption& opt =
+                                AlphaOptionsTable[elemIt->second];
                             QString value = reader.readElementText();
 
                             // Handle password decoding
@@ -805,12 +716,7 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
                                 }
                             }
 
-                            // Write to document
-                            char* basePtr = reinterpret_cast<char*>(doc);
-                            char* fieldPtr = basePtr + opt.iOffset;
-                            QString* strPtr = reinterpret_cast<QString*>(fieldPtr);
-                            *strPtr = value;
-                            break;
+                            opt.setter(*doc, value);
                         }
                     }
                 }
@@ -865,6 +771,17 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
             // Skip other unknown elements
             reader.skipCurrentElement();
         }
+    }
+
+    // Snapshot loaded values for GetLoadedValue API
+    for (int i = 0; OptionsTable[i].pName != nullptr; i++) {
+        const tConfigurationNumericOption& opt = OptionsTable[i];
+        doc->m_loadedNumericOptions[QString::fromUtf8(opt.pName)] = opt.getter(*doc);
+    }
+
+    for (int i = 0; AlphaOptionsTable[i].pName != nullptr; i++) {
+        const tConfigurationAlphaOption& opt = AlphaOptionsTable[i];
+        doc->m_loadedAlphaOptions[QString::fromUtf8(opt.pName)] = opt.getter(*doc);
     }
 
     file.close();
@@ -932,9 +849,9 @@ int ImportXML(WorldDocument* doc, const QString& xmlString, int flags)
     bool importMacros = (flags & XML_MACROS) != 0; // Accelerators
 
     // Track counts before import
-    int triggersBefore = doc->m_TriggerMap.size();
-    int aliasesBefore = doc->m_AliasMap.size();
-    int timersBefore = doc->m_TimerMap.size();
+    int triggersBefore = doc->m_automationRegistry->m_TriggerMap.size();
+    int aliasesBefore = doc->m_automationRegistry->m_AliasMap.size();
+    int timersBefore = doc->m_automationRegistry->m_TimerMap.size();
     int variablesBefore = doc->m_VariableMap.size();
 
     QXmlStreamReader reader(xmlData);
@@ -1092,9 +1009,9 @@ int ImportXML(WorldDocument* doc, const QString& xmlString, int flags)
     }
 
     // Calculate counts of imported items
-    int triggersAfter = doc->m_TriggerMap.size();
-    int aliasesAfter = doc->m_AliasMap.size();
-    int timersAfter = doc->m_TimerMap.size();
+    int triggersAfter = doc->m_automationRegistry->m_TriggerMap.size();
+    int aliasesAfter = doc->m_automationRegistry->m_AliasMap.size();
+    int timersAfter = doc->m_automationRegistry->m_TimerMap.size();
     int variablesAfter = doc->m_VariableMap.size();
 
     int totalImported = (triggersAfter - triggersBefore) + (aliasesAfter - aliasesBefore) +
@@ -1135,17 +1052,17 @@ QString ExportXML(WorldDocument* doc, int flags, const QString& comment)
     writer.writeStartElement("muclient");
 
     // Export triggers
-    if ((flags & XML_TRIGGERS) && !doc->m_TriggerMap.empty()) {
+    if ((flags & XML_TRIGGERS) && !doc->m_automationRegistry->m_TriggerMap.empty()) {
         doc->saveTriggersToXml(writer);
     }
 
     // Export aliases
-    if ((flags & XML_ALIASES) && !doc->m_AliasMap.empty()) {
+    if ((flags & XML_ALIASES) && !doc->m_automationRegistry->m_AliasMap.empty()) {
         doc->saveAliasesToXml(writer);
     }
 
     // Export timers
-    if ((flags & XML_TIMERS) && !doc->m_TimerMap.empty()) {
+    if ((flags & XML_TIMERS) && !doc->m_automationRegistry->m_TimerMap.empty()) {
         doc->saveTimersToXml(writer);
     }
 
@@ -1170,11 +1087,11 @@ QString ExportXML(WorldDocument* doc, int flags, const QString& comment)
 
     int totalExported = 0;
     if (flags & XML_TRIGGERS)
-        totalExported += doc->m_TriggerMap.size();
+        totalExported += doc->m_automationRegistry->m_TriggerMap.size();
     if (flags & XML_ALIASES)
-        totalExported += doc->m_AliasMap.size();
+        totalExported += doc->m_automationRegistry->m_AliasMap.size();
     if (flags & XML_TIMERS)
-        totalExported += doc->m_TimerMap.size();
+        totalExported += doc->m_automationRegistry->m_TimerMap.size();
     if (flags & XML_VARIABLES)
         totalExported += doc->m_VariableMap.size();
 

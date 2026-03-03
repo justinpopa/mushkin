@@ -87,7 +87,7 @@ void ConnectionPage::loadSettings()
     m_portSpin->setValue(m_doc->m_port);
     m_nameEdit->setText(m_doc->m_mush_name);
     m_passwordEdit->setText(m_doc->m_password);
-    m_autoConnectCheck->setChecked(m_doc->m_connect_now != 0);
+    m_autoConnectCheck->setChecked(m_doc->m_connect_now);
 
     m_serverEdit->blockSignals(false);
     m_portSpin->blockSignals(false);
@@ -107,7 +107,7 @@ void ConnectionPage::saveSettings()
     m_doc->m_port = m_portSpin->value();
     m_doc->m_mush_name = m_nameEdit->text();
     m_doc->m_password = m_passwordEdit->text();
-    m_doc->m_connect_now = m_autoConnectCheck->isChecked() ? 1 : 0;
+    m_doc->m_connect_now = m_autoConnectCheck->isChecked();
 
     m_hasChanges = false;
 }

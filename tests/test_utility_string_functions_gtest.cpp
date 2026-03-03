@@ -5,34 +5,10 @@
  * Tests for StripANSI, FixupEscapeSequences, FixupHTML, and MakeRegularExpression
  */
 
-#include "../src/world/script_engine.h"
-#include "../src/world/world_document.h"
-#include <QApplication>
-#include <gtest/gtest.h>
-
-extern "C" {
-#include <lauxlib.h>
-#include <lua.h>
-#include <lualib.h>
-}
+#include "fixtures/world_fixtures.h"
 
 // Test fixture
-class UtilityStringFunctionsTest : public ::testing::Test {
-  protected:
-    void SetUp() override
-    {
-        doc = new WorldDocument();
-        L = doc->m_ScriptEngine->L;
-    }
-
-    void TearDown() override
-    {
-        delete doc;
-    }
-
-    WorldDocument* doc = nullptr;
-    lua_State* L = nullptr;
-};
+class UtilityStringFunctionsTest : public LuaWorldTest {};
 
 // ========== StripANSI Tests ==========
 
@@ -287,11 +263,4 @@ TEST_F(UtilityStringFunctionsTest, ErrorHandling)
     ASSERT_EQ(luaL_dostring(L, code), 0) << lua_tostring(L, -1);
     EXPECT_TRUE(lua_toboolean(L, -1)) << "Should error with missing argument";
     lua_pop(L, 1);
-}
-
-int main(int argc, char** argv)
-{
-    ::testing::InitGoogleTest(&argc, argv);
-    QApplication app(argc, argv);
-    return RUN_ALL_TESTS();
 }

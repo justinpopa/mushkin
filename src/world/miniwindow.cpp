@@ -1524,20 +1524,20 @@ qint32 MiniWindow::ImageOp(qint16 action, qint32 left, qint32 top, qint32 right,
  *
  * Reference: miniwindow.cpp LoadImageMemory function
  */
-qint32 MiniWindow::LoadImageMemory(const QString& imageId, const unsigned char* data, size_t length,
+qint32 MiniWindow::LoadImageMemory(const QString& imageId, std::span<const unsigned char> data,
                                    bool hasAlpha)
 {
     if (imageId.isEmpty()) {
         return eNoNameSpecified;
     }
 
-    if (!data || length == 0) {
+    if (data.empty()) {
         return eBadParameter;
     }
 
     // Load image from memory
     auto img = std::make_unique<QImage>();
-    if (!img->loadFromData(data, static_cast<int>(length))) {
+    if (!img->loadFromData(data.data(), static_cast<int>(data.size()))) {
         return eUnableToLoadImage;
     }
 

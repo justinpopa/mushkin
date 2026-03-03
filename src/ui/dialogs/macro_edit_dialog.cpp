@@ -126,7 +126,7 @@ void MacroEditDialog::loadMacroData()
         return;
     }
 
-    // TODO: Load from WorldDocument when macro support is added
+    // TODO(feature): Load macro bindings from WorldDocument AcceleratorManager.
     // For now, we'll set up stubs
     // m_sendTextEdit->setPlainText(m_doc->m_macros[m_macroIndex]);
     // int macroType = m_doc->m_macro_type[m_macroIndex];
@@ -168,7 +168,7 @@ bool MacroEditDialog::saveMacro()
 
     QString macroText = m_sendTextEdit->toPlainText();
 
-    // TODO: Save to WorldDocument when macro support is added
+    // TODO(feature): Save macro bindings to WorldDocument AcceleratorManager.
     // m_doc->m_macros[m_macroIndex] = macroText;
     // m_doc->m_macro_type[m_macroIndex] = macroType;
 
@@ -193,7 +193,7 @@ void MacroEditDialog::onCancel()
 
 void MacroEditDialog::onEdit()
 {
-    // TODO: Implement multi-line editor dialog similar to original
+    // TODO(ui): Add multi-line script editor dialog for macro send text.
     // For now, just show a message
     QMessageBox::information(this, "Multi-line Editor",
                              "Multi-line editor not yet implemented.\n\n"

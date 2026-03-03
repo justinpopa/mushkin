@@ -13,14 +13,7 @@
 
 #include "../src/world/script_engine.h"
 #include "../src/world/world_document.h"
-#include <QCoreApplication>
-#include <gtest/gtest.h>
-
-extern "C" {
-#include <lauxlib.h>
-#include <lua.h>
-#include <lualib.h>
-}
+#include "fixtures/world_fixtures.h"
 
 // Error code constants (from lua_common.h)
 #define eOK 0
@@ -37,14 +30,13 @@ class ArrayAPITest : public ::testing::Test {
   protected:
     void SetUp() override
     {
-        doc = new WorldDocument();
+        doc = std::make_unique<WorldDocument>();
         L = doc->m_ScriptEngine->L;
         ASSERT_NE(L, nullptr) << "Lua state should be available";
     }
 
     void TearDown() override
     {
-        delete doc;
     }
 
     // Helper to run Lua code and check for success
@@ -86,7 +78,7 @@ class ArrayAPITest : public ::testing::Test {
         return val;
     }
 
-    WorldDocument* doc = nullptr;
+    std::unique_ptr<WorldDocument> doc;
     lua_State* L = nullptr;
 };
 
@@ -409,13 +401,4 @@ TEST_F(ArrayAPITest, ExportImportRoundtrip)
     EXPECT_EQ(getString("v1"), "John Doe") << "Roundtrip should preserve name";
     EXPECT_EQ(getString("v2"), "New York") << "Roundtrip should preserve city";
     EXPECT_EQ(getString("v3"), "42") << "Roundtrip should preserve count";
-}
-
-// Main entry point
-int main(int argc, char** argv)
-{
-    // Qt requires QCoreApplication even for non-GUI tests
-    QCoreApplication app(argc, argv);
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
 }

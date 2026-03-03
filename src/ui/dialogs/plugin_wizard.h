@@ -1,18 +1,21 @@
 #ifndef PLUGIN_WIZARD_H
 #define PLUGIN_WIZARD_H
 
+#include <QCheckBox>
+#include <QComboBox>
+#include <QDateEdit>
+#include <QDoubleSpinBox>
+#include <QLabel>
+#include <QLineEdit>
+#include <QPushButton>
+#include <QSpinBox>
+#include <QString>
+#include <QTableWidget>
+#include <QTextEdit>
 #include <QWizard>
 #include <QWizardPage>
-#include <QLineEdit>
-#include <QTextEdit>
-#include <QCheckBox>
-#include <QSpinBox>
-#include <QDoubleSpinBox>
-#include <QDateEdit>
-#include <QComboBox>
-#include <QTableWidget>
-#include <QPushButton>
-#include <QLabel>
+
+#include <expected>
 
 // Forward declarations
 class WorldDocument;
@@ -44,7 +47,7 @@ class Variable;
 class PluginWizardPage1 : public QWizardPage {
     Q_OBJECT
 
-public:
+  public:
     explicit PluginWizardPage1(WorldDocument* doc, QWidget* parent = nullptr);
     ~PluginWizardPage1() override = default;
 
@@ -52,7 +55,7 @@ public:
     bool validatePage() override;
     void initializePage() override;
 
-private:
+  private:
     WorldDocument* m_doc;
 
     // UI elements
@@ -73,18 +76,18 @@ private:
 class PluginWizardPage2 : public QWizardPage {
     Q_OBJECT
 
-public:
+  public:
     explicit PluginWizardPage2(WorldDocument* doc, QWidget* parent = nullptr);
     ~PluginWizardPage2() override = default;
 
     // QWizardPage interface
     bool validatePage() override;
 
-private slots:
+  private slots:
     void onEditDescription();
     void onGenerateHelpToggled(bool checked);
 
-private:
+  private:
     WorldDocument* m_doc;
 
     // UI elements
@@ -101,7 +104,7 @@ private:
 class PluginWizardPage3 : public QWizardPage {
     Q_OBJECT
 
-public:
+  public:
     explicit PluginWizardPage3(WorldDocument* doc, QWidget* parent = nullptr);
     ~PluginWizardPage3() override = default;
 
@@ -109,12 +112,12 @@ public:
     void initializePage() override;
     bool validatePage() override;
 
-private slots:
+  private slots:
     void onSelectAll();
     void onSelectNone();
     void onHeaderClicked(int column);
 
-private:
+  private:
     WorldDocument* m_doc;
 
     // UI elements
@@ -126,13 +129,7 @@ private:
     int m_lastColumn;
     bool m_reverseSort;
 
-    enum Column {
-        COL_NAME = 0,
-        COL_MATCH,
-        COL_SEND,
-        COL_GROUP,
-        COL_COUNT
-    };
+    enum Column { COL_NAME = 0, COL_MATCH, COL_SEND, COL_GROUP, COL_COUNT };
 };
 
 // ============================================================================
@@ -141,7 +138,7 @@ private:
 class PluginWizardPage4 : public QWizardPage {
     Q_OBJECT
 
-public:
+  public:
     explicit PluginWizardPage4(WorldDocument* doc, QWidget* parent = nullptr);
     ~PluginWizardPage4() override = default;
 
@@ -149,12 +146,12 @@ public:
     void initializePage() override;
     bool validatePage() override;
 
-private slots:
+  private slots:
     void onSelectAll();
     void onSelectNone();
     void onHeaderClicked(int column);
 
-private:
+  private:
     WorldDocument* m_doc;
 
     // UI elements
@@ -166,13 +163,7 @@ private:
     int m_lastColumn;
     bool m_reverseSort;
 
-    enum Column {
-        COL_NAME = 0,
-        COL_MATCH,
-        COL_SEND,
-        COL_GROUP,
-        COL_COUNT
-    };
+    enum Column { COL_NAME = 0, COL_MATCH, COL_SEND, COL_GROUP, COL_COUNT };
 };
 
 // ============================================================================
@@ -181,7 +172,7 @@ private:
 class PluginWizardPage5 : public QWizardPage {
     Q_OBJECT
 
-public:
+  public:
     explicit PluginWizardPage5(WorldDocument* doc, QWidget* parent = nullptr);
     ~PluginWizardPage5() override = default;
 
@@ -189,12 +180,12 @@ public:
     void initializePage() override;
     bool validatePage() override;
 
-private slots:
+  private slots:
     void onSelectAll();
     void onSelectNone();
     void onHeaderClicked(int column);
 
-private:
+  private:
     WorldDocument* m_doc;
 
     // UI elements
@@ -206,13 +197,7 @@ private:
     int m_lastColumn;
     bool m_reverseSort;
 
-    enum Column {
-        COL_NAME = 0,
-        COL_TIME,
-        COL_SEND,
-        COL_GROUP,
-        COL_COUNT
-    };
+    enum Column { COL_NAME = 0, COL_TIME, COL_SEND, COL_GROUP, COL_COUNT };
 };
 
 // ============================================================================
@@ -221,7 +206,7 @@ private:
 class PluginWizardPage6 : public QWizardPage {
     Q_OBJECT
 
-public:
+  public:
     explicit PluginWizardPage6(WorldDocument* doc, QWidget* parent = nullptr);
     ~PluginWizardPage6() override = default;
 
@@ -229,12 +214,12 @@ public:
     void initializePage() override;
     bool validatePage() override;
 
-private slots:
+  private slots:
     void onSelectAll();
     void onSelectNone();
     void onHeaderClicked(int column);
 
-private:
+  private:
     WorldDocument* m_doc;
 
     // UI elements
@@ -247,11 +232,7 @@ private:
     int m_lastColumn;
     bool m_reverseSort;
 
-    enum Column {
-        COL_NAME = 0,
-        COL_CONTENTS,
-        COL_COUNT
-    };
+    enum Column { COL_NAME = 0, COL_CONTENTS, COL_COUNT };
 };
 
 // ============================================================================
@@ -260,7 +241,7 @@ private:
 class PluginWizardPage7 : public QWizardPage {
     Q_OBJECT
 
-public:
+  public:
     explicit PluginWizardPage7(WorldDocument* doc, QWidget* parent = nullptr);
     ~PluginWizardPage7() override = default;
 
@@ -268,10 +249,10 @@ public:
     void initializePage() override;
     bool validatePage() override;
 
-private slots:
+  private slots:
     void onEditScript();
 
-private:
+  private:
     WorldDocument* m_doc;
 
     // UI elements
@@ -287,17 +268,17 @@ private:
 class PluginWizardPage8 : public QWizardPage {
     Q_OBJECT
 
-public:
+  public:
     explicit PluginWizardPage8(WorldDocument* doc, QWidget* parent = nullptr);
     ~PluginWizardPage8() override = default;
 
     // QWizardPage interface
     bool validatePage() override;
 
-private slots:
+  private slots:
     void onEditComments();
 
-private:
+  private:
     WorldDocument* m_doc;
 
     // UI elements
@@ -311,7 +292,7 @@ private:
 class PluginWizard : public QWizard {
     Q_OBJECT
 
-public:
+  public:
     explicit PluginWizard(WorldDocument* doc, QWidget* parent = nullptr);
     ~PluginWizard() override = default;
 
@@ -330,9 +311,9 @@ public:
     // Override accept to generate plugin XML
     void accept() override;
 
-private:
+  private:
     QString generatePluginXml();
-    bool savePluginXml(const QString& xml);
+    [[nodiscard]] std::expected<void, QString> savePluginXml(const QString& xml);
     void removeItemsFromWorld();
 
     WorldDocument* m_doc;

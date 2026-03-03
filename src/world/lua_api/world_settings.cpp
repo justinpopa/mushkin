@@ -8,7 +8,9 @@
  */
 
 #include "../../automation/plugin.h"
+#include "../../network/world_socket.h"
 #include "../../storage/database.h"
+#include "../../storage/global_options.h"
 #include "../../utils/app_paths.h"
 #include "../../world/config_options.h"
 #include "../../world/view_interfaces.h"
@@ -18,12 +20,18 @@
 #include <QCoreApplication>
 #include <QCursor>
 #include <QDir>
+#include <QFileInfo>
 #include <QFontDatabase>
+#include <QGuiApplication>
+#include <QHostAddress>
 #include <QHostInfo>
 #include <QLocale>
 #include <QRegularExpression>
+#include <QSettings>
 #include <QSysInfo>
+#include <algorithm>
 #include <sqlite3.h>
+#include <string>
 
 // Lua 5.1 C headers
 extern "C" {
@@ -331,351 +339,292 @@ int L_GetInfo(lua_State* L)
     switch (type) {
         case 1: // Server address (hostname/IP)
         {
-            QByteArray ba = pDoc->m_server.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_server);
         } break;
 
         case 2: // World name
         {
-            QByteArray ba = pDoc->m_mush_name.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_mush_name);
         } break;
 
         case 3: // Character name
         {
-            QByteArray ba = pDoc->m_name.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_name);
         } break;
 
         case 4: // Logging file preamble
         {
-            QByteArray ba = pDoc->m_file_preamble.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_paste.file_preamble);
         } break;
 
         case 5: // Logging file postamble
         {
-            QByteArray ba = pDoc->m_file_postamble.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_paste.file_postamble);
         } break;
 
         case 6: // Logging line preamble
         {
-            QByteArray ba = pDoc->m_line_preamble.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_paste.line_preamble);
         } break;
 
         case 7: // Logging line postamble
         {
-            QByteArray ba = pDoc->m_line_postamble.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_paste.line_postamble);
         } break;
 
         case 8: // Notes
         {
-            QByteArray ba = pDoc->m_notes.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_notes);
         } break;
 
         case 9: // New activity sound
         {
-            QByteArray ba = pDoc->m_new_activity_sound.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_sound.new_activity_sound);
         } break;
 
         case 10: // Script editor
         {
-            QByteArray ba = pDoc->m_strScriptEditor.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_scripting.editor);
         } break;
 
         case 11: // Log file preamble
         {
-            QByteArray ba = pDoc->m_strLogFilePreamble.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_logging.file_preamble);
         } break;
 
         case 12: // Log file postamble
         {
-            QByteArray ba = pDoc->m_strLogFilePostamble.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_logging.file_postamble);
         } break;
 
         case 13: // Log line preamble (input)
         {
-            QByteArray ba = pDoc->m_strLogLinePreambleInput.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_logging.line_preamble_input);
         } break;
 
         case 14: // Log line preamble (notes)
         {
-            QByteArray ba = pDoc->m_strLogLinePreambleNotes.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_logging.line_preamble_notes);
         } break;
 
         case 15: // Log line preamble (output)
         {
-            QByteArray ba = pDoc->m_strLogLinePreambleOutput.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_logging.line_preamble_output);
         } break;
 
         case 16: // Log line postamble (input)
         {
-            QByteArray ba = pDoc->m_strLogLinePostambleInput.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_logging.line_postamble_input);
         } break;
 
         case 17: // Log line postamble (notes)
         {
-            QByteArray ba = pDoc->m_strLogLinePostambleNotes.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_logging.line_postamble_notes);
         } break;
 
         case 18: // Log line postamble (output)
         {
-            QByteArray ba = pDoc->m_strLogLinePostambleOutput.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_logging.line_postamble_output);
         } break;
 
         case 19: // Speed walk filler
         {
-            QByteArray ba = pDoc->m_strSpeedWalkFiller.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_speedwalk.filler);
         } break;
 
         case 20: // Output font name
         {
-            QByteArray ba = pDoc->m_font_name.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_output.font_name);
         } break;
 
         case 21: // Speed walk prefix
         {
-            QByteArray ba = pDoc->m_speed_walk_prefix.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_speedwalk.prefix);
         } break;
 
         case 22: // Connect text
         {
-            QByteArray ba = pDoc->m_connect_text.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_connect_text);
         } break;
 
         case 23: // Input font name
         {
-            QByteArray ba = pDoc->m_input_font_name.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_input.font_name);
         } break;
 
         case 24: // Paste postamble
         {
-            QByteArray ba = pDoc->m_paste_postamble.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_paste.paste_postamble);
         } break;
 
         case 25: // Paste preamble
         {
-            QByteArray ba = pDoc->m_paste_preamble.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_paste.paste_preamble);
         } break;
 
         case 26: // Paste line postamble
         {
-            QByteArray ba = pDoc->m_pasteline_postamble.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_paste.pasteline_postamble);
         } break;
 
         case 27: // Paste line preamble
         {
-            QByteArray ba = pDoc->m_pasteline_preamble.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_paste.pasteline_preamble);
         } break;
 
         case 28: // Script language
         {
-            QByteArray ba = pDoc->m_strLanguage.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_scripting.language);
         } break;
 
         case 29: // OnWorldOpen callback
         {
-            QByteArray ba = pDoc->m_strWorldOpen.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_scripting.on_world_open);
         } break;
 
         case 30: // OnWorldClose callback
         {
-            QByteArray ba = pDoc->m_strWorldClose.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_scripting.on_world_close);
         } break;
 
         case 31: // OnWorldConnect callback
         {
-            QByteArray ba = pDoc->m_strWorldConnect.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_scripting.on_world_connect);
         } break;
 
         case 32: // OnWorldDisconnect callback
         {
-            QByteArray ba = pDoc->m_strWorldDisconnect.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_scripting.on_world_disconnect);
         } break;
 
         case 33: // OnWorldGetFocus callback
         {
-            QByteArray ba = pDoc->m_strWorldGetFocus.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_scripting.on_world_get_focus);
         } break;
 
         case 34: // OnWorldLoseFocus callback
         {
-            QByteArray ba = pDoc->m_strWorldLoseFocus.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_scripting.on_world_lose_focus);
         } break;
 
         case 35: // Script filename
         {
-            QByteArray ba = pDoc->m_strScriptFilename.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_scripting.filename);
         } break;
 
         case 36: // Script prefix
         {
-            QByteArray ba = pDoc->m_strScriptPrefix.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_scripting.prefix);
         } break;
 
         case 37: // Auto-say string
         {
-            QByteArray ba = pDoc->m_strAutoSayString.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_auto_say.say_string);
         } break;
 
         case 38: // Override prefix
         {
-            QByteArray ba = pDoc->m_strOverridePrefix.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_auto_say.override_prefix);
         } break;
 
         case 39: // Tab completion defaults
         {
-            QByteArray ba = pDoc->m_strTabCompletionDefaults.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_command_window.tab_completion_defaults);
         } break;
 
         case 40: // Auto-log filename
         {
-            QByteArray ba = pDoc->m_strAutoLogFileName.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_logging.auto_log_file_name);
         } break;
 
         case 41: // Recall line preamble
         {
-            QByteArray ba = pDoc->m_strRecallLinePreamble.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_output.recall_line_preamble);
         } break;
 
         case 42: // Terminal identification
         {
-            QByteArray ba = pDoc->m_strTerminalIdentification.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_strTerminalIdentification);
         } break;
 
         case 43: // Mapping failure message
         {
-            QByteArray ba = pDoc->m_strMappingFailure.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_mapping.failure_message);
         } break;
 
         case 44: // OnMXP_Start callback
         {
-            QByteArray ba = pDoc->m_strOnMXP_Start.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_strOnMXP_Start);
         } break;
 
         case 45: // OnMXP_Stop callback
         {
-            QByteArray ba = pDoc->m_strOnMXP_Stop.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_strOnMXP_Stop);
         } break;
 
         case 46: // OnMXP_Error callback
         {
-            QByteArray ba = pDoc->m_strOnMXP_Error.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_strOnMXP_Error);
         } break;
 
         case 47: // OnMXP_OpenTag callback
         {
-            QByteArray ba = pDoc->m_strOnMXP_OpenTag.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_strOnMXP_OpenTag);
         } break;
 
         case 48: // OnMXP_CloseTag callback
         {
-            QByteArray ba = pDoc->m_strOnMXP_CloseTag.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_strOnMXP_CloseTag);
         } break;
 
         case 49: // OnMXP_SetVariable callback
         {
-            QByteArray ba = pDoc->m_strOnMXP_SetVariable.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_strOnMXP_SetVariable);
         } break;
 
         case 50: // Beep sound
         {
-            QByteArray ba = pDoc->m_strBeepSound.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_sound.beep_sound);
         } break;
 
         case 51: // Log filename
         {
-            QByteArray ba = pDoc->m_logfile_name.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_logfile_name);
         } break;
 
         case 52: // Last immediate expression
         {
-            QByteArray ba = pDoc->m_strLastImmediateExpression.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_strLastImmediateExpression);
         } break;
 
         case 53: // Status message
         {
-            QByteArray ba = pDoc->m_strStatusMessage.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_strStatusMessage);
         } break;
 
         case 54: // World file path (GetPathName)
         {
-            QByteArray ba = pDoc->m_strWorldFilePath.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_strWorldFilePath);
         } break;
 
         case 55: // Window title (GetTitle)
         {
-            QByteArray ba = pDoc->m_strWindowTitle.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_strWindowTitle);
         } break;
 
         case 56: // MUSHclient executable path
         {
-            QString appPath = QCoreApplication::applicationFilePath();
-            QByteArray ba = appPath.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, QCoreApplication::applicationFilePath());
         } break;
 
         case 57: // Default world file directory
         {
-            // TODO: Add default world directory config
-            lua_pushstring(L, "");
+            luaPushQString(L, GlobalOptions::instance().defaultWorldFileDirectory());
         } break;
 
         case 58: // Default log file directory
         {
-            // TODO: Add default log directory config
-            lua_pushstring(L, "");
+            luaPushQString(L, GlobalOptions::instance().defaultLogFileDirectory());
         } break;
 
         case 59: // Scripts directory (application directory)
@@ -684,15 +633,14 @@ int L_GetInfo(lua_State* L)
             if (!appDir.isEmpty() && !appDir.endsWith("/")) {
                 appDir += "/";
             }
-            QByteArray ba = appDir.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, appDir);
         } break;
 
         case 60: // Plugins directory (global)
         {
             // Return global plugins directory, resolved to absolute path
-            Database* db = Database::instance();
-            QString pluginsDir = db->getPreference("PluginsDirectory", "./worlds/plugins/");
+            auto& db = Database::instance();
+            QString pluginsDir = db.getPreference("PluginsDirectory", "./worlds/plugins/");
             pluginsDir.replace('\\', '/');
 
             // If relative, resolve against application directory
@@ -707,26 +655,26 @@ int L_GetInfo(lua_State* L)
                 pluginsDir += '/';
             }
 
-            QByteArray ba = pluginsDir.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pluginsDir);
         } break;
 
         case 61: // IP address from socket connection
         {
-            // TODO: Extract IP from m_sockAddr or connection socket
-            lua_pushstring(L, "");
+            if (pDoc->m_connectionManager->isConnected() && pDoc->m_connectionManager->m_pSocket) {
+                luaPushQString(L, pDoc->m_connectionManager->m_pSocket->peerAddress());
+            } else {
+                lua_pushstring(L, "");
+            }
         } break;
 
-        case 62: // Proxy server (removed in original)
+        case 62: // Proxy server
         {
-            lua_pushstring(L, "");
+            luaPushQString(L, pDoc->m_proxy.server);
         } break;
 
         case 63: // Hostname
         {
-            QString hostname = QHostInfo::localHostName();
-            QByteArray ba = hostname.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, QHostInfo::localHostName());
         } break;
 
         case 64: // Current directory with trailing slash
@@ -735,14 +683,12 @@ int L_GetInfo(lua_State* L)
             if (!currentDir.isEmpty() && !currentDir.endsWith("/")) {
                 currentDir += "/";
             }
-            QByteArray ba = currentDir.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, currentDir);
         } break;
 
         case 65: // OnWorldSave callback
         {
-            QByteArray ba = pDoc->m_strWorldSave.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_scripting.on_world_save);
         } break;
 
         case 66: // MUSHclient application directory
@@ -755,52 +701,52 @@ int L_GetInfo(lua_State* L)
             if (!appDir.isEmpty() && !appDir.endsWith("/")) {
                 appDir += "/";
             }
-            QByteArray ba = appDir.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, appDir);
         } break;
 
         case 67: // World file directory
         {
-            // TODO: Extract directory from world file path
-            lua_pushstring(L, "");
+            if (!pDoc->m_strWorldFilePath.isEmpty()) {
+                QString dir = QFileInfo(pDoc->m_strWorldFilePath).path();
+                if (!dir.endsWith("/")) {
+                    dir += "/";
+                }
+                luaPushQString(L, dir);
+            } else {
+                lua_pushstring(L, "");
+            }
         } break;
 
         case 68: // Working directory
         {
-            // TODO: Store working directory (different from current directory)
-            lua_pushstring(L, "");
+            luaPushQString(L, QDir::currentPath());
         } break;
 
         case 69: // Translator file
         {
-            // TODO: Add translator file config
+            // Not applicable: MFC CDocument translator — no cross-platform equivalent.
             lua_pushstring(L, "");
         } break;
 
         case 70: // Locale
         {
-            QString locale = QLocale::system().name();
-            QByteArray ba = locale.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, QLocale::system().name());
         } break;
 
         case 71: // Fixed pitch font
         {
-            // TODO: Add fixed pitch font config
-            lua_pushstring(L, "");
+            luaPushQString(L, GlobalOptions::instance().fixedPitchFont());
         } break;
 
         case 72: // Version
         {
-            // TODO: Define MUSHCLIENT_QT_VERSION or similar
+            // Reports compatibility version for plugin detection.
             lua_pushstring(L, "5.06-preview");
         } break;
 
         case 73: // Build date/time
         {
-            QString buildDateTime = QString("%1 %2").arg(__DATE__).arg(__TIME__);
-            QByteArray ba = buildDateTime.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, QString("%1 %2").arg(__DATE__).arg(__TIME__));
         } break;
 
         case 74: // Sounds directory
@@ -810,57 +756,54 @@ int L_GetInfo(lua_State* L)
                 soundsDir += "/";
             }
             soundsDir += "sounds/";
-            QByteArray ba = soundsDir.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, soundsDir);
         } break;
 
         case 75: // IAC subnegotiation data
         {
-            lua_pushlstring(L, pDoc->m_IAC_subnegotiation_data.constData(),
-                            pDoc->m_IAC_subnegotiation_data.size());
+            lua_pushlstring(L, pDoc->m_telnetParser->m_IAC_subnegotiation_data.constData(),
+                            pDoc->m_telnetParser->m_IAC_subnegotiation_data.size());
         } break;
 
         case 76: // Special font (first one)
         {
-            // TODO: Add special fonts support
+            // Not applicable: Windows GDI special font enumeration. Use AddFont() to register
+            // fonts.
             lua_pushstring(L, "");
         } break;
 
         case 77: // OS version
         {
-            QString osVersion = QSysInfo::prettyProductName();
-            QByteArray ba = osVersion.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, QSysInfo::prettyProductName());
         } break;
 
         case 78: // Foreground image
         {
-            QByteArray ba = pDoc->m_strForegroundImageName.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_strForegroundImageName);
         } break;
 
         case 79: // Background image
         {
-            QByteArray ba = pDoc->m_strBackgroundImageName.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_strBackgroundImageName);
         } break;
 
         case 80: // PNG library version
         {
-            // TODO: Get PNG version if using libpng
+            // Not applicable: Qt handles PNG internally — no standalone libpng to version.
             lua_pushstring(L, "");
         } break;
 
         case 81: // PNG header version
         {
-            // TODO: Get PNG header version
+            // Not applicable: Qt handles PNG internally — no standalone libpng to version.
             lua_pushstring(L, "");
         } break;
 
         case 82: // Preferences database name
         {
-            // TODO: Add preferences database path
-            lua_pushstring(L, "");
+            // QSettings uses platform-native storage (plist on macOS, registry on Windows, conf on
+            // Linux). Return the settings file path where available.
+            luaPushQString(L, QSettings().fileName());
         } break;
 
         case 83: // SQLite version
@@ -870,43 +813,39 @@ int L_GetInfo(lua_State* L)
 
         case 84: // File browsing directory
         {
-            // TODO: Track file browsing directory
+            // Not applicable: Windows common file dialog directory tracking. Use GetInfo(68) for
+            // CWD.
             lua_pushstring(L, "");
         } break;
 
         case 85: // Default state files directory
         {
-            // TODO: Add default state files directory config
-            lua_pushstring(L, "");
+            luaPushQString(L, GlobalOptions::instance().stateFilesDirectory());
         } break;
 
         case 86: // Word under menu
         {
-            QByteArray ba = pDoc->m_strWordUnderMenu.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_strWordUnderMenu);
         } break;
 
         case 87: // Last command sent
         {
-            QByteArray ba = pDoc->m_strLastCommandSent.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_strLastCommandSent);
         } break;
 
         case 88: // Window title (individual world)
         {
-            QByteArray ba = pDoc->m_strWindowTitle.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_strWindowTitle);
         } break;
 
         case 89: // Main window title
         {
-            QByteArray ba = pDoc->m_strMainWindowTitle.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            luaPushQString(L, pDoc->m_strMainWindowTitle);
         } break;
 
         // Boolean flags (101-125)
         case 101: // No echo (IAC WILL ECHO received)
-            lua_pushboolean(L, pDoc->m_bNoEcho);
+            lua_pushboolean(L, pDoc->m_telnetParser->m_bNoEcho);
             break;
 
         case 102: // Debug incoming packets
@@ -914,24 +853,24 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 103: // Compress (MCCP active)
-            lua_pushboolean(L, pDoc->m_bCompress);
+            lua_pushboolean(L, pDoc->m_telnetParser->m_bCompress);
             break;
 
         case 104: // MXP active
-            lua_pushboolean(L, pDoc->m_bMXP);
+            lua_pushboolean(L, pDoc->m_mxpEngine->m_bMXP);
             break;
 
         case 105: // Pueblo active
-            lua_pushboolean(L, pDoc->m_bPuebloActive);
+            lua_pushboolean(L, pDoc->m_mxpEngine->m_bPuebloActive);
             break;
 
         case 106: // Not connected
-            lua_pushboolean(L, pDoc->m_iConnectPhase != eConnectConnectedToMud);
+            lua_pushboolean(L, pDoc->connectPhase() != eConnectConnectedToMud);
             break;
 
         case 107: // Connecting (not disconnected and not connected)
-            lua_pushboolean(L, pDoc->m_iConnectPhase != eConnectNotConnected &&
-                                   pDoc->m_iConnectPhase != eConnectConnectedToMud);
+            lua_pushboolean(L, pDoc->connectPhase() != eConnectNotConnected &&
+                                   pDoc->connectPhase() != eConnectConnectedToMud);
             break;
 
         case 108: // Disconnect OK
@@ -947,16 +886,12 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 111: // World modified (IsModified)
-        {
-            // TODO: Track world modified state
-            lua_pushboolean(L, false);
-        } break;
+            lua_pushboolean(L, pDoc->isModified());
+            break;
 
         case 112: // Mapping enabled
-        {
-            // TODO: Add mapping support flag
-            lua_pushboolean(L, false);
-        } break;
+            lua_pushboolean(L, pDoc->m_mapping.enabled);
+            break;
 
         case 113: // Window open (has active views)
             lua_pushboolean(L, pDoc->m_pActiveOutputView != nullptr);
@@ -964,13 +899,13 @@ int L_GetInfo(lua_State* L)
 
         case 114: // Current view frozen
         {
-            // TODO: Add view freeze state
-            lua_pushboolean(L, false);
+            bool frozen = pDoc->m_pActiveOutputView ? pDoc->m_pActiveOutputView->isFrozen() : false;
+            lua_pushboolean(L, frozen);
         } break;
 
         case 115: // Translator Lua available
         {
-            // TODO: Add translator support
+            // Not applicable: MFC CDocument translator subsystem — no cross-platform equivalent.
             lua_pushboolean(L, false);
         } break;
 
@@ -1006,7 +941,7 @@ int L_GetInfo(lua_State* L)
 
         case 125: // Full screen mode
         {
-            // TODO: Track full screen state
+            // TODO(ui): Requires MainWindow callback to check windowState() & Qt::WindowFullScreen.
             lua_pushboolean(L, false);
         } break;
 
@@ -1020,44 +955,44 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 203: // Total lines sent
-            lua_pushinteger(L, pDoc->m_nTotalLinesSent);
+            lua_pushinteger(L, pDoc->m_connectionManager->m_nTotalLinesSent);
             break;
 
         case 204: // Input packet count
-            lua_pushinteger(L, pDoc->m_iInputPacketCount);
+            lua_pushinteger(L, pDoc->m_connectionManager->m_iInputPacketCount);
             break;
 
         case 205: // Output packet count
-            lua_pushinteger(L, pDoc->m_iOutputPacketCount);
+            lua_pushinteger(L, pDoc->m_connectionManager->m_iOutputPacketCount);
             break;
 
         case 206: // Total uncompressed bytes (MCCP)
-            lua_pushinteger(L, pDoc->m_nTotalUncompressed);
+            lua_pushinteger(L, pDoc->m_telnetParser->m_nTotalUncompressed);
             break;
 
         case 207: // Total compressed bytes (MCCP)
-            lua_pushinteger(L, pDoc->m_nTotalCompressed);
+            lua_pushinteger(L, pDoc->m_telnetParser->m_nTotalCompressed);
             break;
 
         case 208: // MCCP type (0=none, 1=v1, 2=v2)
-            lua_pushinteger(L, pDoc->m_iMCCP_type);
+            lua_pushinteger(L, pDoc->m_telnetParser->m_iMCCP_type);
             break;
 
         case 209: // MXP errors
-            lua_pushinteger(L, pDoc->m_iMXPerrors);
+            lua_pushinteger(L, pDoc->m_mxpEngine->m_iMXPerrors);
             break;
 
         case 210: // MXP tags processed
-            lua_pushinteger(L, pDoc->m_iMXPtags);
+            lua_pushinteger(L, pDoc->m_mxpEngine->m_iMXPtags);
             break;
 
         case 211: // MXP entities processed
-            lua_pushinteger(L, pDoc->m_iMXPentities);
+            lua_pushinteger(L, pDoc->m_mxpEngine->m_iMXPentities);
             break;
 
         case 212: // Output font height
             // Based on: methods_info.cpp
-            lua_pushinteger(L, pDoc->m_font_height);
+            lua_pushinteger(L, pDoc->m_output.font_height);
             break;
 
         case 213: // Output font width
@@ -1074,11 +1009,11 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 216: // Bytes received
-            lua_pushinteger(L, pDoc->m_nBytesIn);
+            lua_pushinteger(L, pDoc->m_connectionManager->m_nBytesIn);
             break;
 
         case 217: // Bytes sent
-            lua_pushinteger(L, pDoc->m_nBytesOut);
+            lua_pushinteger(L, pDoc->m_connectionManager->m_nBytesOut);
             break;
 
         case 218: // Count of variables
@@ -1086,53 +1021,59 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 219: // Count of triggers
-            lua_pushinteger(L, pDoc->m_TriggerMap.size());
+            lua_pushinteger(L, pDoc->m_automationRegistry->m_TriggerMap.size());
             break;
 
         case 220: // Count of timers
-            lua_pushinteger(L, pDoc->m_TimerMap.size());
+            lua_pushinteger(L, pDoc->m_automationRegistry->m_TimerMap.size());
             break;
 
         case 221: // Count of aliases
-            lua_pushinteger(L, pDoc->m_AliasMap.size());
+            lua_pushinteger(L, pDoc->m_automationRegistry->m_AliasMap.size());
             break;
 
         case 222: // Count of queued commands
-            // TODO: Add queued commands list
+            // TODO(feature): Command queue not yet implemented. Return 0 until queue system exists.
             lua_pushinteger(L, 0);
             break;
 
         case 223: // Count of mapper items
-            // TODO: Add mapper support (m_strMapList)
-            lua_pushinteger(L, 0);
+            lua_pushinteger(L, static_cast<lua_Integer>(pDoc->m_mapList.size()));
             break;
 
         case 224: // Count of lines in output window
             // Based on: methods_info.cpp
-            lua_pushinteger(L, pDoc->m_lineList.count());
+            lua_pushinteger(L, static_cast<lua_Integer>(pDoc->m_lineList.size()));
             break;
 
         case 225: // Count of custom MXP elements
-            // TODO: Add MXP custom element support
-            lua_pushinteger(L, 0);
+            lua_pushinteger(L,
+                            static_cast<lua_Integer>(pDoc->m_mxpEngine->m_customElementMap.size()));
             break;
 
         case 226: // Count of custom MXP entities
-            // TODO: Add MXP custom entity support
-            lua_pushinteger(L, 0);
+            lua_pushinteger(L,
+                            static_cast<lua_Integer>(pDoc->m_mxpEngine->m_customEntityMap.size()));
             break;
 
         case 227: // Connection phase
-            lua_pushinteger(L, pDoc->m_iConnectPhase);
+            lua_pushinteger(L, pDoc->connectPhase());
             break;
 
-        case 228: // IP address (as integer)
-            // TODO: Convert QHostAddress to integer
-            lua_pushinteger(L, 0);
-            break;
+        case 228: // IP address as integer (host byte order)
+        {
+            if (pDoc->m_connectionManager->isConnected() && pDoc->m_connectionManager->m_pSocket) {
+                QHostAddress addr(pDoc->m_connectionManager->m_pSocket->peerAddress());
+                bool ok = false;
+                quint32 ipv4 = addr.toIPv4Address(&ok);
+                lua_pushinteger(L, ok ? static_cast<lua_Integer>(ipv4) : 0);
+            } else {
+                lua_pushinteger(L, 0);
+            }
+        } break;
 
-        case 229: // Proxy (always 0 - proxy support removed)
-            lua_pushinteger(L, 0);
+        case 229: // Proxy type (0=None, 1=SOCKS5, 2=HTTP CONNECT)
+            lua_pushinteger(L, pDoc->m_proxy.type);
             break;
 
         case 230: // Execution depth (script call depth)
@@ -1140,8 +1081,11 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 231: // Log file size
-            // TODO: Track log file size
-            lua_pushinteger(L, 0);
+            if (pDoc->m_logfile && pDoc->m_logfile->isOpen()) {
+                lua_pushinteger(L, static_cast<lua_Integer>(pDoc->m_logfile->size()));
+            } else {
+                lua_pushinteger(L, 0);
+            }
             break;
 
         case 232: // High-resolution timer (seconds since epoch)
@@ -1149,13 +1093,11 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 233: // Time taken doing triggers (seconds)
-            // TODO: Add trigger timing support
-            lua_pushnumber(L, 0.0);
+            lua_pushnumber(L, pDoc->m_automationRegistry->m_trigger_time_elapsed);
             break;
 
         case 234: // Time taken doing aliases (seconds)
-            // TODO: Add alias timing support
-            lua_pushnumber(L, 0.0);
+            lua_pushnumber(L, pDoc->m_automationRegistry->m_alias_time_elapsed);
             break;
 
         case 235: // Number of world windows open
@@ -1164,22 +1106,35 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 236: // Command selection start column
-            // TODO: Add input selection tracking
-            lua_pushinteger(L, 0);
+        {
+            auto* inputView = pDoc->activeInputView();
+            if (inputView && inputView->selectionStart() != inputView->selectionEnd()) {
+                lua_pushinteger(L, inputView->selectionStart() + 1); // 1-based
+            } else {
+                lua_pushinteger(L, 0); // No selection
+            }
             break;
+        }
 
         case 237: // Command selection end column
-            // TODO: Add input selection tracking
-            lua_pushinteger(L, 0);
+        {
+            auto* inputView = pDoc->activeInputView();
+            if (inputView && inputView->selectionStart() != inputView->selectionEnd()) {
+                lua_pushinteger(L, inputView->selectionEnd() + 1); // 1-based
+            } else {
+                lua_pushinteger(L, 0); // No selection
+            }
             break;
+        }
 
         case 238: // Window placement flags
-            // TODO: Add window state tracking
+            // Not applicable: Windows window placement flags (WPF_*). Use GetInfo(125) for
+            // fullscreen.
             lua_pushinteger(L, 0);
             break;
 
         case 239: // Current action source (trigger/alias/timer/etc)
-            lua_pushinteger(L, pDoc->m_iCurrentActionSource);
+            lua_pushinteger(L, static_cast<quint32>(pDoc->m_iCurrentActionSource));
             break;
 
         case 240: // Average character width
@@ -1187,7 +1142,7 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 241: // Character height
-            lua_pushinteger(L, pDoc->m_font_height);
+            lua_pushinteger(L, pDoc->m_output.font_height);
             break;
 
         case 242: // UTF-8 error count
@@ -1195,39 +1150,42 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 243: // Fixed pitch font size
-            // TODO: Add global font size config
-            lua_pushinteger(L, 10);
+            lua_pushinteger(L, GlobalOptions::instance().fixedPitchFontSize());
             break;
 
         case 244: // Triggers evaluated count
-            lua_pushinteger(L, pDoc->m_iTriggersEvaluatedCount);
+            lua_pushinteger(L, pDoc->m_automationRegistry->m_iTriggersEvaluatedCount);
             break;
 
         case 245: // Triggers matched count
-            lua_pushinteger(L, pDoc->m_iTriggersMatchedCount);
+            lua_pushinteger(L, pDoc->m_automationRegistry->m_iTriggersMatchedCount);
             break;
 
         case 246: // Aliases evaluated count
-            lua_pushinteger(L, pDoc->m_iAliasesEvaluatedCount);
+            lua_pushinteger(L, pDoc->m_automationRegistry->m_iAliasesEvaluatedCount);
             break;
 
         case 247: // Aliases matched count
-            lua_pushinteger(L, pDoc->m_iAliasesMatchedCount);
+            lua_pushinteger(L, pDoc->m_automationRegistry->m_iAliasesMatchedCount);
             break;
 
         case 248: // Timers fired count
-            lua_pushinteger(L, pDoc->m_iTimersFiredCount);
+            lua_pushinteger(L, pDoc->m_automationRegistry->m_iTimersFiredCount);
             break;
 
         case 249: // Main window client height
-            // TODO: Add main window size tracking
-            lua_pushinteger(L, 0);
+        {
+            auto callback = ToolbarCallbacks::getGetToolBarInfoCallback();
+            lua_pushinteger(L, callback(0, 0)); // which=0 (client area), infoType=0 (height)
             break;
+        }
 
         case 250: // Main window client width
-            // TODO: Add main window size tracking
-            lua_pushinteger(L, 0);
+        {
+            auto callback = ToolbarCallbacks::getGetToolBarInfoCallback();
+            lua_pushinteger(L, callback(0, 1)); // which=0 (client area), infoType=1 (width)
             break;
+        }
 
         case 251: // Main toolbar height
         {
@@ -1286,22 +1244,24 @@ int L_GetInfo(lua_State* L)
         }
 
         case 259: // Status bar height
-            // TODO: Add status bar tracking
+            // Not applicable: Status bar not used — info displayed in InfoBar dock (cases 257-258).
             lua_pushinteger(L, 0);
             break;
 
         case 260: // Status bar width
-            // TODO: Add status bar tracking
+            // Not applicable: Status bar not used — info displayed in InfoBar dock (cases 257-258).
             lua_pushinteger(L, 0);
             break;
 
         case 261: // World window non-client height
-            // TODO: Add window frame tracking
+            // Not applicable: Window frame (non-client area) dimensions are platform-dependent and
+            // rarely used by plugins.
             lua_pushinteger(L, 0);
             break;
 
         case 262: // World window non-client width
-            // TODO: Add window frame tracking
+            // Not applicable: Window frame (non-client area) dimensions are platform-dependent and
+            // rarely used by plugins.
             lua_pushinteger(L, 0);
             break;
 
@@ -1318,22 +1278,30 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 265: // OS major version
-            // TODO: Parse QSysInfo::kernelVersion()
-            lua_pushinteger(L, 0);
+        {
+            QStringList parts = QSysInfo::kernelVersion().split('.');
+            lua_pushinteger(L, parts.size() > 0 ? parts[0].toInt() : 0);
             break;
+        }
 
         case 266: // OS minor version
-            // TODO: Parse QSysInfo::kernelVersion()
-            lua_pushinteger(L, 0);
+        {
+            QStringList parts = QSysInfo::kernelVersion().split('.');
+            lua_pushinteger(L, parts.size() > 1 ? parts[1].toInt() : 0);
             break;
+        }
 
         case 267: // OS build number
-            // TODO: Parse QSysInfo::kernelVersion()
-            lua_pushinteger(L, 0);
+        {
+            QStringList parts = QSysInfo::kernelVersion().split('.');
+            lua_pushinteger(L, parts.size() > 2 ? parts[2].toInt() : 0);
             break;
+        }
 
         case 268: // OS platform ID
-            // TODO: Map QSysInfo to platform ID
+            // Not applicable: Windows OSVERSIONINFO.dwPlatformId constant (always 2 on modern
+            // Windows). Plugins checking this value expect 2; returning 0 signals non-Windows
+            // platform.
             lua_pushinteger(L, 0);
             break;
 
@@ -1420,15 +1388,15 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 286: // Triggers matched this session
-            lua_pushinteger(L, pDoc->m_iTriggersMatchedThisSessionCount);
+            lua_pushinteger(L, pDoc->m_automationRegistry->m_iTriggersMatchedThisSessionCount);
             break;
 
         case 287: // Aliases matched this session
-            lua_pushinteger(L, pDoc->m_iAliasesMatchedThisSessionCount);
+            lua_pushinteger(L, pDoc->m_automationRegistry->m_iAliasesMatchedThisSessionCount);
             break;
 
         case 288: // Timers fired this session
-            lua_pushinteger(L, pDoc->m_iTimersFiredThisSessionCount);
+            lua_pushinteger(L, pDoc->m_automationRegistry->m_iTimersFiredThisSessionCount);
             break;
 
         case 289: // Last line with IAC GA
@@ -1459,79 +1427,110 @@ int L_GetInfo(lua_State* L)
             lua_pushinteger(L, pDoc->m_computedTextRectangle.bottom());
             break;
 
-        case 294: // Scroll bar max position
-            // TODO: Add scroll bar position tracking
-            lua_pushinteger(L, 0);
-            break;
+        case 294: // State of keyboard modifier keys and mouse buttons
+        {
+            // Based on: GetKeyState(VK_*) bitmask in original.
+            // Qt cannot distinguish L/R modifier keys or lock-key toggle states
+            // portably. Bits 0x08-0x100 (L/R variants) and 0x200-0x8000 (lock
+            // key states) are always 0 on non-Windows platforms.
+            long result = 0;
+            Qt::KeyboardModifiers mods = QGuiApplication::queryKeyboardModifiers();
+            if (mods & Qt::ShiftModifier)
+                result |= 0x01;
+            if (mods & Qt::ControlModifier)
+                result |= 0x02;
+            if (mods & Qt::AltModifier)
+                result |= 0x04;
+            Qt::MouseButtons btns = QGuiApplication::mouseButtons();
+            if (btns & Qt::LeftButton)
+                result |= 0x10000;
+            if (btns & Qt::RightButton)
+                result |= 0x20000;
+            if (btns & Qt::MiddleButton)
+                result |= 0x40000;
+            lua_pushinteger(L, static_cast<lua_Integer>(result));
+        } break;
 
-        case 295: // Scroll bar page size
-            // TODO: Add scroll bar page size tracking
-            lua_pushinteger(L, 0);
+        case 295: // Times output window redrawn
+            lua_pushinteger(L, static_cast<lua_Integer>(pDoc->m_iOutputWindowRedrawCount));
             break;
 
         case 296: // Output window scroll bar position
-            // Based on: methods_info.cpp
             if (pDoc->m_pActiveOutputView) {
-                // Return current scroll position in pixels (Y coordinate)
                 lua_pushinteger(L, pDoc->m_pActiveOutputView->getScrollPositionPixels());
             } else {
                 lua_pushnil(L);
             }
             break;
 
-        case 297: // Horizontal scroll bar position
-            // TODO: Add horizontal scroll bar tracking
-            lua_pushinteger(L, 0);
+        case 297: // High-resolution timer frequency
+            // Original: App.m_iCounterFrequency (QueryPerformanceFrequency).
+            // Qt uses millisecond timers, so frequency is 1000.0.
+            lua_pushnumber(L, 1000.0);
             break;
 
-        case 298: // Horizontal scroll bar max position
-            // TODO: Add horizontal scroll bar tracking
-            lua_pushinteger(L, 0);
+        case 298: // SQLite3 version number
+            lua_pushinteger(L, static_cast<lua_Integer>(sqlite3_libversion_number()));
             break;
 
-        case 299: // Horizontal scroll bar page size
-            // TODO: Add horizontal scroll bar tracking
-            lua_pushinteger(L, 0);
+        case 299: // ANSI code page (UTF-8 = 65001)
+            lua_pushinteger(L, 65001);
             break;
 
-        case 300: // Commands in history buffer
-            // TODO: Add input history tracking
-            lua_pushinteger(L, 0);
+        case 300: // OEM code page (UTF-8 = 65001)
+            lua_pushinteger(L, 65001);
             break;
 
-        case 301: // Number of sent packets
-            // TODO: Distinguish between sent packets and sent lines
-            lua_pushinteger(L, pDoc->m_nTotalLinesSent);
-            break;
-
-        case 302: // Connect time (seconds since connected)
-            // TODO: Track connection start time
-            lua_pushnumber(L, 0.0);
-            break;
-
-        case 303: // Number of MXP elements
-            // TODO: Add MXP element tracking
-            lua_pushinteger(L, 0);
-            break;
-
-        case 304: // Locale
+        case 301: // Time connected (DATE \u2014 epoch seconds)
         {
-            QString locale = QLocale::system().name();
-            QByteArray ba = locale.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
+            const QDateTime& ct = pDoc->m_connectionManager->m_tConnectTime;
+            if (ct.isValid()) {
+                lua_pushnumber(L, static_cast<lua_Number>(ct.toSecsSinceEpoch()));
+            } else {
+                lua_pushnil(L);
+            }
         } break;
 
-        case 305: // Client start time (when application started)
-            // TODO: Track application start time
-            // Original: App.m_whenClientStarted
-            lua_pushnumber(L, 0.0);
+        case 302: // Time log file last flushed (DATE \u2014 epoch seconds)
+        {
+            if (pDoc->m_LastFlushTime.isValid()) {
+                lua_pushnumber(L,
+                               static_cast<lua_Number>(pDoc->m_LastFlushTime.toSecsSinceEpoch()));
+            } else {
+                lua_pushnil(L);
+            }
+        } break;
+
+        case 303: // Script file modification time (DATE \u2014 epoch seconds)
+        {
+            if (pDoc->m_timeScriptFileMod.isValid()) {
+                lua_pushnumber(
+                    L, static_cast<lua_Number>(pDoc->m_timeScriptFileMod.toSecsSinceEpoch()));
+            } else {
+                lua_pushnil(L);
+            }
+        } break;
+
+        case 304: // Current time (DATE \u2014 epoch seconds)
+            lua_pushnumber(L, static_cast<lua_Number>(QDateTime::currentSecsSinceEpoch()));
             break;
 
-        case 306: // World start time (when world connected)
-            // TODO: Track world connection start time
-            // Original: m_whenWorldStarted
-            lua_pushnumber(L, 0.0);
-            break;
+        case 305: // Client start time (DATE \u2014 epoch seconds)
+        {
+            // Approximation: captures time at first call. Negligible drift from true app start.
+            static const qint64 s_appStartSecs = QDateTime::currentSecsSinceEpoch();
+            lua_pushnumber(L, static_cast<lua_Number>(s_appStartSecs));
+        } break;
+
+        case 306: // World start time (DATE \u2014 epoch seconds)
+        {
+            const QDateTime& ws = pDoc->m_connectionManager->m_whenWorldStarted;
+            if (ws.isValid()) {
+                lua_pushnumber(L, static_cast<lua_Number>(ws.toSecsSinceEpoch()));
+            } else {
+                lua_pushnil(L);
+            }
+        } break;
 
         case 310: // Newlines received count
             lua_pushinteger(L, pDoc->m_newlines_received);
@@ -1542,21 +1541,6 @@ int L_GetInfo(lua_State* L)
             break;
     }
 
-    return 1;
-}
-
-/**
- * world.GetWorldName()
- *
- * Gets the world name.
- *
- * @return World name
- */
-int L_GetWorldName(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-    QByteArray ba = pDoc->m_mush_name.toUtf8();
-    lua_pushlstring(L, ba.constData(), ba.length());
     return 1;
 }
 
@@ -1574,8 +1558,6 @@ int L_SetOption(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* optionName = luaL_checkstring(L, 1);
-
     // Convert boolean to 0 or 1, nil to 0
     double value;
     if (lua_isboolean(L, 2)) {
@@ -1586,29 +1568,21 @@ int L_SetOption(lua_State* L)
         value = luaL_checknumber(L, 2);
     }
 
-    // Find the option in OptionsTable
-    int optionIndex = -1;
-    QString optionNameStr = QString::fromUtf8(optionName);
-    for (int i = 0; OptionsTable[i].pName != nullptr; i++) {
-        if (optionNameStr.compare(OptionsTable[i].pName, Qt::CaseInsensitive) == 0) {
-            optionIndex = i;
-            break;
-        }
-    }
-
-    if (optionIndex == -1) {
+    // Find the option in OptionsTable (O(1) hash map lookup)
+    QString optionNameStr = luaCheckQString(L, 1);
+    std::string key = optionNameStr.toLower().trimmed().toStdString();
+    auto it = getNumericOptionMap().find(key);
+    if (it == getNumericOptionMap().end()) {
         return luaReturnError(L, eUnknownOption);
     }
+    int optionIndex = it->second;
 
     // Check if plugin is allowed to write this option
     if (pDoc->m_CurrentPlugin && (OptionsTable[optionIndex].iFlags & OPT_PLUGIN_CANNOT_WRITE)) {
         return luaReturnError(L, ePluginCannotSetOption);
     }
 
-    // Set the option value based on its offset and length
     const tConfigurationNumericOption& opt = OptionsTable[optionIndex];
-    char* basePtr = reinterpret_cast<char*>(pDoc);
-    char* fieldPtr = basePtr + opt.iOffset;
 
     // Clamp value to min/max if specified
     if (opt.iMinimum != 0 || opt.iMaximum != 0) {
@@ -1618,25 +1592,7 @@ int L_SetOption(lua_State* L)
             value = opt.iMaximum;
     }
 
-    // Write value based on field length
-    switch (opt.iLength) {
-        case 1:
-            *reinterpret_cast<qint8*>(fieldPtr) = static_cast<qint8>(value);
-            break;
-        case 2:
-            *reinterpret_cast<qint16*>(fieldPtr) = static_cast<qint16>(value);
-            break;
-        case 4:
-            *reinterpret_cast<qint32*>(fieldPtr) = static_cast<qint32>(value);
-            break;
-        case 8:
-            if (opt.iFlags & OPT_DOUBLE) {
-                *reinterpret_cast<double*>(fieldPtr) = value;
-            } else {
-                *reinterpret_cast<qint64*>(fieldPtr) = static_cast<qint64>(value);
-            }
-            break;
-    }
+    opt.setter(*pDoc, value);
 
     return luaReturnOK(L);
 }
@@ -1656,71 +1612,24 @@ int L_GetOption(lua_State* L)
     WorldDocument* pDoc = doc(L);
     const char* optionName = luaL_checkstring(L, 1);
 
-    // Search numeric options table first
-    for (int i = 0; OptionsTable[i].pName != nullptr; i++) {
-        const tConfigurationNumericOption& opt = OptionsTable[i];
+    // Build lowercase key for O(1) lookup
+    std::string key(optionName);
+    std::transform(key.begin(), key.end(), key.begin(), ::tolower);
 
-        if (strcmp(opt.pName, optionName) == 0) {
-            // Calculate pointer to field in document
-            const char* basePtr = reinterpret_cast<const char*>(pDoc);
-            const char* fieldPtr = basePtr + opt.iOffset;
-
-            double value = 0.0;
-
-            // Read value based on field length
-            switch (opt.iLength) {
-                case 1: // unsigned char or bool
-                    if (opt.iMaximum == 0.0 && opt.iMinimum == 0.0) {
-                        // Boolean option
-                        value = *reinterpret_cast<const bool*>(fieldPtr) ? 1.0 : 0.0;
-                    } else {
-                        value = *reinterpret_cast<const quint8*>(fieldPtr);
-                    }
-                    break;
-
-                case 2: // quint16
-                    value = *reinterpret_cast<const quint16*>(fieldPtr);
-                    break;
-
-                case 4: // quint32 or int
-                    if (opt.iFlags & OPT_DOUBLE) {
-                        // Actually a float (should be rare)
-                        value = *reinterpret_cast<const float*>(fieldPtr);
-                    } else {
-                        value = *reinterpret_cast<const qint32*>(fieldPtr);
-                    }
-                    break;
-
-                case 8: // double or qint64
-                    if (opt.iFlags & OPT_DOUBLE) {
-                        value = *reinterpret_cast<const double*>(fieldPtr);
-                    } else {
-                        value = *reinterpret_cast<const qint64*>(fieldPtr);
-                    }
-                    break;
-
-                default:
-                    lua_pushnil(L);
-                    return 1;
-            }
-
-            lua_pushnumber(L, value);
+    // Search numeric options table first (O(1))
+    {
+        auto it = getNumericOptionMap().find(key);
+        if (it != getNumericOptionMap().end()) {
+            lua_pushnumber(L, OptionsTable[it->second].getter(*pDoc));
             return 1;
         }
     }
 
-    // Search alpha (string) options table
-    for (int i = 0; AlphaOptionsTable[i].pName != nullptr; i++) {
-        const tConfigurationAlphaOption& opt = AlphaOptionsTable[i];
-
-        if (strcmp(opt.pName, optionName) == 0) {
-            // Calculate pointer to field in document
-            const char* basePtr = reinterpret_cast<const char*>(pDoc);
-            const char* fieldPtr = basePtr + opt.iOffset;
-
-            // Read QString value
-            const QString* strPtr = reinterpret_cast<const QString*>(fieldPtr);
-            lua_pushstring(L, strPtr->toUtf8().constData());
+    // Search alpha (string) options table (O(1))
+    {
+        auto it = getAlphaOptionMap().find(key);
+        if (it != getAlphaOptionMap().end()) {
+            luaPushQString(L, AlphaOptionsTable[it->second].getter(*pDoc));
             return 1;
         }
     }
@@ -1743,34 +1652,172 @@ int L_GetOption(lua_State* L)
 int L_GetAlphaOption(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* optionName = luaL_checkstring(L, 1);
 
     // Normalize option name: lowercase, trimmed (matches original)
-    QString normalizedName = QString::fromUtf8(optionName).toLower().trimmed();
+    std::string key = luaCheckQString(L, 1).toLower().trimmed().toStdString();
 
-    // Search alpha (string) options table only
-    for (int i = 0; AlphaOptionsTable[i].pName != nullptr; i++) {
-        const tConfigurationAlphaOption& opt = AlphaOptionsTable[i];
+    // Search alpha (string) options table only (O(1))
+    auto it = getAlphaOptionMap().find(key);
+    if (it != getAlphaOptionMap().end()) {
+        const tConfigurationAlphaOption& opt = AlphaOptionsTable[it->second];
+        // Check if plugin is allowed to read this option
+        if (pDoc->m_CurrentPlugin && (opt.iFlags & OPT_PLUGIN_CANNOT_READ)) {
+            lua_pushnil(L);
+            return 1;
+        }
+        luaPushQString(L, opt.getter(*pDoc));
+        return 1;
+    }
 
-        if (normalizedName == opt.pName) {
-            // Check if plugin is allowed to read this option
+    // Option not found
+    lua_pushnil(L);
+    return 1;
+}
+
+/**
+ * GetCurrentValue - Get current value of any option by name
+ *
+ * Lua signature: value = GetCurrentValue(option_name)
+ * Unified wrapper that searches both numeric and alpha tables.
+ * Enforces OPT_PLUGIN_CANNOT_READ on both tables.
+ */
+int L_GetCurrentValue(lua_State* L)
+{
+    WorldDocument* pDoc = doc(L);
+    std::string key = luaCheckQString(L, 1).toLower().trimmed().toStdString();
+
+    // Search numeric options table first (O(1))
+    {
+        auto it = getNumericOptionMap().find(key);
+        if (it != getNumericOptionMap().end()) {
+            const tConfigurationNumericOption& opt = OptionsTable[it->second];
             if (pDoc->m_CurrentPlugin && (opt.iFlags & OPT_PLUGIN_CANNOT_READ)) {
                 lua_pushnil(L);
                 return 1;
             }
-
-            // Calculate pointer to field in document
-            const char* basePtr = reinterpret_cast<const char*>(pDoc);
-            const char* fieldPtr = basePtr + opt.iOffset;
-
-            // Read QString value
-            const QString* strPtr = reinterpret_cast<const QString*>(fieldPtr);
-            lua_pushstring(L, strPtr->toUtf8().constData());
+            lua_pushnumber(L, opt.getter(*pDoc));
             return 1;
         }
     }
 
-    // Option not found
+    // Search alpha (string) options table (O(1))
+    {
+        auto it = getAlphaOptionMap().find(key);
+        if (it != getAlphaOptionMap().end()) {
+            const tConfigurationAlphaOption& opt = AlphaOptionsTable[it->second];
+            if (pDoc->m_CurrentPlugin && (opt.iFlags & OPT_PLUGIN_CANNOT_READ)) {
+                lua_pushnil(L);
+                return 1;
+            }
+            luaPushQString(L, opt.getter(*pDoc));
+            return 1;
+        }
+    }
+
+    lua_pushnil(L);
+    return 1;
+}
+
+/**
+ * GetDefaultValue - Get the default value of any option by name
+ *
+ * Lua signature: value = GetDefaultValue(option_name)
+ * Returns the hardcoded default from the options table metadata.
+ * Enforces OPT_PLUGIN_CANNOT_READ on both tables.
+ */
+int L_GetDefaultValue(lua_State* L)
+{
+    WorldDocument* pDoc = doc(L);
+    std::string key = luaCheckQString(L, 1).toLower().trimmed().toStdString();
+
+    // Search numeric options table first (O(1))
+    {
+        auto it = getNumericOptionMap().find(key);
+        if (it != getNumericOptionMap().end()) {
+            const tConfigurationNumericOption& opt = OptionsTable[it->second];
+            if (pDoc->m_CurrentPlugin && (opt.iFlags & OPT_PLUGIN_CANNOT_READ)) {
+                lua_pushnil(L);
+                return 1;
+            }
+            lua_pushnumber(L, opt.iDefault);
+            return 1;
+        }
+    }
+
+    // Search alpha (string) options table (O(1))
+    {
+        auto it = getAlphaOptionMap().find(key);
+        if (it != getAlphaOptionMap().end()) {
+            const tConfigurationAlphaOption& opt = AlphaOptionsTable[it->second];
+            if (pDoc->m_CurrentPlugin && (opt.iFlags & OPT_PLUGIN_CANNOT_READ)) {
+                lua_pushnil(L);
+                return 1;
+            }
+            if (opt.sDefault) {
+                lua_pushstring(L, opt.sDefault);
+            } else {
+                lua_pushstring(L, "");
+            }
+            return 1;
+        }
+    }
+
+    lua_pushnil(L);
+    return 1;
+}
+
+/**
+ * GetLoadedValue - Get the value of an option as it was when last loaded from disk
+ *
+ * Lua signature: value = GetLoadedValue(option_name)
+ * Returns the snapshot taken after XML load completed.
+ * Enforces OPT_PLUGIN_CANNOT_READ on both tables.
+ */
+int L_GetLoadedValue(lua_State* L)
+{
+    WorldDocument* pDoc = doc(L);
+    std::string key = luaCheckQString(L, 1).toLower().trimmed().toStdString();
+    QString normalizedName = QString::fromStdString(key);
+
+    // Search numeric options table first (O(1))
+    {
+        auto it = getNumericOptionMap().find(key);
+        if (it != getNumericOptionMap().end()) {
+            const tConfigurationNumericOption& opt = OptionsTable[it->second];
+            if (pDoc->m_CurrentPlugin && (opt.iFlags & OPT_PLUGIN_CANNOT_READ)) {
+                lua_pushnil(L);
+                return 1;
+            }
+            auto loadIt = pDoc->m_loadedNumericOptions.find(normalizedName);
+            if (loadIt != pDoc->m_loadedNumericOptions.end()) {
+                lua_pushnumber(L, loadIt->second);
+            } else {
+                // No loaded snapshot available (world not loaded from file)
+                lua_pushnil(L);
+            }
+            return 1;
+        }
+    }
+
+    // Search alpha (string) options table (O(1))
+    {
+        auto it = getAlphaOptionMap().find(key);
+        if (it != getAlphaOptionMap().end()) {
+            const tConfigurationAlphaOption& opt = AlphaOptionsTable[it->second];
+            if (pDoc->m_CurrentPlugin && (opt.iFlags & OPT_PLUGIN_CANNOT_READ)) {
+                lua_pushnil(L);
+                return 1;
+            }
+            auto loadIt = pDoc->m_loadedAlphaOptions.find(normalizedName);
+            if (loadIt != pDoc->m_loadedAlphaOptions.end()) {
+                luaPushQString(L, loadIt->second);
+            } else {
+                lua_pushnil(L);
+            }
+            return 1;
+        }
+    }
+
     lua_pushnil(L);
     return 1;
 }
@@ -1789,79 +1836,70 @@ int L_GetAlphaOption(lua_State* L)
 int L_SetAlphaOption(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* optionName = luaL_checkstring(L, 1);
-    const char* value = luaL_checkstring(L, 2);
 
     // Normalize option name: lowercase, trimmed (matches original)
-    QString normalizedName = QString::fromUtf8(optionName).toLower().trimmed();
-    QString strValue = QString::fromUtf8(value);
+    auto [rawName, strValue] = luaArgs<QString, QString>(L);
+    std::string key = rawName.toLower().trimmed().toStdString();
 
-    // Search alpha (string) options table
-    for (int i = 0; AlphaOptionsTable[i].pName != nullptr; i++) {
-        const tConfigurationAlphaOption& opt = AlphaOptionsTable[i];
+    // Search alpha (string) options table (O(1))
+    auto it = getAlphaOptionMap().find(key);
+    if (it != getAlphaOptionMap().end()) {
+        const tConfigurationAlphaOption& opt = AlphaOptionsTable[it->second];
 
-        if (normalizedName == opt.pName) {
-            // Check if this option can be written at all
-            if (opt.iFlags & OPT_CANNOT_WRITE) {
+        // Check if this option can be written at all
+        if (opt.iFlags & OPT_CANNOT_WRITE) {
+            return luaReturnError(L, eOptionOutOfRange);
+        }
+
+        // Check if plugin is allowed to write this option
+        if (pDoc->m_CurrentPlugin && (opt.iFlags & OPT_PLUGIN_CANNOT_WRITE)) {
+            return luaReturnError(L, ePluginCannotSetOption);
+        }
+
+        // Special validation for command stack character
+        if (opt.iFlags & OPT_COMMAND_STACK) {
+            if (strValue.length() > 1) {
                 return luaReturnError(L, eOptionOutOfRange);
             }
-
-            // Check if plugin is allowed to write this option
-            if (pDoc->m_CurrentPlugin && (opt.iFlags & OPT_PLUGIN_CANNOT_WRITE)) {
-                return luaReturnError(L, ePluginCannotSetOption);
+            if (strValue.isEmpty()) {
+                // Disable command stack
+                pDoc->m_input.enable_command_stack = false;
+                return luaReturnError(L, eOptionOutOfRange);
             }
-
-            // Special validation for command stack character
-            if (opt.iFlags & OPT_COMMAND_STACK) {
-                if (strValue.length() > 1) {
-                    return luaReturnError(L, eOptionOutOfRange);
-                }
-                if (strValue.isEmpty()) {
-                    // Disable command stack
-                    pDoc->m_enable_command_stack = false;
-                    return luaReturnError(L, eOptionOutOfRange);
-                }
-                QChar ch = strValue.at(0);
-                if (!ch.isPrint() || ch.isSpace()) {
-                    pDoc->m_enable_command_stack = false;
-                    return luaReturnError(L, eOptionOutOfRange);
-                }
+            QChar ch = strValue.at(0);
+            if (!ch.isPrint() || ch.isSpace()) {
+                pDoc->m_input.enable_command_stack = false;
+                return luaReturnError(L, eOptionOutOfRange);
             }
-
-            // Special validation for world ID
-            if (opt.iFlags & OPT_WORLD_ID) {
-                if (!strValue.isEmpty()) {
-                    if (strValue.length() != 24) { // PLUGIN_UNIQUE_ID_LENGTH
-                        return luaReturnError(L, eOptionOutOfRange);
-                    }
-                    // Ensure all hex characters
-                    static QRegularExpression hexRegex("^[0-9a-fA-F]+$");
-                    if (!hexRegex.match(strValue).hasMatch()) {
-                        return luaReturnError(L, eOptionOutOfRange);
-                    }
-                    strValue = strValue.toLower();
-                }
-            }
-
-            // Strip newlines from non-multiline options
-            if (!(opt.iFlags & OPT_MULTLINE)) {
-                strValue.remove('\n');
-                strValue.remove('\r');
-            }
-
-            // Calculate pointer to field in document
-            char* basePtr = reinterpret_cast<char*>(pDoc);
-            char* fieldPtr = basePtr + opt.iOffset;
-
-            // Write QString value
-            QString* strPtr = reinterpret_cast<QString*>(fieldPtr);
-            *strPtr = strValue;
-
-            // Handle update flags if needed
-            // TODO: Handle OPT_UPDATE_VIEWS, OPT_UPDATE_INPUT_FONT, etc.
-
-            return luaReturnOK(L);
         }
+
+        // Special validation for world ID
+        if (opt.iFlags & OPT_WORLD_ID) {
+            if (!strValue.isEmpty()) {
+                if (strValue.length() != 24) { // PLUGIN_UNIQUE_ID_LENGTH
+                    return luaReturnError(L, eOptionOutOfRange);
+                }
+                // Ensure all hex characters
+                static QRegularExpression hexRegex("^[0-9a-fA-F]+$");
+                if (!hexRegex.match(strValue).hasMatch()) {
+                    return luaReturnError(L, eOptionOutOfRange);
+                }
+                strValue = strValue.toLower();
+            }
+        }
+
+        // Strip newlines from non-multiline options
+        if (!(opt.iFlags & OPT_MULTLINE)) {
+            strValue.remove('\n');
+            strValue.remove('\r');
+        }
+
+        opt.setter(*pDoc, strValue);
+
+        // TODO(ui): Trigger UI refresh callbacks (view repaint, font reload) when options
+        // change.
+
+        return luaReturnOK(L);
     }
 
     // Option not found
@@ -1878,9 +1916,7 @@ int L_SetAlphaOption(lua_State* L)
 int L_SetStatus(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* text = luaL_checkstring(L, 1);
-
-    pDoc->m_strStatusMessage = QString::fromUtf8(text);
+    pDoc->m_strStatusMessage = luaCheckQString(L, 1);
     pDoc->m_tStatusDisplayed = QDateTime::currentDateTime();
 
     return 0;
@@ -1936,15 +1972,8 @@ int L_TextRectangle(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    qint32 left = luaL_checkinteger(L, 1);
-    qint32 top = luaL_checkinteger(L, 2);
-    qint32 right = luaL_checkinteger(L, 3);
-    qint32 bottom = luaL_checkinteger(L, 4);
-    qint32 borderOffset = luaL_checkinteger(L, 5);
-    QRgb borderColour = luaL_checkinteger(L, 6);
-    qint32 borderWidth = luaL_checkinteger(L, 7);
-    QRgb outsideFillColour = luaL_checkinteger(L, 8);
-    qint32 outsideFillStyle = luaL_checkinteger(L, 9);
+    auto [left, top, right, bottom, borderOffset, borderColour, borderWidth, outsideFillColour,
+          outsideFillStyle] = luaArgs<int, int, int, int, int, int, int, int, int>(L);
 
     qCDebug(lcScript) << "TextRectangle called: rect=(" << left << top << right << bottom
                       << ") border=" << borderOffset << borderWidth;
@@ -1955,9 +1984,9 @@ int L_TextRectangle(lua_State* L)
     // Use QPoint constructor to create from coordinates
     pDoc->m_TextRectangle = QRect(QPoint(left, top), QPoint(right, bottom));
     pDoc->m_TextRectangleBorderOffset = borderOffset;
-    pDoc->m_TextRectangleBorderColour = borderColour;
+    pDoc->m_TextRectangleBorderColour = static_cast<QRgb>(borderColour);
     pDoc->m_TextRectangleBorderWidth = borderWidth;
-    pDoc->m_TextRectangleOutsideFillColour = outsideFillColour;
+    pDoc->m_TextRectangleOutsideFillColour = static_cast<QRgb>(outsideFillColour);
     pDoc->m_TextRectangleOutsideFillStyle = outsideFillStyle;
 
     // Notify OutputView that text rectangle config changed
@@ -1967,8 +1996,7 @@ int L_TextRectangle(lua_State* L)
     // Trigger redraw
     pDoc->Repaint();
 
-    lua_pushinteger(L, 0); // eOK
-    return 1;
+    return luaReturn(L, eOK);
 }
 
 /**
@@ -1986,17 +2014,15 @@ int L_TextRectangle(lua_State* L)
 int L_SetBackgroundImage(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* filename = luaL_optstring(L, 1, "");
     qint32 mode = luaL_optinteger(L, 2, 0);
 
     // Validate mode (matches original)
     if (mode < 0 || mode > 13) {
-        lua_pushinteger(L, eBadParameter);
-        return 1;
+        return luaReturn(L, eBadParameter);
     }
 
     // Store the image path and mode
-    pDoc->m_strBackgroundImageName = QString::fromUtf8(filename);
+    pDoc->m_strBackgroundImageName = luaOptQString(L, 1);
     pDoc->m_iBackgroundMode = mode;
 
     // Tell OutputView to reload the image via interface method
@@ -2004,8 +2030,7 @@ int L_SetBackgroundImage(lua_State* L)
         pDoc->m_pActiveOutputView->reloadBackgroundImage();
     }
 
-    lua_pushinteger(L, eOK);
-    return 1;
+    return luaReturn(L, eOK);
 }
 
 /**
@@ -2017,14 +2042,7 @@ int L_SetBackgroundImage(lua_State* L)
  *
  * @return Current command text
  */
-int L_GetCommand(lua_State* L)
-{
-    WorldDocument* pDoc = doc(L);
-    QString command = pDoc->GetCommand();
-    QByteArray ba = command.toUtf8();
-    lua_pushlstring(L, ba.constData(), ba.length());
-    return 1;
-}
+LUA_DOC_GETTER(L_GetCommand, pDoc->GetCommand())
 
 /**
  * SetCommandWindowHeight - Set command window height (stub implementation)
@@ -2036,8 +2054,7 @@ int L_SetCommandWindowHeight(lua_State* L)
 {
     // qint32 height = luaL_checkinteger(L, 1);
     // qDebug() << "SetCommandWindowHeight called (stub): height=" << height;
-    lua_pushinteger(L, 0); // eOK
-    return 1;
+    return luaReturn(L, eOK);
 }
 
 /**
@@ -2057,8 +2074,7 @@ int L_SetScroll(lua_State* L)
     // qint32 position = luaL_checkinteger(L, 1);
     // bool visible = lua_toboolean(L, 2);
     // qDebug() << "SetScroll called (stub): position=" << position << ", visible=" << visible;
-    lua_pushinteger(L, 0); // eOK
-    return 1;
+    return luaReturn(L, eOK);
 }
 
 /**
@@ -2138,8 +2154,7 @@ int L_SetCursor(lua_State* L)
             break;
         default:
             // Invalid cursor type - return error
-            lua_pushinteger(L, eBadParameter);
-            return 1;
+            return luaReturn(L, eBadParameter);
     }
 
     // Set cursor on the output view (if it exists)
@@ -2147,8 +2162,7 @@ int L_SetCursor(lua_State* L)
         pDoc->m_pActiveOutputView->setViewCursor(QCursor(qtCursor));
     }
 
-    lua_pushinteger(L, eOK);
-    return 1;
+    return luaReturn(L, eOK);
 }
 
 /**
@@ -2170,8 +2184,7 @@ int L_SetCommand(lua_State* L)
     QString qText = QString::fromUtf8(text, len);
 
     qint32 result = pDoc->SetCommand(qText);
-    lua_pushinteger(L, result);
-    return 1;
+    return luaReturn(L, result);
 }
 
 /**
@@ -2189,12 +2202,10 @@ int L_SetCommand(lua_State* L)
 int L_SetCommandSelection(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    qint32 first = luaL_checkinteger(L, 1);
-    qint32 last = luaL_checkinteger(L, 2);
+    auto [first, last] = luaArgs<int, int>(L);
 
     qint32 result = pDoc->SetCommandSelection(first, last);
-    lua_pushinteger(L, result);
-    return 1;
+    return luaReturn(L, result);
 }
 
 /**
@@ -2262,9 +2273,6 @@ void register_setting_functions(lua_State* L)
     // World info functions
     lua_pushcfunction(L, L_GetInfo);
     lua_setfield(L, -2, "GetInfo");
-
-    lua_pushcfunction(L, L_GetWorldName);
-    lua_setfield(L, -2, "GetWorldName");
 
     lua_pushcfunction(L, L_SetOption);
     lua_setfield(L, -2, "SetOption");

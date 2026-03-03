@@ -2,9 +2,9 @@
 #include "world/world_document.h"
 
 #include <QCheckBox>
-#include <QFileInfo>
 #include <QComboBox>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QFormLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -13,8 +13,7 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 
-ScriptingPage::ScriptingPage(WorldDocument* doc, QWidget* parent)
-    : PreferencesPageBase(doc, parent)
+ScriptingPage::ScriptingPage(WorldDocument* doc, QWidget* parent) : PreferencesPageBase(doc, parent)
 {
     setupUi();
 }
@@ -75,10 +74,10 @@ void ScriptingPage::setupUi()
     mainLayout->addWidget(optionsGroup);
 
     // Help text
-    QLabel* helpLabel = new QLabel(
-        tr("The script file is loaded when the world opens. It can define functions "
-           "called by triggers, aliases, and timers."),
-        this);
+    QLabel* helpLabel =
+        new QLabel(tr("The script file is loaded when the world opens. It can define functions "
+                      "called by triggers, aliases, and timers."),
+                   this);
     helpLabel->setWordWrap(true);
     helpLabel->setStyleSheet("color: gray; font-style: italic;");
     mainLayout->addWidget(helpLabel);
@@ -98,11 +97,11 @@ void ScriptingPage::loadSettings()
     m_autoReloadCheck->blockSignals(true);
     m_warnIfNoHandlerCheck->blockSignals(true);
 
-    m_enableScriptCheck->setChecked(m_doc->m_bEnableScripts != 0);
-    m_scriptFileEdit->setText(m_doc->m_strScriptFilename);
+    m_enableScriptCheck->setChecked(m_doc->m_scripting.enabled);
+    m_scriptFileEdit->setText(m_doc->m_scripting.filename);
 
     // Determine language from file extension
-    QString ext = QFileInfo(m_doc->m_strScriptFilename).suffix().toLower();
+    QString ext = QFileInfo(m_doc->m_scripting.filename).suffix().toLower();
     int langIndex = 0; // Default to Lua
     if (ext == "yue")
         langIndex = m_languageCombo->findData("yue");
@@ -115,9 +114,10 @@ void ScriptingPage::loadSettings()
     if (langIndex >= 0)
         m_languageCombo->setCurrentIndex(langIndex);
 
-    // m_nReloadOption: 0=Never, 1=OnFileChange, 2=OnConnect
-    m_autoReloadCheck->setChecked(m_doc->m_nReloadOption != 0);
-    m_warnIfNoHandlerCheck->setChecked(m_doc->m_bWarnIfScriptingInactive != 0);
+    // m_scripting.reload_option: eReloadConfirm=0, eReloadAlways=1, eReloadNever=2
+    m_autoReloadCheck->setChecked(m_doc->m_scripting.reload_option !=
+                                  ScriptReloadOption::eReloadConfirm);
+    m_warnIfNoHandlerCheck->setChecked(m_doc->m_scripting.warn_if_inactive != 0);
 
     // Unblock signals
     m_enableScriptCheck->blockSignals(false);
@@ -134,11 +134,13 @@ void ScriptingPage::saveSettings()
     if (!m_doc)
         return;
 
-    m_doc->m_bEnableScripts = m_enableScriptCheck->isChecked() ? 1 : 0;
-    m_doc->m_strScriptFilename = m_scriptFileEdit->text();
+    m_doc->m_scripting.enabled = m_enableScriptCheck->isChecked();
+    m_doc->m_scripting.filename = m_scriptFileEdit->text();
     // Script language is determined by file extension, not stored separately
-    m_doc->m_nReloadOption = m_autoReloadCheck->isChecked() ? 1 : 0; // 1 = OnFileChange
-    m_doc->m_bWarnIfScriptingInactive = m_warnIfNoHandlerCheck->isChecked() ? 1 : 0;
+    m_doc->m_scripting.reload_option = m_autoReloadCheck->isChecked()
+                                           ? ScriptReloadOption::eReloadAlways
+                                           : ScriptReloadOption::eReloadConfirm;
+    m_doc->m_scripting.warn_if_inactive = m_warnIfNoHandlerCheck->isChecked() ? 1 : 0;
 
     m_doc->setModified(true);
 
@@ -172,8 +174,8 @@ void ScriptingPage::onBrowseClicked()
         filter = tr("Script Files (*.lua *.yue *.moon *.tl *.fnl);;All Files (*)");
     }
 
-    QString fileName = QFileDialog::getOpenFileName(
-        this, tr("Choose Script File"), m_scriptFileEdit->text(), filter);
+    QString fileName = QFileDialog::getOpenFileName(this, tr("Choose Script File"),
+                                                    m_scriptFileEdit->text(), filter);
 
     if (!fileName.isEmpty()) {
         m_scriptFileEdit->setText(fileName);

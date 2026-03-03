@@ -76,22 +76,20 @@ void LogDialog::loadSettings()
     if (!m_doc)
         return;
 
-    // TODO: Load lines to log setting when field is added to WorldDocument
-    // m_lines->setValue(m_doc->???);
+    m_lines->setValue(m_doc->m_logging.log_lines);
 
     // Load log file preamble
-    m_preamble->setText(m_doc->m_strLogFilePreamble);
+    m_preamble->setText(m_doc->m_logging.file_preamble);
 
-    // TODO: Load append to log file setting when field is added to WorldDocument
-    // m_appendToLogFile->setChecked(m_doc->???);
+    m_appendToLogFile->setChecked(m_doc->m_logging.append_to_log_file);
 
     // Load write world name
-    m_writeWorldName->setChecked(m_doc->m_bWriteWorldNameToLog);
+    m_writeWorldName->setChecked(m_doc->m_logging.write_world_name);
 
     // Load logging flags
-    m_logNotes->setChecked(m_doc->m_bLogNotes);
-    m_logInput->setChecked(m_doc->m_log_input);
-    m_logOutput->setChecked(m_doc->m_bLogOutput);
+    m_logNotes->setChecked(m_doc->m_logging.log_notes);
+    m_logInput->setChecked(m_doc->m_logging.log_input);
+    m_logOutput->setChecked(m_doc->m_logging.log_output);
 }
 
 void LogDialog::saveSettings()
@@ -99,22 +97,20 @@ void LogDialog::saveSettings()
     if (!m_doc)
         return;
 
-    // TODO: Save lines to log setting when field is added to WorldDocument
-    // m_doc->??? = m_lines->value();
+    m_doc->m_logging.log_lines = m_lines->value();
 
     // Save log file preamble
-    m_doc->m_strLogFilePreamble = m_preamble->text();
+    m_doc->m_logging.file_preamble = m_preamble->text();
 
-    // TODO: Save append to log file setting when field is added to WorldDocument
-    // m_doc->??? = m_appendToLogFile->isChecked();
+    m_doc->m_logging.append_to_log_file = m_appendToLogFile->isChecked();
 
     // Save write world name
-    m_doc->m_bWriteWorldNameToLog = m_writeWorldName->isChecked();
+    m_doc->m_logging.write_world_name = m_writeWorldName->isChecked();
 
     // Save logging flags
-    m_doc->m_bLogNotes = m_logNotes->isChecked();
-    m_doc->m_log_input = m_logInput->isChecked();
-    m_doc->m_bLogOutput = m_logOutput->isChecked();
+    m_doc->m_logging.log_notes = m_logNotes->isChecked();
+    m_doc->m_logging.log_input = m_logInput->isChecked();
+    m_doc->m_logging.log_output = m_logOutput->isChecked();
 
     // Mark document as modified
     m_doc->setModified(true);

@@ -16,25 +16,22 @@
 
 #include "../src/text/line.h"
 #include "../src/ui/views/input_view.h"
-#include "../src/world/world_document.h"
-#include <QApplication>
+#include "fixtures/world_fixtures.h"
 #include <cstring>
-#include <gtest/gtest.h>
 
 // Test fixture for tab completion tests
 // Provides common setup/teardown and helper methods
-class TabCompletionTest : public ::testing::Test {
+class TabCompletionTest : public WorldDocumentTest {
   protected:
     void SetUp() override
     {
-        doc = new WorldDocument();
-        input = new InputView(doc);
+        WorldDocumentTest::SetUp();
+        input = new InputView(doc.get());
     }
 
     void TearDown() override
     {
         delete input;
-        delete doc;
     }
 
     /**
@@ -46,26 +43,25 @@ class TabCompletionTest : public ::testing::Test {
     void addLineToOutputBuffer(const QString& text)
     {
         // Create line with simple defaults
-        Line* line = new Line(doc->m_lineList.count(), // lineNumber
-                              80,                      // wrapColumn
-                              0,                       // lineFlags
-                              qRgb(255, 255, 255),     // foreColour (white)
-                              qRgb(0, 0, 0),           // backColour (black)
-                              false                    // isUnicode
+        auto line = std::make_unique<Line>(static_cast<int>(doc->m_lineList.size()), // lineNumber
+                                           80,                                       // wrapColumn
+                                           0,                                        // lineFlags
+                                           qRgb(255, 255, 255), // foreColour (white)
+                                           qRgb(0, 0, 0),       // backColour (black)
+                                           false                // isUnicode
         );
 
         // Copy text into line's buffer
         QByteArray textBytes = text.toUtf8();
         int len = textBytes.length();
         line->textBuffer.resize(len);
-        memcpy(line->text(), textBytes.constData(), len);
+        memcpy(line->textBuffer.data(), textBytes.constData(), len);
         line->textBuffer.push_back('\0');
 
-        // Add to output buffer
-        doc->m_lineList.append(line);
+        // Add to output buffer (ownership transferred)
+        doc->m_lineList.push_back(std::move(line));
     }
 
-    WorldDocument* doc = nullptr;
     InputView* input = nullptr;
 };
 
@@ -175,12 +171,12 @@ TEST_F(TabCompletionTest, NoMatch)
  * Test 6: Case-insensitive matching
  * Output buffer: ["Kill Archer"]
  * Input: "kill ar" + Tab
- * Expected: "kill archer" (lowercase if m_bLowerCaseTabCompletion=true)
+ * Expected: "kill archer" (lowercase if m_command_window.lower_case_tab_completion=true)
  */
 TEST_F(TabCompletionTest, CaseInsensitive)
 {
     addLineToOutputBuffer("Kill Archer");
-    doc->m_bLowerCaseTabCompletion = true;
+    doc->m_command_window.lower_case_tab_completion = true;
 
     input->setText("kill ar");
     input->setCursorPosition(7);
@@ -195,13 +191,13 @@ TEST_F(TabCompletionTest, CaseInsensitive)
  * Test 7: No space after completion if disabled
  * Output buffer: ["north"]
  * Input: "nor" + Tab
- * m_bTabCompletionSpace = false
+ * m_command_window.tab_completion_space = false
  * Expected: "north" (no space)
  */
 TEST_F(TabCompletionTest, NoSpaceAfterCompletion)
 {
     addLineToOutputBuffer("north");
-    doc->m_bTabCompletionSpace = false;
+    doc->m_command_window.tab_completion_space = false;
 
     input->setText("nor");
     input->setCursorPosition(3);
@@ -214,14 +210,14 @@ TEST_F(TabCompletionTest, NoSpaceAfterCompletion)
 
 /**
  * Test 8: Completion with default list
- * m_strTabCompletionDefaults = "fireball lightning heal"
+ * m_command_window.tab_completion_defaults = "fireball lightning heal"
  * Output buffer: (empty)
  * Input: "fire" + Tab
  * Expected: "fireball"
  */
 TEST_F(TabCompletionTest, DefaultCompletionList)
 {
-    doc->m_strTabCompletionDefaults = "fireball lightning heal";
+    doc->m_command_window.tab_completion_defaults = "fireball lightning heal";
 
     input->setText("fire");
     input->setCursorPosition(4);
@@ -365,18 +361,4 @@ TEST_F(TabCompletionTest, CompletionNotAtEnd)
 
     // Should complete "ar" to "archer" and keep " south"
     EXPECT_EQ(input->text(), "archer south") << "Completion should work when cursor not at end";
-}
-
-// Main function required for GoogleTest
-// Note: QApplication must be created before any Qt objects
-int main(int argc, char** argv)
-{
-    // Initialize Qt (required for Qt objects like WorldDocument and InputView)
-    QApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

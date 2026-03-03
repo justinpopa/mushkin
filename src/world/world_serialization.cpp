@@ -43,13 +43,7 @@
 #define BLINK 0x0004 // italic
 #define INVERSE 0x0008
 
-// Trigger match bit masks (from original MUSHclient OtherTypes.h)
-#define TRIGGER_MATCH_TEXT 0x0080 // high order of text nibble
-#define TRIGGER_MATCH_BACK 0x0800 // high order of back nibble
-#define TRIGGER_MATCH_HILITE 0x1000
-#define TRIGGER_MATCH_UNDERLINE 0x2000
-#define TRIGGER_MATCH_BLINK 0x4000 // italic
-#define TRIGGER_MATCH_INVERSE 0x8000
+// TRIGGER_MATCH_* constants are defined as inline constexpr in trigger.h
 
 // Helper function to convert BGR color to hex name (#RRGGBB for XML)
 // Internal colors are stored in BGR format (MUSHclient COLORREF)
@@ -88,92 +82,93 @@ void WorldDocument::saveTriggersToXml(QXmlStreamWriter& xml)
 {
     xml.writeStartElement("triggers");
 
-    for (const auto& [name, triggerPtr] : m_TriggerMap) {
+    for (const auto& [name, triggerPtr] : m_automationRegistry->m_TriggerMap) {
         Trigger* trigger = triggerPtr.get();
 
         // Skip temporary triggers
-        if (trigger->bTemporary)
+        if (trigger->temporary)
             continue;
 
         xml.writeStartElement("trigger");
 
         // Write attributes
-        xml.writeAttribute("name", trigger->strLabel);
-        xml.writeAttribute("enabled", trigger->bEnabled ? "y" : "n");
+        xml.writeAttribute("name", trigger->label);
+        xml.writeAttribute("enabled", trigger->enabled ? "y" : "n");
         xml.writeAttribute("match", trigger->trigger);
-        xml.writeAttribute("send_to", QString::number(trigger->iSendTo));
-        xml.writeAttribute("sequence", QString::number(trigger->iSequence));
-        xml.writeAttribute("script", trigger->strProcedure);
-        xml.writeAttribute("group", trigger->strGroup);
-        xml.writeAttribute("variable", trigger->strVariable);
+        xml.writeAttribute("send_to", QString::number(static_cast<quint16>(trigger->send_to)));
+        xml.writeAttribute("sequence", QString::number(trigger->sequence));
+        xml.writeAttribute("script", trigger->procedure);
+        xml.writeAttribute("group", trigger->group);
+        xml.writeAttribute("variable", trigger->variable);
 
         // Behavior flags
-        xml.writeAttribute("omit_from_output", trigger->bOmitFromOutput ? "y" : "n");
+        xml.writeAttribute("omit_from_output", trigger->omit_from_output ? "y" : "n");
         xml.writeAttribute("omit_from_log", trigger->omit_from_log ? "y" : "n");
-        xml.writeAttribute("keep_evaluating", trigger->bKeepEvaluating ? "y" : "n");
-        xml.writeAttribute("regexp", trigger->bRegexp ? "y" : "n");
+        xml.writeAttribute("keep_evaluating", trigger->keep_evaluating ? "y" : "n");
+        xml.writeAttribute("regexp", trigger->use_regexp ? "y" : "n");
         xml.writeAttribute("ignore_case", trigger->ignore_case ? "y" : "n");
-        xml.writeAttribute("repeat", trigger->bRepeat ? "y" : "n");
-        xml.writeAttribute("expand_variables", trigger->bExpandVariables ? "y" : "n");
-        xml.writeAttribute("one_shot", trigger->bOneShot ? "y" : "n");
-        xml.writeAttribute("lowercase_wildcard", trigger->bLowercaseWildcard ? "y" : "n");
+        xml.writeAttribute("repeat", trigger->repeat ? "y" : "n");
+        xml.writeAttribute("expand_variables", trigger->expand_variables ? "y" : "n");
+        xml.writeAttribute("one_shot", trigger->one_shot ? "y" : "n");
+        xml.writeAttribute("lowercase_wildcard", trigger->lowercase_wildcard ? "y" : "n");
 
         // Multi-line matching
-        xml.writeAttribute("multi_line", trigger->bMultiLine ? "y" : "n");
-        xml.writeAttribute("lines_to_match", QString::number(trigger->iLinesToMatch));
+        xml.writeAttribute("multi_line", trigger->multi_line ? "y" : "n");
+        xml.writeAttribute("lines_to_match", QString::number(trigger->lines_to_match));
 
         // Sound
         xml.writeAttribute("sound", trigger->sound_to_play);
-        xml.writeAttribute("sound_if_inactive", trigger->bSoundIfInactive ? "y" : "n");
+        xml.writeAttribute("sound_if_inactive", trigger->sound_if_inactive ? "y" : "n");
 
-        // Decompose iStyle into individual make_* attributes
-        if (trigger->iStyle & HILITE)
+        // Decompose style into individual make_* attributes
+        if (trigger->style & HILITE)
             xml.writeAttribute("make_bold", "y");
-        if (trigger->iStyle & BLINK)
+        if (trigger->style & BLINK)
             xml.writeAttribute("make_italic", "y");
-        if (trigger->iStyle & UNDERLINE)
+        if (trigger->style & UNDERLINE)
             xml.writeAttribute("make_underline", "y");
 
-        // Decompose iMatch into individual attributes
+        // Decompose match_type into individual attributes
         // Extract ANSI color indices (0-15)
-        int text_colour = (trigger->iMatch >> 4) & 0x0F;
-        int back_colour = (trigger->iMatch >> 8) & 0x0F;
+        int text_colour = (trigger->match_type >> 4) & 0x0F;
+        int back_colour = (trigger->match_type >> 8) & 0x0F;
         if (text_colour != 0)
             xml.writeAttribute("text_colour", QString::number(text_colour));
         if (back_colour != 0)
             xml.writeAttribute("back_colour", QString::number(back_colour));
 
         // Extract style matching flags
-        if (trigger->iMatch & HILITE)
+        if (trigger->match_type & HILITE)
             xml.writeAttribute("bold", "y");
-        if (trigger->iMatch & INVERSE)
+        if (trigger->match_type & INVERSE)
             xml.writeAttribute("inverse", "y");
-        if (trigger->iMatch & BLINK)
+        if (trigger->match_type & BLINK)
             xml.writeAttribute("italic", "y");
-        if (trigger->iMatch & TRIGGER_MATCH_TEXT)
+        if (trigger->match_type & TRIGGER_MATCH_TEXT)
             xml.writeAttribute("match_text_colour", "y");
-        if (trigger->iMatch & TRIGGER_MATCH_BACK)
+        if (trigger->match_type & TRIGGER_MATCH_BACK)
             xml.writeAttribute("match_back_colour", "y");
-        if (trigger->iMatch & TRIGGER_MATCH_HILITE)
+        if (trigger->match_type & TRIGGER_MATCH_HILITE)
             xml.writeAttribute("match_bold", "y");
-        if (trigger->iMatch & TRIGGER_MATCH_INVERSE)
+        if (trigger->match_type & TRIGGER_MATCH_INVERSE)
             xml.writeAttribute("match_inverse", "y");
-        if (trigger->iMatch & TRIGGER_MATCH_BLINK)
+        if (trigger->match_type & TRIGGER_MATCH_BLINK)
             xml.writeAttribute("match_italic", "y");
-        if (trigger->iMatch & TRIGGER_MATCH_UNDERLINE)
+        if (trigger->match_type & TRIGGER_MATCH_UNDERLINE)
             xml.writeAttribute("match_underline", "y");
 
         // Custom color (add 1, skip SAMECOLOUR)
         if (trigger->colour != SAMECOLOUR)
             xml.writeAttribute("custom_colour", QString::number(trigger->colour + 1));
 
-        xml.writeAttribute("colour_change_type", QString::number(trigger->iColourChangeType));
+        xml.writeAttribute("colour_change_type",
+                           QString::number(static_cast<quint16>(trigger->colour_change_type)));
 
         // RGB colors as names
-        if (trigger->iOtherForeground != 0)
-            xml.writeAttribute("other_text_colour", colorToName(trigger->iOtherForeground));
-        if (trigger->iOtherBackground != 0)
-            xml.writeAttribute("other_back_colour", colorToName(trigger->iOtherBackground));
+        if (trigger->other_foreground != 0)
+            xml.writeAttribute("other_text_colour", colorToName(trigger->other_foreground));
+        if (trigger->other_background != 0)
+            xml.writeAttribute("other_back_colour", colorToName(trigger->other_background));
 
         // Script language (only write if not Lua - the default)
         if (trigger->scriptLanguage != ScriptLanguage::Lua) {
@@ -181,8 +176,8 @@ void WorldDocument::saveTriggersToXml(QXmlStreamWriter& xml)
         }
 
         // Other options
-        xml.writeAttribute("clipboard_arg", QString::number(trigger->iClipboardArg));
-        xml.writeAttribute("user", QString::number(trigger->iUserOption));
+        xml.writeAttribute("clipboard_arg", QString::number(trigger->clipboard_arg));
+        xml.writeAttribute("user", QString::number(trigger->user_option));
 
         // Contents as child element with CDATA
         if (!trigger->contents.isEmpty()) {
@@ -220,92 +215,92 @@ void WorldDocument::loadTriggersFromXml(QXmlStreamReader& xml, Plugin* plugin)
             // Read attributes
             QXmlStreamAttributes attrs = xml.attributes();
 
-            trigger->strLabel = attrs.value("name").toString();
+            trigger->label = attrs.value("name").toString();
 
             // Generate unique internal name if no name attribute exists
-            if (trigger->strLabel.isEmpty()) {
+            if (trigger->label.isEmpty()) {
                 // Use pattern as base for name (truncated if too long)
                 QString pattern = attrs.value("match").toString();
                 if (pattern.length() > 50) {
                     pattern = pattern.left(50) + "...";
                 }
                 // Make it unique by appending a counter
-                trigger->strInternalName =
+                trigger->internal_name =
                     QString("trigger_%1_%2").arg(triggerCount).arg(qHash(pattern));
             } else {
-                trigger->strInternalName = trigger->strLabel;
+                trigger->internal_name = trigger->label;
             }
-            trigger->bEnabled = attrs.value("enabled").toString() == "y";
+            trigger->enabled = attrs.value("enabled").toString() == "y";
             trigger->trigger = attrs.value("match").toString();
-            trigger->iSendTo = attrs.value("send_to").toInt();
-            trigger->iSequence = attrs.value("sequence").toInt();
-            trigger->strProcedure = attrs.value("script").toString();
-            trigger->strGroup = attrs.value("group").toString();
-            trigger->strVariable = attrs.value("variable").toString();
+            trigger->send_to = static_cast<SendTo>(attrs.value("send_to").toInt());
+            trigger->sequence = attrs.value("sequence").toInt();
+            trigger->procedure = attrs.value("script").toString();
+            trigger->group = attrs.value("group").toString();
+            trigger->variable = attrs.value("variable").toString();
 
             // Behavior flags
-            trigger->bOmitFromOutput = attrs.value("omit_from_output").toString() == "y";
+            trigger->omit_from_output = attrs.value("omit_from_output").toString() == "y";
             trigger->omit_from_log = attrs.value("omit_from_log").toString() == "y";
             // Only set to false if explicitly "n", otherwise keep default (true)
             if (attrs.hasAttribute("keep_evaluating")) {
-                trigger->bKeepEvaluating = attrs.value("keep_evaluating").toString() != "n";
+                trigger->keep_evaluating = attrs.value("keep_evaluating").toString() != "n";
             }
-            trigger->bRegexp = attrs.value("regexp").toString() == "y";
+            trigger->use_regexp = attrs.value("regexp").toString() == "y";
             trigger->ignore_case = attrs.value("ignore_case").toString() == "y";
-            trigger->bRepeat = attrs.value("repeat").toString() == "y";
-            trigger->bExpandVariables = attrs.value("expand_variables").toString() == "y";
-            trigger->bOneShot = attrs.value("one_shot").toString() == "y";
-            trigger->bLowercaseWildcard = attrs.value("lowercase_wildcard").toString() == "y";
+            trigger->repeat = attrs.value("repeat").toString() == "y";
+            trigger->expand_variables = attrs.value("expand_variables").toString() == "y";
+            trigger->one_shot = attrs.value("one_shot").toString() == "y";
+            trigger->lowercase_wildcard = attrs.value("lowercase_wildcard").toString() == "y";
 
             // Multi-line matching
-            trigger->bMultiLine = attrs.value("multi_line").toString() == "y";
-            trigger->iLinesToMatch = attrs.value("lines_to_match").toInt();
+            trigger->multi_line = attrs.value("multi_line").toString() == "y";
+            trigger->lines_to_match = attrs.value("lines_to_match").toInt();
 
             // Sound
             trigger->sound_to_play = attrs.value("sound").toString();
-            trigger->bSoundIfInactive = attrs.value("sound_if_inactive").toString() == "y";
+            trigger->sound_if_inactive = attrs.value("sound_if_inactive").toString() == "y";
 
-            // Compose iStyle from individual make_* attributes
-            trigger->iStyle = 0;
+            // Compose style from individual make_* attributes
+            trigger->style = 0;
             if (attrs.value("make_bold").toString() == "y")
-                trigger->iStyle |= HILITE;
+                trigger->style |= HILITE;
             if (attrs.value("make_italic").toString() == "y")
-                trigger->iStyle |= BLINK;
+                trigger->style |= BLINK;
             if (attrs.value("make_underline").toString() == "y")
-                trigger->iStyle |= UNDERLINE;
+                trigger->style |= UNDERLINE;
 
-            // Compose iMatch from individual attributes
-            trigger->iMatch = 0;
+            // Compose match_type from individual attributes
+            trigger->match_type = 0;
 
-            // Pack ANSI color indices (0-15) into iMatch
+            // Pack ANSI color indices (0-15) into match_type
             if (attrs.hasAttribute("text_colour")) {
                 int text_colour = attrs.value("text_colour").toInt();
-                trigger->iMatch |= (text_colour << 4);
+                trigger->match_type |= (text_colour << 4);
             }
             if (attrs.hasAttribute("back_colour")) {
                 int back_colour = attrs.value("back_colour").toInt();
-                trigger->iMatch |= (back_colour << 8);
+                trigger->match_type |= (back_colour << 8);
             }
 
             // Compose style matching flags
             if (attrs.value("bold").toString() == "y")
-                trigger->iMatch |= HILITE;
+                trigger->match_type |= HILITE;
             if (attrs.value("inverse").toString() == "y")
-                trigger->iMatch |= INVERSE;
+                trigger->match_type |= INVERSE;
             if (attrs.value("italic").toString() == "y")
-                trigger->iMatch |= BLINK;
+                trigger->match_type |= BLINK;
             if (attrs.value("match_text_colour").toString() == "y")
-                trigger->iMatch |= TRIGGER_MATCH_TEXT;
+                trigger->match_type |= TRIGGER_MATCH_TEXT;
             if (attrs.value("match_back_colour").toString() == "y")
-                trigger->iMatch |= TRIGGER_MATCH_BACK;
+                trigger->match_type |= TRIGGER_MATCH_BACK;
             if (attrs.value("match_bold").toString() == "y")
-                trigger->iMatch |= TRIGGER_MATCH_HILITE;
+                trigger->match_type |= TRIGGER_MATCH_HILITE;
             if (attrs.value("match_inverse").toString() == "y")
-                trigger->iMatch |= TRIGGER_MATCH_INVERSE;
+                trigger->match_type |= TRIGGER_MATCH_INVERSE;
             if (attrs.value("match_italic").toString() == "y")
-                trigger->iMatch |= TRIGGER_MATCH_BLINK;
+                trigger->match_type |= TRIGGER_MATCH_BLINK;
             if (attrs.value("match_underline").toString() == "y")
-                trigger->iMatch |= TRIGGER_MATCH_UNDERLINE;
+                trigger->match_type |= TRIGGER_MATCH_UNDERLINE;
 
             // Custom color (decrement by 1, handle SAMECOLOUR)
             if (attrs.hasAttribute("custom_colour")) {
@@ -319,14 +314,15 @@ void WorldDocument::loadTriggersFromXml(QXmlStreamReader& xml, Plugin* plugin)
             }
 
             if (attrs.hasAttribute("colour_change_type"))
-                trigger->iColourChangeType = attrs.value("colour_change_type").toInt();
+                trigger->colour_change_type =
+                    static_cast<ColourChangeType>(attrs.value("colour_change_type").toInt());
 
             // RGB colors from names
             if (attrs.hasAttribute("other_text_colour"))
-                trigger->iOtherForeground =
+                trigger->other_foreground =
                     nameToColor(attrs.value("other_text_colour").toString());
             if (attrs.hasAttribute("other_back_colour"))
-                trigger->iOtherBackground =
+                trigger->other_background =
                     nameToColor(attrs.value("other_back_colour").toString());
 
             // Script language (defaults to Lua if not specified)
@@ -337,9 +333,9 @@ void WorldDocument::loadTriggersFromXml(QXmlStreamReader& xml, Plugin* plugin)
 
             // Other options
             if (attrs.hasAttribute("clipboard_arg"))
-                trigger->iClipboardArg = attrs.value("clipboard_arg").toInt();
+                trigger->clipboard_arg = attrs.value("clipboard_arg").toInt();
             if (attrs.hasAttribute("user"))
-                trigger->iUserOption = attrs.value("user").toInt();
+                trigger->user_option = attrs.value("user").toInt();
 
             // Read <send> child element
             while (xml.readNextStartElement()) {
@@ -351,19 +347,19 @@ void WorldDocument::loadTriggersFromXml(QXmlStreamReader& xml, Plugin* plugin)
             }
 
             // Compile regex if needed
-            if (trigger->bRegexp) {
-                trigger->compileRegexp();
+            if (trigger->use_regexp) {
+                (void)trigger->compileRegexp();
             }
 
             // Add to plugin or world collections based on context
             if (plugin) {
                 // Add to plugin's collections
-                trigger->strInternalName =
-                    trigger->strLabel.isEmpty()
+                trigger->internal_name =
+                    trigger->label.isEmpty()
                         ? QString("trigger_%1_%2").arg(triggerCount).arg(qHash(trigger->trigger))
-                        : trigger->strLabel;
+                        : trigger->label;
 
-                QString triggerName = trigger->strInternalName;
+                QString triggerName = trigger->internal_name;
 
                 // Skip duplicates - don't overwrite existing triggers
                 if (plugin->m_TriggerMap.find(triggerName) != plugin->m_TriggerMap.end()) {
@@ -376,13 +372,14 @@ void WorldDocument::loadTriggersFromXml(QXmlStreamReader& xml, Plugin* plugin)
                 plugin->m_TriggerMap[triggerName] = std::move(trigger);
                 plugin->m_TriggerArray.append(rawPtr);
                 plugin->m_triggersNeedSorting = true;
-                qCDebug(lcWorld) << "Added trigger to plugin:" << rawPtr->strInternalName
-                                 << "sequence:" << rawPtr->iSequence;
+                qCDebug(lcWorld) << "Added trigger to plugin:" << rawPtr->internal_name
+                                 << "sequence:" << rawPtr->sequence;
             } else {
                 // Add to world's collections (existing behavior)
-                QString triggerName = trigger->strInternalName;
-                addTrigger(triggerName, std::move(trigger));
-                m_triggersNeedSorting = true;
+                QString triggerName = trigger->internal_name;
+                (void)addTrigger(triggerName,
+                                 std::move(trigger)); // intentional: deserialization load
+                m_automationRegistry->m_triggersNeedSorting = true;
             }
         }
     }
@@ -392,36 +389,37 @@ void WorldDocument::saveAliasesToXml(QXmlStreamWriter& xml)
 {
     xml.writeStartElement("aliases");
 
-    for (const auto& [name, aliasPtr] : m_AliasMap) {
+    for (const auto& [name, aliasPtr] : m_automationRegistry->m_AliasMap) {
         Alias* alias = aliasPtr.get();
 
         // Skip temporary aliases
-        if (alias->bTemporary)
+        if (alias->temporary)
             continue;
 
         xml.writeStartElement("alias");
 
         // Write attributes
-        xml.writeAttribute("name", alias->strLabel);
-        xml.writeAttribute("enabled", alias->bEnabled ? "y" : "n");
+        xml.writeAttribute("name", alias->label);
+        xml.writeAttribute("enabled", alias->enabled ? "y" : "n");
         xml.writeAttribute("match", alias->name);
-        xml.writeAttribute("send_to", QString::number(alias->iSendTo));
-        xml.writeAttribute("sequence", QString::number(alias->iSequence));
-        xml.writeAttribute("script", alias->strProcedure);
-        xml.writeAttribute("group", alias->strGroup);
-        xml.writeAttribute("variable", alias->strVariable);
+        xml.writeAttribute("send_to", QString::number(static_cast<quint16>(alias->send_to)));
+        xml.writeAttribute("sequence", QString::number(alias->sequence));
+        xml.writeAttribute("script", alias->procedure);
+        xml.writeAttribute("group", alias->group);
+        xml.writeAttribute("variable", alias->variable);
 
         // Behavior flags
-        xml.writeAttribute("omit_from_output", alias->bOmitFromOutput ? "y" : "n");
-        xml.writeAttribute("omit_from_log", alias->bOmitFromLog ? "y" : "n");
-        xml.writeAttribute("omit_from_command_history", alias->bOmitFromCommandHistory ? "y" : "n");
-        xml.writeAttribute("keep_evaluating", alias->bKeepEvaluating ? "y" : "n");
-        xml.writeAttribute("regexp", alias->bRegexp ? "y" : "n");
-        xml.writeAttribute("ignore_case", alias->bIgnoreCase ? "y" : "n");
-        xml.writeAttribute("expand_variables", alias->bExpandVariables ? "y" : "n");
-        xml.writeAttribute("echo_alias", alias->bEchoAlias ? "y" : "n");
-        xml.writeAttribute("one_shot", alias->bOneShot ? "y" : "n");
-        xml.writeAttribute("menu", alias->bMenu ? "y" : "n");
+        xml.writeAttribute("omit_from_output", alias->omit_from_output ? "y" : "n");
+        xml.writeAttribute("omit_from_log", alias->omit_from_log ? "y" : "n");
+        xml.writeAttribute("omit_from_command_history",
+                           alias->omit_from_command_history ? "y" : "n");
+        xml.writeAttribute("keep_evaluating", alias->keep_evaluating ? "y" : "n");
+        xml.writeAttribute("regexp", alias->use_regexp ? "y" : "n");
+        xml.writeAttribute("ignore_case", alias->ignore_case ? "y" : "n");
+        xml.writeAttribute("expand_variables", alias->expand_variables ? "y" : "n");
+        xml.writeAttribute("echo_alias", alias->echo_alias ? "y" : "n");
+        xml.writeAttribute("one_shot", alias->one_shot ? "y" : "n");
+        xml.writeAttribute("menu", alias->menu ? "y" : "n");
 
         // Script language (only write if not Lua - the default)
         if (alias->scriptLanguage != ScriptLanguage::Lua) {
@@ -429,7 +427,7 @@ void WorldDocument::saveAliasesToXml(QXmlStreamWriter& xml)
         }
 
         // Other options
-        xml.writeAttribute("user", QString::number(alias->iUserOption));
+        xml.writeAttribute("user", QString::number(alias->user_option));
 
         // Contents as child element with CDATA
         if (!alias->contents.isEmpty()) {
@@ -460,43 +458,43 @@ void WorldDocument::loadAliasesFromXml(QXmlStreamReader& xml, Plugin* plugin)
             // Read attributes
             QXmlStreamAttributes attrs = xml.attributes();
 
-            alias->strLabel = attrs.value("name").toString();
+            alias->label = attrs.value("name").toString();
 
             // Generate unique internal name if no name attribute exists
-            if (alias->strLabel.isEmpty()) {
+            if (alias->label.isEmpty()) {
                 QString match = attrs.value("match").toString();
                 if (match.length() > 50) {
                     match = match.left(50) + "...";
                 }
-                alias->strInternalName = QString("alias_%1_%2").arg(aliasCount).arg(qHash(match));
+                alias->internal_name = QString("alias_%1_%2").arg(aliasCount).arg(qHash(match));
             } else {
-                alias->strInternalName = alias->strLabel;
+                alias->internal_name = alias->label;
             }
 
             aliasCount++;
-            alias->bEnabled = attrs.value("enabled").toString() == "y";
+            alias->enabled = attrs.value("enabled").toString() == "y";
             alias->name = attrs.value("match").toString();
-            alias->iSendTo = attrs.value("send_to").toInt();
-            alias->iSequence = attrs.value("sequence").toInt();
-            alias->strProcedure = attrs.value("script").toString();
-            alias->strGroup = attrs.value("group").toString();
-            alias->strVariable = attrs.value("variable").toString();
+            alias->send_to = static_cast<SendTo>(attrs.value("send_to").toInt());
+            alias->sequence = attrs.value("sequence").toInt();
+            alias->procedure = attrs.value("script").toString();
+            alias->group = attrs.value("group").toString();
+            alias->variable = attrs.value("variable").toString();
 
             // Behavior flags
-            alias->bOmitFromOutput = attrs.value("omit_from_output").toString() == "y";
-            alias->bOmitFromLog = attrs.value("omit_from_log").toString() == "y";
-            alias->bOmitFromCommandHistory =
+            alias->omit_from_output = attrs.value("omit_from_output").toString() == "y";
+            alias->omit_from_log = attrs.value("omit_from_log").toString() == "y";
+            alias->omit_from_command_history =
                 attrs.value("omit_from_command_history").toString() == "y";
             // Only set to false if explicitly "n", otherwise keep default (true)
             if (attrs.hasAttribute("keep_evaluating")) {
-                alias->bKeepEvaluating = attrs.value("keep_evaluating").toString() != "n";
+                alias->keep_evaluating = attrs.value("keep_evaluating").toString() != "n";
             }
-            alias->bRegexp = attrs.value("regexp").toString() == "y";
-            alias->bIgnoreCase = attrs.value("ignore_case").toString() == "y";
-            alias->bExpandVariables = attrs.value("expand_variables").toString() == "y";
-            alias->bEchoAlias = attrs.value("echo_alias").toString() == "y";
-            alias->bOneShot = attrs.value("one_shot").toString() == "y";
-            alias->bMenu = attrs.value("menu").toString() == "y";
+            alias->use_regexp = attrs.value("regexp").toString() == "y";
+            alias->ignore_case = attrs.value("ignore_case").toString() == "y";
+            alias->expand_variables = attrs.value("expand_variables").toString() == "y";
+            alias->echo_alias = attrs.value("echo_alias").toString() == "y";
+            alias->one_shot = attrs.value("one_shot").toString() == "y";
+            alias->menu = attrs.value("menu").toString() == "y";
 
             // Script language (defaults to Lua if not specified)
             if (attrs.hasAttribute("script_language")) {
@@ -506,7 +504,7 @@ void WorldDocument::loadAliasesFromXml(QXmlStreamReader& xml, Plugin* plugin)
 
             // Other options
             if (attrs.hasAttribute("user"))
-                alias->iUserOption = attrs.value("user").toInt();
+                alias->user_option = attrs.value("user").toInt();
 
             // Read <send> child element
             while (xml.readNextStartElement()) {
@@ -518,14 +516,14 @@ void WorldDocument::loadAliasesFromXml(QXmlStreamReader& xml, Plugin* plugin)
             }
 
             // Compile regex if needed
-            if (alias->bRegexp) {
-                alias->compileRegexp();
+            if (alias->use_regexp) {
+                (void)alias->compileRegexp();
             }
 
             // Add to plugin or world collections based on context
             if (plugin) {
                 // Add to plugin's collections
-                QString internalName = alias->strInternalName;
+                QString internalName = alias->internal_name;
 
                 // Skip duplicates - don't overwrite existing aliases
                 if (plugin->m_AliasMap.find(internalName) != plugin->m_AliasMap.end()) {
@@ -533,7 +531,7 @@ void WorldDocument::loadAliasesFromXml(QXmlStreamReader& xml, Plugin* plugin)
                     continue;
                 }
 
-                qint32 sequence = alias->iSequence;
+                qint32 sequence = alias->sequence;
                 Alias* rawPtr = alias.get();
                 plugin->m_AliasMap[internalName] = std::move(alias);
                 plugin->m_AliasArray.append(rawPtr);
@@ -542,9 +540,9 @@ void WorldDocument::loadAliasesFromXml(QXmlStreamReader& xml, Plugin* plugin)
                                  << "sequence:" << sequence;
             } else {
                 // Add to world's collections (existing behavior)
-                QString internalName = alias->strInternalName;
-                addAlias(internalName, std::move(alias));
-                m_aliasesNeedSorting = true;
+                QString internalName = alias->internal_name;
+                (void)addAlias(internalName, std::move(alias)); // intentional: deserialization load
+                m_automationRegistry->m_aliasesNeedSorting = true;
             }
         }
     }
@@ -558,55 +556,55 @@ void WorldDocument::saveTimersToXml(QXmlStreamWriter& xml)
 {
     xml.writeStartElement("timers");
 
-    for (const auto& [name, timerPtr] : m_TimerMap) {
+    for (const auto& [name, timerPtr] : m_automationRegistry->m_TimerMap) {
         Timer* timer = timerPtr.get();
 
         // Skip temporary timers (don't save to file)
-        if (timer->bTemporary)
+        if (timer->temporary)
             continue;
 
         // Skip included timers (loaded from included file)
-        if (timer->bIncluded)
+        if (timer->included)
             continue;
 
         xml.writeStartElement("timer");
 
         // Write basic attributes
-        xml.writeAttribute("name", timer->strLabel);
-        xml.writeAttribute("enabled", timer->bEnabled ? "y" : "n");
-        xml.writeAttribute("send_to", QString::number(timer->iSendTo));
-        xml.writeAttribute("script", timer->strProcedure);
-        xml.writeAttribute("group", timer->strGroup);
-        xml.writeAttribute("variable", timer->strVariable);
+        xml.writeAttribute("name", timer->label);
+        xml.writeAttribute("enabled", timer->enabled ? "y" : "n");
+        xml.writeAttribute("send_to", QString::number(static_cast<quint16>(timer->send_to)));
+        xml.writeAttribute("script", timer->procedure);
+        xml.writeAttribute("group", timer->group);
+        xml.writeAttribute("variable", timer->variable);
 
         // Timing configuration - use original MUSHclient format for compatibility
         // Original format uses at_time="y"/"n" instead of type="0"/"1"
         // and uses hour/minute/second (picking from at_* or every_* based on type)
-        bool isAtTime = (timer->iType == Timer::eAtTime);
+        bool isAtTime = (timer->type == Timer::TimerType::AtTime);
         xml.writeAttribute("at_time", isAtTime ? "y" : "n");
 
         // Write hour/minute/second from either at_* or every_* fields based on type
         if (isAtTime) {
-            xml.writeAttribute("hour", QString::number(timer->iAtHour));
-            xml.writeAttribute("minute", QString::number(timer->iAtMinute));
-            xml.writeAttribute("second", QString::number(timer->fAtSecond, 'f', 4));
+            xml.writeAttribute("hour", QString::number(timer->at_hour));
+            xml.writeAttribute("minute", QString::number(timer->at_minute));
+            xml.writeAttribute("second", QString::number(timer->at_second, 'f', 4));
         } else {
-            xml.writeAttribute("hour", QString::number(timer->iEveryHour));
-            xml.writeAttribute("minute", QString::number(timer->iEveryMinute));
-            xml.writeAttribute("second", QString::number(timer->fEverySecond, 'f', 4));
+            xml.writeAttribute("hour", QString::number(timer->every_hour));
+            xml.writeAttribute("minute", QString::number(timer->every_minute));
+            xml.writeAttribute("second", QString::number(timer->every_second, 'f', 4));
         }
 
         // Offset fields (always written)
-        xml.writeAttribute("offset_hour", QString::number(timer->iOffsetHour));
-        xml.writeAttribute("offset_minute", QString::number(timer->iOffsetMinute));
-        xml.writeAttribute("offset_second", QString::number(timer->fOffsetSecond, 'f', 4));
+        xml.writeAttribute("offset_hour", QString::number(timer->offset_hour));
+        xml.writeAttribute("offset_minute", QString::number(timer->offset_minute));
+        xml.writeAttribute("offset_second", QString::number(timer->offset_second, 'f', 4));
 
         // Behavior flags
-        xml.writeAttribute("one_shot", timer->bOneShot ? "y" : "n");
+        xml.writeAttribute("one_shot", timer->one_shot ? "y" : "n");
         // Use active_closed for original MUSHclient compatibility
-        xml.writeAttribute("active_closed", timer->bActiveWhenClosed ? "y" : "n");
-        xml.writeAttribute("omit_from_output", timer->bOmitFromOutput ? "y" : "n");
-        xml.writeAttribute("omit_from_log", timer->bOmitFromLog ? "y" : "n");
+        xml.writeAttribute("active_closed", timer->active_when_closed ? "y" : "n");
+        xml.writeAttribute("omit_from_output", timer->omit_from_output ? "y" : "n");
+        xml.writeAttribute("omit_from_log", timer->omit_from_log ? "y" : "n");
 
         // Script language (only write if not Lua - the default)
         if (timer->scriptLanguage != ScriptLanguage::Lua) {
@@ -614,12 +612,12 @@ void WorldDocument::saveTimersToXml(QXmlStreamWriter& xml)
         }
 
         // Other options
-        xml.writeAttribute("user", QString::number(timer->iUserOption));
+        xml.writeAttribute("user", QString::number(timer->user_option));
 
         // Contents as child element with CDATA
-        if (!timer->strContents.isEmpty()) {
+        if (!timer->contents.isEmpty()) {
             xml.writeStartElement("send");
-            xml.writeCDATA(timer->strContents);
+            xml.writeCDATA(timer->contents);
             xml.writeEndElement(); // send
         }
 
@@ -651,34 +649,35 @@ void WorldDocument::loadTimersFromXml(QXmlStreamReader& xml, Plugin* plugin)
             // Read attributes
             QXmlStreamAttributes attrs = xml.attributes();
 
-            timer->strLabel = attrs.value("name").toString();
+            timer->label = attrs.value("name").toString();
 
             // Generate unique internal name if no name attribute exists
             QString internalName;
-            if (timer->strLabel.isEmpty()) {
+            if (timer->label.isEmpty()) {
                 // Use timestamp-based unique name for unlabelled timers
                 internalName = QString("*timer%1").arg(timerCount, 10, 10, QChar('0'));
             } else {
-                internalName = timer->strLabel;
+                internalName = timer->label;
             }
 
-            timer->bEnabled = attrs.value("enabled").toString() == "y";
-            timer->iSendTo = attrs.value("send_to").toInt();
-            timer->strProcedure = attrs.value("script").toString();
-            timer->strGroup = attrs.value("group").toString();
-            timer->strVariable = attrs.value("variable").toString();
+            timer->enabled = attrs.value("enabled").toString() == "y";
+            timer->send_to = static_cast<SendTo>(attrs.value("send_to").toInt());
+            timer->procedure = attrs.value("script").toString();
+            timer->group = attrs.value("group").toString();
+            timer->variable = attrs.value("variable").toString();
 
             // Timing configuration
             // Check for type attribute first (mushclient-qt format), then at_time (original format)
             bool isAtTime;
             if (attrs.hasAttribute("type")) {
-                // New format: type="0" (eAtTime) or type="1" (eInterval)
-                isAtTime = (attrs.value("type").toInt() == Timer::eAtTime);
+                // New format: type="0" (AtTime) or type="1" (Interval)
+                isAtTime =
+                    (attrs.value("type").toInt() == static_cast<int>(Timer::TimerType::AtTime));
             } else {
                 // Original format: at_time="y" or "n"
                 isAtTime = (attrs.value("at_time").toString() == "y");
             }
-            timer->iType = isAtTime ? Timer::eAtTime : Timer::eInterval;
+            timer->type = isAtTime ? Timer::TimerType::AtTime : Timer::TimerType::Interval;
 
             // Read hour/minute/second from either simple names or specific names
             int hour = attrs.value("hour").toInt();
@@ -687,36 +686,36 @@ void WorldDocument::loadTimersFromXml(QXmlStreamReader& xml, Plugin* plugin)
 
             if (isAtTime) {
                 // At-time timer: use hour/minute/second for at_* fields
-                timer->iAtHour =
+                timer->at_hour =
                     attrs.hasAttribute("at_hour") ? attrs.value("at_hour").toInt() : hour;
-                timer->iAtMinute =
+                timer->at_minute =
                     attrs.hasAttribute("at_minute") ? attrs.value("at_minute").toInt() : minute;
-                timer->fAtSecond =
+                timer->at_second =
                     attrs.hasAttribute("at_second") ? attrs.value("at_second").toDouble() : second;
             } else {
                 // Interval timer: use hour/minute/second for every_* fields
-                timer->iEveryHour =
+                timer->every_hour =
                     attrs.hasAttribute("every_hour") ? attrs.value("every_hour").toInt() : hour;
-                timer->iEveryMinute = attrs.hasAttribute("every_minute")
+                timer->every_minute = attrs.hasAttribute("every_minute")
                                           ? attrs.value("every_minute").toInt()
                                           : minute;
-                timer->fEverySecond = attrs.hasAttribute("every_second")
+                timer->every_second = attrs.hasAttribute("every_second")
                                           ? attrs.value("every_second").toDouble()
                                           : second;
             }
 
             // Offset fields
-            timer->iOffsetHour = attrs.value("offset_hour").toInt();
-            timer->iOffsetMinute = attrs.value("offset_minute").toInt();
-            timer->fOffsetSecond = attrs.value("offset_second").toDouble();
+            timer->offset_hour = attrs.value("offset_hour").toInt();
+            timer->offset_minute = attrs.value("offset_minute").toInt();
+            timer->offset_second = attrs.value("offset_second").toDouble();
 
             // Behavior flags
-            timer->bOneShot = attrs.value("one_shot").toString() == "y";
+            timer->one_shot = attrs.value("one_shot").toString() == "y";
             // active_closed is alternate name for active_when_closed
-            timer->bActiveWhenClosed = (attrs.value("active_when_closed").toString() == "y") ||
-                                       (attrs.value("active_closed").toString() == "y");
-            timer->bOmitFromOutput = attrs.value("omit_from_output").toString() == "y";
-            timer->bOmitFromLog = attrs.value("omit_from_log").toString() == "y";
+            timer->active_when_closed = (attrs.value("active_when_closed").toString() == "y") ||
+                                        (attrs.value("active_closed").toString() == "y");
+            timer->omit_from_output = attrs.value("omit_from_output").toString() == "y";
+            timer->omit_from_log = attrs.value("omit_from_log").toString() == "y";
 
             // Script language (defaults to Lua if not specified)
             if (attrs.hasAttribute("script_language")) {
@@ -726,12 +725,12 @@ void WorldDocument::loadTimersFromXml(QXmlStreamReader& xml, Plugin* plugin)
 
             // Other options
             if (attrs.hasAttribute("user"))
-                timer->iUserOption = attrs.value("user").toInt();
+                timer->user_option = attrs.value("user").toInt();
 
             // Read <send> child element
             while (xml.readNextStartElement()) {
                 if (xml.name() == QLatin1String("send")) {
-                    timer->strContents = xml.readElementText();
+                    timer->contents = xml.readElementText();
                 } else {
                     xml.skipCurrentElement();
                 }
@@ -751,13 +750,13 @@ void WorldDocument::loadTimersFromXml(QXmlStreamReader& xml, Plugin* plugin)
                 // Add to plugin's collections
                 Timer* rawTimer = timer.get(); // Get raw pointer before moving
                 plugin->m_TimerMap[internalName] = std::move(timer);
-                if (rawTimer->strLabel.isEmpty()) {
+                if (rawTimer->label.isEmpty()) {
                     plugin->m_TimerRevMap.insert(rawTimer, internalName);
                 }
                 qCDebug(lcWorld) << "Added timer to plugin:" << internalName;
             } else {
                 // Add to world's collections (transfer ownership via move)
-                addTimer(internalName, std::move(timer));
+                (void)addTimer(internalName, std::move(timer)); // intentional: deserialization load
             }
         }
     }
@@ -782,8 +781,8 @@ void WorldDocument::saveVariablesToXml(QXmlStreamWriter& xml)
 
     for (const auto& [name, var] : m_VariableMap) {
         xml.writeStartElement("variable");
-        xml.writeAttribute("name", var->strLabel);
-        xml.writeCharacters(var->strContents);
+        xml.writeAttribute("name", var->label);
+        xml.writeCharacters(var->contents);
         xml.writeEndElement(); // variable
     }
 
@@ -829,13 +828,13 @@ void WorldDocument::loadVariablesFromXml(QXmlStreamReader& xml, Plugin* plugin)
             }
 
             auto var = std::make_unique<Variable>();
-            var->strLabel = varName;
-            var->strContents = contents;
+            var->label = varName;
+            var->contents = contents;
 
             if (plugin) {
-                plugin->m_VariableMap[var->strLabel] = std::move(var);
+                plugin->m_VariableMap[var->label] = std::move(var);
             } else {
-                m_VariableMap[var->strLabel] = std::move(var);
+                m_VariableMap[var->label] = std::move(var);
             }
         }
     }
@@ -855,14 +854,14 @@ void WorldDocument::loadVariablesFromXml(QXmlStreamReader& xml, Plugin* plugin)
 void WorldDocument::Save_One_Variable_XML(QTextStream& out, Variable* variable)
 {
     // Simple XML escaping
-    QString escapedName = variable->strLabel;
+    QString escapedName = variable->label;
     escapedName.replace("&", "&amp;");
     escapedName.replace("<", "&lt;");
     escapedName.replace(">", "&gt;");
     escapedName.replace("\"", "&quot;");
     escapedName.replace("'", "&apos;");
 
-    QString escapedContents = variable->strContents;
+    QString escapedContents = variable->contents;
     escapedContents.replace("&", "&amp;");
     escapedContents.replace("<", "&lt;");
     escapedContents.replace(">", "&gt;");
@@ -896,80 +895,80 @@ void WorldDocument::Save_One_Trigger_XML(QTextStream& out, Trigger* trigger)
 
     // Start trigger element with attributes
     out << "  <trigger\n";
-    out << QString("   name=\"%1\"\n").arg(escapeXml(trigger->strLabel));
-    out << QString("   enabled=\"%1\"\n").arg(trigger->bEnabled ? "y" : "n");
+    out << QString("   name=\"%1\"\n").arg(escapeXml(trigger->label));
+    out << QString("   enabled=\"%1\"\n").arg(trigger->enabled ? "y" : "n");
     out << QString("   match=\"%1\"\n").arg(escapeXml(trigger->trigger));
-    out << QString("   send_to=\"%1\"\n").arg(trigger->iSendTo);
-    out << QString("   sequence=\"%1\"\n").arg(trigger->iSequence);
+    out << QString("   send_to=\"%1\"\n").arg(trigger->send_to);
+    out << QString("   sequence=\"%1\"\n").arg(trigger->sequence);
 
-    if (!trigger->strProcedure.isEmpty())
-        out << QString("   script=\"%1\"\n").arg(escapeXml(trigger->strProcedure));
+    if (!trigger->procedure.isEmpty())
+        out << QString("   script=\"%1\"\n").arg(escapeXml(trigger->procedure));
     if (trigger->scriptLanguage != ScriptLanguage::Lua)
         out << QString("   script_language=\"%1\"\n")
                    .arg(scriptLanguageToString(trigger->scriptLanguage));
-    if (!trigger->strGroup.isEmpty())
-        out << QString("   group=\"%1\"\n").arg(escapeXml(trigger->strGroup));
-    if (!trigger->strVariable.isEmpty())
-        out << QString("   variable=\"%1\"\n").arg(escapeXml(trigger->strVariable));
+    if (!trigger->group.isEmpty())
+        out << QString("   group=\"%1\"\n").arg(escapeXml(trigger->group));
+    if (!trigger->variable.isEmpty())
+        out << QString("   variable=\"%1\"\n").arg(escapeXml(trigger->variable));
 
     // Behavior flags (only write if not default)
-    if (trigger->bOmitFromOutput)
+    if (trigger->omit_from_output)
         out << "   omit_from_output=\"y\"\n";
     if (trigger->omit_from_log)
         out << "   omit_from_log=\"y\"\n";
-    if (!trigger->bKeepEvaluating)
+    if (!trigger->keep_evaluating)
         out << "   keep_evaluating=\"n\"\n";
-    if (trigger->bRegexp)
+    if (trigger->use_regexp)
         out << "   regexp=\"y\"\n";
     if (trigger->ignore_case)
         out << "   ignore_case=\"y\"\n";
-    if (trigger->bRepeat)
+    if (trigger->repeat)
         out << "   repeat=\"y\"\n";
-    if (trigger->bExpandVariables)
+    if (trigger->expand_variables)
         out << "   expand_variables=\"y\"\n";
-    if (trigger->bOneShot)
+    if (trigger->one_shot)
         out << "   one_shot=\"y\"\n";
-    if (trigger->bLowercaseWildcard)
+    if (trigger->lowercase_wildcard)
         out << "   lowercase_wildcard=\"y\"\n";
 
     // Multi-line matching
-    if (trigger->bMultiLine) {
+    if (trigger->multi_line) {
         out << "   multi_line=\"y\"\n";
-        out << QString("   lines_to_match=\"%1\"\n").arg(trigger->iLinesToMatch);
+        out << QString("   lines_to_match=\"%1\"\n").arg(trigger->lines_to_match);
     }
 
     // Sound
     if (!trigger->sound_to_play.isEmpty()) {
         out << QString("   sound=\"%1\"\n").arg(escapeXml(trigger->sound_to_play));
-        if (trigger->bSoundIfInactive)
+        if (trigger->sound_if_inactive)
             out << "   sound_if_inactive=\"y\"\n";
     }
 
     // Style flags
-    if (trigger->iStyle & HILITE)
+    if (trigger->style & HILITE)
         out << "   make_bold=\"y\"\n";
-    if (trigger->iStyle & BLINK)
+    if (trigger->style & BLINK)
         out << "   make_italic=\"y\"\n";
-    if (trigger->iStyle & UNDERLINE)
+    if (trigger->style & UNDERLINE)
         out << "   make_underline=\"y\"\n";
 
-    // Extract ANSI color indices from iMatch (bits 4-11)
-    int text_colour = (trigger->iMatch >> 4) & 0x0F;
-    int back_colour = (trigger->iMatch >> 8) & 0x0F;
+    // Extract ANSI color indices from match_type (bits 4-11)
+    int text_colour = (trigger->match_type >> 4) & 0x0F;
+    int back_colour = (trigger->match_type >> 8) & 0x0F;
     if (text_colour != 0)
         out << QString("   text_colour=\"%1\"\n").arg(text_colour);
     if (back_colour != 0)
         out << QString("   back_colour=\"%1\"\n").arg(back_colour);
 
-    // Extract style matching flags from iMatch
-    if (trigger->iMatch & HILITE)
+    // Extract style matching flags from match_type
+    if (trigger->match_type & HILITE)
         out << "   bold=\"y\"\n";
-    if (trigger->iMatch & INVERSE)
+    if (trigger->match_type & INVERSE)
         out << "   inverse=\"y\"\n";
-    if (trigger->iMatch & BLINK)
+    if (trigger->match_type & BLINK)
         out << "   italic=\"y\"\n";
 
-    // TODO: Add TRIGGER_MATCH_* flag definitions if needed
+    // TRIGGER_MATCH_* constants are defined in trigger.h (HILITE, INVERSE, BLINK, etc.).
 
     out << "  >\n";
 
@@ -1007,47 +1006,47 @@ void WorldDocument::Save_One_Alias_XML(QTextStream& out, Alias* alias)
 
     // Start alias element with attributes
     out << "  <alias\n";
-    out << QString("   name=\"%1\"\n").arg(escapeXml(alias->strLabel));
-    out << QString("   enabled=\"%1\"\n").arg(alias->bEnabled ? "y" : "n");
+    out << QString("   name=\"%1\"\n").arg(escapeXml(alias->label));
+    out << QString("   enabled=\"%1\"\n").arg(alias->enabled ? "y" : "n");
     out << QString("   match=\"%1\"\n").arg(escapeXml(alias->name));
-    out << QString("   send_to=\"%1\"\n").arg(alias->iSendTo);
-    out << QString("   sequence=\"%1\"\n").arg(alias->iSequence);
+    out << QString("   send_to=\"%1\"\n").arg(alias->send_to);
+    out << QString("   sequence=\"%1\"\n").arg(alias->sequence);
 
-    if (!alias->strProcedure.isEmpty())
-        out << QString("   script=\"%1\"\n").arg(escapeXml(alias->strProcedure));
+    if (!alias->procedure.isEmpty())
+        out << QString("   script=\"%1\"\n").arg(escapeXml(alias->procedure));
     if (alias->scriptLanguage != ScriptLanguage::Lua)
         out << QString("   script_language=\"%1\"\n")
                    .arg(scriptLanguageToString(alias->scriptLanguage));
-    if (!alias->strGroup.isEmpty())
-        out << QString("   group=\"%1\"\n").arg(escapeXml(alias->strGroup));
-    if (!alias->strVariable.isEmpty())
-        out << QString("   variable=\"%1\"\n").arg(escapeXml(alias->strVariable));
+    if (!alias->group.isEmpty())
+        out << QString("   group=\"%1\"\n").arg(escapeXml(alias->group));
+    if (!alias->variable.isEmpty())
+        out << QString("   variable=\"%1\"\n").arg(escapeXml(alias->variable));
 
     // Behavior flags (only write if not default)
-    if (alias->bOmitFromOutput)
+    if (alias->omit_from_output)
         out << "   omit_from_output=\"y\"\n";
-    if (alias->bOmitFromLog)
+    if (alias->omit_from_log)
         out << "   omit_from_log=\"y\"\n";
-    if (alias->bOmitFromCommandHistory)
+    if (alias->omit_from_command_history)
         out << "   omit_from_command_history=\"y\"\n";
-    if (!alias->bKeepEvaluating)
+    if (!alias->keep_evaluating)
         out << "   keep_evaluating=\"n\"\n";
-    if (alias->bRegexp)
+    if (alias->use_regexp)
         out << "   regexp=\"y\"\n";
-    if (alias->bIgnoreCase)
+    if (alias->ignore_case)
         out << "   ignore_case=\"y\"\n";
-    if (alias->bExpandVariables)
+    if (alias->expand_variables)
         out << "   expand_variables=\"y\"\n";
-    if (alias->bEchoAlias)
+    if (alias->echo_alias)
         out << "   echo_alias=\"y\"\n";
-    if (alias->bOneShot)
+    if (alias->one_shot)
         out << "   one_shot=\"y\"\n";
-    if (alias->bMenu)
+    if (alias->menu)
         out << "   menu=\"y\"\n";
 
     // User option
-    if (alias->iUserOption != 0)
-        out << QString("   user=\"%1\"\n").arg(alias->iUserOption);
+    if (alias->user_option != 0)
+        out << QString("   user=\"%1\"\n").arg(alias->user_option);
 
     out << "  >\n";
 
@@ -1085,57 +1084,57 @@ void WorldDocument::Save_One_Timer_XML(QTextStream& out, Timer* timer)
 
     // Start timer element with attributes
     out << "  <timer\n";
-    out << QString("   name=\"%1\"\n").arg(escapeXml(timer->strLabel));
-    out << QString("   enabled=\"%1\"\n").arg(timer->bEnabled ? "y" : "n");
-    out << QString("   send_to=\"%1\"\n").arg(timer->iSendTo);
+    out << QString("   name=\"%1\"\n").arg(escapeXml(timer->label));
+    out << QString("   enabled=\"%1\"\n").arg(timer->enabled ? "y" : "n");
+    out << QString("   send_to=\"%1\"\n").arg(timer->send_to);
 
-    if (!timer->strProcedure.isEmpty())
-        out << QString("   script=\"%1\"\n").arg(escapeXml(timer->strProcedure));
+    if (!timer->procedure.isEmpty())
+        out << QString("   script=\"%1\"\n").arg(escapeXml(timer->procedure));
     if (timer->scriptLanguage != ScriptLanguage::Lua)
         out << QString("   script_language=\"%1\"\n")
                    .arg(scriptLanguageToString(timer->scriptLanguage));
-    if (!timer->strGroup.isEmpty())
-        out << QString("   group=\"%1\"\n").arg(escapeXml(timer->strGroup));
-    if (!timer->strVariable.isEmpty())
-        out << QString("   variable=\"%1\"\n").arg(escapeXml(timer->strVariable));
+    if (!timer->group.isEmpty())
+        out << QString("   group=\"%1\"\n").arg(escapeXml(timer->group));
+    if (!timer->variable.isEmpty())
+        out << QString("   variable=\"%1\"\n").arg(escapeXml(timer->variable));
 
     // Timing configuration
-    out << QString("   type=\"%1\"\n").arg(timer->iType);
+    out << QString("   type=\"%1\"\n").arg(static_cast<int>(timer->type));
 
-    // At-time fields (for eAtTime timers)
-    out << QString("   at_hour=\"%1\"\n").arg(timer->iAtHour);
-    out << QString("   at_minute=\"%1\"\n").arg(timer->iAtMinute);
-    out << QString("   at_second=\"%1\"\n").arg(timer->fAtSecond, 0, 'f', 4);
+    // At-time fields (for AtTime timers)
+    out << QString("   at_hour=\"%1\"\n").arg(timer->at_hour);
+    out << QString("   at_minute=\"%1\"\n").arg(timer->at_minute);
+    out << QString("   at_second=\"%1\"\n").arg(timer->at_second, 0, 'f', 4);
 
-    // Interval fields (for eInterval timers)
-    out << QString("   every_hour=\"%1\"\n").arg(timer->iEveryHour);
-    out << QString("   every_minute=\"%1\"\n").arg(timer->iEveryMinute);
-    out << QString("   every_second=\"%1\"\n").arg(timer->fEverySecond, 0, 'f', 4);
+    // Interval fields (for Interval timers)
+    out << QString("   every_hour=\"%1\"\n").arg(timer->every_hour);
+    out << QString("   every_minute=\"%1\"\n").arg(timer->every_minute);
+    out << QString("   every_second=\"%1\"\n").arg(timer->every_second, 0, 'f', 4);
 
     // Offset fields (for interval timers)
-    out << QString("   offset_hour=\"%1\"\n").arg(timer->iOffsetHour);
-    out << QString("   offset_minute=\"%1\"\n").arg(timer->iOffsetMinute);
-    out << QString("   offset_second=\"%1\"\n").arg(timer->fOffsetSecond, 0, 'f', 4);
+    out << QString("   offset_hour=\"%1\"\n").arg(timer->offset_hour);
+    out << QString("   offset_minute=\"%1\"\n").arg(timer->offset_minute);
+    out << QString("   offset_second=\"%1\"\n").arg(timer->offset_second, 0, 'f', 4);
 
     // Behavior flags (only write if not default)
-    if (timer->bOneShot)
+    if (timer->one_shot)
         out << "   one_shot=\"y\"\n";
-    if (timer->bActiveWhenClosed)
+    if (timer->active_when_closed)
         out << "   active_when_closed=\"y\"\n";
-    if (timer->bOmitFromOutput)
+    if (timer->omit_from_output)
         out << "   omit_from_output=\"y\"\n";
-    if (timer->bOmitFromLog)
+    if (timer->omit_from_log)
         out << "   omit_from_log=\"y\"\n";
 
     // User option
-    if (timer->iUserOption != 0)
-        out << QString("   user=\"%1\"\n").arg(timer->iUserOption);
+    if (timer->user_option != 0)
+        out << QString("   user=\"%1\"\n").arg(timer->user_option);
 
     out << "  >\n";
 
     // Contents as <send> child element with CDATA
-    if (!timer->strContents.isEmpty()) {
-        out << "  <send><![CDATA[" << timer->strContents << "]]></send>\n";
+    if (!timer->contents.isEmpty()) {
+        out << "  <send><![CDATA[" << timer->contents << "]]></send>\n";
     }
 
     out << "  </timer>\n";

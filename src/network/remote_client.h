@@ -6,32 +6,30 @@
 #ifndef REMOTE_CLIENT_H
 #define REMOTE_CLIENT_H
 
-#include <QAbstractSocket>
 #include <QDateTime>
 #include <QObject>
 #include <QString>
 #include <memory>
 
-class QTcpSocket;
+class IRemoteTransport;
 class Line;
 class WorldDocument;
-class TelnetServerSession;
 class AnsiFormatter;
 
-/** Handles a single remote client connection with authentication and streaming. */
+/** Handles a single remote client connection. Auth is performed by the transport layer. */
 class RemoteClient : public QObject {
     Q_OBJECT
 
   public:
-    RemoteClient(QTcpSocket* socket, WorldDocument* doc, const QString& password,
-                 int scrollbackLines, QObject* parent = nullptr);
+    RemoteClient(IRemoteTransport* transport, WorldDocument* doc, int scrollbackLines,
+                 QObject* parent = nullptr);
     ~RemoteClient();
 
     bool isAuthenticated() const;
     QString address() const;
     QDateTime connectedAt() const;
-    void sendLine(Line* line);
-    void sendIncompleteLine(Line* line);
+    void sendLine(const Line* line);
+    void sendIncompleteLine(const Line* line);
     void sendRawText(const QString& text, bool includeNewline = true);
     void disconnect();
 
@@ -44,30 +42,23 @@ class RemoteClient : public QObject {
   private slots:
     void onReadyRead();
     void onDisconnected();
-    void onError(QAbstractSocket::SocketError socketError);
-    void onNegotiationComplete();
+    void onTransportReady();
 
   private:
-    enum class State { Negotiating, AwaitingPassword, Authenticated, Disconnecting };
+    enum class State { Connecting, Authenticated, Disconnecting };
 
     void processInput(const QByteArray& data);
     void sendWelcome();
-    void sendPasswordPrompt();
-    bool checkPassword(const QString& attempt);
-    void handleAuthSuccess();
-    void handleAuthFailure();
     void sendScrollback();
     void sendBytes(const QByteArray& data);
 
-    QTcpSocket* m_pSocket;
+    // Non-owning pointer. Ownership is held by whoever created the transport
+    // (typically RemoteAccessServer, which parents it to the RemoteClient).
+    IRemoteTransport* m_transport;
     WorldDocument* m_pDoc;
-    std::unique_ptr<TelnetServerSession> m_telnet;
     std::unique_ptr<AnsiFormatter> m_formatter;
-    QString m_password;
     int m_scrollbackLines;
     State m_state;
-    int m_failedAttempts;
-    int m_maxFailedAttempts;
     QDateTime m_connectedAt;
     QString m_inputBuffer;
 };

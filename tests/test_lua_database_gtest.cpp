@@ -11,16 +11,10 @@
 
 #include "../src/world/script_engine.h"
 #include "../src/world/world_document.h"
-#include <QCoreApplication>
+#include "fixtures/world_fixtures.h"
 #include <QFile>
 #include <QTemporaryDir>
-#include <gtest/gtest.h>
 #include <sqlite3.h>
-
-extern "C" {
-#include <lauxlib.h>
-#include <lua.h>
-}
 
 // Test fixture for Lua database API tests
 class LuaDatabaseTest : public ::testing::Test {
@@ -28,7 +22,7 @@ class LuaDatabaseTest : public ::testing::Test {
     void SetUp() override
     {
         // Create world document (it automatically creates ScriptEngine)
-        world = new WorldDocument();
+        world = std::make_unique<WorldDocument>();
 
         // Get Lua state from world's ScriptEngine
         L = world->m_ScriptEngine->L;
@@ -41,7 +35,7 @@ class LuaDatabaseTest : public ::testing::Test {
         // The databases will be automatically closed when world is deleted
         // since they're stored in m_DatabaseMap with unique_ptr
 
-        delete world;
+        world.reset();
 
         // Clean up test database files
         if (tempDir.isValid()) {
@@ -80,7 +74,7 @@ class LuaDatabaseTest : public ::testing::Test {
         EXPECT_EQ(result, expected) << "Expected error code " << expected << ", got " << result;
     }
 
-    WorldDocument* world = nullptr;
+    std::unique_ptr<WorldDocument> world;
     lua_State* L = nullptr;
     QTemporaryDir tempDir;
 };
@@ -154,7 +148,7 @@ TEST_F(LuaDatabaseTest, DatabaseOpenDuplicateDifferentFileReturnsError)
     lua_pushstring(L, dbPath.toUtf8().constData());
     lua_pcall(L, 2, 1, 0);
 
-    expectError(DATABASE_ERROR_DATABASE_ALREADY_EXISTS);
+    expectError(to_underlying(DatabaseError::DatabaseAlreadyExists));
 }
 
 // Test 5: DatabaseClose closes a database
@@ -186,7 +180,7 @@ TEST_F(LuaDatabaseTest, DatabaseCloseNonExistentReturnsError)
     lua_pushstring(L, "nonexistent");
     lua_pcall(L, 1, 1, 0);
 
-    expectError(DATABASE_ERROR_ID_NOT_FOUND);
+    expectError(to_underlying(DatabaseError::IdNotFound));
 }
 
 // Test 7: DatabaseExec executes SQL statement
@@ -222,7 +216,7 @@ TEST_F(LuaDatabaseTest, DatabaseExecNonExistentReturnsError)
     lua_pushstring(L, "SELECT 1");
     lua_pcall(L, 2, 1, 0);
 
-    expectError(DATABASE_ERROR_ID_NOT_FOUND);
+    expectError(to_underlying(DatabaseError::IdNotFound));
 }
 
 // Test 9: DatabasePrepare prepares a statement
@@ -276,7 +270,7 @@ TEST_F(LuaDatabaseTest, DatabasePrepareWithExistingStatementReturnsError)
     lua_pushstring(L, "SELECT 2");
     lua_pcall(L, 2, 1, 0);
 
-    expectError(DATABASE_ERROR_HAVE_PREPARED_STATEMENT);
+    expectError(to_underlying(DatabaseError::HavePreparedStatement));
 }
 
 // Test 11: DatabaseColumns returns column count
@@ -562,17 +556,4 @@ TEST_F(LuaDatabaseTest, DatabaseColumnTypeReturnsCorrectType)
 
     int type2 = getIntResult();
     EXPECT_EQ(type2, SQLITE_TEXT);
-}
-
-// GoogleTest main function
-int main(int argc, char** argv)
-{
-    // Initialize Qt application (required for Qt types)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

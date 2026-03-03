@@ -360,4 +360,54 @@ inline void PushJsonValue(lua_State* L, const QJsonValue& val)
     }
 }
 
+// ========== Lua <-> QString Conversion Helpers ==========
+
+/** Extract required string argument as QString */
+inline QString luaCheckQString(lua_State* L, int idx)
+{
+    return QString::fromUtf8(luaL_checkstring(L, idx));
+}
+
+/** Extract optional string argument as QString */
+inline QString luaOptQString(lua_State* L, int idx, const char* def = "")
+{
+    return QString::fromUtf8(luaL_optstring(L, idx, def));
+}
+
+/** Push QString to Lua stack (binary-safe) */
+inline void luaPushQString(lua_State* L, const QString& str)
+{
+    QByteArray ba = str.toUtf8();
+    lua_pushlstring(L, ba.constData(), ba.length());
+}
+
+/** Push QStringList to Lua as 1-indexed table */
+inline void luaPushQStringList(lua_State* L, const QStringList& list)
+{
+    lua_newtable(L);
+    for (int i = 0; i < list.size(); i++) {
+        luaPushQString(L, list[i]);
+        lua_rawseti(L, -2, i + 1);
+    }
+}
+
+// ========== Validation Macros ==========
+
+/** Validate condition or return error code */
+#define LUA_VALIDATE(cond, err)                                                                    \
+    do {                                                                                           \
+        if (!(cond))                                                                               \
+            return luaReturnError(L, err);                                                         \
+    } while (0)
+
+/** Validate object name or return error code */
+#define LUA_VALIDATE_NAME(name)                                                                    \
+    do {                                                                                           \
+        qint32 _status = validateObjectName(name);                                                 \
+        if (_status != eOK)                                                                        \
+            return luaReturnError(L, _status);                                                     \
+    } while (0)
+
+#include "lua_bind.h"
+
 #endif // LUA_COMMON_H

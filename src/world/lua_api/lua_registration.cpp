@@ -38,6 +38,19 @@ extern int L_ANSI(lua_State* L);
 extern int L_AnsiNote(lua_State* L);
 extern int L_Hyperlink(lua_State* L);
 extern int L_Simulate(lua_State* L);
+// MXP / XML entity functions (also in world_output.cpp)
+extern int L_GetEntity(lua_State* L);
+extern int L_GetXMLEntity(lua_State* L);
+extern int L_SetEntity(lua_State* L);
+
+// Text manipulation / display functions (also in world_output.cpp)
+extern int L_DeleteLines(lua_State* L);
+extern int L_DeleteOutput(lua_State* L);
+extern int L_SetSelection(lua_State* L);
+extern int L_Bookmark(lua_State* L);
+extern int L_SetUnseenLines(lua_State* L);
+extern int L_ResetStatusTime(lua_State* L);
+extern int L_Transparency(lua_State* L);
 
 // Info bar functions
 extern int L_Info(lua_State* L);
@@ -50,6 +63,9 @@ extern int L_ShowInfoBar(lua_State* L);
 // Network functions
 extern int L_Send(lua_State* L);
 extern int L_SendNoEcho(lua_State* L);
+extern int L_SendImmediate(lua_State* L);
+extern int L_SendPush(lua_State* L);
+extern int L_SendSpecial(lua_State* L);
 extern int L_Connect(lua_State* L);
 extern int L_Disconnect(lua_State* L);
 extern int L_IsConnected(lua_State* L);
@@ -62,11 +78,13 @@ extern int L_GetVariableList(lua_State* L);
 
 // World info functions
 extern int L_GetInfo(lua_State* L);
-extern int L_GetWorldName(lua_State* L);
 extern int L_GetOption(lua_State* L);
 extern int L_SetOption(lua_State* L);
 extern int L_GetAlphaOption(lua_State* L);
 extern int L_SetAlphaOption(lua_State* L);
+extern int L_GetCurrentValue(lua_State* L);
+extern int L_GetDefaultValue(lua_State* L);
+extern int L_GetLoadedValue(lua_State* L);
 extern int L_SetStatus(lua_State* L);
 extern int L_Repaint(lua_State* L);
 extern int L_TextRectangle(lua_State* L);
@@ -100,6 +118,9 @@ extern int L_GetGlobalOptionList(lua_State* L);
 // Command and queue functions
 extern int L_Queue(lua_State* L);
 extern int L_DiscardQueue(lua_State* L);
+extern int L_DoCommand(lua_State* L);
+extern int L_GetInternalCommandsList(lua_State* L);
+extern int L_Help(lua_State* L);
 
 // Color functions
 extern int L_GetNormalColour(lua_State* L);
@@ -111,10 +132,16 @@ extern int L_GetCustomColourBackground(lua_State* L);
 extern int L_SetCustomColourText(lua_State* L);
 extern int L_SetCustomColourBackground(lua_State* L);
 extern int L_SetCustomColourName(lua_State* L);
+extern int L_GetCustomColourName(lua_State* L);
 extern int L_PickColour(lua_State* L);
 extern int L_AdjustColour(lua_State* L);
 extern int L_ColourNameToRGB(lua_State* L);
 extern int L_RGBColourToName(lua_State* L);
+// Bare-name compatibility aliases (dual get/set dispatch)
+extern int L_NormalColour(lua_State* L);
+extern int L_BoldColour(lua_State* L);
+extern int L_CustomColourText(lua_State* L);
+extern int L_CustomColourBackground(lua_State* L);
 
 // Trace/Echo/Speedwalk functions
 extern int L_GetTrace(lua_State* L);
@@ -126,6 +153,9 @@ extern int L_SetSpeedWalkDelay(lua_State* L);
 extern int L_EvaluateSpeedwalk(lua_State* L);
 extern int L_ReverseSpeedwalk(lua_State* L);
 extern int L_RemoveBacktracks(lua_State* L);
+// Bare-name compatibility aliases
+extern int L_EchoInput(lua_State* L);
+extern int L_SpeedWalkDelay(lua_State* L);
 
 // Trigger functions
 extern int L_AddTrigger(lua_State* L);
@@ -181,6 +211,10 @@ extern int L_SetTimerOption(lua_State* L);
 extern int L_Hash(lua_State* L);
 extern int L_Base64Encode(lua_State* L);
 extern int L_Base64Decode(lua_State* L);
+extern int L_GenerateName(lua_State* L);
+extern int L_ReadNamesFile(lua_State* L);
+extern int L_TranslateGerman(lua_State* L);
+extern int L_LowercaseWildcard(lua_State* L);
 extern int L_StripANSI(lua_State* L);
 extern int L_FixupEscapeSequences(lua_State* L);
 extern int L_FixupHTML(lua_State* L);
@@ -199,6 +233,11 @@ extern int L_ActivateClient(lua_State* L);
 extern int L_GetWorldID(lua_State* L);
 extern int L_GetWorldList(lua_State* L);
 extern int L_GetWorldIdList(lua_State* L);
+// World management functions (also in world_utilities.cpp)
+extern int L_GetWorld(lua_State* L);
+extern int L_GetWorldById(lua_State* L);
+extern int L_Open(lua_State* L);
+extern int L_Reset(lua_State* L);
 extern int L_EditDistance(lua_State* L);
 extern int L_OpenBrowser(lua_State* L);
 extern int L_ChangeDir(lua_State* L);
@@ -267,6 +306,7 @@ extern int L_CloseLog(lua_State* L);
 extern int L_WriteLog(lua_State* L);
 extern int L_FlushLog(lua_State* L);
 extern int L_IsLogOpen(lua_State* L);
+extern int L_OmitFromLogFile(lua_State* L);
 extern int L_GetLogInput(lua_State* L);
 extern int L_SetLogInput(lua_State* L);
 extern int L_GetLogNotes(lua_State* L);
@@ -274,6 +314,10 @@ extern int L_SetLogNotes(lua_State* L);
 extern int L_GetLogOutput(lua_State* L);
 extern int L_SetLogOutput(lua_State* L);
 extern int L_LogSend(lua_State* L);
+// Bare-name compatibility aliases
+extern int L_LogInput(lua_State* L);
+extern int L_LogNotes(lua_State* L);
+extern int L_LogOutput(lua_State* L);
 
 // Random number functions
 extern int L_MtRand(lua_State* L);
@@ -340,6 +384,7 @@ extern int L_PlaySound(lua_State* L);
 extern int L_StopSound(lua_State* L);
 extern int L_Sound(lua_State* L);
 extern int L_GetSoundStatus(lua_State* L);
+extern int L_PlaySoundMemory(lua_State* L);
 
 // Notepad functions
 extern int L_SendToNotepad(lua_State* L);
@@ -433,10 +478,32 @@ extern int L_WindowMenu(lua_State* L);
 extern int L_WindowHotspotInfo(lua_State* L);
 extern int L_WindowMoveHotspot(lua_State* L);
 extern int L_WindowScrollwheelHandler(lua_State* L);
+extern int L_WindowList(lua_State* L);
+extern int L_WindowHotspotList(lua_State* L);
+extern int L_WindowCreateImage(lua_State* L);
+extern int L_WindowImageOp(lua_State* L);
+extern int L_WindowLoadImageMemory(lua_State* L);
 
 // Pixel manipulation functions (standalone helpers)
 extern int L_BlendPixel(lua_State* L);
 extern int L_FilterPixel(lua_State* L);
+
+// Mapper functions (defined in world_mapper.cpp)
+extern int L_AddToMapper(lua_State* L);
+extern int L_AddMapperComment(lua_State* L);
+extern int L_DeleteAllMapItems(lua_State* L);
+extern int L_DeleteLastMapItem(lua_State* L);
+extern int L_EnableMapping(lua_State* L);
+extern int L_GetMappingCount(lua_State* L);
+extern int L_GetMappingItem(lua_State* L);
+extern int L_GetMappingString(lua_State* L);
+extern int L_GetMapping(lua_State* L);
+extern int L_SetMapping(lua_State* L);
+extern int L_GetMapColour(lua_State* L);
+extern int L_MapColour(lua_State* L);
+extern int L_MapColourList(lua_State* L);
+extern int L_GetRemoveMapReverses(lua_State* L);
+extern int L_SetRemoveMapReverses(lua_State* L);
 
 // Forward declaration of constants registration (defined in lua_constants.cpp)
 extern void register_lua_constants(lua_State* L);
@@ -471,6 +538,17 @@ int RegisterLuaRoutines(lua_State* L)
         {"Hyperlink", L_Hyperlink},
         {"Simulate", L_Simulate},
 
+        // Text manipulation functions
+        {"DeleteLines", L_DeleteLines},
+        {"DeleteOutput", L_DeleteOutput},
+        {"SetSelection", L_SetSelection},
+
+        // Display/UI functions
+        {"Bookmark", L_Bookmark},
+        {"SetUnseenLines", L_SetUnseenLines},
+        {"ResetStatusTime", L_ResetStatusTime},
+        {"Transparency", L_Transparency},
+
         // Info bar functions
         {"Info", L_Info},
         {"InfoClear", L_InfoClear},
@@ -483,6 +561,9 @@ int RegisterLuaRoutines(lua_State* L)
         // Network functions
         {"Send", L_Send},
         {"SendNoEcho", L_SendNoEcho},
+        {"SendImmediate", L_SendImmediate},
+        {"SendPush", L_SendPush},
+        {"SendSpecial", L_SendSpecial},
         {"Connect", L_Connect},
         {"Disconnect", L_Disconnect},
         {"IsConnected", L_IsConnected},
@@ -495,11 +576,13 @@ int RegisterLuaRoutines(lua_State* L)
 
         // World info functions
         {"GetInfo", L_GetInfo},
-        {"GetWorldName", L_GetWorldName},
         {"GetOption", L_GetOption},
         {"SetOption", L_SetOption},
         {"GetAlphaOption", L_GetAlphaOption},
         {"SetAlphaOption", L_SetAlphaOption},
+        {"GetCurrentValue", L_GetCurrentValue},
+        {"GetDefaultValue", L_GetDefaultValue},
+        {"GetLoadedValue", L_GetLoadedValue},
         {"SetStatus", L_SetStatus},
         {"Repaint", L_Repaint},
         {"TextRectangle", L_TextRectangle},
@@ -531,6 +614,9 @@ int RegisterLuaRoutines(lua_State* L)
         {"GetGlobalOptionList", L_GetGlobalOptionList},
         {"Queue", L_Queue},
         {"DiscardQueue", L_DiscardQueue},
+        {"DoCommand", L_DoCommand},
+        {"GetInternalCommandsList", L_GetInternalCommandsList},
+        {"Help", L_Help},
 
         // Color functions
         {"GetNormalColour", L_GetNormalColour},
@@ -542,8 +628,14 @@ int RegisterLuaRoutines(lua_State* L)
         {"SetCustomColourText", L_SetCustomColourText},
         {"SetCustomColourBackground", L_SetCustomColourBackground},
         {"SetCustomColourName", L_SetCustomColourName},
+        {"GetCustomColourName", L_GetCustomColourName},
         {"PickColour", L_PickColour},
         {"AdjustColour", L_AdjustColour},
+        // Bare-name compatibility aliases (dual get/set dispatch)
+        {"NormalColour", L_NormalColour},
+        {"BoldColour", L_BoldColour},
+        {"CustomColourText", L_CustomColourText},
+        {"CustomColourBackground", L_CustomColourBackground},
 
         // Trace/Echo/Speedwalk functions
         {"GetTrace", L_GetTrace},
@@ -552,6 +644,9 @@ int RegisterLuaRoutines(lua_State* L)
         {"SetEchoInput", L_SetEchoInput},
         {"GetSpeedWalkDelay", L_GetSpeedWalkDelay},
         {"SetSpeedWalkDelay", L_SetSpeedWalkDelay},
+        // Bare-name compatibility aliases
+        {"EchoInput", L_EchoInput},
+        {"SpeedWalkDelay", L_SpeedWalkDelay},
         {"EvaluateSpeedwalk", L_EvaluateSpeedwalk},
         {"ReverseSpeedwalk", L_ReverseSpeedwalk},
         {"RemoveBacktracks", L_RemoveBacktracks},
@@ -612,7 +707,11 @@ int RegisterLuaRoutines(lua_State* L)
         {"Hash", L_Hash},
         {"Base64Encode", L_Base64Encode},
         {"Base64Decode", L_Base64Decode},
-        {"Trim", L_Trim},
+        {"GenerateName", L_GenerateName},
+        {"ReadNamesFile", L_ReadNamesFile},
+        {"TranslateGerman", L_TranslateGerman},
+        {"LowercaseWildcard", L_LowercaseWildcard},
+        // Note: Trim is already registered under Output functions (line 533)
         {"GetUniqueNumber", L_GetUniqueNumber},
         {"GetUniqueID", L_GetUniqueID},
         {"CreateGUID", L_CreateGUID},
@@ -621,7 +720,7 @@ int RegisterLuaRoutines(lua_State* L)
         {"FixupHTML", L_FixupHTML},
         {"MakeRegularExpression", L_MakeRegularExpression},
         {"Execute", L_Execute},
-        {"SetStatus", L_SetStatus},
+        // Note: SetStatus is already registered under World info functions (line 588)
         {"GetGlobalOption", L_GetGlobalOption},
         {"SetCursor", L_SetCursor},
         {"Accelerator", L_Accelerator},
@@ -632,6 +731,10 @@ int RegisterLuaRoutines(lua_State* L)
         {"GetWorldID", L_GetWorldID},
         {"GetWorldList", L_GetWorldList},
         {"GetWorldIdList", L_GetWorldIdList},
+        {"GetWorld", L_GetWorld},
+        {"GetWorldById", L_GetWorldById},
+        {"Open", L_Open},
+        {"Reset", L_Reset},
         {"GetUdpPort", L_GetUdpPort},
         {"UdpSend", L_UdpSend},
         {"UdpListen", L_UdpListen},
@@ -701,12 +804,17 @@ int RegisterLuaRoutines(lua_State* L)
         {"WriteLog", L_WriteLog},
         {"FlushLog", L_FlushLog},
         {"IsLogOpen", L_IsLogOpen},
+        {"OmitFromLogFile", L_OmitFromLogFile},
         {"GetLogInput", L_GetLogInput},
         {"SetLogInput", L_SetLogInput},
         {"GetLogNotes", L_GetLogNotes},
         {"SetLogNotes", L_SetLogNotes},
         {"GetLogOutput", L_GetLogOutput},
         {"SetLogOutput", L_SetLogOutput},
+        // Bare-name compatibility aliases
+        {"LogInput", L_LogInput},
+        {"LogNotes", L_LogNotes},
+        {"LogOutput", L_LogOutput},
         {"LogSend", L_LogSend},
 
         // Random number functions
@@ -846,12 +954,18 @@ int RegisterLuaRoutines(lua_State* L)
         {"WindowHotspotInfo", L_WindowHotspotInfo},
         {"WindowMoveHotspot", L_WindowMoveHotspot},
         {"WindowScrollwheelHandler", L_WindowScrollwheelHandler},
+        {"WindowList", L_WindowList},
+        {"WindowHotspotList", L_WindowHotspotList},
+        {"WindowCreateImage", L_WindowCreateImage},
+        {"WindowImageOp", L_WindowImageOp},
+        {"WindowLoadImageMemory", L_WindowLoadImageMemory},
 
         // Sound functions
         {"PlaySound", L_PlaySound},
         {"StopSound", L_StopSound},
         {"Sound", L_Sound},
         {"GetSoundStatus", L_GetSoundStatus},
+        {"PlaySoundMemory", L_PlaySoundMemory},
 
         // Notepad functions
         {"SendToNotepad", L_SendToNotepad},
@@ -869,6 +983,28 @@ int RegisterLuaRoutines(lua_State* L)
         {"NotepadSaveMethod", L_NotepadSaveMethod},
         {"MoveNotepadWindow", L_MoveNotepadWindow},
         {"GetNotepadWindowPosition", L_GetNotepadWindowPosition},
+
+        // MXP / XML entity functions
+        {"GetEntity", L_GetEntity},
+        {"GetXMLEntity", L_GetXMLEntity},
+        {"SetEntity", L_SetEntity},
+
+        // Mapper functions
+        {"AddToMapper", L_AddToMapper},
+        {"AddMapperComment", L_AddMapperComment},
+        {"DeleteAllMapItems", L_DeleteAllMapItems},
+        {"DeleteLastMapItem", L_DeleteLastMapItem},
+        {"EnableMapping", L_EnableMapping},
+        {"GetMappingCount", L_GetMappingCount},
+        {"GetMappingItem", L_GetMappingItem},
+        {"GetMappingString", L_GetMappingString},
+        {"GetMapping", L_GetMapping},
+        {"SetMapping", L_SetMapping},
+        {"GetMapColour", L_GetMapColour},
+        {"MapColour", L_MapColour},
+        {"MapColourList", L_MapColourList},
+        {"GetRemoveMapReverses", L_GetRemoveMapReverses},
+        {"SetRemoveMapReverses", L_SetRemoveMapReverses},
 
         {nullptr, nullptr} // Sentinel
     };
@@ -990,7 +1126,7 @@ int RegisterLuaRoutines(lua_State* L)
     lua_setglobal(L, "SetCursor");
 
     // Register WorldName as global function (for compatibility with legacy plugins)
-    lua_pushcfunction(L, L_GetWorldName);
+    lua_pushcfunction(L, L_WorldName);
     lua_setglobal(L, "WorldName");
 
     // Register AddTimer as global function (for compatibility with legacy plugins)

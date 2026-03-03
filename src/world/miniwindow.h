@@ -13,6 +13,7 @@
 #include <QVariant>
 #include <map>
 #include <memory>
+#include <span>
 
 // Forward declarations
 class WorldDocument;
@@ -70,7 +71,7 @@ class MiniWindow : public QObject {
 
   public:
     explicit MiniWindow(WorldDocument* doc, QObject* parent = nullptr);
-    ~MiniWindow();
+    ~MiniWindow() override;
 
     // ========== Basic Properties ==========
 
@@ -440,11 +441,10 @@ class MiniWindow : public QObject {
      * @brief Load image from memory buffer
      * @param imageId Image identifier
      * @param data Raw image data (PNG, BMP, JPG, etc.)
-     * @param length Length of data
      * @param hasAlpha Whether to preserve alpha channel
      * @return Error code (eOK on success)
      */
-    qint32 LoadImageMemory(const QString& imageId, const unsigned char* data, size_t length,
+    qint32 LoadImageMemory(const QString& imageId, std::span<const unsigned char> data,
                            bool hasAlpha);
 
     /**

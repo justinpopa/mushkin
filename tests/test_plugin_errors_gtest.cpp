@@ -11,11 +11,9 @@
 
 #include "../src/automation/plugin.h"
 #include "../src/storage/global_options.h"
-#include "../src/world/world_document.h"
-#include <QCoreApplication>
+#include "fixtures/world_fixtures.h"
 #include <QFile>
 #include <QTemporaryDir>
-#include <gtest/gtest.h>
 
 // Error codes from methods_plugins.cpp
 #define eOK 0
@@ -39,24 +37,23 @@ class PluginErrorTest : public ::testing::Test {
         ASSERT_TRUE(tempDir->isValid()) << "Could not create temp directory";
 
         // Create world document
-        doc = new WorldDocument();
+        doc = std::make_unique<WorldDocument>();
         doc->m_mush_name = "Test World";
         doc->m_server = "localhost";
         doc->m_port = 4000;
         doc->m_strWorldID = "{ERROR-TEST-WORLD-ID-123456789012}";
 
         // Configure state files directory
-        GlobalOptions::instance()->setStateFilesDirectory(tempDir->path());
+        GlobalOptions::instance().setStateFilesDirectory(tempDir->path());
     }
 
     void TearDown() override
     {
-        delete doc;
         delete tempDir;
     }
 
     QTemporaryDir* tempDir = nullptr;
-    WorldDocument* doc = nullptr;
+    std::unique_ptr<WorldDocument> doc;
 };
 
 // Test 1: LoadPlugin - File Not Found
@@ -253,9 +250,9 @@ TEST_F(PluginErrorTest, LoadState_MalformedXML)
     malformedState.close();
 
     // Try to load the malformed state
-    bool loadSuccess = statePlugin->LoadState();
+    auto loadResult = statePlugin->LoadState();
 
-    EXPECT_FALSE(loadSuccess) << "LoadState should fail with malformed XML";
+    EXPECT_FALSE(loadResult.has_value()) << "LoadState should fail with malformed XML";
 }
 
 // Test 12: SaveState - Recursion Prevention
@@ -290,20 +287,7 @@ end
     ASSERT_NE(recursionPlugin, nullptr) << "LoadPlugin failed: " << errorMsg.toStdString();
 
     // Call SaveState - should succeed and not hang
-    bool saveSuccess = recursionPlugin->SaveState();
+    auto saveResult = recursionPlugin->SaveState();
 
-    EXPECT_TRUE(saveSuccess) << "SaveState should succeed (recursion prevention works)";
-}
-
-// GoogleTest main function
-int main(int argc, char** argv)
-{
-    // Initialize Qt application (required for Qt types)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
+    EXPECT_TRUE(saveResult.has_value()) << "SaveState should succeed (recursion prevention works)";
 }

@@ -12,18 +12,17 @@
  * Ported from: globalregistryoptions.cpp (original MUSHclient)
  *
  * Usage:
- *   GlobalOptions* opts = GlobalOptions::instance();
- *   bool autoConnect = opts->autoConnectWorlds();
- *   opts->setAutoConnectWorlds(false);
- *   opts->save();  // Persist to storage
+ *   GlobalOptions& opts = GlobalOptions::instance();
+ *   bool autoConnect = opts.autoConnectWorlds();
+ *   opts.setAutoConnectWorlds(false);
+ *   opts.save();  // Persist to storage
  */
 
 #ifndef GLOBAL_OPTIONS_H
 #define GLOBAL_OPTIONS_H
 
 #include <QString>
-
-class QSettings;
+#include <QStringList>
 
 // Theme mode enumeration
 enum ThemeMode { ThemeLight = 0, ThemeDark = 1, ThemeSystem = 2 };
@@ -36,7 +35,7 @@ enum ThemeMode { ThemeLight = 0, ThemeDark = 1, ThemeSystem = 2 };
  */
 class GlobalOptions {
   public:
-    static GlobalOptions* instance();
+    static GlobalOptions& instance();
 
     // Load all options from QSettings
     void load();
@@ -285,6 +284,65 @@ class GlobalOptions {
         m_f1Macro = v;
     }
 
+    // Keyboard / input
+    bool disableKeyboardMenuActivation() const
+    {
+        return m_disableKeyboardMenuActivation;
+    }
+    void setDisableKeyboardMenuActivation(bool v)
+    {
+        m_disableKeyboardMenuActivation = v;
+    }
+
+    // Colour / rendering
+    bool colourGradientConfig() const
+    {
+        return m_colourGradientConfig;
+    }
+    void setColourGradientConfig(bool v)
+    {
+        m_colourGradientConfig = v;
+    }
+
+    bool bleedBackground() const
+    {
+        return m_bleedBackground;
+    }
+    void setBleedBackground(bool v)
+    {
+        m_bleedBackground = v;
+    }
+
+    // Toolbar appearance
+    bool flatToolbars() const
+    {
+        return m_flatToolbars;
+    }
+    void setFlatToolbars(bool v)
+    {
+        m_flatToolbars = v;
+    }
+
+    // Activity window
+    bool openActivityWindow() const
+    {
+        return m_openActivityWindow;
+    }
+    void setOpenActivityWindow(bool v)
+    {
+        m_openActivityWindow = v;
+    }
+
+    // Confirmation dialogs (continued)
+    bool confirmBeforeClosingMXPdebug() const
+    {
+        return m_confirmBeforeClosingMXPdebug;
+    }
+    void setConfirmBeforeClosingMXPdebug(bool v)
+    {
+        m_confirmBeforeClosingMXPdebug = v;
+    }
+
     // ========================================================================
     // INTEGER OPTIONS
     // ========================================================================
@@ -456,6 +514,35 @@ class GlobalOptions {
     void setThemeMode(int v)
     {
         m_themeMode = v;
+    }
+
+    // Button bar / activity
+    int activityButtonBarStyle() const
+    {
+        return m_activityButtonBarStyle;
+    }
+    void setActivityButtonBarStyle(int v)
+    {
+        m_activityButtonBarStyle = v;
+    }
+
+    // Editor
+    int parenMatchFlags() const
+    {
+        return m_parenMatchFlags;
+    }
+    void setParenMatchFlags(int v)
+    {
+        m_parenMatchFlags = v;
+    }
+
+    int notepadFontHeight() const
+    {
+        return m_notepadFontHeight;
+    }
+    void setNotepadFontHeight(int v)
+    {
+        m_notepadFontHeight = v;
     }
 
     // ========================================================================
@@ -641,6 +728,38 @@ class GlobalOptions {
         m_trayIconFileName = v;
     }
 
+    // Notepad font
+    QString notepadFontName() const
+    {
+        return m_notepadFontName;
+    }
+    void setNotepadFontName(const QString& v)
+    {
+        m_notepadFontName = v;
+    }
+
+    // ========================================================================
+    // QSTRINGLIST OPTIONS
+    // ========================================================================
+
+    QStringList worldList() const
+    {
+        return m_worldList;
+    }
+    void setWorldList(const QStringList& v)
+    {
+        m_worldList = v;
+    }
+
+    QStringList globalPluginList() const
+    {
+        return m_globalPluginList;
+    }
+    void setGlobalPluginList(const QStringList& v)
+    {
+        m_globalPluginList = v;
+    }
+
   private:
     GlobalOptions();
     ~GlobalOptions() = default;
@@ -649,10 +768,6 @@ class GlobalOptions {
     GlobalOptions(const GlobalOptions&) = delete;
     GlobalOptions& operator=(const GlobalOptions&) = delete;
 
-    // Helper to get QSettings configured for MUSHclient Registry path
-    QSettings* createSettings() const;
-
-    static GlobalOptions* s_instance;
     bool m_loaded = false;
 
     // ========================================================================
@@ -683,6 +798,12 @@ class GlobalOptions {
     bool m_tabInsertsTab = false;
     bool m_regexpMatchEmpty = true;
     bool m_f1Macro = false;
+    bool m_disableKeyboardMenuActivation = false;
+    bool m_colourGradientConfig = true;
+    bool m_bleedBackground = false;
+    bool m_flatToolbars = true;
+    bool m_openActivityWindow = false;
+    bool m_confirmBeforeClosingMXPdebug = false;
 
     // ========================================================================
     // INTEGER MEMBERS (with defaults)
@@ -705,6 +826,9 @@ class GlobalOptions {
     int m_iconPlacement = 0; // ICON_PLACEMENT_TASKBAR
     int m_trayIcon = 0;
     int m_themeMode = ThemeSystem; // Default to system theme
+    int m_activityButtonBarStyle = 0;
+    int m_parenMatchFlags = 0x0061;
+    int m_notepadFontHeight = 10;
 
     // ========================================================================
     // STRING MEMBERS (with defaults)
@@ -728,6 +852,13 @@ class GlobalOptions {
     QString m_luaScript;
     QString m_locale = "EN";
     QString m_trayIconFileName;
+    QString m_notepadFontName = "Courier";
+
+    // ========================================================================
+    // QSTRINGLIST MEMBERS (with defaults)
+    // ========================================================================
+    QStringList m_worldList;
+    QStringList m_globalPluginList;
 };
 
 #endif // GLOBAL_OPTIONS_H

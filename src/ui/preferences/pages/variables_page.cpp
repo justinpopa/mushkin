@@ -112,11 +112,11 @@ void VariablesPage::loadVariables()
         nameItem->setData(Qt::UserRole, name);
         m_table->setItem(row, ColName, nameItem);
 
-        QTableWidgetItem* valueItem = new QTableWidgetItem(var->strContents);
+        QTableWidgetItem* valueItem = new QTableWidgetItem(var->contents);
         // Truncate display of long values
-        if (var->strContents.length() > 100) {
-            valueItem->setText(var->strContents.left(100) + "...");
-            valueItem->setToolTip(var->strContents);
+        if (var->contents.length() > 100) {
+            valueItem->setText(var->contents.left(100) + "...");
+            valueItem->setToolTip(var->contents);
         }
         m_table->setItem(row, ColValue, valueItem);
     }

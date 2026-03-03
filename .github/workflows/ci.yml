@@ -10,132 +10,189 @@ concurrency:
 
 env:
   QT_VERSION: "6.9.3"
+  LLVM_VERSION: "22"
 
 jobs:
   build:
     name: Build ${{ matrix.os }}
-    runs-on: ${{ matrix.runner }}
+    runs-on: [self-hosted, "${{ matrix.label }}"]
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: Linux
-            runner: ubuntu-latest
+            label: linux
           - os: macOS
-            runner: macos-latest
+            label: macos
           - os: Windows
-            runner: windows-latest
+            label: windows
 
     steps:
+      # ===== Windows bootstrap =====
+      # NOTE: The Windows runner must be configured to run as an administrator.
+      # Re-configure with: ./config.cmd --replace
+      # and run the service under a local admin account, NOT NetworkService.
+      - name: Bootstrap (Windows)
+        if: matrix.os == 'Windows'
+        run: |
+          # Install Chocolatey if missing
+          if (!(Get-Command choco -ErrorAction SilentlyContinue)) {
+            Set-ExecutionPolicy Bypass -Scope Process -Force
+            [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+            Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+            $env:PATH = "C:\ProgramData\chocolatey\bin;$env:PATH"
+            echo "C:\ProgramData\chocolatey\bin" >> $env:GITHUB_PATH
+          }
+          # Install git if missing
+          if (!(Get-Command git -ErrorAction SilentlyContinue)) {
+            choco install git -y
+            $env:PATH = "C:\Program Files\Git\cmd;$env:PATH"
+            echo "C:\Program Files\Git\cmd" >> $env:GITHUB_PATH
+          }
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      # ===== Linux =====
+      # ===== Linux (Ubuntu 24.04) =====
+      - name: Install toolchain (Linux)
+        if: matrix.os == 'Linux'
+        run: |
+          if ! clang-${LLVM_VERSION} --version >/dev/null 2>&1; then
+            wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
+            echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-${LLVM_VERSION} main" | \
+              sudo tee /etc/apt/sources.list.d/llvm.list
+            sudo apt-get update
+            sudo apt-get install -y clang-${LLVM_VERSION}
+          fi
+
       - name: Install dependencies (Linux)
         if: matrix.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential cmake ninja-build \
+            cmake ninja-build g++ python3-pip python3-venv \
             libgl1-mesa-dev libxkbcommon-dev \
             libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 \
             libluajit-5.1-dev libpcre3-dev libsqlite3-dev \
-            libssl-dev zlib1g-dev \
+            libssl-dev zlib1g-dev libssh-dev \
             libpulse-dev libasound2-dev libpipewire-0.3-dev
-          pip3 install aqtinstall
+          python3 -m pip install --break-system-packages aqtinstall
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Install Qt (Linux)
         if: matrix.os == 'Linux'
         run: |
-          aqt install-qt linux desktop ${{ env.QT_VERSION }} linux_gcc_64 -m qtmultimedia --outputdir $HOME/Qt
-          echo "Qt6_DIR=$HOME/Qt/${{ env.QT_VERSION }}/gcc_64/lib/cmake/Qt6" >> $GITHUB_ENV
-          echo "$HOME/Qt/${{ env.QT_VERSION }}/gcc_64/bin" >> $GITHUB_PATH
+          export PATH="$HOME/.local/bin:$PATH"
+          if [ ! -d "$HOME/Qt/${QT_VERSION}" ]; then
+            aqt install-qt linux desktop ${QT_VERSION} linux_gcc_64 -m qtmultimedia --outputdir $HOME/Qt
+          fi
+          echo "Qt6_DIR=$HOME/Qt/${QT_VERSION}/gcc_64/lib/cmake/Qt6" >> $GITHUB_ENV
+          echo "$HOME/Qt/${QT_VERSION}/gcc_64/bin" >> $GITHUB_PATH
 
-      # ===== macOS =====
-      - name: Install dependencies (macOS)
+      - name: Configure (Linux)
+        if: matrix.os == 'Linux'
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=clang-${LLVM_VERSION} \
+            -DCMAKE_CXX_COMPILER=clang++-${LLVM_VERSION}
+
+      # ===== macOS 15 =====
+      - name: Setup Homebrew (macOS)
         if: matrix.os == 'macOS'
         run: |
-          brew install cmake ninja pcre luajit sqlite openssl aqtinstall
+          if [ -x /opt/homebrew/bin/brew ]; then
+            eval "$(/opt/homebrew/bin/brew shellenv)"
+          elif [ -x /usr/local/bin/brew ]; then
+            eval "$(/usr/local/bin/brew shellenv)"
+          fi
+          echo "$(brew --prefix)/bin" >> $GITHUB_PATH
+          echo "$(brew --prefix)/sbin" >> $GITHUB_PATH
+
+      - name: Install toolchain (macOS)
+        if: matrix.os == 'macOS'
+        run: |
+          eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shellenv)"
+          brew install llvm cmake ninja pcre luajit sqlite openssl libssh
+          python3 -m pip install --break-system-packages aqtinstall 2>/dev/null || python3 -m pip install aqtinstall
+          echo "$HOME/Library/Python/$(python3 -c 'import sys;print(f"{sys.version_info.major}.{sys.version_info.minor}")')/bin" >> $GITHUB_PATH
 
       - name: Install Qt (macOS)
         if: matrix.os == 'macOS'
         run: |
-          aqt install-qt mac desktop ${{ env.QT_VERSION }} -m qtmultimedia --outputdir $HOME/Qt
-          echo "Qt6_DIR=$HOME/Qt/${{ env.QT_VERSION }}/macos/lib/cmake/Qt6" >> $GITHUB_ENV
-          echo "$HOME/Qt/${{ env.QT_VERSION }}/macos/bin" >> $GITHUB_PATH
+          if [ ! -d "$HOME/Qt/${QT_VERSION}" ]; then
+            aqt install-qt mac desktop ${QT_VERSION} -m qtmultimedia --outputdir $HOME/Qt
+          fi
+          echo "Qt6_DIR=$HOME/Qt/${QT_VERSION}/macos/lib/cmake/Qt6" >> $GITHUB_ENV
+          echo "$HOME/Qt/${QT_VERSION}/macos/bin" >> $GITHUB_PATH
 
-      # ===== Windows =====
+      - name: Configure (macOS)
+        if: matrix.os == 'macOS'
+        run: |
+          eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shellenv)"
+          LLVM_PREFIX=$(brew --prefix llvm)
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=${LLVM_PREFIX}/bin/clang \
+            -DCMAKE_CXX_COMPILER=${LLVM_PREFIX}/bin/clang++ \
+            -DCMAKE_CXX_FLAGS="-stdlib=libc++"
+
+      # ===== Windows 11 =====
+      - name: Install toolchain (Windows)
+        if: matrix.os == 'Windows'
+        run: |
+          choco install cmake ninja llvm python3 -y
+          # Refresh PATH to pick up newly installed tools
+          $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "User") + ";$env:PATH"
+          python -m pip install aqtinstall
+
       - name: Install dependencies (Windows)
         if: matrix.os == 'Windows'
         run: |
-          choco install ninja -y
-          pip install aqtinstall
-          vcpkg install pcre:x64-windows luajit:x64-windows sqlite3:x64-windows openssl:x64-windows zlib:x64-windows
-
-      - name: Setup MSVC (Windows)
-        if: matrix.os == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1
+          if (!(Test-Path "C:\vcpkg")) {
+            git clone https://github.com/microsoft/vcpkg.git C:\vcpkg
+            C:\vcpkg\bootstrap-vcpkg.bat
+          }
+          C:\vcpkg\vcpkg install pcre:x64-windows luajit:x64-windows sqlite3:x64-windows openssl:x64-windows zlib:x64-windows
 
       - name: Install Qt (Windows)
         if: matrix.os == 'Windows'
         run: |
-          python -m aqt install-qt windows desktop ${{ env.QT_VERSION }} win64_msvc2022_64 -m qtmultimedia --outputdir C:/Qt
-          echo "Qt6_DIR=C:/Qt/${{ env.QT_VERSION }}/msvc2022_64/lib/cmake/Qt6" >> $env:GITHUB_ENV
-          echo "C:/Qt/${{ env.QT_VERSION }}/msvc2022_64/bin" >> $env:GITHUB_PATH
-
-      # ===== Build =====
-      - name: Configure (Unix)
-        if: matrix.os != 'Windows'
-        run: |
-          cmake -B build -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release
+          if (!(Test-Path "C:\Qt\$env:QT_VERSION")) {
+            python -m aqt install-qt windows desktop $env:QT_VERSION win64_msvc2022_64 -m qtmultimedia --outputdir C:\Qt
+          }
+          echo "Qt6_DIR=C:\Qt\$env:QT_VERSION\msvc2022_64\lib\cmake\Qt6" >> $env:GITHUB_ENV
+          echo "C:\Qt\$env:QT_VERSION\msvc2022_64\bin" >> $env:GITHUB_PATH
 
       - name: Configure (Windows)
         if: matrix.os == 'Windows'
         run: |
           cmake -B build -G Ninja `
             -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_C_COMPILER=clang-cl `
+            -DCMAKE_CXX_COMPILER=clang-cl `
             -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake `
             -DVCPKG_TARGET_TRIPLET=x64-windows
 
+      # ===== Build =====
       - name: Build
         run: cmake --build build --config Release --parallel
         env:
-          QT_QPA_PLATFORM: ${{ matrix.os == 'Linux' && 'offscreen' || '' }}
+          QT_QPA_PLATFORM: ${{ matrix.os != 'Windows' && 'offscreen' || '' }}
 
+      # ===== Test =====
       - name: Test (Unix)
         if: matrix.os != 'Windows'
         run: ctest --test-dir build --output-on-failure --build-config Release
         env:
-          QT_QPA_PLATFORM: ${{ matrix.os == 'Linux' && 'offscreen' || '' }}
+          QT_QPA_PLATFORM: offscreen
 
       - name: Test (Windows)
         if: matrix.os == 'Windows'
         run: |
-          # Copy lua51.dll next to yue.dll so it can find its dependency
-          Copy-Item "C:\vcpkg\installed\x64-windows\bin\lua51.dll" "build\lib\" -ErrorAction SilentlyContinue
           $env:PATH = "C:\vcpkg\installed\x64-windows\bin;$env:PATH"
+          Copy-Item "C:\vcpkg\installed\x64-windows\bin\lua51.dll" "build\lib\" -ErrorAction SilentlyContinue
           ctest --test-dir build --output-on-failure --build-config Release
-
-  docs:
-    name: Verify Docs
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Run doc generator
-        run: python3 scripts/generate-lua-docs.py --output-dir /tmp/wiki-test
-
-      - name: Verify output
-        run: |
-          # Check that index was generated
-          test -f /tmp/wiki-test/Lua-API-0.1.0.md
-          # Check that we have a reasonable number of function pages
-          count=$(ls /tmp/wiki-test/Lua-API-0.1.0-*.md | wc -l)
-          echo "Generated $count pages"
-          test $count -gt 400

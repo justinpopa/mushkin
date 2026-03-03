@@ -2,6 +2,14 @@
 # Includes Lua API (previously separate scripting module - merged to eliminate circular dependency)
 add_library(world STATIC
     color_utils.h
+    connection_manager.h   # ConnectionManager companion object (owns connection state)
+    connection_manager.cpp # ConnectionManager implementation
+    speedwalk_engine.h     # speedwalk free functions (evaluate/reverse/removeBacktracks)
+    speedwalk_engine.cpp   # speedwalk implementation
+    output_formatter.h     # OutputFormatter companion object (note/color/hyperlink display)
+    output_formatter.cpp   # OutputFormatter implementation
+    telnet_parser.h
+    telnet_parser.cpp
     world_document.cpp
     world_document.h
     world_triggers.cpp
@@ -15,11 +23,17 @@ add_library(world STATIC
     world_variables.cpp
     world_serialization.cpp
     world_document_plugins.cpp
-    world_sound.cpp          # Sound system
+    automation_registry.h    # AutomationRegistry companion object (trigger/alias/timer state + evaluation)
+    automation_registry.cpp  # AutomationRegistry implementation
+    sound_manager.h          # SoundManager companion object (spatial audio state)
+    sound_manager.cpp        # SoundManager implementation
+    world_sound.cpp          # WorldDocument forwarding wrappers → SoundManager
     world_notepad.cpp        # Notepad window tracking
     world_recall.cpp         # Recall/buffer search
-    world_mxp.cpp            # MXP (MUD eXtension Protocol)
+    world_mxp.cpp            # MXP stub (implementation moved to mxp_engine.cpp)
     mxp_types.h              # MXP data structures
+    mxp_engine.h             # MXPEngine companion object (runtime MXP state + logic)
+    mxp_engine.cpp           # MXPEngine implementation
     accelerator_manager.h    # Keyboard accelerator management
     accelerator_manager.cpp
     macro_keypad_compat.h    # Macro/keypad compatibility with original MUSHclient
@@ -42,6 +56,8 @@ add_library(world STATIC
     lua_utils.cpp
     lua_dialog_callbacks.h
     lua_dialog_callbacks.cpp
+    docommand_callbacks.h
+    docommand_callbacks.cpp
     # Lua API modules
     lua_api/lua_registration.cpp
     lua_api/lua_constants.cpp
@@ -50,7 +66,12 @@ add_library(world STATIC
     lua_api/world_commands.cpp
     lua_api/world_variables.cpp
     lua_api/world_colors.cpp
-    lua_api/world_utilities.cpp
+    lua_api/world_crypto.cpp
+    lua_api/world_udp.cpp
+    lua_api/world_session.cpp
+    lua_api/world_ui_control.cpp
+    lua_api/world_logging_opts.cpp
+    lua_api/world_misc.cpp
     lua_api/world_settings.cpp
     lua_api/lua_progress.cpp
     lua_api/world_triggers.cpp
@@ -59,11 +80,14 @@ add_library(world STATIC
     lua_api/world_logging.cpp
     lua_api/world_database.cpp
     lua_api/world_plugins.cpp
-    lua_api/world_miniwindows.cpp
+    lua_api/world_miniwindow_lifecycle.cpp
+    lua_api/world_miniwindow_drawing.cpp
+    lua_api/world_miniwindow_images.cpp
     lua_api/world_info.cpp
     lua_api/world_sounds.cpp        # Sound system API
     lua_api/world_notepads.cpp      # Notepad window API
     lua_api/world_arrays.cpp        # Named arrays API
+    lua_api/world_mapper.cpp        # Mapper API
     lua_api/lrexlib.cpp             # rex PCRE regex library
 )
 

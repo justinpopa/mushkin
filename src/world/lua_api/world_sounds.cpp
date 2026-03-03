@@ -36,16 +36,12 @@ int L_PlaySound(lua_State* L)
 
     // Get parameters
     qint16 buffer = luaL_checkinteger(L, 1);
-    const char* filename = luaL_checkstring(L, 2);
     bool loop = lua_toboolean(L, 3);
     double volume = luaL_optnumber(L, 4, 0.0); // Default: full volume
     double pan = luaL_optnumber(L, 5, 0.0);    // Default: center
 
     // Call PlaySound
-    qint32 result = pDoc->PlaySound(buffer, QString::fromUtf8(filename), loop, volume, pan);
-
-    lua_pushinteger(L, result);
-    return 1;
+    return luaReturn(L, pDoc->PlaySound(buffer, luaCheckQString(L, 2), loop, volume, pan));
 }
 
 /**
@@ -72,10 +68,7 @@ int L_StopSound(lua_State* L)
     qint16 buffer = luaL_checkinteger(L, 1);
 
     // Call StopSound
-    qint32 result = pDoc->StopSound(buffer);
-
-    lua_pushinteger(L, result);
-    return 1;
+    return luaReturn(L, pDoc->StopSound(buffer));
 }
 
 /**
@@ -99,15 +92,49 @@ int L_Sound(lua_State* L)
         return luaL_error(L, "No world document");
     }
 
-    // Get filename parameter
-    const char* filename = luaL_checkstring(L, 1);
-
+    auto [filename] = luaArgs<QString>(L);
     // Call PlaySoundFile (finds first available buffer)
-    bool success = pDoc->PlaySoundFile(QString::fromUtf8(filename));
-
     // Return error code (eOK or eCannotPlaySound) for API compatibility
-    lua_pushinteger(L, success ? eOK : eCannotPlaySound);
-    return 1;
+    return luaReturn(L, pDoc->PlaySoundFile(filename) ? eOK : eCannotPlaySound);
+}
+
+/**
+ * world.PlaySoundMemory(buffer, data, loop, volume, pan)
+ *
+ * Play a sound from an in-memory buffer. In the original MUSHclient this
+ * passed raw PCM/WAV data directly to the sound driver. Mushkin uses
+ * Qt Multimedia which requires a file path or a QMediaContent source and
+ * does not support raw memory buffers in a cross-platform way.
+ *
+ * This function is a stub that returns eCannotPlaySound to inform the
+ * caller that memory-buffer playback is not supported. Use PlaySound()
+ * with a file path instead.
+ *
+ * @param buffer (number) Buffer slot number (1-10)
+ * @param data (string) Raw audio data (binary — ignored in this implementation)
+ * @param loop (boolean) Whether to loop (optional)
+ * @param volume (number) Volume -100..0 (optional)
+ * @param pan (number) Stereo panning -100..100 (optional)
+ *
+ * @return (number) Error code:
+ *   - eCannotPlaySound (30004): Memory-buffer playback not supported
+ *
+ * @example
+ * -- This will always fail; use PlaySound with a file path instead
+ * local result = PlaySoundMemory(1, audio_data)
+ * if result ~= 0 then
+ *     Note("Memory sound not supported, using file")
+ *     PlaySound(1, "sounds/alert.wav", false, 0, 0)
+ * end
+ *
+ * @see PlaySound, Sound, StopSound
+ */
+int L_PlaySoundMemory(lua_State* L)
+{
+    // Memory-buffer sound playback is not supported in the Qt Multimedia
+    // backend. Return eCannotPlaySound so callers can fall back gracefully.
+    (void)L;
+    return luaReturnError(L, eCannotPlaySound);
 }
 
 /**
@@ -140,8 +167,5 @@ int L_GetSoundStatus(lua_State* L)
     qint16 buffer = luaL_checkinteger(L, 1);
 
     // Call GetSoundStatus
-    qint32 status = pDoc->GetSoundStatus(buffer);
-
-    lua_pushinteger(L, status);
-    return 1;
+    return luaReturn(L, pDoc->GetSoundStatus(buffer));
 }

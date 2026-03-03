@@ -16,8 +16,10 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QScopeGuard>
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
+#include <expected>
 
 // Default plugin sequence (plugins.h)
 #define DEFAULT_PLUGIN_SEQUENCE 5000
@@ -115,8 +117,8 @@ Plugin::~Plugin()
         ExecutePluginScript(ON_PLUGIN_CLOSE);
         m_pDoc->m_CurrentPlugin = pSavedPlugin;
 
-        // Save state before destruction
-        SaveState();
+        // Save state before destruction (ignore result in destructor)
+        (void)SaveState();
     }
 
     // Delete all triggers (unique_ptr handles deletion automatically)
@@ -245,7 +247,7 @@ void Plugin::rebuildTriggerArray()
 
     // Sort by sequence (lower sequence = earlier evaluation)
     std::sort(m_TriggerArray.begin(), m_TriggerArray.end(),
-              [](const Trigger* a, const Trigger* b) { return a->iSequence < b->iSequence; });
+              [](const Trigger* a, const Trigger* b) { return a->sequence < b->sequence; });
 
     m_triggersNeedSorting = false;
 }
@@ -267,7 +269,7 @@ void Plugin::rebuildAliasArray()
 
     // Sort by sequence (lower sequence = earlier evaluation)
     std::sort(m_AliasArray.begin(), m_AliasArray.end(),
-              [](const Alias* a, const Alias* b) { return a->iSequence < b->iSequence; });
+              [](const Alias* a, const Alias* b) { return a->sequence < b->sequence; });
 
     m_aliasesNeedSorting = false;
 }
@@ -330,12 +332,12 @@ bool Plugin::ExecutePluginScript(const QString& callbackName)
     QString strReason = QString("Executing plugin %1 sub %2").arg(m_strName, callbackName);
 
     // Call Lua
-    long nInvocationCount = 0;
+    qint32 invocation_count = 0;
     bool result = true; // Default: continue propagation
 
     bool bError =
-        m_ScriptEngine->executeLua(dispid, callbackName, eDontChangeAction, strType, strReason,
-                                   nparams, sparams, nInvocationCount, &result);
+        m_ScriptEngine->executeLua(dispid, callbackName, ActionSource::eDontChangeAction, strType,
+                                   strReason, nparams, sparams, invocation_count, &result);
 
     // If error, mark callback as invalid and continue
     if (bError) {
@@ -375,12 +377,12 @@ bool Plugin::ExecutePluginScript(const QString& callbackName, const QString& arg
     QString strReason = QString("Executing plugin %1 sub %2").arg(m_strName, callbackName);
 
     // Call Lua
-    long nInvocationCount = 0;
+    qint32 invocation_count = 0;
     bool result = true; // Default: continue propagation
 
     bool bError =
-        m_ScriptEngine->executeLua(dispid, callbackName, eDontChangeAction, strType, strReason,
-                                   nparams, sparams, nInvocationCount, &result);
+        m_ScriptEngine->executeLua(dispid, callbackName, ActionSource::eDontChangeAction, strType,
+                                   strReason, nparams, sparams, invocation_count, &result);
 
     // If error, mark callback as invalid and continue
     if (bError) {
@@ -426,12 +428,12 @@ bool Plugin::ExecutePluginScript(const QString& callbackName, qint32 arg1, const
     QString strReason = QString("Executing plugin %1 sub %2").arg(m_strName, callbackName);
 
     // Call Lua
-    long nInvocationCount = 0;
+    qint32 invocation_count = 0;
     bool result = true; // Default: continue propagation
 
     bool bError =
-        m_ScriptEngine->executeLua(dispid, callbackName, eDontChangeAction, strType, strReason,
-                                   nparams, sparams, nInvocationCount, &result);
+        m_ScriptEngine->executeLua(dispid, callbackName, ActionSource::eDontChangeAction, strType,
+                                   strReason, nparams, sparams, invocation_count, &result);
 
     // If error, mark callback as invalid and continue
     if (bError) {
@@ -477,12 +479,12 @@ bool Plugin::ExecutePluginScript(const QString& callbackName, qint32 arg1, qint3
     QString strReason = QString("Executing plugin %1 sub %2").arg(m_strName, callbackName);
 
     // Call Lua
-    long nInvocationCount = 0;
+    qint32 invocation_count = 0;
     bool result = true; // Default: continue propagation
 
     bool bError =
-        m_ScriptEngine->executeLua(dispid, callbackName, eDontChangeAction, strType, strReason,
-                                   nparams, sparams, nInvocationCount, &result);
+        m_ScriptEngine->executeLua(dispid, callbackName, ActionSource::eDontChangeAction, strType,
+                                   strReason, nparams, sparams, invocation_count, &result);
 
     // If error, mark callback as invalid and continue
     if (bError) {
@@ -533,12 +535,12 @@ bool Plugin::ExecutePluginScript(const QString& callbackName, qint32 arg1, const
     QString strReason = QString("Executing plugin %1 sub %2").arg(m_strName, callbackName);
 
     // Call Lua
-    long nInvocationCount = 0;
+    qint32 invocation_count = 0;
     bool result = true; // Default: continue propagation
 
     bool bError =
-        m_ScriptEngine->executeLua(dispid, callbackName, eDontChangeAction, strType, strReason,
-                                   nparams, sparams, nInvocationCount, &result);
+        m_ScriptEngine->executeLua(dispid, callbackName, ActionSource::eDontChangeAction, strType,
+                                   strReason, nparams, sparams, invocation_count, &result);
 
     // If error, mark callback as invalid and continue
     if (bError) {
@@ -559,41 +561,42 @@ bool Plugin::ExecutePluginScript(const QString& callbackName, qint32 arg1, const
  * This matches original MUSHclient for compatibility and per-world isolation.
  * Calls OnPluginSaveState callback before saving.
  *
- * @return true on success
+ * @return empty expected on success, error string on failure
  */
-bool Plugin::SaveState()
+std::expected<void, QString> Plugin::SaveState()
 {
     // Check if state saving is enabled
     if (!m_bSaveState) {
-        return true; // Not saving state
+        return {}; // Not saving state — not an error
     }
 
     // Prevent infinite recursion
     if (m_bSavingStateNow) {
-        return true;
+        return {}; // Already saving — silently succeed
     }
 
     // Check if we have an ID (required for filename)
     if (m_strID.isEmpty()) {
         qCDebug(lcAutomation) << "Plugin::SaveState() - no ID for plugin:" << m_strName;
-        return false;
+        return std::unexpected(QString("Plugin has no ID: %1").arg(m_strName));
     }
 
     // Need a state files directory
-    QString stateDir = GlobalOptions::instance()->stateFilesDirectory();
+    QString stateDir = GlobalOptions::instance().stateFilesDirectory();
     if (stateDir.isEmpty()) {
         qCDebug(lcAutomation) << "Plugin::SaveState() - no state files directory configured";
-        return false;
+        return std::unexpected(QString("No state files directory configured"));
     }
 
     // Need a world ID for per-world isolation
     if (m_pDoc->m_strWorldID.isEmpty()) {
         qCDebug(lcAutomation) << "Plugin::SaveState() - no world ID for plugin:" << m_strName;
-        return false;
+        return std::unexpected(QString("World has no ID (plugin: %1)").arg(m_strName));
     }
 
-    // Set saving flag
+    // Set saving flag with RAII guard to ensure reset on all exit paths
     m_bSavingStateNow = true;
+    const auto resetFlag = qScopeGuard([this] { m_bSavingStateNow = false; });
 
     // Save current plugin context and set to this plugin
     Plugin* savedPlugin = m_pDoc->m_CurrentPlugin;
@@ -611,8 +614,7 @@ bool Plugin::SaveState()
         if (!dir.mkpath(".")) {
             qCDebug(lcAutomation) << "Plugin::SaveState() - failed to create state directory:"
                                   << stateDir;
-            m_bSavingStateNow = false;
-            return false;
+            return std::unexpected(QString("Failed to create state directory: %1").arg(stateDir));
         }
     }
 
@@ -625,8 +627,8 @@ bool Plugin::SaveState()
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
         qCDebug(lcAutomation) << "Plugin::SaveState() - failed to open file for writing:"
                               << stateFilePath;
-        m_bSavingStateNow = false;
-        return false;
+        return std::unexpected(
+            QString("Failed to open state file for writing: %1").arg(stateFilePath));
     }
 
     // Write XML
@@ -646,8 +648,8 @@ bool Plugin::SaveState()
         // Variables are already sorted by name (std::map maintains key order)
         for (const auto& [key, var] : m_VariableMap) {
             xml.writeStartElement("variable");
-            xml.writeAttribute("name", var->strLabel);
-            xml.writeCharacters(var->strContents);
+            xml.writeAttribute("name", var->label);
+            xml.writeCharacters(var->contents);
             xml.writeEndElement(); // variable
         }
 
@@ -692,10 +694,8 @@ bool Plugin::SaveState()
     file.flush();
     file.close();
 
-    // Clear saving flag
-    m_bSavingStateNow = false;
-
-    return true;
+    // m_bSavingStateNow reset by qScopeGuard
+    return {};
 }
 
 /**
@@ -705,24 +705,24 @@ bool Plugin::SaveState()
  * Uses format: {StateFilesDir}/{WorldID}-{PluginID}-state.xml
  * This matches original MUSHclient for compatibility and per-world isolation.
  *
- * @return true on success
+ * @return empty expected on success, error string on failure
  */
-bool Plugin::LoadState()
+std::expected<void, QString> Plugin::LoadState()
 {
     // Check if we have an ID (required for filename)
     if (m_strID.isEmpty()) {
-        return true; // No state to load
+        return {}; // No state to load — not an error
     }
 
     // Need a state files directory
-    QString stateDir = GlobalOptions::instance()->stateFilesDirectory();
+    QString stateDir = GlobalOptions::instance().stateFilesDirectory();
     if (stateDir.isEmpty()) {
-        return true; // No state directory configured
+        return {}; // No state directory configured — not an error
     }
 
     // Need a world ID for per-world isolation
     if (m_pDoc->m_strWorldID.isEmpty()) {
-        return true; // No world ID, can't load state
+        return {}; // No world ID, can't load state — not an error
     }
 
     // Build state filename: {stateDir}/{worldID}-{pluginID}-state.xml
@@ -732,14 +732,15 @@ bool Plugin::LoadState()
     // Check if state file exists
     QFile file(stateFilePath);
     if (!file.exists()) {
-        return true; // No state file yet, this is OK
+        return {}; // No state file yet — not an error
     }
 
     // Open file for reading
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         qCDebug(lcAutomation) << "Plugin::LoadState() - failed to open file for reading:"
                               << stateFilePath;
-        return false;
+        return std::unexpected(
+            QString("Failed to open state file for reading: %1").arg(stateFilePath));
     }
 
     // Read XML
@@ -759,8 +760,8 @@ bool Plugin::LoadState()
 
                             // Create variable and add to map
                             auto var = std::make_unique<Variable>();
-                            var->strLabel = name;
-                            var->strContents = value;
+                            var->label = name;
+                            var->contents = value;
                             m_VariableMap[name] = std::move(var);
                         } else {
                             xml.skipCurrentElement();
@@ -803,11 +804,12 @@ bool Plugin::LoadState()
 
     // Check for XML errors
     if (xml.hasError()) {
-        qCDebug(lcAutomation) << "Plugin::LoadState() - XML error:" << xml.errorString();
+        QString xmlError = xml.errorString();
+        qCDebug(lcAutomation) << "Plugin::LoadState() - XML error:" << xmlError;
         file.close();
-        return false;
+        return std::unexpected(QString("XML parse error in state file: %1").arg(xmlError));
     }
 
     file.close();
-    return true;
+    return {};
 }

@@ -23,6 +23,116 @@ extern "C" {
 
 #include "lua_common.h"
 
+// ============================================================
+// Info table for GetTimerInfo / GetPluginTimerInfo
+// Shared by both world and plugin variants via luaInfoLookup.
+// ============================================================
+
+static const InfoField<Timer> kTimerInfoFields[] = {
+    {1,
+     [](lua_State* L, const Timer& t) {
+         // hour (at-time hour or interval hour)
+         if (t.type == Timer::TimerType::AtTime) {
+             lua_pushnumber(L, t.at_hour);
+         } else {
+             lua_pushnumber(L, t.every_hour);
+         }
+     }},
+    {2,
+     [](lua_State* L, const Timer& t) {
+         // minute
+         if (t.type == Timer::TimerType::AtTime) {
+             lua_pushnumber(L, t.at_minute);
+         } else {
+             lua_pushnumber(L, t.every_minute);
+         }
+     }},
+    {3,
+     [](lua_State* L, const Timer& t) {
+         // second
+         if (t.type == Timer::TimerType::AtTime) {
+             lua_pushnumber(L, t.at_second);
+         } else {
+             lua_pushnumber(L, t.every_second);
+         }
+     }},
+    {4, [](lua_State* L, const Timer& t) { luaPush(L, t.contents); }},
+    {5, [](lua_State* L, const Timer& t) { luaPush(L, t.procedure); }},
+    {6, [](lua_State* L, const Timer& t) { luaPush(L, t.omit_from_log); }},
+    {7, [](lua_State* L, const Timer& t) { luaPush(L, t.enabled); }},
+    {8, [](lua_State* L, const Timer& t) { luaPush(L, t.type == Timer::TimerType::AtTime); }},
+    {9, [](lua_State* L, const Timer& t) { luaPush(L, t.one_shot); }},
+    {10, [](lua_State* L, const Timer& t) { luaPush(L, t.temporary); }},
+    {11,
+     [](lua_State* L, const Timer& t) {
+         // interval hour (0 for at-time timers)
+         if (t.type == Timer::TimerType::Interval) {
+             lua_pushnumber(L, t.every_hour);
+         } else {
+             lua_pushnumber(L, 0);
+         }
+     }},
+    {12,
+     [](lua_State* L, const Timer& t) {
+         // interval minute
+         if (t.type == Timer::TimerType::Interval) {
+             lua_pushnumber(L, t.every_minute);
+         } else {
+             lua_pushnumber(L, 0);
+         }
+     }},
+    {13,
+     [](lua_State* L, const Timer& t) {
+         // interval second
+         if (t.type == Timer::TimerType::Interval) {
+             lua_pushnumber(L, t.every_second);
+         } else {
+             lua_pushnumber(L, 0.0);
+         }
+     }},
+    {14, [](lua_State* L, const Timer& t) { luaPush(L, t.create_sequence); }},
+    {15, [](lua_State* L, const Timer& t) { luaPush(L, t.group); }},
+    {16, [](lua_State* L, const Timer& t) { luaPush(L, t.variable); }},
+    {17, [](lua_State* L, const Timer& t) { luaPush(L, t.user_option); }},
+    {18, [](lua_State* L, const Timer& t) { luaPush(L, t.executing_script); }},
+    {19, [](lua_State* L, const Timer& t) { luaPush(L, t.dispid != -1); }},
+    {20, [](lua_State* L, const Timer& t) { luaPush(L, t.invocation_count); }},
+    {21, [](lua_State* L, const Timer& t) { luaPush(L, t.matched); }},
+    {22,
+     [](lua_State* L, const Timer& t) {
+         if (t.when_fired.isValid()) {
+             lua_pushnumber(L, t.when_fired.toSecsSinceEpoch());
+         } else {
+             lua_pushnil(L);
+         }
+     }},
+    {23, [](lua_State* L, const Timer& t) { luaPush(L, static_cast<int>(t.send_to)); }},
+    {24, [](lua_State* L, const Timer& t) { luaPush(L, t.active_when_closed); }},
+    {25,
+     [](lua_State* L, const Timer& t) {
+         // time to next fire (in seconds)
+         if (t.fire_time.isValid()) {
+             qint64 msecs = QDateTime::currentDateTime().msecsTo(t.fire_time);
+             lua_pushnumber(L, msecs / 1000.0);
+         } else {
+             lua_pushnumber(L, 0.0);
+         }
+     }},
+    {26,
+     [](lua_State* L, const Timer& t) {
+         // at_time_string (formatted time)
+         if (t.type == Timer::TimerType::AtTime) {
+             QString timeStr = QString("%1:%2:%3")
+                                   .arg(t.at_hour, 2, 10, QChar('0'))
+                                   .arg(t.at_minute, 2, 10, QChar('0'))
+                                   .arg(t.at_second, 5, 'f', 2, QChar('0'));
+             luaPushQString(L, timeStr);
+         } else {
+             lua_pushstring(L, "");
+         }
+     }},
+};
+
 // ========== Timer Functions ==========
 
 /**
@@ -72,41 +182,45 @@ int L_AddTimer(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* name = luaL_checkstring(L, 1);
+    QString qName = luaCheckQString(L, 1);
     int hour = luaL_checkinteger(L, 2);
     int minute = luaL_checkinteger(L, 3);
     double second = luaL_checknumber(L, 4);
-    const char* text = luaL_checkstring(L, 5);
+    QString text = luaCheckQString(L, 5);
     int flags = luaL_checkinteger(L, 6);
-    const char* scriptName = luaL_optstring(L, 7, "");
-
-    QString qName = QString::fromUtf8(name);
+    QString scriptName = luaOptQString(L, 7);
 
     // Validate and normalize timer name
-    qint32 nameStatus = validateObjectName(qName);
-    if (nameStatus != eOK) {
-        lua_pushnumber(L, nameStatus);
-        return 1;
-    }
+    LUA_VALIDATE_NAME(qName);
 
     // Check if timer already exists (check appropriate map based on context)
     // Use plugin(L) to get the plugin from Lua registry - this is reliable even after modal dialogs
     Plugin* currentPlugin = plugin(L);
     if (currentPlugin) {
-        if (currentPlugin->m_TimerMap.find(qName) != currentPlugin->m_TimerMap.end()) {
+        auto it = currentPlugin->m_TimerMap.find(qName);
+        if (it != currentPlugin->m_TimerMap.end()) {
             // If Replace flag is set, delete the old timer first
             if (flags & eTimerReplace) {
-                currentPlugin->m_TimerRevMap.remove(currentPlugin->m_TimerMap[qName].get());
-                currentPlugin->m_TimerMap.erase(qName);
+                // Cannot replace a timer whose script is currently executing (use-after-free guard)
+                if (it->second->executing_script) {
+                    return luaReturnError(L, eItemInUse);
+                }
+                currentPlugin->m_TimerRevMap.remove(it->second.get());
+                currentPlugin->m_TimerMap.erase(it);
             } else {
                 return luaReturnError(L, eTimerAlreadyExists);
             }
         }
     } else {
-        if (pDoc->getTimer(qName)) {
+        Timer* existing = pDoc->getTimer(qName);
+        if (existing) {
             // If Replace flag is set, delete the old timer first
             if (flags & eTimerReplace) {
-                pDoc->deleteTimer(qName);
+                // Cannot replace a timer whose script is currently executing (use-after-free guard)
+                if (existing->executing_script) {
+                    return luaReturnError(L, eItemInUse);
+                }
+                (void)pDoc->deleteTimer(qName); // safe: already checked executing_script
             } else {
                 return luaReturnError(L, eTimerAlreadyExists);
             }
@@ -133,65 +247,65 @@ int L_AddTimer(lua_State* L)
 
     // Create timer
     auto timer = std::make_unique<Timer>();
-    timer->strLabel = qName;
-    timer->bEnabled = (flags & eTimerEnabled) != 0;
-    timer->bOneShot = (flags & eTimerOneShot) != 0;
-    timer->bTemporary = (flags & eTimerTemporary) != 0;
-    timer->bActiveWhenClosed = (flags & eTimerActiveWhenClosed) != 0;
-    timer->strContents = QString::fromUtf8(text);
-    timer->strProcedure = QString::fromUtf8(scriptName);
+    timer->label = qName;
+    timer->enabled = (flags & eTimerEnabled) != 0;
+    timer->one_shot = (flags & eTimerOneShot) != 0;
+    timer->temporary = (flags & eTimerTemporary) != 0;
+    timer->active_when_closed = (flags & eTimerActiveWhenClosed) != 0;
+    timer->contents = text;
+    timer->procedure = scriptName;
 
     // Set timer type and timing fields
     if (flags & eTimerAtTime) {
         // At-time timer: fire at specific time each day
-        timer->iType = Timer::eAtTime;
-        timer->iAtHour = hour;
-        timer->iAtMinute = minute;
-        timer->fAtSecond = second;
+        timer->type = Timer::TimerType::AtTime;
+        timer->at_hour = hour;
+        timer->at_minute = minute;
+        timer->at_second = second;
     } else {
         // Interval timer: fire every N time
-        timer->iType = Timer::eInterval;
-        timer->iEveryHour = hour;
-        timer->iEveryMinute = minute;
-        timer->fEverySecond = second;
+        timer->type = Timer::TimerType::Interval;
+        timer->every_hour = hour;
+        timer->every_minute = minute;
+        timer->every_second = second;
     }
 
     // Set SendTo based on flags
     if (flags & eTimerSpeedWalk) {
-        timer->iSendTo = eSendToSpeedwalk;
+        timer->send_to = eSendToSpeedwalk;
     } else if (flags & eTimerNote) {
-        timer->iSendTo = eSendToOutput;
+        timer->send_to = eSendToOutput;
     } else {
-        timer->iSendTo = eSendToWorld;
+        timer->send_to = eSendToWorld;
     }
 
     // Calculate when the timer should first fire (based on ResetOneTimer)
     // Only calculate if timer is enabled
-    if (timer->bEnabled) {
+    if (timer->enabled) {
         QDateTime now = QDateTime::currentDateTime();
-        timer->tWhenFired = now;
+        timer->when_fired = now;
 
-        if (timer->iType == Timer::eAtTime) {
+        if (timer->type == Timer::TimerType::AtTime) {
             // At-time timer: set to today at the specified time
             QDate today = now.date();
-            QTime targetTime(timer->iAtHour, timer->iAtMinute, (int)timer->fAtSecond,
-                             (int)((timer->fAtSecond - (int)timer->fAtSecond) * 1000));
-            timer->tFireTime = QDateTime(today, targetTime);
+            QTime targetTime(timer->at_hour, timer->at_minute, (int)timer->at_second,
+                             (int)((timer->at_second - (int)timer->at_second) * 1000));
+            timer->fire_time = QDateTime(today, targetTime);
 
             // If this time has passed today, move to tomorrow
-            if (timer->tFireTime < now) {
-                timer->tFireTime = timer->tFireTime.addDays(1);
+            if (timer->fire_time < now) {
+                timer->fire_time = timer->fire_time.addDays(1);
             }
         } else {
             // Interval timer: fire after the interval from now
             qint64 intervalSecs =
-                timer->iEveryHour * 3600 + timer->iEveryMinute * 60 + (qint64)timer->fEverySecond;
-            timer->tFireTime = now.addSecs(intervalSecs);
+                timer->every_hour * 3600 + timer->every_minute * 60 + (qint64)timer->every_second;
+            timer->fire_time = now.addSecs(intervalSecs);
 
             // Subtract offset (if any)
-            timer->tFireTime =
-                timer->tFireTime.addSecs(-(timer->iOffsetHour * 3600 + timer->iOffsetMinute * 60 +
-                                           (qint64)timer->fOffsetSecond));
+            timer->fire_time =
+                timer->fire_time.addSecs(-(timer->offset_hour * 3600 + timer->offset_minute * 60 +
+                                           (qint64)timer->offset_second));
         }
     }
 
@@ -203,11 +317,8 @@ int L_AddTimer(lua_State* L)
         currentPlugin->m_TimerRevMap[rawTimer] = qName;
         // Fire time already calculated above when timer was created
     } else {
-        // Add to world's timer map
-        if (!pDoc->addTimer(qName, std::move(timer))) {
-            // addTimer returns false if timer already exists (shouldn't happen - we checked above)
-            return luaReturnError(L, eTimerAlreadyExists);
-        }
+        // Add to world's timer map (shouldn't fail - we checked above)
+        LUA_UNWRAP_VOID(pDoc->addTimer(qName, std::move(timer)), eTimerAlreadyExists);
     }
 
     return luaReturnOK(L);
@@ -232,9 +343,7 @@ int L_AddTimer(lua_State* L)
 int L_DeleteTimer(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
 
     // Check appropriate timer map based on context
     Plugin* currentPlugin = plugin(L);
@@ -243,12 +352,13 @@ int L_DeleteTimer(lua_State* L)
         if (it == currentPlugin->m_TimerMap.end()) {
             return luaReturnError(L, eTimerNotFound);
         }
+        if (it->second->executing_script) {
+            return luaReturnError(L, eItemInUse);
+        }
         currentPlugin->m_TimerRevMap.remove(it->second.get());
         currentPlugin->m_TimerMap.erase(it);
     } else {
-        if (!pDoc->deleteTimer(qName)) {
-            return luaReturnError(L, eTimerNotFound);
-        }
+        LUA_UNWRAP_VOID(pDoc->deleteTimer(qName), eTimerNotFound);
     }
 
     return luaReturnOK(L);
@@ -276,10 +386,9 @@ int L_DeleteTimer(lua_State* L)
 int L_EnableTimer(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
+    QString qName = luaCheckQString(L, 1);
     bool enabled = lua_toboolean(L, 2);
 
-    QString qName = QString::fromUtf8(name);
     Timer* timer = nullptr;
 
     // Check appropriate timer map based on context
@@ -297,7 +406,7 @@ int L_EnableTimer(lua_State* L)
         return luaReturnError(L, eTimerNotFound);
     }
 
-    timer->bEnabled = enabled;
+    timer->enabled = enabled;
     return luaReturnOK(L);
 }
 
@@ -322,9 +431,7 @@ int L_EnableTimer(lua_State* L)
 int L_IsTimer(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
     Timer* timer = nullptr;
 
     // Check appropriate timer map based on context
@@ -375,9 +482,7 @@ int L_IsTimer(lua_State* L)
 int L_GetTimer(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
     Timer* timer = nullptr;
 
     // Check appropriate timer map based on context
@@ -398,39 +503,31 @@ int L_GetTimer(lua_State* L)
     // Get time values (depends on timer type)
     int hour, minute;
     double second;
-    if (timer->iType == Timer::eAtTime) {
-        hour = timer->iAtHour;
-        minute = timer->iAtMinute;
-        second = timer->fAtSecond;
+    if (timer->type == Timer::TimerType::AtTime) {
+        hour = timer->at_hour;
+        minute = timer->at_minute;
+        second = timer->at_second;
     } else {
-        hour = timer->iEveryHour;
-        minute = timer->iEveryMinute;
-        second = timer->fEverySecond;
+        hour = timer->every_hour;
+        minute = timer->every_minute;
+        second = timer->every_second;
     }
 
     // Build flags
     int flags = 0;
-    if (timer->bEnabled)
+    if (timer->enabled)
         flags |= eTimerEnabled;
-    if (timer->bOneShot)
+    if (timer->one_shot)
         flags |= eTimerOneShot;
-    if (timer->iSendTo == eSendToSpeedwalk)
+    if (timer->send_to == eSendToSpeedwalk)
         flags |= eTimerSpeedWalk;
-    if (timer->iSendTo == eSendToOutput)
+    if (timer->send_to == eSendToOutput)
         flags |= eTimerNote;
-    if (timer->bActiveWhenClosed)
+    if (timer->active_when_closed)
         flags |= eTimerActiveWhenClosed;
 
     // Return: error_code, hour, minute, second, response, flags, script
-    lua_pushnumber(L, eOK);
-    lua_pushnumber(L, hour);
-    lua_pushnumber(L, minute);
-    lua_pushnumber(L, second);
-    lua_pushstring(L, timer->strContents.toUtf8().constData());
-    lua_pushnumber(L, flags);
-    lua_pushstring(L, timer->strProcedure.toUtf8().constData());
-
-    return 7;
+    return luaReturn(L, eOK, hour, minute, second, timer->contents, flags, timer->procedure);
 }
 
 /**
@@ -481,165 +578,15 @@ int L_GetTimer(lua_State* L)
  */
 int L_GetTimerInfo(lua_State* L)
 {
-    WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-    int info_type = luaL_checkinteger(L, 2);
-
-    QString qName = QString::fromUtf8(name);
-    Timer* timer = nullptr;
-
-    // Check appropriate timer map based on context
-    Plugin* currentPlugin = plugin(L);
-    if (currentPlugin) {
-        auto it = currentPlugin->m_TimerMap.find(qName);
-        if (it != currentPlugin->m_TimerMap.end()) {
-            timer = it->second.get();
-        }
-    } else {
-        timer = pDoc->getTimer(qName);
-    }
+    auto [name, info_type] = luaArgs<QString, int>(L);
+    Timer* timer = findTimer(L, name);
 
     if (!timer) {
         lua_pushnil(L);
         return 1;
     }
 
-    switch (info_type) {
-        case 1: // hour (at-time hour or interval hour)
-            if (timer->iType == Timer::eAtTime) {
-                lua_pushnumber(L, timer->iAtHour);
-            } else {
-                lua_pushnumber(L, timer->iEveryHour);
-            }
-            break;
-        case 2: // minute
-            if (timer->iType == Timer::eAtTime) {
-                lua_pushnumber(L, timer->iAtMinute);
-            } else {
-                lua_pushnumber(L, timer->iEveryMinute);
-            }
-            break;
-        case 3: // second
-            if (timer->iType == Timer::eAtTime) {
-                lua_pushnumber(L, timer->fAtSecond);
-            } else {
-                lua_pushnumber(L, timer->fEverySecond);
-            }
-            break;
-        case 4: // contents (send text)
-        {
-            QByteArray ba = timer->strContents.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
-        case 5: // strProcedure (script name)
-        {
-            QByteArray ba = timer->strProcedure.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
-        case 6: // bOmitFromLog
-            lua_pushboolean(L, timer->bOmitFromLog);
-            break;
-        case 7: // bEnabled
-            lua_pushboolean(L, timer->bEnabled);
-            break;
-        case 8: // bAtTime
-            lua_pushboolean(L, timer->iType == Timer::eAtTime);
-            break;
-        case 9: // bOneShot
-            lua_pushboolean(L, timer->bOneShot);
-            break;
-        case 10: // bTemporary
-            lua_pushboolean(L, timer->bTemporary);
-            break;
-        case 11: // interval hour (0 for at-time timers)
-            if (timer->iType == Timer::eInterval) {
-                lua_pushnumber(L, timer->iEveryHour);
-            } else {
-                lua_pushnumber(L, 0);
-            }
-            break;
-        case 12: // interval minute
-            if (timer->iType == Timer::eInterval) {
-                lua_pushnumber(L, timer->iEveryMinute);
-            } else {
-                lua_pushnumber(L, 0);
-            }
-            break;
-        case 13: // interval second
-            if (timer->iType == Timer::eInterval) {
-                lua_pushnumber(L, timer->fEverySecond);
-            } else {
-                lua_pushnumber(L, 0.0);
-            }
-            break;
-        case 14: // sequence (use nCreateSequence)
-            lua_pushnumber(L, timer->nCreateSequence);
-            break;
-        case 15: // strGroup
-        {
-            QByteArray ba = timer->strGroup.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
-        case 16: // strVariable
-        {
-            QByteArray ba = timer->strVariable.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
-        case 17: // iUserOption
-            lua_pushnumber(L, timer->iUserOption);
-            break;
-        case 18: // bExecutingScript
-            lua_pushboolean(L, timer->bExecutingScript);
-            break;
-        case 19: // has script (dispid != DISPID_UNKNOWN)
-            lua_pushboolean(L, timer->dispid != -1);
-            break;
-        case 20: // nInvocationCount
-            lua_pushnumber(L, timer->nInvocationCount);
-            break;
-        case 21: // nMatched
-            lua_pushnumber(L, timer->nMatched);
-            break;
-        case 22: // tWhenFired
-            if (timer->tWhenFired.isValid()) {
-                lua_pushnumber(L, timer->tWhenFired.toSecsSinceEpoch());
-            } else {
-                lua_pushnil(L);
-            }
-            break;
-        case 23: // iSendTo
-            lua_pushnumber(L, timer->iSendTo);
-            break;
-        case 24: // bActiveWhenClosed
-            lua_pushboolean(L, timer->bActiveWhenClosed);
-            break;
-        case 25: // time to next fire (in seconds)
-            if (timer->tFireTime.isValid()) {
-                qint64 msecs = QDateTime::currentDateTime().msecsTo(timer->tFireTime);
-                lua_pushnumber(L, msecs / 1000.0);
-            } else {
-                lua_pushnumber(L, 0.0);
-            }
-            break;
-        case 26: // at_time_string (formatted time)
-            if (timer->iType == Timer::eAtTime) {
-                QString timeStr = QString("%1:%2:%3")
-                                      .arg(timer->iAtHour, 2, 10, QChar('0'))
-                                      .arg(timer->iAtMinute, 2, 10, QChar('0'))
-                                      .arg(timer->fAtSecond, 5, 'f', 2, QChar('0'));
-                QByteArray ba = timeStr.toUtf8();
-                lua_pushlstring(L, ba.constData(), ba.length());
-            } else {
-                lua_pushstring(L, "");
-            }
-            break;
-
-        default:
-            lua_pushnil(L);
-            break;
-    }
-
-    return 1;
+    return luaInfoLookup(L, *timer, kTimerInfoFields, info_type);
 }
 
 /**
@@ -665,10 +612,17 @@ int L_GetTimerList(lua_State* L)
 
     lua_newtable(L);
     int i = 1;
-    for (const auto& [name, timer] : pDoc->m_TimerMap) {
-        QByteArray ba = name.toUtf8();
-        lua_pushlstring(L, ba.constData(), ba.length());
-        lua_rawseti(L, -2, i++);
+    Plugin* currentPlugin = plugin(L);
+    if (currentPlugin) {
+        for (const auto& [name, timerPtr] : currentPlugin->m_TimerMap) {
+            luaPushQString(L, name);
+            lua_rawseti(L, -2, i++);
+        }
+    } else {
+        for (const auto& [name, timer] : pDoc->m_automationRegistry->m_TimerMap) {
+            luaPushQString(L, name);
+            lua_rawseti(L, -2, i++);
+        }
     }
 
     return 1;
@@ -695,9 +649,7 @@ int L_GetTimerList(lua_State* L)
 int L_ResetTimer(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-
-    QString qName = QString::fromUtf8(name);
+    QString qName = luaCheckQString(L, 1);
     Timer* timer = nullptr;
 
     // Check appropriate timer map based on context
@@ -741,9 +693,17 @@ int L_ResetTimers(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    // Iterate through all timers and reset each one
-    for (const auto& [name, timer] : pDoc->m_TimerMap) {
-        pDoc->calculateNextFireTime(timer.get());
+    Plugin* currentPlugin = plugin(L);
+    if (currentPlugin) {
+        // Plugin context: reset all timers in the plugin's map
+        for (const auto& [name, timerPtr] : currentPlugin->m_TimerMap) {
+            pDoc->calculateNextFireTime(timerPtr.get());
+        }
+    } else {
+        // World context: iterate through all world-level timers and reset each one
+        for (const auto& [name, timer] : pDoc->m_automationRegistry->m_TimerMap) {
+            pDoc->calculateNextFireTime(timer.get());
+        }
     }
 
     return 0;
@@ -778,7 +738,7 @@ int L_DoAfter(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
     double seconds = luaL_checknumber(L, 1);
-    const char* text = luaL_checkstring(L, 2);
+    QString text = luaCheckQString(L, 2);
 
     if (seconds <= 0.0) {
         return luaReturnError(L, eTimeInvalid);
@@ -790,22 +750,20 @@ int L_DoAfter(lua_State* L)
 
     // Create temporary one-shot interval timer
     auto timer = std::make_unique<Timer>();
-    timer->strLabel = name;
-    timer->iType = Timer::eInterval;
-    timer->iEveryHour = 0;
-    timer->iEveryMinute = 0;
-    timer->fEverySecond = seconds;
-    timer->strContents = QString::fromUtf8(text);
-    timer->bEnabled = true;
-    timer->bOneShot = true; // Delete after firing
-    timer->bTemporary = true;
-    timer->bActiveWhenClosed = true;
-    timer->iSendTo = eSendToWorld;
+    timer->label = name;
+    timer->type = Timer::TimerType::Interval;
+    timer->every_hour = 0;
+    timer->every_minute = 0;
+    timer->every_second = seconds;
+    timer->contents = text;
+    timer->enabled = true;
+    timer->one_shot = true; // Delete after firing
+    timer->temporary = true;
+    timer->active_when_closed = true;
+    timer->send_to = eSendToWorld;
 
     // Add to document (transfer ownership)
-    if (!pDoc->addTimer(name, std::move(timer))) {
-        return luaReturnError(L, eTimerAlreadyExists);
-    }
+    LUA_UNWRAP_VOID(pDoc->addTimer(name, std::move(timer)), eTimerAlreadyExists);
 
     return luaReturnOK(L);
 }
@@ -851,7 +809,7 @@ int L_DoAfterSpecial(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
     double seconds = luaL_checknumber(L, 1);
-    const char* text = luaL_checkstring(L, 2);
+    QString text = luaCheckQString(L, 2);
     int sendto = luaL_checknumber(L, 3);
 
     if (seconds < 0.1 || seconds > 86399.0) {
@@ -869,17 +827,17 @@ int L_DoAfterSpecial(lua_State* L)
 
     // Create temporary one-shot interval timer
     auto timer = std::make_unique<Timer>();
-    timer->strLabel = name;
-    timer->iType = Timer::eInterval;
-    timer->iEveryHour = 0;
-    timer->iEveryMinute = 0;
-    timer->fEverySecond = seconds;
-    timer->strContents = QString::fromUtf8(text);
-    timer->bEnabled = true;
-    timer->bOneShot = true; // Delete after firing
-    timer->bTemporary = true;
-    timer->bActiveWhenClosed = true;
-    timer->iSendTo = sendto;
+    timer->label = name;
+    timer->type = Timer::TimerType::Interval;
+    timer->every_hour = 0;
+    timer->every_minute = 0;
+    timer->every_second = seconds;
+    timer->contents = text;
+    timer->enabled = true;
+    timer->one_shot = true; // Delete after firing
+    timer->temporary = true;
+    timer->active_when_closed = true;
+    timer->send_to = static_cast<SendTo>(sendto);
 
     // Add to appropriate timer map (plugin or world)
     // When called from plugin with eSendToScript, timer must execute in plugin's Lua state
@@ -892,9 +850,7 @@ int L_DoAfterSpecial(lua_State* L)
         // Initialize fire time for plugin timer
         pDoc->resetOneTimer(rawTimer);
     } else {
-        if (!pDoc->addTimer(name, std::move(timer))) {
-            return luaReturnError(L, eTimerAlreadyExists);
-        }
+        LUA_UNWRAP_VOID(pDoc->addTimer(name, std::move(timer)), eTimerAlreadyExists);
     }
 
     return luaReturnOK(L);
@@ -923,7 +879,7 @@ int L_DoAfterNote(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
     double seconds = luaL_checknumber(L, 1);
-    const char* text = luaL_checkstring(L, 2);
+    QString text = luaCheckQString(L, 2);
 
     if (seconds <= 0.0) {
         return luaReturnError(L, eTimeInvalid);
@@ -936,19 +892,19 @@ int L_DoAfterNote(lua_State* L)
 
     // Create temporary one-shot interval timer
     auto timer = std::make_unique<Timer>();
-    timer->strLabel = name;
-    timer->iType = Timer::eInterval;
-    timer->iEveryHour = 0;
-    timer->iEveryMinute = 0;
-    timer->fEverySecond = seconds;
-    timer->strContents = QString::fromUtf8(text);
-    timer->bEnabled = true;
-    timer->bOneShot = true;
-    timer->bTemporary = true;
-    timer->bActiveWhenClosed = true;
-    timer->iSendTo = eSendToOutput; // Send to output (note)
+    timer->label = name;
+    timer->type = Timer::TimerType::Interval;
+    timer->every_hour = 0;
+    timer->every_minute = 0;
+    timer->every_second = seconds;
+    timer->contents = text;
+    timer->enabled = true;
+    timer->one_shot = true;
+    timer->temporary = true;
+    timer->active_when_closed = true;
+    timer->send_to = eSendToOutput; // Send to output (note)
 
-    if (!pDoc->addTimer(name, std::move(timer))) {
+    if (!pDoc->addTimer(name, std::move(timer)).has_value()) {
         return luaReturnError(L, eTimerAlreadyExists);
     }
 
@@ -978,7 +934,7 @@ int L_DoAfterSpeedWalk(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
     double seconds = luaL_checknumber(L, 1);
-    const char* text = luaL_checkstring(L, 2);
+    QString text = luaCheckQString(L, 2);
 
     if (seconds <= 0.0) {
         return luaReturnError(L, eTimeInvalid);
@@ -991,21 +947,19 @@ int L_DoAfterSpeedWalk(lua_State* L)
 
     // Create temporary one-shot interval timer
     auto timer = std::make_unique<Timer>();
-    timer->strLabel = name;
-    timer->iType = Timer::eInterval;
-    timer->iEveryHour = 0;
-    timer->iEveryMinute = 0;
-    timer->fEverySecond = seconds;
-    timer->strContents = QString::fromUtf8(text);
-    timer->bEnabled = true;
-    timer->bOneShot = true;
-    timer->bTemporary = true;
-    timer->bActiveWhenClosed = true;
-    timer->iSendTo = eSendToSpeedwalk;
+    timer->label = name;
+    timer->type = Timer::TimerType::Interval;
+    timer->every_hour = 0;
+    timer->every_minute = 0;
+    timer->every_second = seconds;
+    timer->contents = text;
+    timer->enabled = true;
+    timer->one_shot = true;
+    timer->temporary = true;
+    timer->active_when_closed = true;
+    timer->send_to = eSendToSpeedwalk;
 
-    if (!pDoc->addTimer(name, std::move(timer))) {
-        return luaReturnError(L, eTimerAlreadyExists);
-    }
+    LUA_UNWRAP_VOID(pDoc->addTimer(name, std::move(timer)), eTimerAlreadyExists);
 
     return luaReturnOK(L);
 }
@@ -1031,18 +985,28 @@ int L_DoAfterSpeedWalk(lua_State* L)
 int L_EnableTimerGroup(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* groupName = luaL_checkstring(L, 1);
+    QString qGroupName = luaCheckQString(L, 1);
     bool enabled = lua_toboolean(L, 2);
-
-    QString qGroupName = QString::fromUtf8(groupName);
     int count = 0;
 
-    // Iterate through all timers
-    for (const auto& [name, timerPtr] : pDoc->m_TimerMap) {
-        Timer* timer = timerPtr.get();
-        if (timer->strGroup == qGroupName) {
-            timer->bEnabled = enabled;
-            count++;
+    Plugin* currentPlugin = plugin(L);
+    if (currentPlugin) {
+        // Plugin context: only iterate plugin's timer map
+        for (const auto& [name, timerPtr] : currentPlugin->m_TimerMap) {
+            Timer* timer = timerPtr.get();
+            if (timer->group == qGroupName) {
+                timer->enabled = enabled;
+                count++;
+            }
+        }
+    } else {
+        // World context: iterate world-level timer map
+        for (const auto& [name, timerPtr] : pDoc->m_automationRegistry->m_TimerMap) {
+            Timer* timer = timerPtr.get();
+            if (timer->group == qGroupName) {
+                timer->enabled = enabled;
+                count++;
+            }
         }
     }
 
@@ -1070,21 +1034,36 @@ int L_EnableTimerGroup(lua_State* L)
 int L_DeleteTimerGroup(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* groupName = luaL_checkstring(L, 1);
-
-    QString qGroupName = QString::fromUtf8(groupName);
+    QString qGroupName = luaCheckQString(L, 1);
     QStringList toDelete;
 
-    // Find all timers in this group
-    for (const auto& [name, timerPtr] : pDoc->m_TimerMap) {
-        if (timerPtr->strGroup == qGroupName) {
-            toDelete.append(name);
+    Plugin* currentPlugin = plugin(L);
+    if (currentPlugin) {
+        // Find all timers in this group within the plugin map
+        for (const auto& [name, timerPtr] : currentPlugin->m_TimerMap) {
+            if (timerPtr->group == qGroupName) {
+                toDelete.append(name);
+            }
         }
-    }
-
-    // Delete them
-    for (const QString& name : toDelete) {
-        pDoc->deleteTimer(name);
+        // Delete them from the plugin map (also clean reverse map)
+        for (const QString& name : toDelete) {
+            auto it = currentPlugin->m_TimerMap.find(name);
+            if (it != currentPlugin->m_TimerMap.end()) {
+                currentPlugin->m_TimerRevMap.remove(it->second.get());
+                currentPlugin->m_TimerMap.erase(it);
+            }
+        }
+    } else {
+        // Find all timers in this group within the world map
+        for (const auto& [name, timerPtr] : pDoc->m_automationRegistry->m_TimerMap) {
+            if (timerPtr->group == qGroupName) {
+                toDelete.append(name);
+            }
+        }
+        // Delete them
+        for (const QString& name : toDelete) {
+            (void)pDoc->deleteTimer(name); // intentional: bulk group/temporary delete
+        }
     }
 
     lua_pushnumber(L, toDelete.size());
@@ -1112,16 +1091,33 @@ int L_DeleteTemporaryTimers(lua_State* L)
     WorldDocument* pDoc = doc(L);
     QStringList toDelete;
 
-    // Find all temporary timers
-    for (const auto& [name, timerPtr] : pDoc->m_TimerMap) {
-        if (timerPtr->bTemporary) {
-            toDelete.append(name);
+    Plugin* currentPlugin = plugin(L);
+    if (currentPlugin) {
+        // Find all temporary timers in the plugin map
+        for (const auto& [name, timerPtr] : currentPlugin->m_TimerMap) {
+            if (timerPtr->temporary) {
+                toDelete.append(name);
+            }
         }
-    }
-
-    // Delete them
-    for (const QString& name : toDelete) {
-        pDoc->deleteTimer(name);
+        // Delete them from the plugin map (also clean reverse map)
+        for (const QString& name : toDelete) {
+            auto it = currentPlugin->m_TimerMap.find(name);
+            if (it != currentPlugin->m_TimerMap.end()) {
+                currentPlugin->m_TimerRevMap.remove(it->second.get());
+                currentPlugin->m_TimerMap.erase(it);
+            }
+        }
+    } else {
+        // Find all temporary timers in the world map
+        for (const auto& [name, timerPtr] : pDoc->m_automationRegistry->m_TimerMap) {
+            if (timerPtr->temporary) {
+                toDelete.append(name);
+            }
+        }
+        // Delete them
+        for (const QString& name : toDelete) {
+            (void)pDoc->deleteTimer(name); // intentional: bulk group/temporary delete
+        }
     }
 
     lua_pushnumber(L, toDelete.size());
@@ -1156,11 +1152,8 @@ int L_DeleteTemporaryTimers(lua_State* L)
 int L_GetTimerOption(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-    const char* optionName = luaL_checkstring(L, 2);
-
-    QString qName = QString::fromUtf8(name);
-    QString qOption = QString::fromUtf8(optionName).toLower();
+    QString qName = luaCheckQString(L, 1);
+    QString qOption = luaCheckQString(L, 2).toLower();
 
     Timer* timer = nullptr;
 
@@ -1182,59 +1175,55 @@ int L_GetTimerOption(lua_State* L)
 
     // Map option names to values
     if (qOption == "hour") {
-        if (timer->iType == Timer::eAtTime) {
-            lua_pushnumber(L, timer->iAtHour);
+        if (timer->type == Timer::TimerType::AtTime) {
+            lua_pushnumber(L, timer->at_hour);
         } else {
-            lua_pushnumber(L, timer->iEveryHour);
+            lua_pushnumber(L, timer->every_hour);
         }
     } else if (qOption == "minute") {
-        if (timer->iType == Timer::eAtTime) {
-            lua_pushnumber(L, timer->iAtMinute);
+        if (timer->type == Timer::TimerType::AtTime) {
+            lua_pushnumber(L, timer->at_minute);
         } else {
-            lua_pushnumber(L, timer->iEveryMinute);
+            lua_pushnumber(L, timer->every_minute);
         }
     } else if (qOption == "second") {
-        if (timer->iType == Timer::eAtTime) {
-            lua_pushnumber(L, timer->fAtSecond);
+        if (timer->type == Timer::TimerType::AtTime) {
+            lua_pushnumber(L, timer->at_second);
         } else {
-            lua_pushnumber(L, timer->fEverySecond);
+            lua_pushnumber(L, timer->every_second);
         }
     } else if (qOption == "enabled") {
-        lua_pushboolean(L, timer->bEnabled);
+        lua_pushboolean(L, timer->enabled);
     } else if (qOption == "at_time") {
-        lua_pushboolean(L, timer->iType == Timer::eAtTime);
+        lua_pushboolean(L, timer->type == Timer::TimerType::AtTime);
     } else if (qOption == "one_shot") {
-        lua_pushboolean(L, timer->bOneShot);
+        lua_pushboolean(L, timer->one_shot);
     } else if (qOption == "temporary") {
-        lua_pushboolean(L, timer->bTemporary);
+        lua_pushboolean(L, timer->temporary);
     } else if (qOption == "active_when_closed") {
-        lua_pushboolean(L, timer->bActiveWhenClosed);
+        lua_pushboolean(L, timer->active_when_closed);
     } else if (qOption == "send_to") {
-        lua_pushnumber(L, timer->iSendTo);
+        lua_pushnumber(L, static_cast<int>(timer->send_to));
     } else if (qOption == "script") {
-        QByteArray ba = timer->strProcedure.toUtf8();
-        lua_pushlstring(L, ba.constData(), ba.length());
+        luaPushQString(L, timer->procedure);
     } else if (qOption == "send") {
-        QByteArray ba = timer->strContents.toUtf8();
-        lua_pushlstring(L, ba.constData(), ba.length());
+        luaPushQString(L, timer->contents);
     } else if (qOption == "group") {
-        QByteArray ba = timer->strGroup.toUtf8();
-        lua_pushlstring(L, ba.constData(), ba.length());
+        luaPushQString(L, timer->group);
     } else if (qOption == "offset_hour") {
-        lua_pushnumber(L, timer->iOffsetHour);
+        lua_pushnumber(L, timer->offset_hour);
     } else if (qOption == "offset_minute") {
-        lua_pushnumber(L, timer->iOffsetMinute);
+        lua_pushnumber(L, timer->offset_minute);
     } else if (qOption == "offset_second") {
-        lua_pushnumber(L, timer->fOffsetSecond);
+        lua_pushnumber(L, timer->offset_second);
     } else if (qOption == "user") {
-        lua_pushnumber(L, timer->iUserOption);
+        lua_pushnumber(L, timer->user_option);
     } else if (qOption == "omit_from_output") {
-        lua_pushboolean(L, timer->bOmitFromOutput);
+        lua_pushboolean(L, timer->omit_from_output);
     } else if (qOption == "omit_from_log") {
-        lua_pushboolean(L, timer->bOmitFromLog);
+        lua_pushboolean(L, timer->omit_from_log);
     } else if (qOption == "variable") {
-        QByteArray ba = timer->strVariable.toUtf8();
-        lua_pushlstring(L, ba.constData(), ba.length());
+        luaPushQString(L, timer->variable);
     } else {
         lua_pushnil(L);
     }
@@ -1276,11 +1265,8 @@ int L_GetTimerOption(lua_State* L)
 int L_SetTimerOption(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    const char* name = luaL_checkstring(L, 1);
-    const char* optionName = luaL_checkstring(L, 2);
-
-    QString qName = QString::fromUtf8(name);
-    QString qOption = QString::fromUtf8(optionName).toLower();
+    QString qName = luaCheckQString(L, 1);
+    QString qOption = luaCheckQString(L, 2).toLower();
 
     Timer* timer = nullptr;
 
@@ -1305,10 +1291,10 @@ int L_SetTimerOption(lua_State* L)
         if (value < 0 || value > 23) {
             return luaReturnError(L, eTimeInvalid);
         }
-        if (timer->iType == Timer::eAtTime) {
-            timer->iAtHour = value;
+        if (timer->type == Timer::TimerType::AtTime) {
+            timer->at_hour = value;
         } else {
-            timer->iEveryHour = value;
+            timer->every_hour = value;
         }
         pDoc->calculateNextFireTime(timer);
     } else if (qOption == "minute") {
@@ -1316,10 +1302,10 @@ int L_SetTimerOption(lua_State* L)
         if (value < 0 || value > 59) {
             return luaReturnError(L, eTimeInvalid);
         }
-        if (timer->iType == Timer::eAtTime) {
-            timer->iAtMinute = value;
+        if (timer->type == Timer::TimerType::AtTime) {
+            timer->at_minute = value;
         } else {
-            timer->iEveryMinute = value;
+            timer->every_minute = value;
         }
         pDoc->calculateNextFireTime(timer);
     } else if (qOption == "second") {
@@ -1327,65 +1313,61 @@ int L_SetTimerOption(lua_State* L)
         if (value < 0.0 || value >= 60.0) {
             return luaReturnError(L, eTimeInvalid);
         }
-        if (timer->iType == Timer::eAtTime) {
-            timer->fAtSecond = value;
+        if (timer->type == Timer::TimerType::AtTime) {
+            timer->at_second = value;
         } else {
-            timer->fEverySecond = value;
+            timer->every_second = value;
         }
         pDoc->calculateNextFireTime(timer);
     } else if (qOption == "enabled") {
-        timer->bEnabled = lua_toboolean(L, 3);
+        timer->enabled = lua_toboolean(L, 3);
     } else if (qOption == "at_time") {
         bool isAtTime = lua_toboolean(L, 3);
-        timer->iType = isAtTime ? Timer::eAtTime : Timer::eInterval;
+        timer->type = isAtTime ? Timer::TimerType::AtTime : Timer::TimerType::Interval;
         pDoc->calculateNextFireTime(timer);
     } else if (qOption == "one_shot") {
-        timer->bOneShot = lua_toboolean(L, 3);
+        timer->one_shot = lua_toboolean(L, 3);
     } else if (qOption == "temporary") {
-        timer->bTemporary = lua_toboolean(L, 3);
+        timer->temporary = lua_toboolean(L, 3);
     } else if (qOption == "active_when_closed") {
-        timer->bActiveWhenClosed = lua_toboolean(L, 3);
+        timer->active_when_closed = lua_toboolean(L, 3);
     } else if (qOption == "send_to") {
-        timer->iSendTo = luaL_checkinteger(L, 3);
+        timer->send_to = static_cast<SendTo>(luaL_checkinteger(L, 3));
     } else if (qOption == "script") {
-        const char* value = luaL_checkstring(L, 3);
-        timer->strProcedure = QString::fromUtf8(value);
+        timer->procedure = luaCheckQString(L, 3);
     } else if (qOption == "send") {
-        const char* value = luaL_checkstring(L, 3);
-        timer->strContents = QString::fromUtf8(value);
+        timer->contents = luaCheckQString(L, 3);
     } else if (qOption == "group") {
-        const char* value = luaL_checkstring(L, 3);
-        timer->strGroup = QString::fromUtf8(value);
+        timer->group = luaCheckQString(L, 3);
     } else if (qOption == "offset_hour") {
         int value = luaL_checkinteger(L, 3);
         if (value < 0 || value > 23) {
             return luaReturnError(L, eTimeInvalid);
         }
-        timer->iOffsetHour = value;
+        timer->offset_hour = value;
         pDoc->calculateNextFireTime(timer);
     } else if (qOption == "offset_minute") {
         int value = luaL_checkinteger(L, 3);
         if (value < 0 || value > 59) {
             return luaReturnError(L, eTimeInvalid);
         }
-        timer->iOffsetMinute = value;
+        timer->offset_minute = value;
         pDoc->calculateNextFireTime(timer);
     } else if (qOption == "offset_second") {
         double value = luaL_checknumber(L, 3);
         if (value < 0.0 || value >= 60.0) {
             return luaReturnError(L, eTimeInvalid);
         }
-        timer->fOffsetSecond = value;
+        timer->offset_second = value;
         pDoc->calculateNextFireTime(timer);
     } else if (qOption == "user") {
-        timer->iUserOption = luaL_checkinteger(L, 3);
+        timer->user_option = luaL_checkinteger(L, 3);
     } else if (qOption == "omit_from_output") {
-        timer->bOmitFromOutput = lua_toboolean(L, 3);
+        timer->omit_from_output = lua_toboolean(L, 3);
     } else if (qOption == "omit_from_log") {
-        timer->bOmitFromLog = lua_toboolean(L, 3);
+        timer->omit_from_log = lua_toboolean(L, 3);
     } else if (qOption == "variable") {
-        const char* value = luaL_checkstring(L, 3);
-        timer->strVariable = QString::fromUtf8(value);
+        timer->variable = luaCheckQString(L, 3);
     } else {
         return luaReturnError(L, eOK); // Unknown option, but don't fail
     }
@@ -1415,16 +1397,14 @@ int L_GetPluginTimerList(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* pluginID = luaL_checkstring(L, 1);
-
-    Plugin* plugin = pDoc->FindPluginByID(QString::fromUtf8(pluginID));
+    Plugin* plugin = pDoc->FindPluginByID(luaCheckQString(L, 1));
 
     lua_newtable(L);
 
     if (plugin) {
         int index = 1;
         for (const auto& [name, timerPtr] : plugin->m_TimerMap) {
-            lua_pushstring(L, name.toUtf8().constData());
+            luaPushQString(L, name);
             lua_rawseti(L, -2, index++);
         }
     }
@@ -1454,11 +1434,9 @@ int L_GetPluginTimerInfo(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* pluginID = luaL_checkstring(L, 1);
-    const char* timerName = luaL_checkstring(L, 2);
+    Plugin* plugin = pDoc->FindPluginByID(luaCheckQString(L, 1));
+    QString tName = luaCheckQString(L, 2);
     int infoType = luaL_checkinteger(L, 3);
-
-    Plugin* plugin = pDoc->FindPluginByID(QString::fromUtf8(pluginID));
 
     if (!plugin) {
         lua_pushnil(L);
@@ -1470,7 +1448,6 @@ int L_GetPluginTimerInfo(lua_State* L)
     pDoc->m_CurrentPlugin = plugin;
 
     // Find timer in plugin's map
-    QString tName = QString::fromUtf8(timerName);
     Timer* timer = nullptr;
     auto it = plugin->m_TimerMap.find(tName);
     if (it != plugin->m_TimerMap.end()) {
@@ -1483,146 +1460,13 @@ int L_GetPluginTimerInfo(lua_State* L)
         return 1;
     }
 
-    // Return timer info using same cases as GetTimerInfo
-    switch (infoType) {
-        case 1: // hour (at-time hour or interval hour)
-            if (timer->iType == Timer::eAtTime) {
-                lua_pushnumber(L, timer->iAtHour);
-            } else {
-                lua_pushnumber(L, timer->iEveryHour);
-            }
-            break;
-        case 2: // minute
-            if (timer->iType == Timer::eAtTime) {
-                lua_pushnumber(L, timer->iAtMinute);
-            } else {
-                lua_pushnumber(L, timer->iEveryMinute);
-            }
-            break;
-        case 3: // second
-            if (timer->iType == Timer::eAtTime) {
-                lua_pushnumber(L, timer->fAtSecond);
-            } else {
-                lua_pushnumber(L, timer->fEverySecond);
-            }
-            break;
-        case 4: // contents (send text)
-        {
-            QByteArray ba = timer->strContents.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
-        case 5: // strProcedure (script name)
-        {
-            QByteArray ba = timer->strProcedure.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
-        case 6: // bOmitFromLog
-            lua_pushboolean(L, timer->bOmitFromLog);
-            break;
-        case 7: // bEnabled
-            lua_pushboolean(L, timer->bEnabled);
-            break;
-        case 8: // bAtTime
-            lua_pushboolean(L, timer->iType == Timer::eAtTime);
-            break;
-        case 9: // bOneShot
-            lua_pushboolean(L, timer->bOneShot);
-            break;
-        case 10: // bTemporary
-            lua_pushboolean(L, timer->bTemporary);
-            break;
-        case 11: // interval hour (0 for at-time timers)
-            if (timer->iType == Timer::eInterval) {
-                lua_pushnumber(L, timer->iEveryHour);
-            } else {
-                lua_pushnumber(L, 0);
-            }
-            break;
-        case 12: // interval minute
-            if (timer->iType == Timer::eInterval) {
-                lua_pushnumber(L, timer->iEveryMinute);
-            } else {
-                lua_pushnumber(L, 0);
-            }
-            break;
-        case 13: // interval second
-            if (timer->iType == Timer::eInterval) {
-                lua_pushnumber(L, timer->fEverySecond);
-            } else {
-                lua_pushnumber(L, 0.0);
-            }
-            break;
-        case 14: // sequence (use nCreateSequence)
-            lua_pushnumber(L, timer->nCreateSequence);
-            break;
-        case 15: // strGroup
-        {
-            QByteArray ba = timer->strGroup.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
-        case 16: // strVariable
-        {
-            QByteArray ba = timer->strVariable.toUtf8();
-            lua_pushlstring(L, ba.constData(), ba.length());
-        } break;
-        case 17: // iUserOption
-            lua_pushnumber(L, timer->iUserOption);
-            break;
-        case 18: // bExecutingScript
-            lua_pushboolean(L, timer->bExecutingScript);
-            break;
-        case 19: // has script (dispid != DISPID_UNKNOWN)
-            lua_pushboolean(L, timer->dispid != -1);
-            break;
-        case 20: // nInvocationCount
-            lua_pushnumber(L, timer->nInvocationCount);
-            break;
-        case 21: // nMatched
-            lua_pushnumber(L, timer->nMatched);
-            break;
-        case 22: // tWhenFired
-            if (timer->tWhenFired.isValid()) {
-                lua_pushnumber(L, timer->tWhenFired.toSecsSinceEpoch());
-            } else {
-                lua_pushnil(L);
-            }
-            break;
-        case 23: // iSendTo
-            lua_pushnumber(L, timer->iSendTo);
-            break;
-        case 24: // bActiveWhenClosed
-            lua_pushboolean(L, timer->bActiveWhenClosed);
-            break;
-        case 25: // time to next fire (in seconds)
-            if (timer->tFireTime.isValid()) {
-                qint64 msecs = QDateTime::currentDateTime().msecsTo(timer->tFireTime);
-                lua_pushnumber(L, msecs / 1000.0);
-            } else {
-                lua_pushnumber(L, 0.0);
-            }
-            break;
-        case 26: // at_time_string (formatted time)
-            if (timer->iType == Timer::eAtTime) {
-                QString timeStr = QString("%1:%2:%3")
-                                      .arg(timer->iAtHour, 2, 10, QChar('0'))
-                                      .arg(timer->iAtMinute, 2, 10, QChar('0'))
-                                      .arg(timer->fAtSecond, 5, 'f', 2, QChar('0'));
-                QByteArray ba = timeStr.toUtf8();
-                lua_pushlstring(L, ba.constData(), ba.length());
-            } else {
-                lua_pushstring(L, "");
-            }
-            break;
-
-        default:
-            lua_pushnil(L);
-            break;
-    }
+    // Return timer info using same table as GetTimerInfo
+    int result = luaInfoLookup(L, *timer, kTimerInfoFields, infoType);
 
     // Restore context
     pDoc->m_CurrentPlugin = savedPlugin;
 
-    return 1;
+    return result;
 }
 
 /**
@@ -1646,11 +1490,9 @@ int L_GetPluginTimerOption(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    const char* pluginID = luaL_checkstring(L, 1);
-    const char* timerName = luaL_checkstring(L, 2);
-    const char* optionName = luaL_checkstring(L, 3);
-
-    Plugin* plugin = pDoc->FindPluginByID(QString::fromUtf8(pluginID));
+    Plugin* plugin = pDoc->FindPluginByID(luaCheckQString(L, 1));
+    QString tName = luaCheckQString(L, 2);
+    QString option = luaCheckQString(L, 3);
 
     if (!plugin) {
         lua_pushnil(L);
@@ -1662,7 +1504,6 @@ int L_GetPluginTimerOption(lua_State* L)
     pDoc->m_CurrentPlugin = plugin;
 
     // Find timer
-    QString tName = QString::fromUtf8(timerName);
     Timer* timer = nullptr;
     auto it = plugin->m_TimerMap.find(tName);
     if (it != plugin->m_TimerMap.end()) {
@@ -1670,13 +1511,12 @@ int L_GetPluginTimerOption(lua_State* L)
     }
 
     if (timer) {
-        QString option = QString::fromUtf8(optionName);
         if (option == "enabled") {
-            lua_pushboolean(L, timer->bEnabled);
+            lua_pushboolean(L, timer->enabled);
         } else if (option == "at_time") {
-            lua_pushboolean(L, timer->iType == Timer::eAtTime);
+            lua_pushboolean(L, timer->type == Timer::TimerType::AtTime);
         } else if (option == "one_shot") {
-            lua_pushboolean(L, timer->bOneShot);
+            lua_pushboolean(L, timer->one_shot);
         } else {
             lua_pushnil(L);
         }

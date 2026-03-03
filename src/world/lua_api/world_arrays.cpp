@@ -30,10 +30,9 @@
  */
 static int L_ArrayCreate(lua_State* L)
 {
-    const char* name = luaL_checkstring(L, 1);
     WorldDocument* pDoc = doc(L);
 
-    QString arrayName = QString::fromUtf8(name);
+    QString arrayName = luaCheckQString(L, 1);
     ArraysMap& arrays = pDoc->getArrayMap();
 
     // Check if array already exists
@@ -59,10 +58,9 @@ static int L_ArrayCreate(lua_State* L)
  */
 static int L_ArrayDelete(lua_State* L)
 {
-    const char* name = luaL_checkstring(L, 1);
     WorldDocument* pDoc = doc(L);
 
-    QString arrayName = QString::fromUtf8(name);
+    QString arrayName = luaCheckQString(L, 1);
     ArraysMap& arrays = pDoc->getArrayMap();
 
     if (!arrays.contains(arrayName)) {
@@ -86,10 +84,9 @@ static int L_ArrayDelete(lua_State* L)
  */
 static int L_ArrayClear(lua_State* L)
 {
-    const char* name = luaL_checkstring(L, 1);
     WorldDocument* pDoc = doc(L);
 
-    QString arrayName = QString::fromUtf8(name);
+    QString arrayName = luaCheckQString(L, 1);
     ArraysMap& arrays = pDoc->getArrayMap();
 
     if (!arrays.contains(arrayName)) {
@@ -116,14 +113,11 @@ static int L_ArrayClear(lua_State* L)
  */
 static int L_ArraySet(lua_State* L)
 {
-    const char* name = luaL_checkstring(L, 1);
-    const char* key = luaL_checkstring(L, 2);
-    const char* value = luaL_checkstring(L, 3);
     WorldDocument* pDoc = doc(L);
 
-    QString arrayName = QString::fromUtf8(name);
-    QString keyStr = QString::fromUtf8(key);
-    QString valueStr = QString::fromUtf8(value);
+    QString arrayName = luaCheckQString(L, 1);
+    QString keyStr = luaCheckQString(L, 2);
+    QString valueStr = luaCheckQString(L, 3);
     ArraysMap& arrays = pDoc->getArrayMap();
 
     if (!arrays.contains(arrayName)) {
@@ -151,12 +145,10 @@ static int L_ArraySet(lua_State* L)
  */
 static int L_ArrayGet(lua_State* L)
 {
-    const char* name = luaL_checkstring(L, 1);
-    const char* key = luaL_checkstring(L, 2);
     WorldDocument* pDoc = doc(L);
 
-    QString arrayName = QString::fromUtf8(name);
-    QString keyStr = QString::fromUtf8(key);
+    QString arrayName = luaCheckQString(L, 1);
+    QString keyStr = luaCheckQString(L, 2);
     ArraysMap& arrays = pDoc->getArrayMap();
 
     if (!arrays.contains(arrayName)) {
@@ -169,8 +161,7 @@ static int L_ArrayGet(lua_State* L)
         return 1;
     }
 
-    QByteArray valueBytes = arrays[arrayName][keyStr].toUtf8();
-    lua_pushlstring(L, valueBytes.constData(), valueBytes.length());
+    luaPushQString(L, arrays[arrayName][keyStr]);
     return 1;
 }
 
@@ -186,12 +177,10 @@ static int L_ArrayGet(lua_State* L)
  */
 static int L_ArrayDeleteKey(lua_State* L)
 {
-    const char* name = luaL_checkstring(L, 1);
-    const char* key = luaL_checkstring(L, 2);
     WorldDocument* pDoc = doc(L);
 
-    QString arrayName = QString::fromUtf8(name);
-    QString keyStr = QString::fromUtf8(key);
+    QString arrayName = luaCheckQString(L, 1);
+    QString keyStr = luaCheckQString(L, 2);
     ArraysMap& arrays = pDoc->getArrayMap();
 
     if (!arrays.contains(arrayName)) {
@@ -220,10 +209,9 @@ static int L_ArrayDeleteKey(lua_State* L)
  */
 static int L_ArrayExists(lua_State* L)
 {
-    const char* name = luaL_checkstring(L, 1);
     WorldDocument* pDoc = doc(L);
 
-    QString arrayName = QString::fromUtf8(name);
+    QString arrayName = luaCheckQString(L, 1);
     const ArraysMap& arrays = pDoc->getArrayMap();
 
     lua_pushboolean(L, arrays.contains(arrayName));
@@ -241,12 +229,10 @@ static int L_ArrayExists(lua_State* L)
  */
 static int L_ArrayKeyExists(lua_State* L)
 {
-    const char* name = luaL_checkstring(L, 1);
-    const char* key = luaL_checkstring(L, 2);
     WorldDocument* pDoc = doc(L);
 
-    QString arrayName = QString::fromUtf8(name);
-    QString keyStr = QString::fromUtf8(key);
+    QString arrayName = luaCheckQString(L, 1);
+    QString keyStr = luaCheckQString(L, 2);
     const ArraysMap& arrays = pDoc->getArrayMap();
 
     if (!arrays.contains(arrayName)) {
@@ -284,10 +270,9 @@ static int L_ArrayCount(lua_State* L)
  */
 static int L_ArraySize(lua_State* L)
 {
-    const char* name = luaL_checkstring(L, 1);
     WorldDocument* pDoc = doc(L);
 
-    QString arrayName = QString::fromUtf8(name);
+    QString arrayName = luaCheckQString(L, 1);
     const ArraysMap& arrays = pDoc->getArrayMap();
 
     if (!arrays.contains(arrayName)) {
@@ -309,10 +294,9 @@ static int L_ArraySize(lua_State* L)
  */
 static int L_ArrayGetFirstKey(lua_State* L)
 {
-    const char* name = luaL_checkstring(L, 1);
     WorldDocument* pDoc = doc(L);
 
-    QString arrayName = QString::fromUtf8(name);
+    QString arrayName = luaCheckQString(L, 1);
     const ArraysMap& arrays = pDoc->getArrayMap();
 
     if (!arrays.contains(arrayName) || arrays[arrayName].isEmpty()) {
@@ -321,8 +305,7 @@ static int L_ArrayGetFirstKey(lua_State* L)
     }
 
     // QMap is sorted by key, so constBegin() gives the first key
-    QByteArray keyBytes = arrays[arrayName].constBegin().key().toUtf8();
-    lua_pushlstring(L, keyBytes.constData(), keyBytes.length());
+    luaPushQString(L, arrays[arrayName].constBegin().key());
     return 1;
 }
 
@@ -336,10 +319,9 @@ static int L_ArrayGetFirstKey(lua_State* L)
  */
 static int L_ArrayGetLastKey(lua_State* L)
 {
-    const char* name = luaL_checkstring(L, 1);
     WorldDocument* pDoc = doc(L);
 
-    QString arrayName = QString::fromUtf8(name);
+    QString arrayName = luaCheckQString(L, 1);
     const ArraysMap& arrays = pDoc->getArrayMap();
 
     if (!arrays.contains(arrayName) || arrays[arrayName].isEmpty()) {
@@ -348,8 +330,7 @@ static int L_ArrayGetLastKey(lua_State* L)
     }
 
     // QMap is sorted by key, so lastKey() gives the last key
-    QByteArray keyBytes = arrays[arrayName].lastKey().toUtf8();
-    lua_pushlstring(L, keyBytes.constData(), keyBytes.length());
+    luaPushQString(L, arrays[arrayName].lastKey());
     return 1;
 }
 
@@ -369,8 +350,7 @@ static int L_ArrayListAll(lua_State* L)
 
     int index = 1;
     for (auto it = arrays.constBegin(); it != arrays.constEnd(); ++it) {
-        QByteArray nameBytes = it.key().toUtf8();
-        lua_pushlstring(L, nameBytes.constData(), nameBytes.length());
+        luaPushQString(L, it.key());
         lua_rawseti(L, -2, index++);
     }
 
@@ -387,10 +367,9 @@ static int L_ArrayListAll(lua_State* L)
  */
 static int L_ArrayListKeys(lua_State* L)
 {
-    const char* name = luaL_checkstring(L, 1);
     WorldDocument* pDoc = doc(L);
 
-    QString arrayName = QString::fromUtf8(name);
+    QString arrayName = luaCheckQString(L, 1);
     const ArraysMap& arrays = pDoc->getArrayMap();
 
     lua_newtable(L);
@@ -402,8 +381,7 @@ static int L_ArrayListKeys(lua_State* L)
     const QMap<QString, QString>& arr = arrays[arrayName];
     int index = 1;
     for (auto it = arr.constBegin(); it != arr.constEnd(); ++it) {
-        QByteArray keyBytes = it.key().toUtf8();
-        lua_pushlstring(L, keyBytes.constData(), keyBytes.length());
+        luaPushQString(L, it.key());
         lua_rawseti(L, -2, index++);
     }
 
@@ -420,10 +398,9 @@ static int L_ArrayListKeys(lua_State* L)
  */
 static int L_ArrayListValues(lua_State* L)
 {
-    const char* name = luaL_checkstring(L, 1);
     WorldDocument* pDoc = doc(L);
 
-    QString arrayName = QString::fromUtf8(name);
+    QString arrayName = luaCheckQString(L, 1);
     const ArraysMap& arrays = pDoc->getArrayMap();
 
     lua_newtable(L);
@@ -435,8 +412,7 @@ static int L_ArrayListValues(lua_State* L)
     const QMap<QString, QString>& arr = arrays[arrayName];
     int index = 1;
     for (auto it = arr.constBegin(); it != arr.constEnd(); ++it) {
-        QByteArray valueBytes = it.value().toUtf8();
-        lua_pushlstring(L, valueBytes.constData(), valueBytes.length());
+        luaPushQString(L, it.value());
         lua_rawseti(L, -2, index++);
     }
 
@@ -470,12 +446,10 @@ static QString escapeForExport(const QString& str, const QString& delimiter)
  */
 static int L_ArrayExport(lua_State* L)
 {
-    const char* name = luaL_checkstring(L, 1);
-    const char* delim = luaL_checkstring(L, 2);
     WorldDocument* pDoc = doc(L);
 
-    QString arrayName = QString::fromUtf8(name);
-    QString delimiter = QString::fromUtf8(delim);
+    QString arrayName = luaCheckQString(L, 1);
+    QString delimiter = luaCheckQString(L, 2);
 
     // Validate delimiter
     if (delimiter.length() != 1 || delimiter == "\\") {
@@ -514,8 +488,7 @@ static int L_ArrayExport(lua_State* L)
         result += escapedKey + delimiter + escapedValue;
     }
 
-    QByteArray resultBytes = result.toUtf8();
-    lua_pushlstring(L, resultBytes.constData(), resultBytes.length());
+    luaPushQString(L, result);
     return 1;
 }
 
@@ -530,12 +503,10 @@ static int L_ArrayExport(lua_State* L)
  */
 static int L_ArrayExportKeys(lua_State* L)
 {
-    const char* name = luaL_checkstring(L, 1);
-    const char* delim = luaL_checkstring(L, 2);
     WorldDocument* pDoc = doc(L);
 
-    QString arrayName = QString::fromUtf8(name);
-    QString delimiter = QString::fromUtf8(delim);
+    QString arrayName = luaCheckQString(L, 1);
+    QString delimiter = luaCheckQString(L, 2);
 
     // Validate delimiter
     if (delimiter.length() != 1 || delimiter == "\\") {
@@ -571,8 +542,7 @@ static int L_ArrayExportKeys(lua_State* L)
         result += escapeForExport(it.key(), delimiter);
     }
 
-    QByteArray resultBytes = result.toUtf8();
-    lua_pushlstring(L, resultBytes.constData(), resultBytes.length());
+    luaPushQString(L, result);
     return 1;
 }
 
@@ -594,14 +564,11 @@ static int L_ArrayExportKeys(lua_State* L)
  */
 static int L_ArrayImport(lua_State* L)
 {
-    const char* name = luaL_checkstring(L, 1);
-    const char* values = luaL_checkstring(L, 2);
-    const char* delim = luaL_checkstring(L, 3);
     WorldDocument* pDoc = doc(L);
 
-    QString arrayName = QString::fromUtf8(name);
-    QString valuesStr = QString::fromUtf8(values);
-    QString delimiter = QString::fromUtf8(delim);
+    QString arrayName = luaCheckQString(L, 1);
+    QString valuesStr = luaCheckQString(L, 2);
+    QString delimiter = luaCheckQString(L, 3);
 
     // Validate delimiter
     if (delimiter.length() != 1 || delimiter == "\\") {
@@ -700,10 +667,9 @@ static int L_ArrayImport(lua_State* L)
  */
 static int L_ArrayList(lua_State* L)
 {
-    const char* name = luaL_checkstring(L, 1);
     WorldDocument* pDoc = doc(L);
 
-    QString arrayName = QString::fromUtf8(name);
+    QString arrayName = luaCheckQString(L, 1);
     const ArraysMap& arrays = pDoc->getArrayMap();
 
     auto it = arrays.find(arrayName);
@@ -715,10 +681,8 @@ static int L_ArrayList(lua_State* L)
 
     const QMap<QString, QString>& arr = it.value();
     for (auto i = arr.constBegin(); i != arr.constEnd(); ++i) {
-        QByteArray keyBytes = i.key().toUtf8();
-        QByteArray valueBytes = i.value().toUtf8();
-        lua_pushlstring(L, keyBytes.constData(), keyBytes.length());
-        lua_pushlstring(L, valueBytes.constData(), valueBytes.length());
+        luaPushQString(L, i.key());
+        luaPushQString(L, i.value());
         lua_rawset(L, -3);
     }
 

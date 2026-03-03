@@ -4,9 +4,8 @@
 // Verifies Timer class fields and basic operations
 
 #include "../src/automation/timer.h"
-#include <QCoreApplication>
+#include "fixtures/world_fixtures.h"
 #include <QDateTime>
-#include <gtest/gtest.h>
 
 // Test fixture for timer structure tests
 class TimerStructureTest : public ::testing::Test {
@@ -17,156 +16,130 @@ class TimerStructureTest : public ::testing::Test {
 // Test 1: Timer construction with defaults
 TEST_F(TimerStructureTest, DefaultConstruction)
 {
-    Timer* timer = new Timer();
+    auto timer = std::make_unique<Timer>();
 
     // Verify default values (based on actual defaults, not assumptions)
-    EXPECT_EQ(timer->iType, Timer::eInterval) << "Default type should be eInterval (0)";
-    EXPECT_TRUE(timer->bEnabled) << "Timer should be enabled by default";
-    EXPECT_EQ(timer->iSendTo, 0) << "Default send-to should be 0";
-    EXPECT_EQ(timer->nMatched, 0) << "Match count should be 0";
-    EXPECT_GE(timer->nCreateSequence, 0) << "Create sequence should be valid";
-
-    delete timer;
+    EXPECT_EQ(timer->type, Timer::TimerType::Interval) << "Default type should be Interval (0)";
+    EXPECT_TRUE(timer->enabled) << "Timer should be enabled by default";
+    EXPECT_EQ(timer->send_to, 0) << "Default send-to should be 0";
+    EXPECT_EQ(timer->matched, 0) << "Match count should be 0";
+    EXPECT_GE(timer->create_sequence, 0) << "Create sequence should be valid";
 }
 
 // Test 2: Setting timer fields (interval timer)
 TEST_F(TimerStructureTest, IntervalTimerFields)
 {
-    Timer* timer = new Timer();
+    auto timer = std::make_unique<Timer>();
 
     // Set interval timer properties
-    timer->strLabel = "test_timer";
-    timer->iType = Timer::eInterval;
-    timer->iEveryMinute = 5;
-    timer->fEverySecond = 30.5;
-    timer->strContents = "say Timer fired!";
-    timer->strProcedure = "on_timer";
-    timer->strGroup = "Combat";
-    timer->bOneShot = false;
-    timer->bTemporary = true;
+    timer->label = "test_timer";
+    timer->type = Timer::TimerType::Interval;
+    timer->every_minute = 5;
+    timer->every_second = 30.5;
+    timer->contents = "say Timer fired!";
+    timer->procedure = "on_timer";
+    timer->group = "Combat";
+    timer->one_shot = false;
+    timer->temporary = true;
 
     // Verify fields were set correctly
-    EXPECT_EQ(timer->strLabel, "test_timer");
-    EXPECT_EQ(timer->iType, Timer::eInterval);
-    EXPECT_EQ(timer->iEveryMinute, 5);
-    EXPECT_DOUBLE_EQ(timer->fEverySecond, 30.5);
-    EXPECT_EQ(timer->strContents, "say Timer fired!");
-    EXPECT_EQ(timer->strProcedure, "on_timer");
-    EXPECT_EQ(timer->strGroup, "Combat");
-    EXPECT_FALSE(timer->bOneShot);
-    EXPECT_TRUE(timer->bTemporary);
-
-    delete timer;
+    EXPECT_EQ(timer->label, "test_timer");
+    EXPECT_EQ(timer->type, Timer::TimerType::Interval);
+    EXPECT_EQ(timer->every_minute, 5);
+    EXPECT_DOUBLE_EQ(timer->every_second, 30.5);
+    EXPECT_EQ(timer->contents, "say Timer fired!");
+    EXPECT_EQ(timer->procedure, "on_timer");
+    EXPECT_EQ(timer->group, "Combat");
+    EXPECT_FALSE(timer->one_shot);
+    EXPECT_TRUE(timer->temporary);
 }
 
 // Test 3: At-time timer creation
 TEST_F(TimerStructureTest, AtTimeTimer)
 {
-    Timer* timer = new Timer();
+    auto timer = std::make_unique<Timer>();
 
     // Set at-time timer properties
-    timer->strLabel = "daily_reminder";
-    timer->iType = Timer::eAtTime;
-    timer->iAtHour = 15;
-    timer->iAtMinute = 30;
-    timer->fAtSecond = 0.0;
-    timer->strContents = "say It's 3:30 PM!";
-    timer->bActiveWhenClosed = true;
+    timer->label = "daily_reminder";
+    timer->type = Timer::TimerType::AtTime;
+    timer->at_hour = 15;
+    timer->at_minute = 30;
+    timer->at_second = 0.0;
+    timer->contents = "say It's 3:30 PM!";
+    timer->active_when_closed = true;
 
     // Verify at-time fields
-    EXPECT_EQ(timer->strLabel, "daily_reminder");
-    EXPECT_EQ(timer->iType, Timer::eAtTime);
-    EXPECT_EQ(timer->iAtHour, 15);
-    EXPECT_EQ(timer->iAtMinute, 30);
-    EXPECT_DOUBLE_EQ(timer->fAtSecond, 0.0);
-    EXPECT_TRUE(timer->bActiveWhenClosed);
-    EXPECT_GE(timer->nCreateSequence, 0);
-
-    delete timer;
+    EXPECT_EQ(timer->label, "daily_reminder");
+    EXPECT_EQ(timer->type, Timer::TimerType::AtTime);
+    EXPECT_EQ(timer->at_hour, 15);
+    EXPECT_EQ(timer->at_minute, 30);
+    EXPECT_DOUBLE_EQ(timer->at_second, 0.0);
+    EXPECT_TRUE(timer->active_when_closed);
+    EXPECT_GE(timer->create_sequence, 0);
 }
 
 // Test 4: Sequence counter increments
 TEST_F(TimerStructureTest, SequenceCounter)
 {
-    Timer* timer1 = new Timer();
-    Timer* timer2 = new Timer();
-    Timer* timer3 = new Timer();
-    Timer* timer4 = new Timer();
+    auto timer1 = std::make_unique<Timer>();
+    auto timer2 = std::make_unique<Timer>();
+    auto timer3 = std::make_unique<Timer>();
+    auto timer4 = std::make_unique<Timer>();
 
     // Verify sequences increment
-    EXPECT_LT(timer1->nCreateSequence, timer2->nCreateSequence)
+    EXPECT_LT(timer1->create_sequence, timer2->create_sequence)
         << "Sequence should increment for timer2";
-    EXPECT_LT(timer2->nCreateSequence, timer3->nCreateSequence)
+    EXPECT_LT(timer2->create_sequence, timer3->create_sequence)
         << "Sequence should increment for timer3";
-    EXPECT_LT(timer3->nCreateSequence, timer4->nCreateSequence)
+    EXPECT_LT(timer3->create_sequence, timer4->create_sequence)
         << "Sequence should increment for timer4";
-
-    delete timer1;
-    delete timer2;
-    delete timer3;
-    delete timer4;
 }
 
 // Test 5: All field types accessible
 TEST_F(TimerStructureTest, AllFieldsAccessible)
 {
-    Timer* timer = new Timer();
+    auto timer = std::make_unique<Timer>();
 
     // Set all field types to verify they're accessible
     // Timing fields
-    timer->iOffsetHour = 0;
-    timer->iOffsetMinute = 2;
-    timer->fOffsetSecond = 0.0;
+    timer->offset_hour = 0;
+    timer->offset_minute = 2;
+    timer->offset_second = 0.0;
 
     // Action fields
-    timer->strVariable = "last_timer";
-    timer->strContents = "test";
-    timer->strProcedure = "test_proc";
+    timer->variable = "last_timer";
+    timer->contents = "test";
+    timer->procedure = "test_proc";
 
     // Flags
-    timer->bOmitFromOutput = true;
-    timer->bOmitFromLog = false;
-    timer->bExecutingScript = false;
-    timer->bIncluded = false;
-    timer->bSelected = true;
+    timer->omit_from_output = true;
+    timer->omit_from_log = false;
+    timer->executing_script = false;
+    timer->included = false;
+    timer->selected = true;
 
     // Metadata
-    timer->iUserOption = 42;
+    timer->user_option = 42;
     timer->dispid = QVariant(123);
 
     // Runtime tracking
-    timer->nUpdateNumber = 456;
-    timer->nInvocationCount = 10;
-    timer->nMatched = 5;
-    timer->tFireTime = QDateTime::currentDateTime().addSecs(300);
-    timer->tWhenFired = QDateTime::currentDateTime();
+    timer->update_number = 456;
+    timer->invocation_count = 10;
+    timer->matched = 5;
+    timer->fire_time = QDateTime::currentDateTime().addSecs(300);
+    timer->when_fired = QDateTime::currentDateTime();
 
     // Verify all fields are set correctly
-    EXPECT_EQ(timer->iOffsetMinute, 2);
-    EXPECT_EQ(timer->strVariable, "last_timer");
-    EXPECT_TRUE(timer->bOmitFromOutput);
-    EXPECT_FALSE(timer->bOmitFromLog);
-    EXPECT_TRUE(timer->bSelected);
-    EXPECT_EQ(timer->iUserOption, 42);
+    EXPECT_EQ(timer->offset_minute, 2);
+    EXPECT_EQ(timer->variable, "last_timer");
+    EXPECT_TRUE(timer->omit_from_output);
+    EXPECT_FALSE(timer->omit_from_log);
+    EXPECT_TRUE(timer->selected);
+    EXPECT_EQ(timer->user_option, 42);
     EXPECT_EQ(timer->dispid.toInt(), 123);
-    EXPECT_EQ(timer->nUpdateNumber, 456);
-    EXPECT_EQ(timer->nInvocationCount, 10);
-    EXPECT_EQ(timer->nMatched, 5);
-    EXPECT_TRUE(timer->tFireTime.isValid());
-    EXPECT_TRUE(timer->tWhenFired.isValid());
-
-    delete timer;
-}
-
-// Main function required for GoogleTest
-int main(int argc, char** argv)
-{
-    // Initialize Qt (required for Qt objects)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
+    EXPECT_EQ(timer->update_number, 456);
+    EXPECT_EQ(timer->invocation_count, 10);
+    EXPECT_EQ(timer->matched, 5);
+    EXPECT_TRUE(timer->fire_time.isValid());
+    EXPECT_TRUE(timer->when_fired.isValid());
 }

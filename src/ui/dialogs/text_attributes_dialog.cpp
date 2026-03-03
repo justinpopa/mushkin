@@ -190,14 +190,5 @@ void TextAttributesDialog::updateColorSwatch(QLabel* swatch, const QColor& color
 
 void TextAttributesDialog::onLineInfo()
 {
-    // TODO: Implement line info functionality
-    // This will show detailed information about the entire line
-    // containing the character being inspected.
-    // For now, this is a placeholder that can be implemented when
-    // the line info system is available.
-
-    // Expected behavior:
-    // 1. Open a new dialog showing line-level information
-    // 2. Display line number, line length, timestamp, etc.
-    // 3. Show all styles/attributes present on the line
+    // TODO(feature): Display metadata (timestamp, style runs) for selected output line.
 }

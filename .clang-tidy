@@ -1,0 +1,36 @@
+---
+Checks: >
+  -*,
+  modernize-*,
+  performance-*,
+  cppcoreguidelines-owning-memory,
+  cppcoreguidelines-no-malloc,
+  cppcoreguidelines-pro-type-cstyle-cast,
+  cppcoreguidelines-avoid-c-arrays,
+  bugprone-use-after-move,
+  bugprone-dangling-handle,
+  bugprone-forward-declaration-namespace,
+  readability-redundant-string-cstr,
+  readability-container-size-empty,
+  misc-unused-using-decls
+
+WarningsAsErrors: >
+  cppcoreguidelines-owning-memory,
+  cppcoreguidelines-no-malloc,
+  bugprone-use-after-move
+
+CheckOptions:
+  - key: modernize-use-auto.MinTypeNameLength
+    value: 5
+  - key: modernize-loop-convert.MinConfidence
+    value: reasonable
+  - key: modernize-pass-by-value.IncludeStyle
+    value: google
+  - key: performance-unnecessary-value-param.AllowedTypes
+    value: 'QString;QStringList;QVariant'
+
+HeaderFilterRegex: 'src/.*\.h$'
+
+# Skip third-party C code and external dependencies
+ExcludeHeaderFilterRegex: '(third-party|external|build)/.*'
+---

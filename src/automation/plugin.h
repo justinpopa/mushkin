@@ -13,6 +13,7 @@
 #include <QObject>
 #include <QString>
 #include <QVector>
+#include <expected>
 #include <memory>
 
 // Forward declarations
@@ -109,7 +110,7 @@ class Plugin : public QObject {
 
     // Variables: own set of script variables (key-value pairs)
     // Plugin state persistence
-    VariableMap m_VariableMap; // name → Variable*
+    VariableMap m_VariableMap; // name → unique_ptr<Variable>
 
     // Arrays: nested map for Lua table persistence
     // Plugin state persistence
@@ -258,9 +259,9 @@ class Plugin : public QObject {
      * Writes plugin variables and arrays to <plugin_id>.state file.
      * Calls OnPluginSaveState callback before saving.
      *
-     * @return true on success
+     * @return empty expected on success, error string on failure
      */
-    bool SaveState();
+    [[nodiscard]] std::expected<void, QString> SaveState();
 
     /**
      * Load plugin state from .state file
@@ -269,9 +270,9 @@ class Plugin : public QObject {
      *
      * Reads variables and arrays from <plugin_id>.state file.
      *
-     * @return true on success
+     * @return empty expected on success, error string on failure
      */
-    bool LoadState();
+    [[nodiscard]] std::expected<void, QString> LoadState();
 
     // ========== Accessor Methods ==========
 

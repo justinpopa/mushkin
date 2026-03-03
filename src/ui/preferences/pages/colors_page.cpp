@@ -8,8 +8,7 @@
 #include <QTableWidget>
 #include <QVBoxLayout>
 
-ColorsPage::ColorsPage(WorldDocument* doc, QWidget* parent)
-    : PreferencesPageBase(doc, parent)
+ColorsPage::ColorsPage(WorldDocument* doc, QWidget* parent) : PreferencesPageBase(doc, parent)
 {
     setupUi();
 }
@@ -20,10 +19,12 @@ void ColorsPage::setupUi()
     mainLayout->setContentsMargins(0, 0, 0, 0);
 
     // Help text
-    QLabel* helpLabel = new QLabel(
-        tr("Custom colors can be used in triggers and other features. "
-           "Each color has a text (foreground) and background component."),
-        this);
+    QLabel* helpLabel =
+        new QLabel(tr("Custom colors can be used in triggers and other features. "
+                      "Each color has a text (foreground) and background component.\n\n"
+                      "Note: ANSI terminal colors (the 16 standard colors used for MUD output) "
+                      "are configured on the Output page."),
+                   this);
     helpLabel->setWordWrap(true);
     mainLayout->addWidget(helpLabel);
 
@@ -80,9 +81,9 @@ void ColorsPage::loadSettings()
     m_table->blockSignals(true);
 
     for (int i = 0; i < 16; i++) {
-        m_customText[i] = m_doc->m_customtext[i];
-        m_customBack[i] = m_doc->m_customback[i];
-        m_customNames[i] = m_doc->m_strCustomColourName[i];
+        m_customText[i] = m_doc->m_colors.custom_text[i];
+        m_customBack[i] = m_doc->m_colors.custom_back[i];
+        m_customNames[i] = m_doc->m_colors.custom_colour_name[i];
 
         // Update name
         m_table->item(i, 1)->setText(m_customNames[i]);
@@ -102,9 +103,9 @@ void ColorsPage::saveSettings()
         return;
 
     for (int i = 0; i < 16; i++) {
-        m_doc->m_customtext[i] = m_customText[i];
-        m_doc->m_customback[i] = m_customBack[i];
-        m_doc->m_strCustomColourName[i] = m_table->item(i, 1)->text();
+        m_doc->m_colors.custom_text[i] = m_customText[i];
+        m_doc->m_colors.custom_back[i] = m_customBack[i];
+        m_doc->m_colors.custom_colour_name[i] = m_table->item(i, 1)->text();
     }
 
     m_doc->setModified(true);
@@ -154,8 +155,9 @@ void ColorsPage::onBackColorClicked()
         return;
 
     int index = btn->property("colorIndex").toInt();
-    QColor color = QColorDialog::getColor(QColor(m_customBack[index]), this,
-                                          tr("Choose background color for custom %1").arg(index + 1));
+    QColor color =
+        QColorDialog::getColor(QColor(m_customBack[index]), this,
+                               tr("Choose background color for custom %1").arg(index + 1));
 
     if (color.isValid()) {
         m_customBack[index] = color.rgb();

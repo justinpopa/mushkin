@@ -13,54 +13,21 @@
  */
 
 #include "../src/automation/script_language.h"
-#include "../src/text/line.h"
-#include "../src/text/style.h"
-#include "../src/world/script_engine.h"
-#include "../src/world/world_document.h"
-#include <QCoreApplication>
+#include "fixtures/world_fixtures.h"
 #include <QDir>
-#include <gtest/gtest.h>
-
-extern "C" {
-#include <lauxlib.h>
-#include <lua.h>
-#include <lualib.h>
-}
 
 // Test fixture for script loading tests
-class ScriptLoadingTest : public ::testing::Test {
+class ScriptLoadingTest : public ConnectedWorldTest {
   protected:
     void SetUp() override
     {
-        doc = new WorldDocument();
-
-        // Initialize basic state
-        doc->m_mush_name = "Test World";
-        doc->m_server = "test.mud.com";
-        doc->m_port = 4000;
-        doc->m_iConnectPhase = eConnectConnectedToMud;
-        doc->m_bUTF_8 = true;
+        ConnectedWorldTest::SetUp();
 
         // Initialize note() settings
         doc->m_bNotesInRGB = true;
         doc->m_iNoteColourFore = qRgb(255, 255, 255); // White
         doc->m_iNoteColourBack = qRgb(0, 0, 0);       // Black
         doc->m_iNoteStyle = 0;                        // No special styling
-
-        // Create initial line (needed for note() to work)
-        doc->m_currentLine = new Line(1, 80, 0, qRgb(192, 192, 192), qRgb(0, 0, 0), true);
-        auto initialStyle = std::make_unique<Style>();
-        initialStyle->iLength = 0;
-        initialStyle->iFlags = COLOUR_RGB;
-        initialStyle->iForeColour = qRgb(192, 192, 192);
-        initialStyle->iBackColour = qRgb(0, 0, 0);
-        initialStyle->pAction = nullptr;
-        doc->m_currentLine->styleList.push_back(std::move(initialStyle));
-
-        // Set current style
-        doc->m_iFlags = COLOUR_RGB;
-        doc->m_iForeColour = qRgb(192, 192, 192);
-        doc->m_iBackColour = qRgb(0, 0, 0);
 
         // Initialize script timing
         doc->m_iScriptTimeTaken = 0;
@@ -77,11 +44,6 @@ class ScriptLoadingTest : public ::testing::Test {
         testDir = QDir::currentPath() + "/tests";
     }
 
-    void TearDown() override
-    {
-        delete doc;
-    }
-
     // Helper method to reset Lua state between tests
     void resetLuaState()
     {
@@ -89,7 +51,6 @@ class ScriptLoadingTest : public ::testing::Test {
         doc->m_ScriptEngine->openLua();
     }
 
-    WorldDocument* doc = nullptr;
     QString testDir;
 };
 
@@ -146,7 +107,7 @@ TEST_F(ScriptLoadingTest, ParseLuaRuntimeError)
 // Test 5: loadScriptFile() with valid script
 TEST_F(ScriptLoadingTest, LoadValidScriptFile)
 {
-    doc->m_strScriptFilename = testDir + "/test_valid.lua";
+    doc->m_scripting.filename = testDir + "/test_valid.lua";
     doc->loadScriptFile();
 
     // Check if functions were defined
@@ -164,7 +125,7 @@ TEST_F(ScriptLoadingTest, LoadScriptFileWithSyntaxError)
 {
     resetLuaState();
 
-    doc->m_strScriptFilename = testDir + "/test_syntax_error.lua";
+    doc->m_scripting.filename = testDir + "/test_syntax_error.lua";
 
     // Should handle syntax error gracefully without crashing
     EXPECT_NO_THROW(doc->loadScriptFile()) << "Should handle syntax error gracefully";
@@ -175,7 +136,7 @@ TEST_F(ScriptLoadingTest, LoadScriptFileWithRuntimeError)
 {
     resetLuaState();
 
-    doc->m_strScriptFilename = testDir + "/test_runtime_error.lua";
+    doc->m_scripting.filename = testDir + "/test_runtime_error.lua";
 
     // Should handle runtime error gracefully without crashing
     EXPECT_NO_THROW(doc->loadScriptFile()) << "Should handle runtime error gracefully";
@@ -184,7 +145,7 @@ TEST_F(ScriptLoadingTest, LoadScriptFileWithRuntimeError)
 // Test 8: showErrorLines()
 TEST_F(ScriptLoadingTest, ShowErrorLines)
 {
-    doc->m_strScriptFilename = testDir + "/test_syntax_error.lua";
+    doc->m_scripting.filename = testDir + "/test_syntax_error.lua";
 
     // Should execute without crashing
     EXPECT_NO_THROW(doc->showErrorLines(13)) << "showErrorLines() should execute without crashing";
@@ -194,7 +155,7 @@ TEST_F(ScriptLoadingTest, ShowErrorLines)
 TEST_F(ScriptLoadingTest, TimingStatistics)
 {
     // Load a script to trigger timing
-    doc->m_strScriptFilename = testDir + "/test_valid.lua";
+    doc->m_scripting.filename = testDir + "/test_valid.lua";
     doc->loadScriptFile();
 
     EXPECT_GT(doc->m_iScriptTimeTaken, 0) << "Script timing should be recorded";
@@ -382,7 +343,8 @@ TEST_F(ScriptLoadingTest, YueScriptParseScript)
     QString yueCode = R"(
 global yue_parse_value = 100
 )";
-    bool error = doc->m_ScriptEngine->parseScript(yueCode, "YueScript parseScript", ScriptLanguage::YueScript);
+    bool error = doc->m_ScriptEngine->parseScript(yueCode, "YueScript parseScript",
+                                                  ScriptLanguage::YueScript);
     EXPECT_FALSE(error) << "parseScript with YueScript should succeed";
 
     lua_State* L = doc->m_ScriptEngine->L;
@@ -445,7 +407,8 @@ TEST_F(ScriptLoadingTest, TealParseScript)
 local y: number = 200
 teal_parse_value = y
 )";
-    bool error = doc->m_ScriptEngine->parseScript(tealCode, "Teal parseScript", ScriptLanguage::Teal);
+    bool error =
+        doc->m_ScriptEngine->parseScript(tealCode, "Teal parseScript", ScriptLanguage::Teal);
     EXPECT_FALSE(error) << "parseScript with Teal should succeed";
 
     lua_State* L = doc->m_ScriptEngine->L;
@@ -506,7 +469,8 @@ TEST_F(ScriptLoadingTest, FennelParseScript)
     QString fennelCode = R"(
 (global fennel_parse_value 300)
 )";
-    bool error = doc->m_ScriptEngine->parseScript(fennelCode, "Fennel parseScript", ScriptLanguage::Fennel);
+    bool error =
+        doc->m_ScriptEngine->parseScript(fennelCode, "Fennel parseScript", ScriptLanguage::Fennel);
     EXPECT_FALSE(error) << "parseScript with Fennel should succeed";
 
     lua_State* L = doc->m_ScriptEngine->L;
@@ -605,7 +569,8 @@ TEST_F(ScriptLoadingTest, MoonScriptParseScript)
     QString moonCode = R"(
 export moon_parse_value = 100
 )";
-    bool error = doc->m_ScriptEngine->parseScript(moonCode, "MoonScript parseScript", ScriptLanguage::MoonScript);
+    bool error = doc->m_ScriptEngine->parseScript(moonCode, "MoonScript parseScript",
+                                                  ScriptLanguage::MoonScript);
     EXPECT_FALSE(error) << "parseScript with MoonScript should succeed";
 
     lua_State* L = doc->m_ScriptEngine->L;
@@ -622,19 +587,7 @@ TEST_F(ScriptLoadingTest, MoonScriptErrorHandling)
     QString invalidMoon = R"(
 @@@ invalid syntax here ###
 )";
-    QString transpiled = doc->m_ScriptEngine->transpileMoonScript(invalidMoon, "Invalid MoonScript");
+    QString transpiled =
+        doc->m_ScriptEngine->transpileMoonScript(invalidMoon, "Invalid MoonScript");
     EXPECT_TRUE(transpiled.isEmpty()) << "Invalid MoonScript should return empty string";
-}
-
-// GoogleTest main function
-int main(int argc, char** argv)
-{
-    // Initialize Qt application (required for Qt types)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

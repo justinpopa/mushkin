@@ -5,34 +5,10 @@
  * Tests for utils.md5, utils.sha256, utils.base64encode, and utils.base64decode
  */
 
-#include "../src/world/script_engine.h"
-#include "../src/world/world_document.h"
-#include <QApplication>
-#include <gtest/gtest.h>
-
-extern "C" {
-#include <lauxlib.h>
-#include <lua.h>
-#include <lualib.h>
-}
+#include "fixtures/world_fixtures.h"
 
 // Test fixture
-class UtilsHashingTest : public ::testing::Test {
-  protected:
-    void SetUp() override
-    {
-        doc = new WorldDocument();
-        L = doc->m_ScriptEngine->L;
-    }
-
-    void TearDown() override
-    {
-        delete doc;
-    }
-
-    WorldDocument* doc = nullptr;
-    lua_State* L = nullptr;
-};
+class UtilsHashingTest : public LuaWorldTest {};
 
 // ========== utils.md5 Tests ==========
 
@@ -910,18 +886,4 @@ TEST_F(UtilsHashingTest, XmlreadComplex)
     ASSERT_EQ(luaL_dostring(L, code), 0) << lua_tostring(L, -1);
     EXPECT_TRUE(lua_toboolean(L, -1));
     lua_pop(L, 1);
-}
-
-// ========== Main function ==========
-
-int main(int argc, char** argv)
-{
-    // Initialize QApplication (required for Qt)
-    QApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run tests
-    return RUN_ALL_TESTS();
 }

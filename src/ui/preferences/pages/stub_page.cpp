@@ -9,9 +9,6 @@ StubPage::StubPage(WorldDocument* doc, const QString& name, const QString& descr
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(20, 20, 20, 20);
 
-    auto* nameLabel = new QLabel(QString("<h2>%1</h2>").arg(name), this);
-    layout->addWidget(nameLabel);
-
     auto* descLabel = new QLabel(description, this);
     descLabel->setWordWrap(true);
     layout->addWidget(descLabel);

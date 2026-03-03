@@ -8,51 +8,55 @@
 // Forward declaration
 class Action;
 
-// ========== COLOUR TYPE DEFINES (OtherTypes.h) ==========
+// ========== COLOUR TYPE CONSTANTS (OtherTypes.h) ==========
 // These are stored in the COLOURTYPE bits (0x0300) of iFlags
 
-#define COLOUR_ANSI 0x0000     // ANSI colour from ANSI table (m_normalcolour/m_boldcolour)
-#define COLOUR_CUSTOM 0x0100   // Custom colour from custom table (m_customtext/m_customback)
-#define COLOUR_RGB 0x0200      // RGB colour directly in iForeColour/iBackColour
-#define COLOUR_RESERVED 0x0300 // Reserved for future use
+inline constexpr quint16 COLOUR_ANSI =
+    0x0000; // ANSI colour from ANSI table (m_colors.normal_colour/m_colors.bold_colour)
+inline constexpr quint16 COLOUR_CUSTOM =
+    0x0100; // Custom colour from custom table (m_colors.custom_text/m_colors.custom_back)
+inline constexpr quint16 COLOUR_RGB = 0x0200;      // RGB colour directly in iForeColour/iBackColour
+inline constexpr quint16 COLOUR_RESERVED = 0x0300; // Reserved for future use
 
-// ========== ACTION TYPE DEFINES (OtherTypes.h) ==========
+// ========== ACTION TYPE CONSTANTS (OtherTypes.h) ==========
 // These are stored in the ACTIONTYPE bits (0x0C00) of iFlags
 
-#define ACTION_NONE 0x0000      // No action
-#define ACTION_SEND 0x0400      // Send strAction to MUD
-#define ACTION_HYPERLINK 0x0800 // HTTP:// or mailto: link
-#define ACTION_PROMPT 0x0C00    // Send strAction to command window (prompt user)
+inline constexpr quint16 ACTION_NONE = 0x0000;      // No action
+inline constexpr quint16 ACTION_SEND = 0x0400;      // Send strAction to MUD
+inline constexpr quint16 ACTION_HYPERLINK = 0x0800; // HTTP:// or mailto: link
+inline constexpr quint16 ACTION_PROMPT = 0x0C00; // Send strAction to command window (prompt user)
 
-// ========== STYLE FLAGS (OtherTypes.h) ==========
-// These define visual text styling and special behaviors
+// ========== STYLE FLAG BITS (OtherTypes.h) ==========
+// These define visual text styling and special behaviors.
+// Used in bitwise OR/AND operations on quint16 iFlags — inline constexpr, not enum class.
 
-#define NORMAL 0x0000     // Mnemonic way of clearing all attributes
-#define HILITE 0x0001     // Bold text
-#define UNDERLINE 0x0002  // Underlined text
-#define BLINK 0x0004      // Italic (blink is rarely used, so repurposed for italic)
-#define INVERSE 0x0008    // Swap foreground/background colors
-#define CHANGED 0x0010    // Colour has been changed by a trigger
-#define STRIKEOUT 0x0020  // Strike-through text
-#define COLOURTYPE 0x0300 // Mask for color type bits (2 bits)
-#define ACTIONTYPE 0x0C00 // Mask for action type bits (2 bits)
-#define STYLE_BITS 0x0FFF // Everything except START_TAG
-#define START_TAG 0x1000  // This style starts an MXP tag (strAction is tag name)
-#define TEXT_STYLE 0x002F // Text styling flags: bold, underline, italic, inverse, strikeout
+inline constexpr quint16 NORMAL = 0x0000;    // Mnemonic way of clearing all attributes
+inline constexpr quint16 HILITE = 0x0001;    // Bold text
+inline constexpr quint16 UNDERLINE = 0x0002; // Underlined text
+inline constexpr quint16 BLINK = 0x0004; // Italic (blink is rarely used, so repurposed for italic)
+inline constexpr quint16 INVERSE = 0x0008;    // Swap foreground/background colors
+inline constexpr quint16 CHANGED = 0x0010;    // Colour has been changed by a trigger
+inline constexpr quint16 STRIKEOUT = 0x0020;  // Strike-through text
+inline constexpr quint16 COLOURTYPE = 0x0300; // Mask for color type bits (2 bits)
+inline constexpr quint16 ACTIONTYPE = 0x0C00; // Mask for action type bits (2 bits)
+inline constexpr quint16 STYLE_BITS = 0x0FFF; // Everything except START_TAG
+inline constexpr quint16 START_TAG = 0x1000; // This style starts an MXP tag (strAction is tag name)
+inline constexpr quint16 TEXT_STYLE =
+    0x002F; // Text styling flags: bold, underline, italic, inverse, strikeout
 
 // ========== POPUP MENU DELIMITER (OtherTypes.h) ==========
 // Used for separating multiple menu items in action hints
 // Example: <send "cmd1|cmd2|cmd3" hint="Menu|Item 1|Item 2|Item 3">
 
-#define POPUP_DELIMITER "|"
+inline constexpr char POPUP_DELIMITER[] = "|";
 
 // ========== ANSI COLOR INDICES ==========
 // These are indices into the color lookup tables, not RGB values!
 // Must match original MUSHclient: enum { BLACK=0, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE }
 // Note: ANSI_* versions are defined as enum in world_document.h
 
-#define WHITE 7
-#define BLACK 0
+inline constexpr int WHITE = 7;
+inline constexpr int BLACK = 0;
 
 /**
  * Style - Text style run
@@ -100,11 +104,17 @@ class Style {
     ~Style();
 
     // Public members (same as original for direct access)
-    quint16 iLength;                 // How many bytes (characters) this style affects
-    quint16 iFlags;                  // Style bits (see defines above)
-    QRgb iForeColour;                // Foreground color (interpretation depends on COLOURTYPE bits)
-    QRgb iBackColour;                // Background color (interpretation depends on COLOURTYPE bits)
-    std::shared_ptr<Action> pAction; // Action/hyperlink pointer (or nullptr)
+    quint16 iLength;  // How many bytes (characters) this style affects
+    quint16 iFlags;   // Style bits (see defines above)
+    QRgb iForeColour; // Foreground color (interpretation depends on COLOURTYPE bits)
+    QRgb iBackColour; // Background color (interpretation depends on COLOURTYPE bits)
+    // shared_ptr is intentional: a single Action object is shared across multiple Style runs.
+    // When MXP/auto-detected hyperlinks span several style changes (e.g., color mid-link),
+    // AddToLine() copies m_currentAction into each new Style. All those Style objects own the
+    // same Action via shared reference counting. OutputView event handlers also take a temporary
+    // copy by value to extend lifetime during click/hover processing. unique_ptr cannot model
+    // this because there is no single owner at the point of creation.
+    std::shared_ptr<Action> pAction; // shared Action/hyperlink (nullptr = no action)
 };
 
 #endif // STYLE_H

@@ -5,14 +5,20 @@
 #include <QCoreApplication>
 #include <QDebug>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QSqlError>
 #include <QSqlQuery>
-#include <QStandardPaths>
 #include <QVariant>
+#include <array>
+#include <span>
 
-// Initialize static instance
-Database* Database::s_instance = nullptr;
+namespace {
+StorageError makeError(StorageErrorType type, const QString& message)
+{
+    return StorageError{type, message};
+}
+} // namespace
 
 Database::Database(QObject* parent) : QObject(parent)
 {
@@ -23,92 +29,87 @@ Database::~Database()
     close();
 }
 
-Database* Database::instance()
+Database& Database::instance()
 {
-    if (!s_instance) {
-        s_instance = new Database();
-    }
-    return s_instance;
+    static Database instance;
+    return instance;
 }
 
-bool Database::open()
+std::expected<void, StorageError> Database::open()
 {
-    // If already open, return success
     if (m_db.isOpen()) {
-        return true;
+        return {};
     }
 
-    // Determine database path using original MUSHclient approach:
-    // 1. Try working directory first
-    // 2. Fall back to application directory
-    //
-    // This matches: MUSHclient.cpp
+    const QString filename = "mushclient_prefs.sqlite";
 
-    QString filename = "mushclient_prefs.sqlite";
-
-    // Try working directory first
     m_dbPath = QDir::currentPath() + "/" + filename;
     qCDebug(lcStorage) << "Trying working directory:" << m_dbPath;
 
     if (!QFile::exists(m_dbPath)) {
-        // Fall back to application directory
         m_dbPath = AppPaths::getAppDirectory() + "/" + filename;
         qCDebug(lcStorage) << "Trying application directory:" << m_dbPath;
     }
 
     qCDebug(lcStorage) << "Database path:" << m_dbPath;
 
-    // Check if database file exists
-    bool databaseExists = QFile::exists(m_dbPath);
+    const bool databaseExists = QFile::exists(m_dbPath);
 
-    // Create/open SQLite database connection
-    m_db = QSqlDatabase::addDatabase("QSQLITE", "preferences");
+    if (QSqlDatabase::contains("preferences")) {
+        m_db = QSqlDatabase::database("preferences");
+    } else {
+        m_db = QSqlDatabase::addDatabase("QSQLITE", "preferences");
+    }
     m_db.setDatabaseName(m_dbPath);
 
-    // Open the database
     if (!m_db.open()) {
-        QString errMsg = QString("Failed to open database: %1").arg(lastError());
+        const QString errMsg = QString("Failed to open database: %1").arg(lastError());
         qWarning() << errMsg;
         emit error(errMsg);
-        return false;
+        return std::unexpected(makeError(StorageErrorType::ConnectionFailed, errMsg));
     }
 
     qCDebug(lcStorage) << "Database opened successfully";
 
-    // If database was just created, create schema
     if (!databaseExists) {
         qCDebug(lcStorage) << "Creating database schema...";
-        if (!createSchema()) {
-            QString errMsg = QString("Failed to create database schema: %1").arg(lastError());
+        const auto schemaResult = createSchema();
+        if (!schemaResult.has_value()) {
+            const QString errMsg =
+                QString("Failed to create database schema: %1").arg(schemaResult.error().message);
             qWarning() << errMsg;
             emit error(errMsg);
             close();
-            return false;
+            return std::unexpected(makeError(StorageErrorType::SchemaError, errMsg));
         }
         qCDebug(lcStorage) << "Database schema created successfully";
     } else {
-        // Existing database - check if migration is needed
-        if (!migrateSchema()) {
-            QString errMsg = QString("Failed to migrate database schema: %1").arg(lastError());
+        const auto migrationResult = migrateSchema();
+        if (!migrationResult.has_value()) {
+            const QString errMsg = QString("Failed to migrate database schema: %1")
+                                       .arg(migrationResult.error().message);
             qWarning() << errMsg;
             emit error(errMsg);
-            // Don't close - try to continue with potentially outdated schema
+            // Preserve previous behavior: keep DB open and continue.
         }
     }
 
-    return true;
+    return {};
 }
 
 void Database::close()
 {
+    const QString connectionName = m_db.connectionName();
+
     if (m_db.isOpen()) {
         qCDebug(lcStorage) << "Closing database";
         m_db.close();
     }
 
-    // Remove the connection
-    if (QSqlDatabase::contains("preferences")) {
-        QSqlDatabase::removeDatabase("preferences");
+    m_db = QSqlDatabase();
+
+    if (!connectionName.isEmpty() && QSqlDatabase::contains(connectionName)) {
+        QSqlDatabase::removeDatabase(connectionName);
     }
 }
 
@@ -122,67 +123,53 @@ QString Database::databasePath() const
     return m_dbPath;
 }
 
-bool Database::createSchema()
+std::expected<void, StorageError> Database::createSchema()
 {
     if (!m_db.isOpen()) {
-        qWarning() << "Cannot create schema: database not open";
-        return false;
+        const QString msg = "Cannot create schema: database not open";
+        qWarning() << msg;
+        return std::unexpected(makeError(StorageErrorType::ConnectionFailed, msg));
     }
 
-    // Match original MUSHclient schema
-
-    // Create control table (database metadata and version tracking)
-    QString createControl = R"(
+    const QString createControl = R"(
         CREATE TABLE IF NOT EXISTS control (
             name VARCHAR(10) NOT NULL PRIMARY KEY,
             value INT NOT NULL
         )
     )";
-
-    if (!execute(createControl)) {
-        qWarning() << "Failed to create control table:" << lastError();
-        return false;
+    if (const auto res = execute(createControl); !res.has_value()) {
+        return std::unexpected(res.error());
     }
 
-    // Set initial database version if not already set
-    int dbVersion = getDatabaseVersion();
+    const int dbVersion = getDatabaseVersion();
     if (dbVersion == 0) {
-        setDatabaseVersion(CURRENT_DB_VERSION);
+        if (const auto res = setDatabaseVersion(CURRENT_DB_VERSION); !res.has_value()) {
+            return std::unexpected(res.error());
+        }
         qCDebug(lcStorage) << "Set initial database version to" << CURRENT_DB_VERSION;
     }
 
-    // Create prefs table (global preferences - key/value pairs)
-    // Matches original: all values stored as TEXT
-    QString createPrefs = R"(
+    const QString createPrefs = R"(
         CREATE TABLE IF NOT EXISTS prefs (
             name VARCHAR(50) NOT NULL PRIMARY KEY,
             value TEXT NOT NULL
         )
     )";
-
-    if (!execute(createPrefs)) {
-        qWarning() << "Failed to create prefs table:" << lastError();
-        return false;
+    if (const auto res = execute(createPrefs); !res.has_value()) {
+        return std::unexpected(res.error());
     }
 
-    // Create worlds table (world window geometry - key/value pairs)
-    // Original stores: "WorldName:wp.left" -> "100", etc.
-    QString createWorlds = R"(
+    const QString createWorlds = R"(
         CREATE TABLE IF NOT EXISTS worlds (
             name VARCHAR(50) NOT NULL PRIMARY KEY,
             value TEXT NOT NULL
         )
     )";
-
-    if (!execute(createWorlds)) {
-        qWarning() << "Failed to create worlds table:" << lastError();
-        return false;
+    if (const auto res = execute(createWorlds); !res.has_value()) {
+        return std::unexpected(res.error());
     }
 
-    // Create recent_files table (NEW - cross-platform MRU replacement)
-    // Original MUSHclient uses Windows Registry for MRU
-    // We use a table for cross-platform support
-    QString createRecentFiles = R"(
+    const QString createRecentFiles = R"(
         CREATE TABLE IF NOT EXISTS recent_files (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             path TEXT NOT NULL UNIQUE,
@@ -191,95 +178,105 @@ bool Database::createSchema()
             world_name TEXT DEFAULT ''
         )
     )";
-
-    if (!execute(createRecentFiles)) {
-        qWarning() << "Failed to create recent_files table:" << lastError();
-        return false;
+    if (const auto res = execute(createRecentFiles); !res.has_value()) {
+        return std::unexpected(res.error());
     }
 
-    // Create index on timestamp for efficient sorting
-    QString createRecentFilesIndex = R"(
+    const QString createRecentFilesIndex = R"(
         CREATE INDEX IF NOT EXISTS idx_recent_files_timestamp
         ON recent_files(timestamp DESC)
     )";
-
-    if (!execute(createRecentFilesIndex)) {
-        qWarning() << "Failed to create recent_files index:" << lastError();
-        return false;
+    if (const auto res = execute(createRecentFilesIndex); !res.has_value()) {
+        return std::unexpected(res.error());
     }
 
     qCDebug(lcStorage) << "All database tables created successfully";
-    return true;
+    return {};
 }
 
-bool Database::migrateSchema()
+std::expected<void, StorageError> Database::migrateSchema()
 {
     if (!m_db.isOpen()) {
-        qWarning() << "Cannot migrate schema: database not open";
-        return false;
+        const QString msg = "Cannot migrate schema: database not open";
+        qWarning() << msg;
+        return std::unexpected(makeError(StorageErrorType::ConnectionFailed, msg));
     }
 
-    // Ensure control table exists (might be missing in very old databases)
-    QString createControl = R"(
+    const QString createControl = R"(
         CREATE TABLE IF NOT EXISTS control (
             name VARCHAR(10) NOT NULL PRIMARY KEY,
             value INT NOT NULL
         )
     )";
-    if (!execute(createControl)) {
-        qWarning() << "Failed to ensure control table exists";
-        return false;
+    if (const auto res = execute(createControl); !res.has_value()) {
+        return std::unexpected(res.error());
     }
 
-    int currentVersion = getDatabaseVersion();
+    const int currentVersion = getDatabaseVersion();
     qCDebug(lcStorage) << "Database version:" << currentVersion
                        << "Current version:" << CURRENT_DB_VERSION;
 
     if (currentVersion >= CURRENT_DB_VERSION) {
         qCDebug(lcStorage) << "No migration needed";
-        return true;
+        return {};
     }
 
     qCDebug(lcStorage) << "Migrating database from version" << currentVersion << "to"
                        << CURRENT_DB_VERSION;
 
-    // Migration from version 0/1 to version 2:
-    // Ensure recent_files table has the correct schema
     if (currentVersion < 2) {
         qCDebug(lcStorage) << "Applying migration to version 2...";
 
-        // Check if recent_files table exists
         QSqlQuery query(m_db);
-        query.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='recent_files'");
+        if (!query.exec("SELECT name FROM sqlite_master WHERE type='table' AND "
+                        "name='recent_files'")) {
+            const QString msg =
+                QString("Failed to inspect sqlite_master: %1").arg(query.lastError().text());
+            qWarning() << msg;
+            return std::unexpected(makeError(StorageErrorType::QueryFailed, msg));
+        }
 
         if (query.next()) {
-            // Table exists - add missing columns if needed
-            if (!columnExists("recent_files", "file_size")) {
+            const auto fileSizeExists = columnExists("recent_files", "file_size");
+            if (!fileSizeExists.has_value()) {
+                return std::unexpected(fileSizeExists.error());
+            }
+            if (!fileSizeExists.value()) {
                 qCDebug(lcStorage) << "Adding file_size column to recent_files";
-                if (!execute("ALTER TABLE recent_files ADD COLUMN file_size INTEGER DEFAULT 0")) {
-                    qWarning() << "Failed to add file_size column";
-                    return false;
+                if (const auto res =
+                        execute("ALTER TABLE recent_files ADD COLUMN file_size INTEGER DEFAULT 0");
+                    !res.has_value()) {
+                    return std::unexpected(res.error());
                 }
             }
 
-            if (!columnExists("recent_files", "world_name")) {
+            const auto worldNameExists = columnExists("recent_files", "world_name");
+            if (!worldNameExists.has_value()) {
+                return std::unexpected(worldNameExists.error());
+            }
+            if (!worldNameExists.value()) {
                 qCDebug(lcStorage) << "Adding world_name column to recent_files";
-                if (!execute("ALTER TABLE recent_files ADD COLUMN world_name TEXT DEFAULT ''")) {
-                    qWarning() << "Failed to add world_name column";
-                    return false;
+                if (const auto res =
+                        execute("ALTER TABLE recent_files ADD COLUMN world_name TEXT DEFAULT ''");
+                    !res.has_value()) {
+                    return std::unexpected(res.error());
                 }
             }
 
-            if (!columnExists("recent_files", "timestamp")) {
+            const auto timestampExists = columnExists("recent_files", "timestamp");
+            if (!timestampExists.has_value()) {
+                return std::unexpected(timestampExists.error());
+            }
+            if (!timestampExists.value()) {
                 qCDebug(lcStorage) << "Adding timestamp column to recent_files";
-                if (!execute("ALTER TABLE recent_files ADD COLUMN timestamp INTEGER DEFAULT 0")) {
-                    qWarning() << "Failed to add timestamp column";
-                    return false;
+                if (const auto res =
+                        execute("ALTER TABLE recent_files ADD COLUMN timestamp INTEGER DEFAULT 0");
+                    !res.has_value()) {
+                    return std::unexpected(res.error());
                 }
             }
         } else {
-            // Table doesn't exist - create it fresh
-            QString createRecentFiles = R"(
+            const QString createRecentFiles = R"(
                 CREATE TABLE IF NOT EXISTS recent_files (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     path TEXT NOT NULL UNIQUE,
@@ -288,61 +285,61 @@ bool Database::migrateSchema()
                     world_name TEXT DEFAULT ''
                 )
             )";
-            if (!execute(createRecentFiles)) {
-                qWarning() << "Failed to create recent_files table";
-                return false;
+            if (const auto res = execute(createRecentFiles); !res.has_value()) {
+                return std::unexpected(res.error());
             }
 
-            // Create index
-            QString createIndex = R"(
+            const QString createIndex = R"(
                 CREATE INDEX IF NOT EXISTS idx_recent_files_timestamp
                 ON recent_files(timestamp DESC)
             )";
-            if (!execute(createIndex)) {
-                qWarning() << "Failed to create recent_files index";
-                return false;
+            if (const auto res = execute(createIndex); !res.has_value()) {
+                return std::unexpected(res.error());
             }
         }
 
-        // Ensure prefs and worlds tables exist too
-        if (!execute("CREATE TABLE IF NOT EXISTS prefs (name VARCHAR(50) NOT NULL PRIMARY KEY, "
-                     "value TEXT NOT NULL)")) {
-            qWarning() << "Failed to ensure prefs table exists";
-            return false;
+        if (const auto res =
+                execute("CREATE TABLE IF NOT EXISTS prefs (name VARCHAR(50) NOT NULL PRIMARY KEY, "
+                        "value TEXT NOT NULL)");
+            !res.has_value()) {
+            return std::unexpected(res.error());
         }
-        if (!execute("CREATE TABLE IF NOT EXISTS worlds (name VARCHAR(50) NOT NULL PRIMARY KEY, "
-                     "value TEXT NOT NULL)")) {
-            qWarning() << "Failed to ensure worlds table exists";
-            return false;
+
+        if (const auto res =
+                execute("CREATE TABLE IF NOT EXISTS worlds (name VARCHAR(50) NOT NULL PRIMARY KEY, "
+                        "value TEXT NOT NULL)");
+            !res.has_value()) {
+            return std::unexpected(res.error());
         }
     }
 
-    // Update version to current
-    if (!setDatabaseVersion(CURRENT_DB_VERSION)) {
-        qWarning() << "Failed to update database version";
-        return false;
+    if (const auto res = setDatabaseVersion(CURRENT_DB_VERSION); !res.has_value()) {
+        return std::unexpected(res.error());
     }
 
     qCDebug(lcStorage) << "Migration complete - now at version" << CURRENT_DB_VERSION;
-    return true;
+    return {};
 }
 
-bool Database::columnExists(const QString& tableName, const QString& columnName)
+std::expected<bool, StorageError> Database::columnExists(const QString& tableName,
+                                                         const QString& columnName)
 {
     if (!m_db.isOpen()) {
-        return false;
+        const QString msg = "Cannot inspect schema: database not open";
+        return std::unexpected(makeError(StorageErrorType::ConnectionFailed, msg));
     }
 
     QSqlQuery query(m_db);
     query.prepare("PRAGMA table_info(" + tableName + ")");
 
     if (!query.exec()) {
-        qWarning() << "Failed to get table info for" << tableName;
-        return false;
+        const QString msg =
+            QString("Failed to get table info for %1: %2").arg(tableName, query.lastError().text());
+        qWarning() << msg;
+        return std::unexpected(makeError(StorageErrorType::QueryFailed, msg));
     }
 
     while (query.next()) {
-        // Column 1 is the column name
         if (query.value(1).toString().compare(columnName, Qt::CaseInsensitive) == 0) {
             return true;
         }
@@ -351,21 +348,23 @@ bool Database::columnExists(const QString& tableName, const QString& columnName)
     return false;
 }
 
-bool Database::execute(const QString& sql)
+std::expected<void, StorageError> Database::execute(const QString& sql)
 {
     if (!m_db.isOpen()) {
-        qWarning() << "Cannot execute query: database not open";
-        return false;
+        const QString msg = "Cannot execute query: database not open";
+        qWarning() << msg;
+        return std::unexpected(makeError(StorageErrorType::ConnectionFailed, msg));
     }
 
     QSqlQuery query(m_db);
     if (!query.exec(sql)) {
-        qWarning() << "Query failed:" << sql;
-        qWarning() << "Error:" << query.lastError().text();
-        return false;
+        const QString msg =
+            QString("Query failed: %1 | Error: %2").arg(sql, query.lastError().text());
+        qWarning() << msg;
+        return std::unexpected(makeError(StorageErrorType::QueryFailed, msg));
     }
 
-    return true;
+    return {};
 }
 
 QString Database::lastError() const
@@ -374,7 +373,7 @@ QString Database::lastError() const
         return "Database connection is invalid";
     }
 
-    QSqlError err = m_db.lastError();
+    const QSqlError err = m_db.lastError();
     if (err.isValid()) {
         return err.text();
     }
@@ -382,28 +381,24 @@ QString Database::lastError() const
     return QString();
 }
 
-// Recent Files Operations
-
-bool Database::addRecentFile(const QString& path)
+std::expected<void, StorageError> Database::addRecentFile(const QString& path)
 {
     if (!m_db.isOpen()) {
-        qWarning() << "Cannot add recent file: database not open";
-        return false;
+        const QString msg = "Cannot add recent file: database not open";
+        qWarning() << msg;
+        return std::unexpected(makeError(StorageErrorType::ConnectionFailed, msg));
     }
 
     if (path.isEmpty()) {
-        qWarning() << "Cannot add recent file: path is empty";
-        return false;
+        const QString msg = "Cannot add recent file: path is empty";
+        qWarning() << msg;
+        return std::unexpected(makeError(StorageErrorType::InvalidArgument, msg));
     }
 
-    // Get current timestamp (seconds since epoch)
-    qint64 timestamp = QDateTime::currentSecsSinceEpoch();
-
-    // Get file size
+    const qint64 timestamp = QDateTime::currentSecsSinceEpoch();
     QFileInfo fileInfo(path);
-    qint64 fileSize = fileInfo.size();
+    const qint64 fileSize = fileInfo.size();
 
-    // Try to update existing entry first
     QSqlQuery query(m_db);
     query.prepare("UPDATE recent_files SET timestamp = ?, file_size = ? WHERE path = ?");
     query.addBindValue(timestamp);
@@ -411,11 +406,12 @@ bool Database::addRecentFile(const QString& path)
     query.addBindValue(path);
 
     if (!query.exec()) {
-        qWarning() << "Failed to update recent file:" << query.lastError().text();
-        return false;
+        const QString msg =
+            QString("Failed to update recent file: %1").arg(query.lastError().text());
+        qWarning() << msg;
+        return std::unexpected(makeError(StorageErrorType::QueryFailed, msg));
     }
 
-    // If no rows were updated, insert new entry
     if (query.numRowsAffected() == 0) {
         query.prepare("INSERT INTO recent_files (path, timestamp, file_size) VALUES (?, ?, ?)");
         query.addBindValue(path);
@@ -423,13 +419,15 @@ bool Database::addRecentFile(const QString& path)
         query.addBindValue(fileSize);
 
         if (!query.exec()) {
-            qWarning() << "Failed to insert recent file:" << query.lastError().text();
-            return false;
+            const QString msg =
+                QString("Failed to insert recent file: %1").arg(query.lastError().text());
+            qWarning() << msg;
+            return std::unexpected(makeError(StorageErrorType::QueryFailed, msg));
         }
     }
 
     qCDebug(lcStorage) << "Added recent file:" << path;
-    return true;
+    return {};
 }
 
 QStringList Database::getRecentFiles(int maxCount)
@@ -441,7 +439,6 @@ QStringList Database::getRecentFiles(int maxCount)
         return files;
     }
 
-    // Query recent files, ordered by timestamp (most recent first)
     QSqlQuery query(m_db);
     query.prepare("SELECT path FROM recent_files ORDER BY timestamp DESC LIMIT ?");
     query.addBindValue(maxCount);
@@ -451,11 +448,8 @@ QStringList Database::getRecentFiles(int maxCount)
         return files;
     }
 
-    // Collect results
     while (query.next()) {
-        QString path = query.value(0).toString();
-
-        // Only include files that still exist
+        const QString path = query.value(0).toString();
         if (QFile::exists(path)) {
             files.append(path);
         } else {
@@ -467,27 +461,28 @@ QStringList Database::getRecentFiles(int maxCount)
     return files;
 }
 
-bool Database::clearRecentFiles()
+std::expected<void, StorageError> Database::clearRecentFiles()
 {
     if (!m_db.isOpen()) {
-        qWarning() << "Cannot clear recent files: database not open";
-        return false;
+        const QString msg = "Cannot clear recent files: database not open";
+        qWarning() << msg;
+        return std::unexpected(makeError(StorageErrorType::ConnectionFailed, msg));
     }
 
-    if (!execute("DELETE FROM recent_files")) {
-        qWarning() << "Failed to clear recent files:" << lastError();
-        return false;
+    if (const auto res = execute("DELETE FROM recent_files"); !res.has_value()) {
+        return std::unexpected(res.error());
     }
 
     qCDebug(lcStorage) << "Cleared all recent files";
-    return true;
+    return {};
 }
 
-bool Database::removeRecentFile(const QString& path)
+std::expected<void, StorageError> Database::removeRecentFile(const QString& path)
 {
     if (!m_db.isOpen()) {
-        qWarning() << "Cannot remove recent file: database not open";
-        return false;
+        const QString msg = "Cannot remove recent file: database not open";
+        qWarning() << msg;
+        return std::unexpected(makeError(StorageErrorType::ConnectionFailed, msg));
     }
 
     QSqlQuery query(m_db);
@@ -495,22 +490,22 @@ bool Database::removeRecentFile(const QString& path)
     query.addBindValue(path);
 
     if (!query.exec()) {
-        qWarning() << "Failed to remove recent file:" << query.lastError().text();
-        return false;
+        const QString msg =
+            QString("Failed to remove recent file: %1").arg(query.lastError().text());
+        qWarning() << msg;
+        return std::unexpected(makeError(StorageErrorType::QueryFailed, msg));
     }
 
     qCDebug(lcStorage) << "Removed recent file:" << path;
-    return true;
+    return {};
 }
-
-// Control Table Operations
 
 int Database::getDatabaseVersion()
 {
     return getControlInt("database_version", 0);
 }
 
-bool Database::setDatabaseVersion(int version)
+std::expected<void, StorageError> Database::setDatabaseVersion(int version)
 {
     return setControlInt("database_version", version);
 }
@@ -538,40 +533,41 @@ int Database::getControlInt(const QString& name, int defaultValue)
     return defaultValue;
 }
 
-bool Database::setControlInt(const QString& name, int value)
+std::expected<void, StorageError> Database::setControlInt(const QString& name, int value)
 {
     if (!m_db.isOpen()) {
-        qWarning() << "Cannot set control value: database not open";
-        return false;
+        const QString msg = "Cannot set control value: database not open";
+        qWarning() << msg;
+        return std::unexpected(makeError(StorageErrorType::ConnectionFailed, msg));
     }
 
-    // Try UPDATE first
     QSqlQuery query(m_db);
     query.prepare("UPDATE control SET value = ? WHERE name = ?");
     query.addBindValue(value);
     query.addBindValue(name);
 
     if (!query.exec()) {
-        qWarning() << "Failed to update control table:" << query.lastError().text();
-        return false;
+        const QString msg =
+            QString("Failed to update control table: %1").arg(query.lastError().text());
+        qWarning() << msg;
+        return std::unexpected(makeError(StorageErrorType::QueryFailed, msg));
     }
 
-    // If no rows updated, INSERT
     if (query.numRowsAffected() == 0) {
         query.prepare("INSERT INTO control (name, value) VALUES (?, ?)");
         query.addBindValue(name);
         query.addBindValue(value);
 
         if (!query.exec()) {
-            qWarning() << "Failed to insert into control table:" << query.lastError().text();
-            return false;
+            const QString msg =
+                QString("Failed to insert into control table: %1").arg(query.lastError().text());
+            qWarning() << msg;
+            return std::unexpected(makeError(StorageErrorType::QueryFailed, msg));
         }
     }
 
-    return true;
+    return {};
 }
-
-// Prefs Table Operations
 
 QString Database::getPreference(const QString& name, const QString& defaultValue)
 {
@@ -596,158 +592,184 @@ QString Database::getPreference(const QString& name, const QString& defaultValue
     return defaultValue;
 }
 
-bool Database::setPreference(const QString& name, const QString& value)
+std::expected<void, StorageError> Database::setPreference(const QString& name, const QString& value)
 {
     if (!m_db.isOpen()) {
-        qWarning() << "Cannot set preference: database not open";
-        return false;
+        const QString msg = "Cannot set preference: database not open";
+        qWarning() << msg;
+        return std::unexpected(makeError(StorageErrorType::ConnectionFailed, msg));
     }
 
-    // Ensure we never try to save a null QString (convert to empty string)
-    QString safeValue = value.isNull() ? QString("") : value;
+    const QString safeValue = value.isNull() ? QString("") : value;
 
-    // Try UPDATE first
     QSqlQuery query(m_db);
     query.prepare("UPDATE prefs SET value = ? WHERE name = ?");
     query.addBindValue(safeValue);
     query.addBindValue(name);
 
     if (!query.exec()) {
-        qWarning() << "Failed to update prefs table:" << query.lastError().text();
-        return false;
+        const QString msg =
+            QString("Failed to update prefs table: %1").arg(query.lastError().text());
+        qWarning() << msg;
+        return std::unexpected(makeError(StorageErrorType::QueryFailed, msg));
     }
 
-    // If no rows updated, INSERT
     if (query.numRowsAffected() == 0) {
         query.prepare("INSERT INTO prefs (name, value) VALUES (?, ?)");
         query.addBindValue(name);
         query.addBindValue(safeValue);
 
         if (!query.exec()) {
-            qWarning() << "Failed to insert into prefs table:" << query.lastError().text();
-            return false;
+            const QString msg =
+                QString("Failed to insert into prefs table: %1").arg(query.lastError().text());
+            qWarning() << msg;
+            return std::unexpected(makeError(StorageErrorType::QueryFailed, msg));
         }
     }
 
-    return true;
+    return {};
 }
 
 int Database::getPreferenceInt(const QString& name, int defaultValue)
 {
-    QString value = getPreference(name, QString::number(defaultValue));
+    const QString value = getPreference(name, QString::number(defaultValue));
     return value.toInt();
 }
 
-bool Database::setPreferenceInt(const QString& name, int value)
+std::expected<void, StorageError> Database::setPreferenceInt(const QString& name, int value)
 {
     return setPreference(name, QString::number(value));
 }
 
-// Worlds Table Operations (per-world window geometry)
-
-bool Database::saveWindowGeometry(const QString& worldName, const QRect& geometry)
+std::expected<void, StorageError> Database::saveWindowGeometry(const QString& worldName,
+                                                               const QRect& geometry)
 {
     if (!m_db.isOpen()) {
-        qWarning() << "Cannot save window geometry: database not open";
-        return false;
+        const QString msg = "Cannot save window geometry: database not open";
+        qWarning() << msg;
+        return std::unexpected(makeError(StorageErrorType::ConnectionFailed, msg));
     }
 
     if (worldName.isEmpty()) {
-        qWarning() << "Cannot save window geometry: world name is empty";
-        return false;
+        const QString msg = "Cannot save window geometry: world name is empty";
+        qWarning() << msg;
+        return std::unexpected(makeError(StorageErrorType::InvalidArgument, msg));
     }
 
-    // Store geometry using same keys as original MUSHclient: "{worldname}:wp.left", etc.
-    // Original uses left/top/right/bottom, we use left/top/width/height for Qt compatibility
-    QString prefix = worldName + ":wp.";
+    const QString prefix = worldName + ":wp.";
+
+    struct FieldValue {
+        QString key;
+        int value;
+    };
+
+    const std::array<FieldValue, 4> fields = {{
+        {prefix + "left", geometry.x()},
+        {prefix + "top", geometry.y()},
+        {prefix + "width", geometry.width()},
+        {prefix + "height", geometry.height()},
+    }};
 
     QSqlQuery query(m_db);
 
-    // Helper lambda to save a single value
-    auto saveValue = [&](const QString& key, int value) -> bool {
-        // Try UPDATE first
-        query.prepare("UPDATE worlds SET value = ? WHERE name = ?");
-        query.addBindValue(QString::number(value));
-        query.addBindValue(key);
-
-        if (!query.exec()) {
-            return false;
-        }
-
-        // If no rows updated, INSERT
-        if (query.numRowsAffected() == 0) {
-            query.prepare("INSERT INTO worlds (name, value) VALUES (?, ?)");
-            query.addBindValue(key);
-            query.addBindValue(QString::number(value));
+    const auto saveValues =
+        [&](std::span<const FieldValue> items) -> std::expected<void, StorageError> {
+        for (const auto& item : items) {
+            query.prepare("UPDATE worlds SET value = ? WHERE name = ?");
+            query.addBindValue(QString::number(item.value));
+            query.addBindValue(item.key);
 
             if (!query.exec()) {
-                return false;
+                const QString msg = QString("Failed to update worlds entry '%1': %2")
+                                        .arg(item.key, query.lastError().text());
+                return std::unexpected(makeError(StorageErrorType::QueryFailed, msg));
+            }
+
+            if (query.numRowsAffected() == 0) {
+                query.prepare("INSERT INTO worlds (name, value) VALUES (?, ?)");
+                query.addBindValue(item.key);
+                query.addBindValue(QString::number(item.value));
+
+                if (!query.exec()) {
+                    const QString msg = QString("Failed to insert worlds entry '%1': %2")
+                                            .arg(item.key, query.lastError().text());
+                    return std::unexpected(makeError(StorageErrorType::QueryFailed, msg));
+                }
             }
         }
-        return true;
+        return {};
     };
 
-    // Save all four geometry values
-    if (!saveValue(prefix + "left", geometry.x()))
-        return false;
-    if (!saveValue(prefix + "top", geometry.y()))
-        return false;
-    if (!saveValue(prefix + "width", geometry.width()))
-        return false;
-    if (!saveValue(prefix + "height", geometry.height()))
-        return false;
+    if (const auto res = saveValues(std::span<const FieldValue>(fields)); !res.has_value()) {
+        return std::unexpected(res.error());
+    }
 
     qCDebug(lcStorage) << "Saved window geometry for" << worldName << ":" << geometry;
-    return true;
+    return {};
 }
 
-bool Database::loadWindowGeometry(const QString& worldName, QRect& geometry)
+std::expected<QRect, StorageError> Database::loadWindowGeometry(const QString& worldName)
 {
     if (!m_db.isOpen()) {
-        qWarning() << "Cannot load window geometry: database not open";
-        return false;
+        const QString msg = "Cannot load window geometry: database not open";
+        qWarning() << msg;
+        return std::unexpected(makeError(StorageErrorType::ConnectionFailed, msg));
     }
 
     if (worldName.isEmpty()) {
-        qWarning() << "Cannot load window geometry: world name is empty";
-        return false;
+        const QString msg = "Cannot load window geometry: world name is empty";
+        qWarning() << msg;
+        return std::unexpected(makeError(StorageErrorType::InvalidArgument, msg));
     }
 
-    // Load geometry using same keys as saveWindowGeometry
-    QString prefix = worldName + ":wp.";
+    const QString prefix = worldName + ":wp.";
+
+    struct FieldRef {
+        QString key;
+        int* value;
+    };
+
+    int left = 0;
+    int top = 0;
+    int width = 800;
+    int height = 600;
+
+    const std::array<FieldRef, 4> fields = {{
+        {prefix + "left", &left},
+        {prefix + "top", &top},
+        {prefix + "width", &width},
+        {prefix + "height", &height},
+    }};
 
     QSqlQuery query(m_db);
 
-    // Helper lambda to load a single value
-    auto loadValue = [&](const QString& key, int& value) -> bool {
-        query.prepare("SELECT value FROM worlds WHERE name = ?");
-        query.addBindValue(key);
+    const auto loadValues =
+        [&](std::span<const FieldRef> items) -> std::expected<void, StorageError> {
+        for (const auto& item : items) {
+            query.prepare("SELECT value FROM worlds WHERE name = ?");
+            query.addBindValue(item.key);
 
-        if (!query.exec()) {
-            return false;
+            if (!query.exec()) {
+                const QString msg = QString("Failed to load worlds entry '%1': %2")
+                                        .arg(item.key, query.lastError().text());
+                return std::unexpected(makeError(StorageErrorType::QueryFailed, msg));
+            }
+
+            if (!query.next()) {
+                const QString msg = QString("Window geometry key not found: %1").arg(item.key);
+                return std::unexpected(makeError(StorageErrorType::NotFound, msg));
+            }
+
+            *item.value = query.value(0).toInt();
         }
-
-        if (query.next()) {
-            value = query.value(0).toInt();
-            return true;
-        }
-
-        return false; // Key not found
+        return {};
     };
 
-    int left = 0, top = 0, width = 800, height = 600; // Defaults
+    if (const auto res = loadValues(std::span<const FieldRef>(fields)); !res.has_value()) {
+        return std::unexpected(res.error());
+    }
 
-    // Load all four values - if any are missing, return false
-    if (!loadValue(prefix + "left", left))
-        return false;
-    if (!loadValue(prefix + "top", top))
-        return false;
-    if (!loadValue(prefix + "width", width))
-        return false;
-    if (!loadValue(prefix + "height", height))
-        return false;
-
-    geometry = QRect(left, top, width, height);
+    const QRect geometry(left, top, width, height);
     qCDebug(lcStorage) << "Loaded window geometry for" << worldName << ":" << geometry;
-    return true;
+    return geometry;
 }

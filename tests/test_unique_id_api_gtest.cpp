@@ -8,35 +8,11 @@
  * - world.GetUniqueNumber() - Returns sequential number (existing)
  */
 
-#include "../src/world/script_engine.h"
-#include "../src/world/world_document.h"
-#include <QApplication>
+#include "fixtures/world_fixtures.h"
 #include <QRegularExpression>
-#include <gtest/gtest.h>
-
-extern "C" {
-#include <lauxlib.h>
-#include <lua.h>
-#include <lualib.h>
-}
 
 // Test fixture for unique ID API tests
-class UniqueIDAPITest : public ::testing::Test {
-  protected:
-    void SetUp() override
-    {
-        doc = new WorldDocument();
-        L = doc->m_ScriptEngine->L;
-    }
-
-    void TearDown() override
-    {
-        delete doc;
-    }
-
-    WorldDocument* doc = nullptr;
-    lua_State* L = nullptr;
-};
+class UniqueIDAPITest : public LuaWorldTest {};
 
 // Test GetUniqueID returns 24-character hex string
 TEST_F(UniqueIDAPITest, GetUniqueIDReturns24CharHex)
@@ -197,12 +173,4 @@ TEST_F(UniqueIDAPITest, GetUniqueNumberIncrements)
 
     EXPECT_GT(num2, num1) << "GetUniqueNumber should increment";
     EXPECT_GT(num3, num2) << "GetUniqueNumber should increment";
-}
-
-int main(int argc, char** argv)
-{
-    ::testing::InitGoogleTest(&argc, argv);
-    // Qt application needed for QUuid and WorldDocument
-    QApplication app(argc, argv);
-    return RUN_ALL_TESTS();
 }

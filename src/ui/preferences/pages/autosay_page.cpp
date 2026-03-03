@@ -8,8 +8,7 @@
 #include <QLineEdit>
 #include <QVBoxLayout>
 
-AutoSayPage::AutoSayPage(WorldDocument* doc, QWidget* parent)
-    : PreferencesPageBase(doc, parent)
+AutoSayPage::AutoSayPage(WorldDocument* doc, QWidget* parent) : PreferencesPageBase(doc, parent)
 {
     setupUi();
 }
@@ -25,10 +24,10 @@ void AutoSayPage::setupUi()
     mainLayout->addWidget(m_enableCheck);
 
     // Help text
-    QLabel* helpLabel = new QLabel(
-        tr("When enabled, commands that don't start with the override prefix "
-           "will automatically have the say string prepended."),
-        this);
+    QLabel* helpLabel =
+        new QLabel(tr("When enabled, commands that don't start with the override prefix "
+                      "will automatically have the say string prepended."),
+                   this);
     helpLabel->setWordWrap(true);
     helpLabel->setStyleSheet("color: gray; font-style: italic;");
     mainLayout->addWidget(helpLabel);
@@ -61,15 +60,18 @@ void AutoSayPage::setupUi()
     QGroupBox* optionsGroup = new QGroupBox(tr("Options"), this);
     QVBoxLayout* optionsLayout = new QVBoxLayout(optionsGroup);
 
-    m_excludeMacrosCheck = new QCheckBox(tr("Exclude macro/accelerator keys from auto-say"), optionsGroup);
+    m_excludeMacrosCheck =
+        new QCheckBox(tr("Exclude macro/accelerator keys from auto-say"), optionsGroup);
     connect(m_excludeMacrosCheck, &QCheckBox::toggled, this, &AutoSayPage::markChanged);
     optionsLayout->addWidget(m_excludeMacrosCheck);
 
-    m_excludeNonAlphaCheck = new QCheckBox(tr("Exclude commands not starting with a letter"), optionsGroup);
+    m_excludeNonAlphaCheck =
+        new QCheckBox(tr("Exclude commands not starting with a letter"), optionsGroup);
     connect(m_excludeNonAlphaCheck, &QCheckBox::toggled, this, &AutoSayPage::markChanged);
     optionsLayout->addWidget(m_excludeNonAlphaCheck);
 
-    m_reEvaluateCheck = new QCheckBox(tr("Re-evaluate auto-say after alias expansion"), optionsGroup);
+    m_reEvaluateCheck =
+        new QCheckBox(tr("Re-evaluate auto-say after alias expansion"), optionsGroup);
     connect(m_reEvaluateCheck, &QCheckBox::toggled, this, &AutoSayPage::markChanged);
     optionsLayout->addWidget(m_reEvaluateCheck);
 
@@ -91,12 +93,12 @@ void AutoSayPage::loadSettings()
     m_excludeNonAlphaCheck->blockSignals(true);
     m_reEvaluateCheck->blockSignals(true);
 
-    m_enableCheck->setChecked(m_doc->m_bEnableAutoSay != 0);
-    m_sayStringEdit->setText(m_doc->m_strAutoSayString);
-    m_overridePrefixEdit->setText(m_doc->m_strOverridePrefix);
-    m_excludeMacrosCheck->setChecked(m_doc->m_bExcludeMacros != 0);
-    m_excludeNonAlphaCheck->setChecked(m_doc->m_bExcludeNonAlpha != 0);
-    m_reEvaluateCheck->setChecked(m_doc->m_bReEvaluateAutoSay != 0);
+    m_enableCheck->setChecked(m_doc->m_auto_say.enabled);
+    m_sayStringEdit->setText(m_doc->m_auto_say.say_string);
+    m_overridePrefixEdit->setText(m_doc->m_auto_say.override_prefix);
+    m_excludeMacrosCheck->setChecked(m_doc->m_auto_say.exclude_macros);
+    m_excludeNonAlphaCheck->setChecked(m_doc->m_auto_say.exclude_non_alpha);
+    m_reEvaluateCheck->setChecked(m_doc->m_auto_say.re_evaluate);
 
     // Unblock signals
     m_enableCheck->blockSignals(false);
@@ -114,12 +116,12 @@ void AutoSayPage::saveSettings()
     if (!m_doc)
         return;
 
-    m_doc->m_bEnableAutoSay = m_enableCheck->isChecked() ? 1 : 0;
-    m_doc->m_strAutoSayString = m_sayStringEdit->text();
-    m_doc->m_strOverridePrefix = m_overridePrefixEdit->text();
-    m_doc->m_bExcludeMacros = m_excludeMacrosCheck->isChecked() ? 1 : 0;
-    m_doc->m_bExcludeNonAlpha = m_excludeNonAlphaCheck->isChecked() ? 1 : 0;
-    m_doc->m_bReEvaluateAutoSay = m_reEvaluateCheck->isChecked() ? 1 : 0;
+    m_doc->m_auto_say.enabled = m_enableCheck->isChecked();
+    m_doc->m_auto_say.say_string = m_sayStringEdit->text();
+    m_doc->m_auto_say.override_prefix = m_overridePrefixEdit->text();
+    m_doc->m_auto_say.exclude_macros = m_excludeMacrosCheck->isChecked();
+    m_doc->m_auto_say.exclude_non_alpha = m_excludeNonAlphaCheck->isChecked();
+    m_doc->m_auto_say.re_evaluate = m_reEvaluateCheck->isChecked();
 
     m_doc->setModified(true);
     m_hasChanges = false;

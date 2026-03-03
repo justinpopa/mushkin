@@ -7,33 +7,9 @@
 
 #include "../src/world/script_engine.h"
 #include "../src/world/world_document.h"
-#include <QCoreApplication>
-#include <gtest/gtest.h>
+#include "fixtures/world_fixtures.h"
 
-extern "C" {
-#include <lauxlib.h>
-#include <lua.h>
-#include <lualib.h>
-}
-
-// Test fixture for Lua basics tests
-class LuaBasicsTest : public ::testing::Test {
-  protected:
-    void SetUp() override
-    {
-        doc = new WorldDocument();
-        L = doc->m_ScriptEngine->L;
-        ASSERT_NE(L, nullptr) << "Lua state should be available";
-    }
-
-    void TearDown() override
-    {
-        delete doc;
-    }
-
-    WorldDocument* doc = nullptr;
-    lua_State* L = nullptr;
-};
+class LuaBasicsTest : public LuaWorldTest {};
 
 // Test 0: Simple assignment (no functions)
 TEST_F(LuaBasicsTest, SimpleAssignment)
@@ -171,17 +147,4 @@ TEST_F(LuaBasicsTest, TostringWithFunctionReturn)
     lua_pop(L, 1);
 
     EXPECT_STREQ(funcresult, "42") << "tostring on function return should be '42'";
-}
-
-// Main function required for GoogleTest
-int main(int argc, char** argv)
-{
-    // Initialize Qt (required for Qt objects like WorldDocument)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

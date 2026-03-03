@@ -1,41 +1,45 @@
 #include "unified_preferences_dialog.h"
-#include "preferences_page_base.h"
-#include "pages/stub_page.h"
-#include "pages/triggers_page.h"
 #include "pages/aliases_page.h"
-#include "pages/timers_page.h"
-#include "pages/connection_page.h"
-#include "pages/output_page.h"
-#include "pages/logging_page.h"
-#include "pages/scripting_page.h"
-#include "pages/input_page.h"
-#include "pages/paste_send_page.h"
-#include "pages/macros_page.h"
-#include "pages/info_page.h"
-#include "pages/colors_page.h"
-#include "pages/keypad_page.h"
 #include "pages/autosay_page.h"
+#include "pages/colors_page.h"
+#include "pages/connection_page.h"
+#include "pages/info_page.h"
+#include "pages/input_page.h"
+#include "pages/keypad_page.h"
+#include "pages/logging_page.h"
+#include "pages/macros_page.h"
+#include "pages/output_page.h"
+#include "pages/paste_send_page.h"
+#include "pages/scripting_page.h"
+#include "pages/stub_page.h"
+#include "pages/timers_page.h"
+#include "pages/triggers_page.h"
 #include "pages/variables_page.h"
+#include "preferences_page_base.h"
 #include "world/world_document.h"
 
+#include <QApplication>
 #include <QDialogButtonBox>
 #include <QHBoxLayout>
 #include <QHeaderView>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QScreen>
 #include <QSplitter>
 #include <QStackedWidget>
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
 UnifiedPreferencesDialog::UnifiedPreferencesDialog(WorldDocument* doc, Page initialPage,
-                                                     QWidget* parent)
+                                                   QWidget* parent)
     : QDialog(parent), m_doc(doc), m_currentPage(initialPage), m_hasChanges(false)
 {
     setWindowTitle(tr("World Configuration - %1").arg(doc->worldName()));
-    setMinimumSize(900, 600);
-    resize(1000, 700);
+    setMinimumSize(800, 500);
+    const QSize available = qApp->primaryScreen()->availableSize();
+    resize(qMin(1000, available.width() - 80), qMin(700, available.height() - 80));
 
     setupUi();
     setupTree();
@@ -65,6 +69,7 @@ void UnifiedPreferencesDialog::setupUi()
     m_tree->setIndentation(20);
     m_tree->setAnimated(true);
     m_tree->setExpandsOnDoubleClick(true);
+    m_tree->installEventFilter(this);
 
     // Right side: Content area
     auto* contentWidget = new QWidget(splitter);
@@ -124,7 +129,7 @@ void UnifiedPreferencesDialog::setupTree()
     appearanceGroup->setFlags(appearanceGroup->flags() & ~Qt::ItemIsSelectable);
     appearanceGroup->setExpanded(true);
     addPageItem(appearanceGroup, Page::Output, tr("Output"));
-    addPageItem(appearanceGroup, Page::Colors, tr("Colors"));
+    addPageItem(appearanceGroup, Page::Colors, tr("Custom Colors"));
     addPageItem(appearanceGroup, Page::MXP, tr("MXP / Pueblo"));
 
     // Automation group
@@ -153,8 +158,7 @@ void UnifiedPreferencesDialog::setupTree()
     addPageItem(scriptingGroup, Page::Variables, tr("Variables"));
 }
 
-void UnifiedPreferencesDialog::addPageItem(QTreeWidgetItem* parent, Page page,
-                                            const QString& label)
+void UnifiedPreferencesDialog::addPageItem(QTreeWidgetItem* parent, Page page, const QString& label)
 {
     auto* item = new QTreeWidgetItem(parent, {label});
     m_treeItems[page] = item;
@@ -186,8 +190,7 @@ void UnifiedPreferencesDialog::setupPages()
     // Appearance pages
     addPage(Page::Output, new OutputPage(m_doc, this));
     addPage(Page::Colors, new ColorsPage(m_doc, this));
-    addStubPage(Page::MXP, tr("MXP / Pueblo"),
-                tr("Configure MXP and Pueblo protocol settings."));
+    addStubPage(Page::MXP, tr("MXP / Pueblo"), tr("Configure MXP and Pueblo protocol settings."));
 
     // Automation pages
     addPage(Page::Triggers, new TriggersPage(m_doc, this));
@@ -208,8 +211,7 @@ void UnifiedPreferencesDialog::setupPages()
 
 void UnifiedPreferencesDialog::connectSignals()
 {
-    connect(m_tree, &QTreeWidget::itemClicked, this,
-            &UnifiedPreferencesDialog::onTreeItemClicked);
+    connect(m_tree, &QTreeWidget::itemClicked, this, &UnifiedPreferencesDialog::onTreeItemClicked);
     connect(m_tree, &QTreeWidget::itemActivated, this,
             &UnifiedPreferencesDialog::onTreeItemClicked);
 
@@ -219,6 +221,21 @@ void UnifiedPreferencesDialog::connectSignals()
             &UnifiedPreferencesDialog::onCancelClicked);
     connect(m_buttonBox->button(QDialogButtonBox::Apply), &QPushButton::clicked, this,
             &UnifiedPreferencesDialog::onApplyClicked);
+}
+
+bool UnifiedPreferencesDialog::eventFilter(QObject* obj, QEvent* event)
+{
+    if (obj == m_tree && event->type() == QEvent::KeyPress) {
+        const auto* keyEvent = static_cast<const QKeyEvent*>(event);
+        if (keyEvent->key() == Qt::Key_Return || keyEvent->key() == Qt::Key_Enter) {
+            QTreeWidgetItem* current = m_tree->currentItem();
+            if (current) {
+                onTreeItemClicked(current, 0);
+            }
+            return true;
+        }
+    }
+    return QDialog::eventFilter(obj, event);
 }
 
 void UnifiedPreferencesDialog::setCurrentPage(Page page)
@@ -281,10 +298,10 @@ void UnifiedPreferencesDialog::onOkClicked()
 void UnifiedPreferencesDialog::onCancelClicked()
 {
     if (m_hasChanges) {
-        auto result = QMessageBox::question(
-            this, tr("Unsaved Changes"),
-            tr("You have unsaved changes. Are you sure you want to cancel?"),
-            QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+        auto result =
+            QMessageBox::question(this, tr("Unsaved Changes"),
+                                  tr("You have unsaved changes. Are you sure you want to cancel?"),
+                                  QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
         if (result != QMessageBox::Yes) {
             return;
         }

@@ -118,6 +118,9 @@ int main(int argc, char* argv[])
     // Use only relative paths for portability - no system paths
     // Working directory is set to AppPaths::getAppDirectory() at startup
     QStringList luaPaths = {
+        // Bundled modules first — prevents conflicts with incompatible user versions
+        exeDir + "/../Resources/lua/?.lua",
+        exeDir + "/../Resources/lua/?/init.lua",
         "./?.lua",
         "./lua/?.lua",
         "./lua/?/init.lua",
@@ -146,13 +149,13 @@ int main(int argc, char* argv[])
     qputenv("LUA_CPATH", newLuaCPath.toLocal8Bit());
 
     // Open preferences database
-    Database* db = Database::instance();
-    if (!db->open()) {
+    auto& db = Database::instance();
+    if (!db.open()) {
         qWarning() << "Failed to open preferences database";
     }
 
     // Load global options from database
-    GlobalOptions::instance()->load();
+    GlobalOptions::instance().load();
 
     // Register Lua dialog callbacks (connects ui module dialogs to world module)
     LuaDialogRegistration::registerDialogCallbacks();

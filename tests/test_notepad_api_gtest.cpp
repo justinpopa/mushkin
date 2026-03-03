@@ -18,16 +18,7 @@
  */
 
 #include "../src/world/notepad_widget.h"
-#include "../src/world/script_engine.h"
-#include "../src/world/world_document.h"
-#include <QApplication>
-#include <gtest/gtest.h>
-
-extern "C" {
-#include <lauxlib.h>
-#include <lua.h>
-#include <lualib.h>
-}
+#include "fixtures/world_fixtures.h"
 
 // Error codes from lua_common.h
 const int eOK = 0;
@@ -35,67 +26,7 @@ const int eNoSuchNotepad = 30075;
 const int eInvalidColourName = 30077;
 
 // Test fixture for Notepad API tests
-class NotepadApiTest : public ::testing::Test {
-  protected:
-    void SetUp() override
-    {
-        doc = new WorldDocument();
-
-        // Initialize basic state
-        doc->m_mush_name = "Test World";
-        doc->m_server = "test.mud.com";
-        doc->m_port = 4000;
-        doc->m_bUTF_8 = true;
-
-        // Get Lua state
-        ASSERT_NE(doc->m_ScriptEngine, nullptr) << "ScriptEngine should exist";
-        ASSERT_NE(doc->m_ScriptEngine->L, nullptr) << "Lua state should exist";
-        L = doc->m_ScriptEngine->L;
-    }
-
-    void TearDown() override
-    {
-        delete doc;
-    }
-
-    // Helper to execute Lua code
-    void executeLua(const char* code)
-    {
-        ASSERT_EQ(luaL_loadstring(L, code), 0) << "Lua code should compile: " << code;
-        ASSERT_EQ(lua_pcall(L, 0, 0, 0), 0) << "Lua code should execute: " << code;
-    }
-
-    // Helper to get global boolean value
-    bool getGlobalBool(const char* name)
-    {
-        lua_getglobal(L, name);
-        bool result = lua_toboolean(L, -1);
-        lua_pop(L, 1);
-        return result;
-    }
-
-    // Helper to get global number value
-    double getGlobalNumber(const char* name)
-    {
-        lua_getglobal(L, name);
-        double result = lua_tonumber(L, -1);
-        lua_pop(L, 1);
-        return result;
-    }
-
-    // Helper to get global string value
-    QString getGlobalString(const char* name)
-    {
-        lua_getglobal(L, name);
-        const char* str = lua_tostring(L, -1);
-        QString result = str ? QString::fromUtf8(str) : QString();
-        lua_pop(L, 1);
-        return result;
-    }
-
-    WorldDocument* doc = nullptr;
-    lua_State* L = nullptr;
-};
+class NotepadApiTest : public ConnectedWorldTest {};
 
 // Test 1: SendToNotepad creates new notepad
 TEST_F(NotepadApiTest, SendToNotepadCreatesNew)
@@ -408,12 +339,4 @@ TEST_F(NotepadApiTest, WindowPositionFunctionsExist)
     lua_getglobal(L, "pos_result");
     EXPECT_TRUE(lua_isnil(L, -1));
     lua_pop(L, 1);
-}
-
-// Main test runner
-int main(int argc, char** argv)
-{
-    QApplication app(argc, argv);
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
 }
