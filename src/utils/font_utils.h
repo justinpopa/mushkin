@@ -1,82 +1,81 @@
 #ifndef FONT_UTILS_H
 #define FONT_UTILS_H
 
+#include "logging.h"
+
 #include <QFont>
-#include <QtGlobal>
+#include <QFontInfo>
+#include <QGuiApplication>
+#include <QScreen>
 
 /**
- * @brief Create a QFont with cross-platform Windows-compatible sizing
+ * @brief Create a QFont from a world-file point size
  *
- * World files store font sizes as point sizes assuming Windows 96 DPI.
- * On macOS (72 DPI logical), Qt would render these fonts ~25% smaller.
+ * MUSHclient world files store font sizes as typographic point sizes.
+ * The original MUSHclient converts these to GDI pixels at runtime via:
+ *   lfHeight = -MulDiv(pointSize, GetDeviceCaps(LOGPIXELSY), 72)
  *
- * This function converts the point size to pixel size on macOS to match
- * Windows rendering, while using native point sizing on Windows/Linux.
+ * Qt's setPointSize() performs the same conversion using the screen's
+ * logical DPI, so it should produce correct results on all platforms
+ * without manual DPI compensation.
  *
  * @param family Font family name
  * @param pointSize Point size (as stored in world files)
- * @return QFont configured for cross-platform consistent rendering
+ * @return QFont configured with the given point size
  */
 inline QFont createScaledFont(const QString& family, int pointSize)
 {
     QFont font(family);
-
-#ifdef Q_OS_MACOS
-    // macOS uses 72 DPI logical, but world files assume Windows 96 DPI
-    // Convert: pixelSize = pointSize * 96 / 72
-    int pixelSize = qRound(pointSize * 96.0 / 72.0);
-    font.setPixelSize(pixelSize > 0 ? pixelSize : 1);
-#else
-    // Windows/Linux: use point size directly
     font.setPointSize(pointSize > 0 ? pointSize : 1);
-#endif
+
+    // Diagnostic: log what Qt resolved so we can verify cross-platform behavior
+    if (auto* screen = QGuiApplication::primaryScreen()) {
+        qCDebug(lcFont) << "createScaledFont:" << family << pointSize << "pt"
+                        << "-> screenDPI:" << screen->logicalDotsPerInchY()
+                        << "resolvedPixelSize:" << QFontInfo(font).pixelSize();
+    }
 
     return font;
 }
 
 /**
- * @brief Convert a point size to pixels for cross-platform consistency
+ * @brief Get the pixel size for a world-file point size
  *
- * On macOS, converts Windows 96 DPI point sizes to pixel sizes.
- * On Windows/Linux, returns the point size unchanged (Qt handles DPI).
- *
- * Useful for stylesheet font-size values where we need pixels.
+ * Converts a point size to the pixel value Qt would use on the current
+ * screen. Useful for stylesheet font-size values where pixels are needed.
  *
  * @param pointSize Point size (as stored in world files)
- * @return Pixel size on macOS, point size on other platforms
+ * @return Resolved pixel size for the current screen DPI
  */
 inline int scaledFontSize(int pointSize)
 {
-#ifdef Q_OS_MACOS
+    if (auto* screen = QGuiApplication::primaryScreen()) {
+        return qRound(pointSize * screen->logicalDotsPerInchY() / 72.0);
+    }
+    // Fallback: assume 96 DPI (Windows default)
     return qRound(pointSize * 96.0 / 72.0);
-#else
-    return pointSize;
-#endif
 }
 
 /**
- * @brief Create a QFont with cross-platform sizing (floating point version)
+ * @brief Create a QFont from a world-file point size (floating point version)
  *
  * Same as createScaledFont but accepts floating point sizes for
  * more precise font sizing (used by miniwindows).
  *
  * @param family Font family name
  * @param pointSize Point size as floating point
- * @return QFont configured for cross-platform consistent rendering
+ * @return QFont configured with the given point size
  */
 inline QFont createScaledFontF(const QString& family, double pointSize)
 {
     QFont font(family);
-
-#ifdef Q_OS_MACOS
-    // macOS uses 72 DPI logical, but world files assume Windows 96 DPI
-    // Convert: pixelSize = pointSize * 96 / 72
-    int pixelSize = qRound(pointSize * 96.0 / 72.0);
-    font.setPixelSize(pixelSize > 0 ? pixelSize : 1);
-#else
-    // Windows/Linux: use point size directly
     font.setPointSizeF(pointSize > 0.0 ? pointSize : 1.0);
-#endif
+
+    if (auto* screen = QGuiApplication::primaryScreen()) {
+        qCDebug(lcFont) << "createScaledFontF:" << family << pointSize << "pt"
+                        << "-> screenDPI:" << screen->logicalDotsPerInchY()
+                        << "resolvedPixelSize:" << QFontInfo(font).pixelSize();
+    }
 
     return font;
 }

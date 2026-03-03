@@ -196,3 +196,45 @@ jobs:
           $env:PATH = "C:\vcpkg\installed\x64-windows\bin;$env:PATH"
           Copy-Item "C:\vcpkg\installed\x64-windows\bin\lua51.dll" "build\lib\" -ErrorAction SilentlyContinue
           ctest --test-dir build --output-on-failure --build-config Release
+
+      # ===== Upload Artifacts =====
+      # Dev builds (dynamically linked) — require runtime dependencies on the host.
+      # macOS: brew install pcre luajit sqlite openssl libssh
+      # Linux: system packages (see Install dependencies step)
+      # Windows: vcpkg DLLs bundled in artifact
+      - name: Package artifact (macOS)
+        if: matrix.os == 'macOS'
+        run: |
+          mkdir -p artifact
+          if [ -d build/mushkin.app ]; then
+            cp -R build/mushkin.app artifact/
+          else
+            cp build/mushkin artifact/ 2>/dev/null || true
+          fi
+          cp -r build/lib artifact/ 2>/dev/null || true
+          cp -r build/lua artifact/ 2>/dev/null || true
+
+      - name: Package artifact (Linux)
+        if: matrix.os == 'Linux'
+        run: |
+          mkdir -p artifact
+          cp build/mushkin artifact/ 2>/dev/null || true
+          cp -r build/lib artifact/ 2>/dev/null || true
+          cp -r build/lua artifact/ 2>/dev/null || true
+
+      - name: Package artifact (Windows)
+        if: matrix.os == 'Windows'
+        run: |
+          New-Item -ItemType Directory -Force artifact | Out-Null
+          Copy-Item build\mushkin.exe artifact\ -ErrorAction SilentlyContinue
+          if (Test-Path build\lib) { xcopy build\lib artifact\lib\ /E /I 2>$null }
+          if (Test-Path build\lua) { xcopy build\lua artifact\lua\ /E /I 2>$null }
+          $vcpkgBin = "C:\vcpkg\installed\x64-windows\bin"
+          if (Test-Path $vcpkgBin) { Copy-Item "$vcpkgBin\*.dll" artifact\ 2>$null }
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mushkin-dev-${{ matrix.os }}-${{ github.sha }}
+          path: artifact/
+          retention-days: 14
