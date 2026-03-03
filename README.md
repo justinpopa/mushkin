@@ -1,6 +1,12 @@
 # Mushkin
 
 [![CI](https://github.com/justinpopa/mushkin/actions/workflows/ci.yml/badge.svg)](https://github.com/justinpopa/mushkin/actions/workflows/ci.yml)
+[![Release](https://github.com/justinpopa/mushkin/actions/workflows/release.yml/badge.svg)](https://github.com/justinpopa/mushkin/actions/workflows/release.yml)
+[![Latest Release](https://img.shields.io/github/v/release/justinpopa/mushkin?include_prereleases)](https://github.com/justinpopa/mushkin/releases)
+[![License](https://img.shields.io/github/license/justinpopa/mushkin)](LICENSE)
+[![macOS](https://img.shields.io/badge/macOS-arm64%20%7C%20x64-black?logo=apple)](https://github.com/justinpopa/mushkin/releases)
+[![Linux](https://img.shields.io/badge/Linux-x64-black?logo=linux&logoColor=white)](https://github.com/justinpopa/mushkin/releases)
+[![Windows](https://img.shields.io/badge/Windows-x64-black?logo=windows)](https://github.com/justinpopa/mushkin/releases)
 
 A modern MUD client built with Qt. Mushkin is a cross-platform rewrite of [MUSHclient](http://www.gammon.com.au/mushclient/) designed to run natively on macOS, Linux, and Windows.
 
