@@ -8,8 +8,8 @@
 # x86_64 on Intel). Homebrew doesn't provide universal dynamic libraries.
 #
 # Prerequisites:
-#   xcode-select --install
-#   brew install cmake ninja pcre luajit sqlite openssl libssh
+#   Full Xcode (not just command-line tools) — Qt static builds need Metal headers
+#   brew install cmake ninja llvm pcre luajit sqlite openssl libssh
 #   pip3 install aqtinstall
 #
 # Usage:
@@ -58,6 +58,20 @@ fi
 check_prerequisites() {
     echo_info "Checking prerequisites..."
     local missing=()
+
+    # Full Xcode is required for static Qt builds (Metal framework headers, etc.)
+    # Command-line tools alone are not sufficient.
+    if ! xcode-select -p 2>/dev/null | grep -q "Xcode.app"; then
+        echo_error "Full Xcode installation required (not just command-line tools)."
+        echo_error "Static Qt builds need Metal framework headers that only ship with Xcode."
+        echo_error ""
+        echo_error "Install Xcode from the App Store, then run:"
+        echo_error "  sudo xcode-select -s /Applications/Xcode.app/Contents/Developer"
+        echo_error ""
+        echo_error "If you just want to run Mushkin, download a pre-built release instead:"
+        echo_error "  https://github.com/justinpopa/mushkin/releases"
+        exit 1
+    fi
 
     command -v cmake &>/dev/null || missing+=("cmake")
     command -v ninja &>/dev/null || missing+=("ninja")
