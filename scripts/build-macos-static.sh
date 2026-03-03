@@ -159,7 +159,7 @@ build_mushkin() {
         -DCMAKE_C_COMPILER="$CC" \
         -DCMAKE_CXX_COMPILER="$CXX"
 
-    cmake --build . -j"$NUM_CORES"
+    cmake --build . --target mushkin -j"$NUM_CORES"
 }
 
 # ============================================================

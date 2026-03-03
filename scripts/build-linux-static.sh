@@ -184,7 +184,7 @@ build_mushkin() {
 
     cmake "$PROJECT_ROOT" "${cmake_args[@]}"
 
-    cmake --build . -j"$NUM_CORES"
+    cmake --build . --target mushkin -j"$NUM_CORES"
 }
 
 # ============================================================

@@ -187,7 +187,7 @@ function Build-Mushkin {
 
     if ($LASTEXITCODE -ne 0) { throw "CMake configure failed" }
 
-    cmake --build . -j $NumCores
+    cmake --build . --target mushkin -j $NumCores
     if ($LASTEXITCODE -ne 0) { throw "Build failed" }
 
     Pop-Location
