@@ -40,10 +40,6 @@ option(STATIC_BUILD "Build with static Qt (dynamic deps from package manager)" O
 
 if(STATIC_BUILD)
     message(STATUS "Static build enabled - Qt will be statically linked")
-    # Disable app bundle for static builds (we want a single binary)
-    if(APPLE)
-        set(BUILD_APP_BUNDLE OFF)
-    endif()
 endif()
 
 # Qt setup - enable automatic MOC/UIC/RCC processing
@@ -383,6 +379,14 @@ endif()
 if(EXISTS "${CMAKE_SOURCE_DIR}/external/llthreads2/CMakeLists.txt")
     add_subdirectory(external/llthreads2)
     message(STATUS "llthreads2: Building Lua threading module")
+endif()
+
+# Ensure Lua C modules are built alongside mushkin (needed for release packaging)
+if(TARGET socket_core AND TARGET mime_core AND TARGET ssl_core AND TARGET llthreads2)
+    add_dependencies(mushkin socket_core socket_unix mime_core ssl_core llthreads2)
+    if(NOT WIN32 AND TARGET yue_module)
+        add_dependencies(mushkin yue_module)
+    endif()
 endif()
 
 # ========== Google Test Framework ==========

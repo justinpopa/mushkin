@@ -63,6 +63,26 @@ set_target_properties(mushkin PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
 )
 
+# ========== Static Build RPATH ==========
+# Configure RPATH so bundled dynamic libraries are found at runtime
+if(STATIC_BUILD)
+    if(APPLE)
+        # .app bundle: dylibs go in Contents/Frameworks/
+        set_target_properties(mushkin PROPERTIES
+            INSTALL_RPATH "@executable_path/../Frameworks"
+            BUILD_WITH_INSTALL_RPATH TRUE
+        )
+    elseif(NOT WIN32)
+        # Linux: dylibs go in lib/ next to binary
+        set_target_properties(mushkin PROPERTIES
+            INSTALL_RPATH "$ORIGIN/lib"
+            BUILD_WITH_INSTALL_RPATH TRUE
+        )
+        # DT_RPATH (not DT_RUNPATH) so it's inherited by transitive deps
+        target_link_options(mushkin PRIVATE -Wl,--disable-new-dtags)
+    endif()
+endif()
+
 # macOS bundle settings
 if(APPLE)
     # Set the icon file as a source (gets copied into bundle Resources)

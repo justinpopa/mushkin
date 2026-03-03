@@ -16,7 +16,7 @@
 #   ./scripts/build-macos-static.sh
 #
 # Output:
-#   build-static/mushkin - Native binary with static Qt
+#   build-static/mushkin.app - Self-contained app bundle with static Qt
 #
 # Note: First run takes ~60 minutes to build Qt.
 #       Subsequent builds take ~2 minutes (Qt is cached).
@@ -141,7 +141,139 @@ build_mushkin() {
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_PREFIX_PATH="$QT_STATIC_DIR"
 
-    cmake --build . --target mushkin -j"$NUM_CORES"
+    cmake --build . -j"$NUM_CORES"
+}
+
+# ============================================================
+# Bundle Dynamic Libraries into .app
+# ============================================================
+
+bundle_dylibs() {
+    local app_bundle="$BUILD_DIR/mushkin.app"
+    local frameworks_dir="$app_bundle/Contents/Frameworks"
+    local binary="$app_bundle/Contents/MacOS/mushkin"
+    local lib_dir="$app_bundle/Contents/MacOS/lib"
+
+    if [ ! -d "$app_bundle" ]; then
+        echo_error ".app bundle not found at $app_bundle"
+        exit 1
+    fi
+
+    echo_info "Bundling dynamic libraries into .app..."
+    mkdir -p "$frameworks_dir"
+
+    # Homebrew prefix (Apple Silicon vs Intel)
+    local brew_prefix
+    if [ -d /opt/homebrew ]; then
+        brew_prefix="/opt/homebrew"
+    else
+        brew_prefix="/usr/local"
+    fi
+
+    # Collect all dylibs referenced by the binary that come from Homebrew
+    local homebrew_deps
+    homebrew_deps=$(otool -L "$binary" | grep "$brew_prefix" | awk '{print $1}')
+
+    if [ -z "$homebrew_deps" ]; then
+        echo_info "No Homebrew dylibs found - binary may already be self-contained"
+        return 0
+    fi
+
+    # Copy each Homebrew dylib to Frameworks/
+    local copied_dylibs=()
+    for dep in $homebrew_deps; do
+        local real_path
+        real_path=$(realpath "$dep")
+        local dylib_name
+        dylib_name=$(basename "$real_path")
+
+        if [ ! -f "$frameworks_dir/$dylib_name" ]; then
+            echo_info "  Copying $dylib_name"
+            cp "$real_path" "$frameworks_dir/$dylib_name"
+            chmod 755 "$frameworks_dir/$dylib_name"
+            copied_dylibs+=("$dylib_name")
+        fi
+    done
+
+    # Also find transitive dependencies (dylibs that reference other Homebrew dylibs)
+    local found_new=true
+    while $found_new; do
+        found_new=false
+        for fw in "$frameworks_dir"/*.dylib; do
+            [ -f "$fw" ] || continue
+            local transitive
+            transitive=$(otool -L "$fw" | grep "$brew_prefix" | awk '{print $1}')
+            for dep in $transitive; do
+                local real_path
+                real_path=$(realpath "$dep")
+                local dylib_name
+                dylib_name=$(basename "$real_path")
+                if [ ! -f "$frameworks_dir/$dylib_name" ]; then
+                    echo_info "  Copying transitive dep $dylib_name"
+                    cp "$real_path" "$frameworks_dir/$dylib_name"
+                    chmod 755 "$frameworks_dir/$dylib_name"
+                    found_new=true
+                fi
+            done
+        done
+    done
+
+    # Fix install names in Frameworks/ dylibs
+    echo_info "Fixing install names..."
+    for fw in "$frameworks_dir"/*.dylib; do
+        [ -f "$fw" ] || continue
+        local dylib_name
+        dylib_name=$(basename "$fw")
+
+        # Fix the dylib's own identity
+        install_name_tool -id "@rpath/$dylib_name" "$fw" 2>/dev/null || true
+
+        # Fix references to other Homebrew dylibs
+        local refs
+        refs=$(otool -L "$fw" | grep "$brew_prefix" | awk '{print $1}')
+        for ref in $refs; do
+            local ref_real
+            ref_real=$(realpath "$ref")
+            local ref_name
+            ref_name=$(basename "$ref_real")
+            install_name_tool -change "$ref" "@loader_path/$ref_name" "$fw" 2>/dev/null || true
+        done
+    done
+
+    # Fix the main binary - replace Homebrew paths with @rpath
+    echo_info "Fixing main binary references..."
+    local binary_refs
+    binary_refs=$(otool -L "$binary" | grep "$brew_prefix" | awk '{print $1}')
+    for ref in $binary_refs; do
+        local ref_real
+        ref_real=$(realpath "$ref")
+        local ref_name
+        ref_name=$(basename "$ref_real")
+        install_name_tool -change "$ref" "@rpath/$ref_name" "$binary" 2>/dev/null || true
+    done
+
+    # Fix Lua .so modules in Contents/MacOS/lib/
+    echo_info "Fixing Lua module references..."
+    if [ -d "$lib_dir" ]; then
+        find "$lib_dir" -name "*.so" -type f | while read -r so_file; do
+            local so_refs
+            so_refs=$(otool -L "$so_file" | grep "$brew_prefix" | awk '{print $1}')
+            for ref in $so_refs; do
+                local ref_real
+                ref_real=$(realpath "$ref")
+                local ref_name
+                ref_name=$(basename "$ref_real")
+                # Lua modules are in Contents/MacOS/lib/ — Frameworks is at ../Frameworks/
+                install_name_tool -change "$ref" "@executable_path/../Frameworks/$ref_name" "$so_file" 2>/dev/null || true
+            done
+        done
+    fi
+
+    # Ad-hoc codesign the entire bundle
+    echo_info "Codesigning .app bundle..."
+    codesign --force --deep --sign - "$app_bundle"
+
+    echo_info "Dylib bundling complete"
 }
 
 # ============================================================
@@ -149,7 +281,8 @@ build_mushkin() {
 # ============================================================
 
 verify_build() {
-    local binary="$BUILD_DIR/mushkin"
+    local app_bundle="$BUILD_DIR/mushkin.app"
+    local binary="$app_bundle/Contents/MacOS/mushkin"
 
     if [ ! -f "$binary" ]; then
         echo_error "Build failed - binary not found"
@@ -162,13 +295,69 @@ verify_build() {
     # Check architecture
     local archs=$(lipo -archs "$binary" 2>/dev/null)
     echo "  Architecture: $archs"
-    echo "  Size: $(du -h "$binary" | cut -f1)"
-    echo "  Location: $binary"
+    echo "  App bundle: $app_bundle"
+    echo "  Binary size: $(du -h "$binary" | cut -f1)"
+
+    # Show bundled frameworks
+    local fw_dir="$app_bundle/Contents/Frameworks"
+    if [ -d "$fw_dir" ]; then
+        echo ""
+        echo_info "Bundled frameworks:"
+        ls -lh "$fw_dir"/*.dylib 2>/dev/null | awk '{print "  " $NF " (" $5 ")"}'
+    fi
+
+    # Show bundled Lua modules
+    local lib_dir="$app_bundle/Contents/MacOS/lib"
+    if [ -d "$lib_dir" ]; then
+        echo ""
+        echo_info "Bundled Lua modules:"
+        find "$lib_dir" -name "*.so" -type f | while read -r f; do
+            echo "  $(echo "$f" | sed "s|$lib_dir/||")"
+        done
+    fi
+
     echo ""
 
-    # Show dynamic dependencies
-    echo_info "Dynamic dependencies:"
-    otool -L "$binary" | grep -v "mushkin:" | head -20
+    # Verify no Homebrew paths remain
+    echo_info "Checking for leaked Homebrew paths..."
+    local leaked=false
+
+    # Check main binary
+    if otool -L "$binary" | grep -q "/opt/homebrew\|/usr/local/opt"; then
+        echo_error "Main binary still references Homebrew paths:"
+        otool -L "$binary" | grep "/opt/homebrew\|/usr/local/opt"
+        leaked=true
+    fi
+
+    # Check Frameworks
+    if [ -d "$fw_dir" ]; then
+        for fw in "$fw_dir"/*.dylib; do
+            [ -f "$fw" ] || continue
+            if otool -L "$fw" | grep -q "/opt/homebrew\|/usr/local/opt"; then
+                echo_error "$(basename "$fw") still references Homebrew paths:"
+                otool -L "$fw" | grep "/opt/homebrew\|/usr/local/opt"
+                leaked=true
+            fi
+        done
+    fi
+
+    # Check Lua modules
+    if [ -d "$lib_dir" ]; then
+        find "$lib_dir" -name "*.so" -type f | while read -r so_file; do
+            if otool -L "$so_file" | grep -q "/opt/homebrew\|/usr/local/opt"; then
+                echo_error "$(basename "$so_file") still references Homebrew paths:"
+                otool -L "$so_file" | grep "/opt/homebrew\|/usr/local/opt"
+                leaked=true
+            fi
+        done
+    fi
+
+    if [ "$leaked" = true ]; then
+        echo_error "FAILED: Homebrew paths leaked into bundle"
+        exit 1
+    else
+        echo_info "OK - no Homebrew paths found in bundle"
+    fi
 }
 
 # ============================================================
@@ -184,11 +373,12 @@ main() {
     check_prerequisites
     build_static_qt
     build_mushkin
+    bundle_dylibs
     verify_build
 
     echo ""
     echo_info "Build complete!"
-    echo_info "Binary: $BUILD_DIR/mushkin"
+    echo_info "App bundle: $BUILD_DIR/mushkin.app"
 }
 
 main "$@"
