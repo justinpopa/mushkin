@@ -63,6 +63,26 @@ set_target_properties(mushkin PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
 )
 
+# ========== Static Build RPATH ==========
+# Configure RPATH so bundled dynamic libraries are found at runtime
+if(STATIC_BUILD)
+    if(APPLE)
+        # .app bundle: dylibs go in Contents/Frameworks/
+        set_target_properties(mushkin PROPERTIES
+            INSTALL_RPATH "@executable_path/../Frameworks"
+            BUILD_WITH_INSTALL_RPATH TRUE
+        )
+    elseif(NOT WIN32)
+        # Linux: dylibs go in lib/ next to binary
+        set_target_properties(mushkin PROPERTIES
+            INSTALL_RPATH "$ORIGIN/lib"
+            BUILD_WITH_INSTALL_RPATH TRUE
+        )
+        # DT_RPATH (not DT_RUNPATH) so it's inherited by transitive deps
+        target_link_options(mushkin PRIVATE -Wl,--disable-new-dtags)
+    endif()
+endif()
+
 # macOS bundle settings
 if(APPLE)
     # Set the icon file as a source (gets copied into bundle Resources)
@@ -85,6 +105,42 @@ if(APPLE)
     # Ad-hoc codesign the app bundle after build (required for macOS to run unsigned apps)
     # This gets invalidated by macdeployqt, so deployment scripts must re-sign
     if(BUILD_APP_BUNDLE)
+        # Copy Lua runtime files into Contents/Resources/lua/ so require() finds them
+        # inside the self-contained app bundle regardless of working directory.
+        add_custom_command(TARGET mushkin POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CMAKE_BINARY_DIR}/lua"
+                "$<TARGET_BUNDLE_DIR:mushkin>/Contents/Resources/lua"
+            COMMENT "Copying Lua runtime files into app bundle Resources/lua"
+        )
+
+        # Copy compiled Lua C modules (socket/core.so, mime/core.so, ssl.so, yue.so)
+        # into Contents/MacOS/lib/ so package.cpath finds them inside the app bundle.
+        add_custom_command(TARGET mushkin POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                "$<TARGET_BUNDLE_DIR:mushkin>/Contents/MacOS/lib/socket"
+                "$<TARGET_BUNDLE_DIR:mushkin>/Contents/MacOS/lib/mime"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CMAKE_BINARY_DIR}/lib/socket/core.so"
+                "$<TARGET_BUNDLE_DIR:mushkin>/Contents/MacOS/lib/socket/core.so"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CMAKE_BINARY_DIR}/lib/socket/unix.so"
+                "$<TARGET_BUNDLE_DIR:mushkin>/Contents/MacOS/lib/socket/unix.so"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CMAKE_BINARY_DIR}/lib/mime/core.so"
+                "$<TARGET_BUNDLE_DIR:mushkin>/Contents/MacOS/lib/mime/core.so"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CMAKE_BINARY_DIR}/lib/ssl.so"
+                "$<TARGET_BUNDLE_DIR:mushkin>/Contents/MacOS/lib/ssl.so"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CMAKE_BINARY_DIR}/lib/yue.so"
+                "$<TARGET_BUNDLE_DIR:mushkin>/Contents/MacOS/lib/yue.so"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CMAKE_BINARY_DIR}/lib/llthreads2.so"
+                "$<TARGET_BUNDLE_DIR:mushkin>/Contents/MacOS/lib/llthreads2.so"
+            COMMENT "Copying compiled Lua C modules into app bundle MacOS/lib"
+        )
+
         add_custom_command(TARGET mushkin POST_BUILD
             COMMAND codesign --force --deep --sign - "$<TARGET_BUNDLE_DIR:mushkin>"
             COMMENT "Ad-hoc signing mushkin.app"

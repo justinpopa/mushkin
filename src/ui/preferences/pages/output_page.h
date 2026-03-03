@@ -3,6 +3,7 @@
 
 #include "../preferences_page_base.h"
 #include <QFont>
+#include <array>
 
 class QLabel;
 class QPushButton;
@@ -21,7 +22,10 @@ class OutputPage : public PreferencesPageBase {
   public:
     explicit OutputPage(WorldDocument* doc, QWidget* parent = nullptr);
 
-    QString pageName() const override { return tr("Output"); }
+    QString pageName() const override
+    {
+        return tr("Output");
+    }
     QString pageDescription() const override
     {
         return tr("Configure output window appearance, fonts, and display options.");
@@ -46,12 +50,12 @@ class OutputPage : public PreferencesPageBase {
     QFont m_outputFont;
 
     // ANSI color palette (16 colors: 8 normal + 8 bright)
-    QPushButton* m_colorButtons[16];
-    QRgb m_ansiColors[16];
+    std::array<QPushButton*, 16> m_colorButtons{};
+    std::array<QRgb, 16> m_ansiColors{};
 
     // Display options
-    QCheckBox* m_wordWrapCheck;   // Enable word-wrap at spaces (m_wrap)
-    QSpinBox* m_wrapColumnSpin;   // Wrap column width (m_nWrapColumn)
+    QCheckBox* m_wordWrapCheck; // Enable word-wrap at spaces (m_wrap)
+    QSpinBox* m_wrapColumnSpin; // Wrap column width (m_nWrapColumn)
     QCheckBox* m_showBoldCheck;
     QCheckBox* m_showItalicCheck;
     QCheckBox* m_showUnderlineCheck;

@@ -9,24 +9,14 @@
  */
 
 #include "../src/ui/views/input_view.h"
-#include "../src/world/script_engine.h"
-#include "../src/world/world_document.h"
-#include <QApplication>
-#include <gtest/gtest.h>
-
-extern "C" {
-#include <lauxlib.h>
-#include <lua.h>
-#include <lualib.h>
-}
+#include "fixtures/world_fixtures.h"
 
 // Test fixture for command/color API tests
-class CommandColorAPITest : public ::testing::Test {
+class CommandColorAPITest : public LuaWorldTest {
   protected:
     void SetUp() override
     {
-        doc = new WorldDocument();
-        L = doc->m_ScriptEngine->L;
+        LuaWorldTest::SetUp();
 
         // Load test script file (relative to build/tests directory)
         if (luaL_dofile(L, "tests/test_api.lua") != 0) {
@@ -39,7 +29,6 @@ class CommandColorAPITest : public ::testing::Test {
     void TearDown() override
     {
         delete inputView;
-        delete doc;
     }
 
     // Helper to call a Lua test function
@@ -58,8 +47,6 @@ class CommandColorAPITest : public ::testing::Test {
         EXPECT_EQ(result, 0) << functionName << " should succeed";
     }
 
-    WorldDocument* doc = nullptr;
-    lua_State* L = nullptr;
     InputView* inputView = nullptr;
 };
 
@@ -79,7 +66,7 @@ TEST_F(CommandColorAPITest, GetCommandNoInputView)
 TEST_F(CommandColorAPITest, GetCommandWithInputView)
 {
     // Create InputView and set it
-    inputView = new InputView(doc, nullptr);
+    inputView = new InputView(doc.get(), nullptr);
     doc->setActiveInputView(inputView);
 
     // Set some text
@@ -101,7 +88,7 @@ TEST_F(CommandColorAPITest, GetCommandWithInputView)
 TEST_F(CommandColorAPITest, SetCommandValid)
 {
     // Create InputView (empty by default)
-    inputView = new InputView(doc, nullptr);
+    inputView = new InputView(doc.get(), nullptr);
     doc->setActiveInputView(inputView);
 
     // Call Lua test (should succeed)
@@ -115,7 +102,7 @@ TEST_F(CommandColorAPITest, SetCommandValid)
 TEST_F(CommandColorAPITest, SetCommandNotEmpty)
 {
     // Create InputView with existing text
-    inputView = new InputView(doc, nullptr);
+    inputView = new InputView(doc.get(), nullptr);
     inputView->setText("existing text");
     doc->setActiveInputView(inputView);
 
@@ -130,7 +117,7 @@ TEST_F(CommandColorAPITest, SetCommandNotEmpty)
 TEST_F(CommandColorAPITest, SetCommandSelection)
 {
     // Create InputView with text
-    inputView = new InputView(doc, nullptr);
+    inputView = new InputView(doc.get(), nullptr);
     inputView->setText("test command");
     doc->setActiveInputView(inputView);
 
@@ -146,7 +133,7 @@ TEST_F(CommandColorAPITest, SetCommandSelection)
 TEST_F(CommandColorAPITest, SetCommandSelectionEnd)
 {
     // Create InputView with text
-    inputView = new InputView(doc, nullptr);
+    inputView = new InputView(doc.get(), nullptr);
     inputView->setText("test command");
     doc->setActiveInputView(inputView);
 
@@ -166,7 +153,7 @@ TEST_F(CommandColorAPITest, SetCustomColourNameValid)
     callLuaTest("test_set_custom_colour_name_valid");
 
     // Verify C++ side: color name should be set
-    EXPECT_EQ(doc->m_strCustomColourName[0], "MyRed");
+    EXPECT_EQ(doc->m_colors.custom_colour_name[0], "MyRed");
 }
 
 // Test SetCustomColourName with out of range index
@@ -199,8 +186,8 @@ TEST_F(CommandColorAPITest, SetCustomColourNameMaxLength)
     callLuaTest("test_set_custom_colour_name_max_length");
 
     // Verify C++ side: 30-char name should be set
-    EXPECT_EQ(doc->m_strCustomColourName[0], "123456789012345678901234567890");
-    EXPECT_EQ(doc->m_strCustomColourName[0].length(), 30);
+    EXPECT_EQ(doc->m_colors.custom_colour_name[0], "123456789012345678901234567890");
+    EXPECT_EQ(doc->m_colors.custom_colour_name[0].length(), 30);
 }
 
 // Test SetCustomColourName with different color indices
@@ -209,9 +196,9 @@ TEST_F(CommandColorAPITest, SetCustomColourNameDifferentValues)
     callLuaTest("test_set_custom_colour_name_different_values");
 
     // Verify C++ side: all three colors should be set
-    EXPECT_EQ(doc->m_strCustomColourName[0], "Color1");
-    EXPECT_EQ(doc->m_strCustomColourName[1], "Color2");
-    EXPECT_EQ(doc->m_strCustomColourName[15], "Color16");
+    EXPECT_EQ(doc->m_colors.custom_colour_name[0], "Color1");
+    EXPECT_EQ(doc->m_colors.custom_colour_name[1], "Color2");
+    EXPECT_EQ(doc->m_colors.custom_colour_name[15], "Color16");
 }
 
 // Test SetCustomColourName marks document as modified
@@ -236,7 +223,7 @@ TEST_F(CommandColorAPITest, SetCustomColourNameModifiesDocument)
 TEST_F(CommandColorAPITest, SetCustomColourNameNoChangeIfSame)
 {
     // Set initial name
-    doc->m_strCustomColourName[0] = "TestColor";
+    doc->m_colors.custom_colour_name[0] = "TestColor";
     doc->m_bModified = false;
 
     // Set same name again
@@ -259,17 +246,4 @@ TEST_F(CommandColorAPITest, GetUdpPort)
     callLuaTest("test_get_udp_port");
 
     // No C++ side effects to verify (function always returns 0)
-}
-
-// GoogleTest main function
-int main(int argc, char** argv)
-{
-    // Initialize Qt application (required for QWidget types like InputView)
-    QApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

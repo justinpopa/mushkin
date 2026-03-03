@@ -9,8 +9,7 @@
 #include "../src/text/action.h"
 #include "../src/text/line.h"
 #include "../src/text/style.h"
-#include <QCoreApplication>
-#include <gtest/gtest.h>
+#include "fixtures/world_fixtures.h"
 
 // Test fixture for Action tests
 class ActionTest : public ::testing::Test {
@@ -114,21 +113,19 @@ class LineTest : public ::testing::Test {
 // Test 7: Basic line creation
 TEST_F(LineTest, BasicCreation)
 {
-    Line* testLine = new Line(1, 80, 0, qRgb(255, 255, 255), qRgb(0, 0, 0), false);
+    auto testLine = std::make_unique<Line>(1, 80, 0, qRgb(255, 255, 255), qRgb(0, 0, 0), false);
 
     EXPECT_NE(testLine, nullptr);
     EXPECT_EQ(testLine->m_nLineNumber, 1);
     EXPECT_GT(testLine->iMemoryAllocated(), 0);
     EXPECT_EQ(testLine->len(), 0); // Empty line (len() doesn't count null terminator)
     EXPECT_EQ(testLine->styleList.size(), 0);
-
-    delete testLine;
 }
 
 // Test 8: Line with text and styles
 TEST_F(LineTest, LineWithTextAndStyles)
 {
-    Line* testLine = new Line(1, 80, 0, qRgb(255, 255, 255), qRgb(0, 0, 0), false);
+    auto testLine = std::make_unique<Line>(1, 80, 0, qRgb(255, 255, 255), qRgb(0, 0, 0), false);
 
     auto normalStyle = std::make_unique<Style>();
     normalStyle->iLength = 11;
@@ -152,19 +149,17 @@ TEST_F(LineTest, LineWithTextAndStyles)
 
     // Resize buffer and copy text
     testLine->textBuffer.resize(textLen);
-    memcpy(testLine->text(), testText, textLen);
+    memcpy(testLine->textBuffer.data(), testText, textLen);
     testLine->textBuffer.push_back('\0');
 
     EXPECT_EQ(testLine->len(), textLen); // Text length (len() doesn't count null terminator)
-    EXPECT_STREQ(testLine->text(), "Hello world bold!");
-
-    delete testLine;
+    EXPECT_STREQ(testLine->text().data(), "Hello world bold!");
 }
 
 // Test 9: Action lifecycle with Line
 TEST_F(LineTest, ActionLifecycleWithLine)
 {
-    Line* testLine = new Line(1, 80, 0, qRgb(255, 255, 255), qRgb(0, 0, 0), false);
+    auto testLine = std::make_unique<Line>(1, 80, 0, qRgb(255, 255, 255), qRgb(0, 0, 0), false);
 
     auto testAction =
         std::make_shared<Action>("look at sword", "Click to examine sword", "", nullptr);
@@ -192,12 +187,12 @@ TEST_F(LineTest, ActionLifecycleWithLine)
     const char* testText = "Hello world sword";
     int textLen = qstrlen(testText);
     testLine->textBuffer.resize(textLen);
-    memcpy(testLine->text(), testText, textLen);
+    memcpy(testLine->textBuffer.data(), testText, textLen);
     testLine->textBuffer.push_back('\0');
 
     EXPECT_EQ(testLine->styleList.size(), 2);
 
-    delete testLine;
+    testLine.reset();
 
     // After line deletion, action ref count should be back to 1
     EXPECT_EQ(testAction.use_count(), 1);
@@ -225,17 +220,4 @@ TEST_F(ActionTest, MultipleStylesSharingAction)
 
     style2.reset();
     EXPECT_EQ(testAction.use_count(), 1);
-}
-
-// GoogleTest main entry point
-int main(int argc, char** argv)
-{
-    // Initialize Qt application (required for Qt types)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

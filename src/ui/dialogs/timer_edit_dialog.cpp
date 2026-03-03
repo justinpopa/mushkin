@@ -271,32 +271,32 @@ void TimerEditDialog::loadTimerData()
     }
 
     // Load data into form
-    m_labelEdit->setText(timer->strLabel);
-    m_enabledCheck->setChecked(timer->bEnabled);
-    m_groupEdit->setText(timer->strGroup);
+    m_labelEdit->setText(timer->label);
+    m_enabledCheck->setChecked(timer->enabled);
+    m_groupEdit->setText(timer->group);
 
     // Timer type
-    if (timer->iType == Timer::eAtTime) {
+    if (timer->type == Timer::TimerType::AtTime) {
         m_atTimeRadio->setChecked(true);
-        m_atHourSpin->setValue(timer->iAtHour);
-        m_atMinuteSpin->setValue(timer->iAtMinute);
-        m_atSecondSpin->setValue(timer->fAtSecond);
+        m_atHourSpin->setValue(timer->at_hour);
+        m_atMinuteSpin->setValue(timer->at_minute);
+        m_atSecondSpin->setValue(timer->at_second);
     } else {
         m_intervalRadio->setChecked(true);
-        m_everyHourSpin->setValue(timer->iEveryHour);
-        m_everyMinuteSpin->setValue(timer->iEveryMinute);
-        m_everySecondSpin->setValue(timer->fEverySecond);
-        m_offsetHourSpin->setValue(timer->iOffsetHour);
-        m_offsetMinuteSpin->setValue(timer->iOffsetMinute);
-        m_offsetSecondSpin->setValue(timer->fOffsetSecond);
+        m_everyHourSpin->setValue(timer->every_hour);
+        m_everyMinuteSpin->setValue(timer->every_minute);
+        m_everySecondSpin->setValue(timer->every_second);
+        m_offsetHourSpin->setValue(timer->offset_hour);
+        m_offsetMinuteSpin->setValue(timer->offset_minute);
+        m_offsetSecondSpin->setValue(timer->offset_second);
     }
 
     // Response
-    m_sendTextEdit->setPlainText(timer->strContents);
-    m_scriptEdit->setText(timer->strProcedure);
+    m_sendTextEdit->setPlainText(timer->contents);
+    m_scriptEdit->setText(timer->procedure);
 
     // Set send-to combo
-    int index = m_sendToCombo->findData(timer->iSendTo);
+    int index = m_sendToCombo->findData(static_cast<int>(timer->send_to));
     if (index >= 0) {
         m_sendToCombo->setCurrentIndex(index);
     }
@@ -308,10 +308,10 @@ void TimerEditDialog::loadTimerData()
     }
 
     // Options
-    m_oneShotCheck->setChecked(timer->bOneShot);
-    m_activeWhenClosedCheck->setChecked(timer->bActiveWhenClosed);
-    m_omitFromOutputCheck->setChecked(timer->bOmitFromOutput);
-    m_omitFromLogCheck->setChecked(timer->bOmitFromLog);
+    m_oneShotCheck->setChecked(timer->one_shot);
+    m_activeWhenClosedCheck->setChecked(timer->active_when_closed);
+    m_omitFromOutputCheck->setChecked(timer->omit_from_output);
+    m_omitFromLogCheck->setChecked(timer->omit_from_log);
 }
 
 bool TimerEditDialog::validateForm()
@@ -341,70 +341,98 @@ bool TimerEditDialog::validateForm()
 
 bool TimerEditDialog::saveTimer()
 {
-    Timer* timer = nullptr;
-
     if (m_isEditMode) {
         // Edit existing timer
-        timer = m_doc->getTimer(m_timerName);
+        Timer* timer = m_doc->getTimer(m_timerName);
         if (!timer) {
             QMessageBox::warning(this, "Error", "Timer not found: " + m_timerName);
             return false;
         }
+
+        // Save form data to timer
+        timer->label = m_labelEdit->text().trimmed();
+        timer->enabled = m_enabledCheck->isChecked();
+        timer->group = m_groupEdit->text().trimmed();
+
+        // Timer type and timing
+        if (m_atTimeRadio->isChecked()) {
+            timer->type = Timer::TimerType::AtTime;
+            timer->at_hour = m_atHourSpin->value();
+            timer->at_minute = m_atMinuteSpin->value();
+            timer->at_second = m_atSecondSpin->value();
+        } else {
+            timer->type = Timer::TimerType::Interval;
+            timer->every_hour = m_everyHourSpin->value();
+            timer->every_minute = m_everyMinuteSpin->value();
+            timer->every_second = m_everySecondSpin->value();
+            timer->offset_hour = m_offsetHourSpin->value();
+            timer->offset_minute = m_offsetMinuteSpin->value();
+            timer->offset_second = m_offsetSecondSpin->value();
+        }
+
+        // Response
+        timer->contents = m_sendTextEdit->toPlainText();
+        timer->procedure = m_scriptEdit->text().trimmed();
+        timer->send_to = static_cast<SendTo>(m_sendToCombo->currentData().toInt());
+        timer->scriptLanguage =
+            static_cast<ScriptLanguage>(m_scriptLanguageCombo->currentData().toInt());
+
+        // Options
+        timer->one_shot = m_oneShotCheck->isChecked();
+        timer->active_when_closed = m_activeWhenClosedCheck->isChecked();
+        timer->omit_from_output = m_omitFromOutputCheck->isChecked();
+        timer->omit_from_log = m_omitFromLogCheck->isChecked();
+
+        // Recalculate fire time
+        m_doc->resetOneTimer(timer);
     } else {
         // Create new timer
-        timer = new Timer();
-    }
+        auto timerPtr = std::make_unique<Timer>();
 
-    // Save form data to timer
-    timer->strLabel = m_labelEdit->text().trimmed();
-    timer->bEnabled = m_enabledCheck->isChecked();
-    timer->strGroup = m_groupEdit->text().trimmed();
+        // Save form data to timer
+        timerPtr->label = m_labelEdit->text().trimmed();
+        timerPtr->enabled = m_enabledCheck->isChecked();
+        timerPtr->group = m_groupEdit->text().trimmed();
 
-    // Timer type and timing
-    if (m_atTimeRadio->isChecked()) {
-        timer->iType = Timer::eAtTime;
-        timer->iAtHour = m_atHourSpin->value();
-        timer->iAtMinute = m_atMinuteSpin->value();
-        timer->fAtSecond = m_atSecondSpin->value();
-    } else {
-        timer->iType = Timer::eInterval;
-        timer->iEveryHour = m_everyHourSpin->value();
-        timer->iEveryMinute = m_everyMinuteSpin->value();
-        timer->fEverySecond = m_everySecondSpin->value();
-        timer->iOffsetHour = m_offsetHourSpin->value();
-        timer->iOffsetMinute = m_offsetMinuteSpin->value();
-        timer->fOffsetSecond = m_offsetSecondSpin->value();
-    }
+        // Timer type and timing
+        if (m_atTimeRadio->isChecked()) {
+            timerPtr->type = Timer::TimerType::AtTime;
+            timerPtr->at_hour = m_atHourSpin->value();
+            timerPtr->at_minute = m_atMinuteSpin->value();
+            timerPtr->at_second = m_atSecondSpin->value();
+        } else {
+            timerPtr->type = Timer::TimerType::Interval;
+            timerPtr->every_hour = m_everyHourSpin->value();
+            timerPtr->every_minute = m_everyMinuteSpin->value();
+            timerPtr->every_second = m_everySecondSpin->value();
+            timerPtr->offset_hour = m_offsetHourSpin->value();
+            timerPtr->offset_minute = m_offsetMinuteSpin->value();
+            timerPtr->offset_second = m_offsetSecondSpin->value();
+        }
 
-    // Response
-    timer->strContents = m_sendTextEdit->toPlainText();
-    timer->strProcedure = m_scriptEdit->text().trimmed();
-    timer->iSendTo = m_sendToCombo->currentData().toInt();
-    timer->scriptLanguage =
-        static_cast<ScriptLanguage>(m_scriptLanguageCombo->currentData().toInt());
+        // Response
+        timerPtr->contents = m_sendTextEdit->toPlainText();
+        timerPtr->procedure = m_scriptEdit->text().trimmed();
+        timerPtr->send_to = static_cast<SendTo>(m_sendToCombo->currentData().toInt());
+        timerPtr->scriptLanguage =
+            static_cast<ScriptLanguage>(m_scriptLanguageCombo->currentData().toInt());
 
-    // Options
-    timer->bOneShot = m_oneShotCheck->isChecked();
-    timer->bActiveWhenClosed = m_activeWhenClosedCheck->isChecked();
-    timer->bOmitFromOutput = m_omitFromOutputCheck->isChecked();
-    timer->bOmitFromLog = m_omitFromLogCheck->isChecked();
+        // Options
+        timerPtr->one_shot = m_oneShotCheck->isChecked();
+        timerPtr->active_when_closed = m_activeWhenClosedCheck->isChecked();
+        timerPtr->omit_from_output = m_omitFromOutputCheck->isChecked();
+        timerPtr->omit_from_log = m_omitFromLogCheck->isChecked();
 
-    // Add to document if new
-    if (!m_isEditMode) {
-        // Transfer ownership to unique_ptr
-        auto timerPtr = std::unique_ptr<Timer>(timer);
-        Timer* rawTimer = timerPtr.get(); // Keep raw pointer for later use
-        if (!m_doc->addTimer(timerPtr->strLabel, std::move(timerPtr))) {
+        // Capture raw pointer before move to call resetOneTimer after transfer
+        Timer* rawTimer = timerPtr.get();
+        QString label = timerPtr->label;
+        if (auto res = m_doc->addTimer(label, std::move(timerPtr)); !res.has_value()) {
             QMessageBox::warning(this, "Error",
-                                 "Failed to add timer. A timer with this name may already exist.");
-            // timerPtr will automatically delete on scope exit
+                                 QString("Failed to add timer: %1").arg(res.error().message));
             return false;
         }
-        // Reset the timer to calculate its fire time
+        // Reset the timer to calculate its fire time (pointer remains valid — owned by doc)
         m_doc->resetOneTimer(rawTimer);
-    } else {
-        // For edited timer, recalculate fire time
-        m_doc->resetOneTimer(timer);
     }
 
     return true;

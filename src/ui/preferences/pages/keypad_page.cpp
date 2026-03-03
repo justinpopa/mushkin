@@ -9,8 +9,7 @@
 #include <QScrollArea>
 #include <QVBoxLayout>
 
-KeypadPage::KeypadPage(WorldDocument* doc, QWidget* parent)
-    : PreferencesPageBase(doc, parent)
+KeypadPage::KeypadPage(WorldDocument* doc, QWidget* parent) : PreferencesPageBase(doc, parent)
 {
     setupUi();
 }
@@ -26,10 +25,10 @@ void KeypadPage::setupUi()
     mainLayout->addWidget(m_enableCheck);
 
     // Help text
-    QLabel* helpLabel = new QLabel(
-        tr("Configure commands sent when numeric keypad keys are pressed. "
-           "Use with Num Lock off for directional movement."),
-        this);
+    QLabel* helpLabel =
+        new QLabel(tr("Configure commands sent when numeric keypad keys are pressed. "
+                      "Use with Num Lock off for directional movement."),
+                   this);
     helpLabel->setWordWrap(true);
     helpLabel->setStyleSheet("color: gray; font-style: italic;");
     mainLayout->addWidget(helpLabel);
@@ -45,13 +44,11 @@ void KeypadPage::setupUi()
     // Standard keypad keys layout
     // Keys: 0-9, /, *, -, +, Enter, .
     // With modifiers: None, Shift, Ctrl
-    const char* keyNames[] = {
-        "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
-        "/", "*", "-", "+", "Enter", ".",
-        "Shift+0", "Shift+1", "Shift+2", "Shift+3", "Shift+4",
-        "Shift+5", "Shift+6", "Shift+7", "Shift+8", "Shift+9",
-        "Ctrl+0", "Ctrl+1", "Ctrl+2", "Ctrl+3"
-    };
+    const char* keyNames[] = {"0",       "1",       "2",       "3",       "4",       "5",
+                              "6",       "7",       "8",       "9",       "/",       "*",
+                              "-",       "+",       "Enter",   ".",       "Shift+0", "Shift+1",
+                              "Shift+2", "Shift+3", "Shift+4", "Shift+5", "Shift+6", "Shift+7",
+                              "Shift+8", "Shift+9", "Ctrl+0",  "Ctrl+1",  "Ctrl+2",  "Ctrl+3"};
 
     // Create groups for organization
     QGroupBox* basicGroup = new QGroupBox(tr("Basic Keys (Num Lock Off)"), scrollWidget);
@@ -178,7 +175,7 @@ void KeypadPage::loadSettings()
             m_keypadEdits[i]->blockSignals(true);
     }
 
-    m_enableCheck->setChecked(m_doc->m_keypad_enable != 0);
+    m_enableCheck->setChecked(m_doc->m_keypad_enable);
 
     for (int i = 0; i < KEYPAD_MAX_ITEMS; i++) {
         if (m_keypadEdits[i])
@@ -200,7 +197,7 @@ void KeypadPage::saveSettings()
     if (!m_doc)
         return;
 
-    m_doc->m_keypad_enable = m_enableCheck->isChecked() ? 1 : 0;
+    m_doc->m_keypad_enable = m_enableCheck->isChecked();
 
     for (int i = 0; i < KEYPAD_MAX_ITEMS; i++) {
         if (m_keypadEdits[i])

@@ -4,8 +4,28 @@ project(mushkin VERSION 0.1.0 LANGUAGES C CXX)
 # x-release-please-end
 
 # C++ standard
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Suppress Qt 6.9 qyieldcpu.h warning on ARM (implicit __yield declaration).
+# This is a Qt framework bug — the header should include <arm_acle.h>.
+add_compile_options(-Wno-implicit-function-declaration)
+
+# Workaround: Homebrew LLVM + macOS 26 SDK header incompatibility.
+# When Qt (or other imported targets) add the SDK include path via -isystem,
+# it breaks LLVM's libc++ header wrapping (size_t, wint_t etc. not found).
+# Marking the SDK include path as implicit prevents CMake from emitting -isystem for it,
+# allowing LLVM's internal header ordering to work correctly.
+if(APPLE AND NOT CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+    execute_process(
+        COMMAND xcrun --show-sdk-path
+        OUTPUT_VARIABLE _sdk_path
+        OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(_sdk_path)
+        list(APPEND CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES "${_sdk_path}/usr/include")
+        list(APPEND CMAKE_C_IMPLICIT_INCLUDE_DIRECTORIES "${_sdk_path}/usr/include")
+    endif()
+endif()
 
 # ========== macOS App Bundle Option ==========
 if(APPLE)
@@ -20,10 +40,6 @@ option(STATIC_BUILD "Build with static Qt (dynamic deps from package manager)" O
 
 if(STATIC_BUILD)
     message(STATUS "Static build enabled - Qt will be statically linked")
-    # Disable app bundle for static builds (we want a single binary)
-    if(APPLE)
-        set(BUILD_APP_BUNDLE OFF)
-    endif()
 endif()
 
 # Qt setup - enable automatic MOC/UIC/RCC processing
@@ -74,6 +90,25 @@ find_package(Qt6 COMPONENTS Multimedia SpatialAudio REQUIRED)
 
 # zlib for MCCP compression
 find_package(ZLIB REQUIRED)
+
+# libssh for SSH remote access server
+if(APPLE)
+    find_package(libssh CONFIG REQUIRED
+        PATHS /opt/homebrew/opt/libssh /usr/local/opt/libssh
+        NO_DEFAULT_PATH
+    )
+elseif(WIN32)
+    find_package(libssh CONFIG REQUIRED)
+else()
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(LIBSSH REQUIRED libssh)
+    if(NOT TARGET ssh)
+        add_library(ssh SHARED IMPORTED)
+        set_target_properties(ssh PROPERTIES
+            IMPORTED_LOCATION "${LIBSSH_LINK_LIBRARIES}"
+            INTERFACE_INCLUDE_DIRECTORIES "${LIBSSH_INCLUDE_DIRS}")
+    endif()
+endif()
 
 # PCRE for rex Lua library (Perl-compatible regular expressions)
 # Original MUSHclient uses PCRE 8.x (legacy PCRE, not PCRE2)
@@ -340,6 +375,23 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/external/yuescript/src/yuescript/yuescript.cpp")
     message(STATUS "YueScript: Building yue module for .yue file support")
 endif()
 
+# llthreads2 - Lua threading module (used by Aardwolf async.lua)
+if(EXISTS "${CMAKE_SOURCE_DIR}/external/llthreads2/CMakeLists.txt")
+    add_subdirectory(external/llthreads2)
+    message(STATUS "llthreads2: Building Lua threading module")
+endif()
+
+# Ensure Lua C modules are built alongside mushkin (needed for release packaging)
+if(TARGET socket_core AND TARGET mime_core AND TARGET ssl_core AND TARGET llthreads2)
+    add_dependencies(mushkin socket_core mime_core ssl_core llthreads2)
+    if(TARGET socket_unix)
+        add_dependencies(mushkin socket_unix)
+    endif()
+    if(TARGET yue_module)
+        add_dependencies(mushkin yue_module)
+    endif()
+endif()
+
 # ========== Google Test Framework ==========
 # Fetch GoogleTest for unit testing
 include(FetchContent)
@@ -354,6 +406,12 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 
 # Make GoogleTest available
 FetchContent_MakeAvailable(googletest)
+
+# Suppress warnings from GoogleTest internals (char8_t conversion, etc.)
+target_compile_options(gtest PRIVATE -w)
+target_compile_options(gtest_main PRIVATE -w)
+target_compile_options(gmock PRIVATE -w)
+target_compile_options(gmock_main PRIVATE -w)
 
 # Testing
 enable_testing()

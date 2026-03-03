@@ -10,25 +10,17 @@
 #include "../src/automation/alias.h"
 #include "../src/automation/sendto.h"
 #include "../src/world/world_document.h"
-#include <QCoreApplication>
+#include "fixtures/world_fixtures.h"
 #include <QFile>
 #include <QTemporaryDir>
-#include <gtest/gtest.h>
 
-class SendToIntegrationTest : public ::testing::Test {
+class SendToIntegrationTest : public WorldDocumentTest {
   protected:
     void SetUp() override
     {
-        doc = new WorldDocument();
+        WorldDocumentTest::SetUp();
         doc->setWorldName("TestWorld");
     }
-
-    void TearDown() override
-    {
-        delete doc;
-    }
-
-    WorldDocument* doc;
 };
 
 /**
@@ -41,8 +33,8 @@ TEST_F(SendToIntegrationTest, SendToVariableSetsVariable)
     // Send to variable
     doc->sendTo(eSendToVariable,
                 "test_value", // value to set
-                false,        // bOmitFromOutput
-                false,        // bOmitFromLog
+                false,        // omit_from_output
+                false,        // omit_from_log
                 "",           // strDescription
                 "test_var",   // variable name
                 output);
@@ -75,15 +67,16 @@ TEST_F(SendToIntegrationTest, SendToExecuteTriggersAliases)
 {
     // Create an alias that sets a variable via contents (not script)
     auto alias = std::make_unique<Alias>();
-    alias->strLabel = "test_alias";
+    alias->label = "test_alias";
     alias->name = "testalias";
-    alias->contents = "dummy";              // Send something to world
-    alias->iSendTo = eSendToVariable;       // Send to variable instead
-    alias->strVariable = "alias_triggered"; // Variable name
-    alias->bEnabled = true;
-    alias->iSequence = 100;
+    alias->contents = "dummy";           // Send something to world
+    alias->send_to = eSendToVariable;    // Send to variable instead
+    alias->variable = "alias_triggered"; // Variable name
+    alias->enabled = true;
+    alias->sequence = 100;
 
-    doc->addAlias("test_alias", std::move(alias));
+    auto addResult = doc->addAlias("test_alias", std::move(alias));
+    EXPECT_TRUE(addResult.has_value());
 
     QString output;
 
@@ -163,17 +156,4 @@ TEST_F(SendToIntegrationTest, SendToOutputAppendsToString)
 
     EXPECT_TRUE(output.contains("First line"));
     EXPECT_TRUE(output.contains("Second line"));
-}
-
-// GoogleTest main function
-int main(int argc, char** argv)
-{
-    // Initialize Qt application (required for Qt types)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

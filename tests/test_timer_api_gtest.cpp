@@ -20,59 +20,43 @@
 
 #include "../src/automation/sendto.h"
 #include "../src/automation/timer.h"
-#include "../src/world/script_engine.h"
-#include "../src/world/world_document.h"
-#include <QCoreApplication>
+#include "fixtures/world_fixtures.h"
 #include <QDateTime>
-#include <gtest/gtest.h>
-
-extern "C" {
-#include <lauxlib.h>
-#include <lua.h>
-#include <lualib.h>
-}
 
 // Test fixture for timer API tests
-class TimerApiTest : public ::testing::Test {
+class TimerApiTest : public LuaWorldTest {
   protected:
     void SetUp() override
     {
-        doc = new WorldDocument();
+        LuaWorldTest::SetUp();
         doc->m_mush_name = "Test World";
         doc->m_server = "localhost";
         doc->m_port = 4000;
-
-        // Verify script engine is available
-        ASSERT_NE(doc->m_ScriptEngine, nullptr) << "Script engine should be initialized";
-        ASSERT_NE(doc->m_ScriptEngine->L, nullptr) << "Lua state should be initialized";
     }
 
     void TearDown() override
     {
-        delete doc;
     }
 
-    // Helper to execute Lua code
+    // Helper to execute Lua code (takes QString, uses parseLua)
     void executeLua(const QString& code)
     {
         bool hasError = doc->m_ScriptEngine->parseLua(code, "test");
         ASSERT_FALSE(hasError) << "Lua execution should succeed";
     }
 
-    // Helper to get Lua global number
+    // Helper to get Lua global number (takes QString)
     double getLuaNumber(const QString& varName)
     {
-        lua_State* L = doc->m_ScriptEngine->L;
         lua_getglobal(L, varName.toUtf8().constData());
         double value = lua_tonumber(L, -1);
         lua_pop(L, 1);
         return value;
     }
 
-    // Helper to get Lua global string
+    // Helper to get Lua global string (takes QString)
     QString getLuaString(const QString& varName)
     {
-        lua_State* L = doc->m_ScriptEngine->L;
         lua_getglobal(L, varName.toUtf8().constData());
         const char* value = lua_tostring(L, -1);
         QString result = value ? QString::fromUtf8(value) : QString();
@@ -80,17 +64,14 @@ class TimerApiTest : public ::testing::Test {
         return result;
     }
 
-    // Helper to get Lua global boolean
+    // Helper to get Lua global boolean (takes QString)
     bool getLuaBoolean(const QString& varName)
     {
-        lua_State* L = doc->m_ScriptEngine->L;
         lua_getglobal(L, varName.toUtf8().constData());
         bool value = lua_toboolean(L, -1);
         lua_pop(L, 1);
         return value;
     }
-
-    WorldDocument* doc = nullptr;
 };
 
 // Test 1: AddTimer - Create interval timer
@@ -108,12 +89,12 @@ TEST_F(TimerApiTest, AddTimerInterval)
     // Verify timer was created
     Timer* timer = doc->getTimer("test_timer1");
     ASSERT_NE(timer, nullptr) << "Timer should exist";
-    EXPECT_EQ(timer->iType, Timer::eInterval) << "Timer should be interval type";
-    EXPECT_EQ(timer->iEveryHour, 0) << "Hour should be 0";
-    EXPECT_EQ(timer->iEveryMinute, 0) << "Minute should be 0";
-    EXPECT_EQ(timer->fEverySecond, 5.0) << "Second should be 5.0";
-    EXPECT_EQ(timer->strContents, QString("look")) << "Contents should be 'look'";
-    EXPECT_TRUE(timer->bEnabled) << "Timer should be enabled";
+    EXPECT_EQ(timer->type, Timer::TimerType::Interval) << "Timer should be interval type";
+    EXPECT_EQ(timer->every_hour, 0) << "Hour should be 0";
+    EXPECT_EQ(timer->every_minute, 0) << "Minute should be 0";
+    EXPECT_EQ(timer->every_second, 5.0) << "Second should be 5.0";
+    EXPECT_EQ(timer->contents, QString("look")) << "Contents should be 'look'";
+    EXPECT_TRUE(timer->enabled) << "Timer should be enabled";
 }
 
 // Test 2: AddTimer - Create at-time timer
@@ -131,11 +112,11 @@ TEST_F(TimerApiTest, AddTimerAtTime)
     // Verify timer was created
     Timer* timer = doc->getTimer("test_timer2");
     ASSERT_NE(timer, nullptr) << "Timer should exist";
-    EXPECT_EQ(timer->iType, Timer::eAtTime) << "Timer should be at-time type";
-    EXPECT_EQ(timer->iAtHour, 15) << "Hour should be 15";
-    EXPECT_EQ(timer->iAtMinute, 30) << "Minute should be 30";
-    EXPECT_EQ(timer->fAtSecond, 0.0) << "Second should be 0.0";
-    EXPECT_EQ(timer->strContents, QString("check mail")) << "Contents should be 'check mail'";
+    EXPECT_EQ(timer->type, Timer::TimerType::AtTime) << "Timer should be at-time type";
+    EXPECT_EQ(timer->at_hour, 15) << "Hour should be 15";
+    EXPECT_EQ(timer->at_minute, 30) << "Minute should be 30";
+    EXPECT_EQ(timer->at_second, 0.0) << "Second should be 0.0";
+    EXPECT_EQ(timer->contents, QString("check mail")) << "Contents should be 'check mail'";
 }
 
 // Test 3: IsTimer
@@ -284,7 +265,7 @@ TEST_F(TimerApiTest, ResetTimer)
     // Verify fire time was recalculated
     Timer* timer = doc->getTimer("test_timer1");
     ASSERT_NE(timer, nullptr) << "Timer should exist";
-    EXPECT_TRUE(timer->tFireTime.isValid()) << "Fire time should be valid";
+    EXPECT_TRUE(timer->fire_time.isValid()) << "Fire time should be valid";
 }
 
 // Test 9: DoAfter
@@ -299,7 +280,7 @@ TEST_F(TimerApiTest, DoAfter)
 
     // Find the doafter timer (name starts with "doafter_")
     Timer* doafterTimer = nullptr;
-    for (const auto& [name, timerPtr] : doc->m_TimerMap) {
+    for (const auto& [name, timerPtr] : doc->m_automationRegistry->m_TimerMap) {
         if (name.startsWith("doafter_")) {
             doafterTimer = timerPtr.get();
             break;
@@ -307,11 +288,12 @@ TEST_F(TimerApiTest, DoAfter)
     }
 
     ASSERT_NE(doafterTimer, nullptr) << "DoAfter timer should be created";
-    EXPECT_EQ(doafterTimer->iType, Timer::eInterval) << "DoAfter timer should be interval type";
-    EXPECT_EQ(doafterTimer->fEverySecond, 3.5) << "DoAfter timer should fire after 3.5 seconds";
-    EXPECT_EQ(doafterTimer->strContents, QString("north")) << "DoAfter contents should be 'north'";
-    EXPECT_TRUE(doafterTimer->bOneShot) << "DoAfter timer should be one-shot";
-    EXPECT_TRUE(doafterTimer->bTemporary) << "DoAfter timer should be temporary";
+    EXPECT_EQ(doafterTimer->type, Timer::TimerType::Interval)
+        << "DoAfter timer should be interval type";
+    EXPECT_EQ(doafterTimer->every_second, 3.5) << "DoAfter timer should fire after 3.5 seconds";
+    EXPECT_EQ(doafterTimer->contents, QString("north")) << "DoAfter contents should be 'north'";
+    EXPECT_TRUE(doafterTimer->one_shot) << "DoAfter timer should be one-shot";
+    EXPECT_TRUE(doafterTimer->temporary) << "DoAfter timer should be temporary";
 }
 
 // Test 10: DoAfterNote
@@ -326,7 +308,7 @@ TEST_F(TimerApiTest, DoAfterNote)
 
     // Find the doafternote timer
     Timer* noteTimer = nullptr;
-    for (const auto& [name, timerPtr] : doc->m_TimerMap) {
+    for (const auto& [name, timerPtr] : doc->m_automationRegistry->m_TimerMap) {
         if (name.startsWith("doafternote_")) {
             noteTimer = timerPtr.get();
             break;
@@ -334,7 +316,7 @@ TEST_F(TimerApiTest, DoAfterNote)
     }
 
     ASSERT_NE(noteTimer, nullptr) << "DoAfterNote timer should be created";
-    EXPECT_EQ(noteTimer->iSendTo, (quint16)eSendToOutput) << "DoAfterNote should send to output";
+    EXPECT_EQ(noteTimer->send_to, eSendToOutput) << "DoAfterNote should send to output";
 }
 
 // Test 11: EnableTimerGroup
@@ -440,17 +422,4 @@ TEST_F(TimerApiTest, DeleteTimer)
     // Verify timers are deleted
     EXPECT_EQ(doc->getTimer("test_timer1"), nullptr) << "test_timer1 should be deleted";
     EXPECT_EQ(doc->getTimer("test_timer2"), nullptr) << "test_timer2 should be deleted";
-}
-
-// GoogleTest main function
-int main(int argc, char** argv)
-{
-    // Initialize Qt application (required for Qt types)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

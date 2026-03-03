@@ -3,36 +3,42 @@
 
 #include <QColor>
 #include <QDateTime>
-#include <QFile>              // Log file management
-#include <QFileSystemWatcher> // Script file change monitoring
-#include <QJsonDocument>      // GMCP JSON parsing
+#include <QFile>              // std::unique_ptr<QFile> m_logfile
+#include <QFileSystemWatcher> // QFileSystemWatcher* m_scriptFileWatcher
 #include <QMap>               // TriggerMap, AliasMap
 #include <QObject>
 #include <QPoint>
+#include <QPointer> // For QPointer<NotepadWidget> (null-safe observer)
 #include <QRect>
 #include <QRgb>
 #include <QSet>
 #include <QString>
 #include <QStringList>
-#include <QTimer>     // Timer evaluation loop
-#include <QVector>    // TriggerArray, AliasArray
-#include <deque>      // For m_recentLines (multi-line triggers)
-#include <functional> // For std::function (progress callback)
-#include <memory>     // For std::unique_ptr
+#include <QTimer>        // Timer evaluation loop
+#include <QVector>       // TriggerArray, AliasArray
+#include <array>         // For std::array (fixed-size collections)
+#include <deque>         // For m_recentLines (multi-line triggers)
+#include <expected>      // For std::expected (fallible operations)
+#include <functional>    // For std::function (progress callback)
+#include <memory>        // For std::unique_ptr
+#include <span>          // For std::span (buffer parameters)
+#include <unordered_map> // For std::unordered_map (option snapshots)
+#include <vector>        // For std::vector (line buffer)
+
+#include "automation_registry.h" // AutomationRegistry companion object (owns automation storage)
+#include "connection_manager.h"  // ConnectionManager companion object (owns connection state)
+#include "mxp_engine.h"          // MXPEngine companion object (owns MXP protocol state)
+#include "output_formatter.h" // OutputFormatter companion object (owns note/colour/hyperlink output)
+#include "telnet_parser.h"    // TelnetParser, Phase enum, telnet constants
+#include "world_context.h"    // IWorldContext interface
+#include "world_error.h"      // WorldError, WorldErrorType
 
 #include "../automation/script_language.h" // ScriptLanguage enum
+#include "../automation/sendto.h"          // SendTo enum
 #include "../automation/variable.h"        // ArraysMap type
-#include "miniwindow.h"                    // MiniWindow (off-screen drawing surface)
-#include "mxp_types.h"              // MXP data structures
-#include <QJsonArray>               // GMCP JSON parsing
-#include <QJsonObject>              // GMCP JSON parsing
-#include <QJsonValue>               // GMCP JSON parsing
-#include <zlib.h>                   // For MCCP compression
+#include "../text/style.h" // Style flag bits (HILITE, UNDERLINE, BLINK, INVERSE, STRIKEOUT, COLOUR_*, COLOURTYPE, ACTIONTYPE, STYLE_BITS)
 
 // Forward declarations
-class QAudioEngine;   // Spatial audio engine
-class QAudioListener; // Spatial audio listener
-class QSpatialSound;  // Positioned sound source
 class WorldSocket;
 class Line;
 class Style;
@@ -46,6 +52,8 @@ class Variable;           //
 class IOutputView;        // Interface for output view (see view_interfaces.h)
 class IInputView;         // Interface for input view (see view_interfaces.h)
 class NotepadWidget;      // Notepad window
+class MiniWindow;         // Off-screen drawing surface (miniwindow.h)
+class SoundManager;       // Spatial audio state (sound_manager.h)
 class RemoteAccessServer; // Remote access server for telnet connections
 class AcceleratorManager; // Keyboard accelerator management
 
@@ -55,14 +63,12 @@ struct sqlite3_stmt;
 
 
 // Constants
-#define MAX_CUSTOM 16       // maximum custom colours
-#define MACRO_COUNT 12      // F1-F12 function keys
-#define KEYPAD_MAX_ITEMS 30 // keypad items
+inline constexpr int MAX_CUSTOM = 16;       // maximum custom colours
+inline constexpr int MACRO_COUNT = 12;      // F1-F12 function keys
+inline constexpr int KEYPAD_MAX_ITEMS = 30; // keypad items
 
 // xterm 256-color palette (defined in world_protocol.cpp)
 extern QRgb xterm_256_colours[256];
-// Sound buffers: Match original MUSHclient's 10 buffers for compatibility
-#define MAX_SOUND_BUFFERS 10 // maximum simultaneous sounds
 
 // Type definitions
 typedef std::map<QString, std::unique_ptr<Variable>> VariableMap;
@@ -79,76 +85,78 @@ struct LuaDatabase {
     LuaDatabase() : db(nullptr), pStmt(nullptr), bValidRow(false), iColumns(0)
     {
     }
+
+    // Non-copyable, non-movable: owns sqlite3* handle; destructor calls sqlite3_close.
+    // Stored exclusively via std::unique_ptr<LuaDatabase> in m_DatabaseMap.
+    LuaDatabase(const LuaDatabase&) = delete;
+    LuaDatabase& operator=(const LuaDatabase&) = delete;
+    LuaDatabase(LuaDatabase&&) = delete;
+    LuaDatabase& operator=(LuaDatabase&&) = delete;
+
+    // Defined out-of-line in world_database.cpp (requires complete sqlite3.h type)
+    ~LuaDatabase();
 };
 
 // Database error codes (negative to avoid conflicting with SQLite error codes)
 // Based on methods_database.cpp
-const qint32 DATABASE_ERROR_ID_NOT_FOUND = -1;            // Unknown database ID
-const qint32 DATABASE_ERROR_NOT_OPEN = -2;                // Database not opened
-const qint32 DATABASE_ERROR_HAVE_PREPARED_STATEMENT = -3; // Already have a prepared statement
-const qint32 DATABASE_ERROR_NO_PREPARED_STATEMENT = -4;   // No prepared statement yet
-const qint32 DATABASE_ERROR_NO_VALID_ROW = -5;            // Have not stepped to valid row
-const qint32 DATABASE_ERROR_DATABASE_ALREADY_EXISTS =
-    -6;                                               // Already have a database of that disk name
-const qint32 DATABASE_ERROR_COLUMN_OUT_OF_RANGE = -7; // Requested column out of range
-
-// Sound Buffer Structure
-// Uses Qt Spatial Audio for stereo panning support
-struct SoundBuffer {
-    QSpatialSound* spatialSound; // Positioned sound source
-    bool isPlaying;              // Currently playing?
-    bool isLooping;              // Loop playback?
-    QString filename;            // Current file
-
-    SoundBuffer() : spatialSound(nullptr), isPlaying(false), isLooping(false)
-    {
-    }
+enum class DatabaseError : qint32 {
+    IdNotFound = -1,            // Unknown database ID
+    NotOpen = -2,               // Database not opened
+    HavePreparedStatement = -3, // Already have a prepared statement
+    NoPreparedStatement = -4,   // No prepared statement yet
+    NoValidRow = -5,            // Have not stepped to valid row
+    DatabaseAlreadyExists = -6, // Already have a database of that disk name
+    ColumnOutOfRange = -7,      // Requested column out of range
 };
+
+[[nodiscard]] inline constexpr auto to_underlying(DatabaseError e) noexcept
+{
+    return static_cast<std::underlying_type_t<DatabaseError>>(e);
+}
 
 // Flag bits for m_iFlags1
-#define FLAGS1_ArrowRecallsPartial 0x0001
-#define FLAGS1_CtrlZGoesToEndOfBuffer 0x0002
-#define FLAGS1_CtrlPGoesToPreviousCommand 0x0004
-#define FLAGS1_CtrlNGoesToNextCommand 0x0008
-#define FLAGS1_HyperlinkAddsToCommandHistory 0x0010
-#define FLAGS1_EchoHyperlinkInOutputWindow 0x0020
-#define FLAGS1_AutoWrapWindowWidth 0x0040
-#define FLAGS1_NAWS 0x0080
-#define FLAGS1_Pueblo 0x0100
-#define FLAGS1_NoEchoOff 0x0200
-#define FLAGS1_UseCustomLinkColour 0x0400
-#define FLAGS1_MudCanChangeLinkColour 0x0800
-#define FLAGS1_UnderlineHyperlinks 0x1000
-#define FLAGS1_MudCanRemoveUnderline 0x2000
+inline constexpr quint16 FLAGS1_ArrowRecallsPartial = 0x0001;
+inline constexpr quint16 FLAGS1_CtrlZGoesToEndOfBuffer = 0x0002;
+inline constexpr quint16 FLAGS1_CtrlPGoesToPreviousCommand = 0x0004;
+inline constexpr quint16 FLAGS1_CtrlNGoesToNextCommand = 0x0008;
+inline constexpr quint16 FLAGS1_HyperlinkAddsToCommandHistory = 0x0010;
+inline constexpr quint16 FLAGS1_EchoHyperlinkInOutputWindow = 0x0020;
+inline constexpr quint16 FLAGS1_AutoWrapWindowWidth = 0x0040;
+inline constexpr quint16 FLAGS1_NAWS = 0x0080;
+inline constexpr quint16 FLAGS1_Pueblo = 0x0100;
+inline constexpr quint16 FLAGS1_NoEchoOff = 0x0200;
+inline constexpr quint16 FLAGS1_UseCustomLinkColour = 0x0400;
+inline constexpr quint16 FLAGS1_MudCanChangeLinkColour = 0x0800;
+inline constexpr quint16 FLAGS1_UnderlineHyperlinks = 0x1000;
+inline constexpr quint16 FLAGS1_MudCanRemoveUnderline = 0x2000;
 
 // Flag bits for m_iFlags2
-#define FLAGS2_AlternativeInverse 0x0001
-#define FLAGS2_ShowConnectDisconnect 0x0002
-#define FLAGS2_IgnoreMXPcolourChanges 0x0004
-#define FLAGS2_Custom16isDefaultColour 0x0008
-#define FLAGS2_LogInColour 0x0010
-#define FLAGS2_LogRaw 0x0020
+inline constexpr quint16 FLAGS2_AlternativeInverse = 0x0001;
+inline constexpr quint16 FLAGS2_ShowConnectDisconnect = 0x0002;
+inline constexpr quint16 FLAGS2_IgnoreMXPcolourChanges = 0x0004;
+inline constexpr quint16 FLAGS2_Custom16isDefaultColour = 0x0008;
+inline constexpr quint16 FLAGS2_LogInColour = 0x0010;
+inline constexpr quint16 FLAGS2_LogRaw = 0x0020;
 
 // Auto-connect values
-enum { eNoAutoConnect, eConnectMUSH, eConnectAndGoIntoGame };
+enum class AutoConnect : int { eNoAutoConnect, eConnectMUSH, eConnectAndGoIntoGame };
 
 // MXP usage values
-enum { eMXP_Off, eMXP_Query, eMXP_On };
+enum class MXPMode : quint16 { eMXP_Off, eMXP_Query, eMXP_On };
 
 // Connection phase values (doc.h)
-enum {
-    eConnectNotConnected,  // 0: not connected and not attempting connection
-    eConnectMudNameLookup, // 1: finding address of MUD
-    // Proxy states removed
-    eConnectConnectingToMud = 3, // 3: connecting to MUD
-    eConnectConnectedToMud = 8,  // 8: connected, we can play now
-    eConnectDisconnecting = 9,   // 9: in process of disconnecting, don't attempt to reconnect
-};
+// These are now inline constexpr aliases to connection_manager.h constants.
+// Kept here for backward compatibility with all callers in world_*.cpp and lua_api/*.cpp.
+inline constexpr qint32 eConnectNotConnected = CONNECT_NOT_CONNECTED;
+inline constexpr qint32 eConnectMudNameLookup = CONNECT_MUD_NAME_LOOKUP;
+inline constexpr qint32 eConnectConnectingToMud = CONNECT_CONNECTING_TO_MUD;
+inline constexpr qint32 eConnectConnectedToMud = CONNECT_CONNECTED_TO_MUD;
+inline constexpr qint32 eConnectDisconnecting = CONNECT_DISCONNECTING;
 
 // Action source values (Lua callbacks)
 // These tell scripts what triggered the current code execution
 // Based on doc.h action source enum
-enum ActionSource {
+enum class ActionSource : quint32 {
     eUnknownActionSource = 0, // Unknown/not set
     eUserAction,              // User typed a command
     eWorldAction,             // World event (connect, disconnect, open, close)
@@ -162,7 +170,7 @@ enum ActionSource {
 
 // Command history position status (command history navigation)
 // Based on sendvw.h in original MUSHclient
-enum HistoryStatus {
+enum class HistoryStatus : int {
     eAtTop,    // At the top (oldest command) of history
     eInMiddle, // Somewhere in the middle of history
     eAtBottom  // At the bottom (newest, or ready for new command)
@@ -170,150 +178,120 @@ enum HistoryStatus {
 
 // Script reload option values (for m_nReloadOption)
 // Based on doc.h script reload enum
-enum ScriptReloadOption {
+enum class ScriptReloadOption : qint32 {
     eReloadConfirm = 0, // Show dialog asking user when script file changes
     eReloadAlways = 1,  // Automatically reload script when file changes
     eReloadNever = 2    // Ignore script file changes
 };
 
 // ========== Telnet Protocol Constants (RFC 854) ==========
+// inline constexpr aliases to the values in telnet_parser.h (TELNET_* / TELOPT_*_OPT).
+// Kept here for backward compatibility with callers in world_protocol.cpp, etc.
+inline constexpr auto IAC = TELNET_IAC;
+inline constexpr auto DONT = TELNET_DONT;
+inline constexpr auto DO = TELNET_DO;
+inline constexpr auto WONT = TELNET_WONT;
+inline constexpr auto WILL = TELNET_WILL;
+inline constexpr auto SB = TELNET_SB;
+inline constexpr auto GO_AHEAD = TELNET_GO_AHEAD;
+inline constexpr auto ERASE_LINE = TELNET_ERASE_LINE;
+inline constexpr auto ERASE_CHARACTER = TELNET_ERASE_CHARACTER;
+inline constexpr auto ARE_YOU_THERE = TELNET_ARE_YOU_THERE;
+inline constexpr auto ABORT_OUTPUT = TELNET_ABORT_OUTPUT;
+inline constexpr auto INTERRUPT_PROCESS = TELNET_INTERRUPT_PROCESS;
+inline constexpr auto BREAK = TELNET_BREAK;
+inline constexpr auto DATA_MARK = TELNET_DATA_MARK;
+inline constexpr auto NOP = TELNET_NOP;
+inline constexpr auto SE = TELNET_SE;
+inline constexpr auto EOR = TELNET_EOR;
 
-// Telnet commands
-#define IAC 255               // 0xFF - Interpret As Command
-#define DONT 254              // 0xFE - Don't use this option
-#define DO 253                // 0xFD - Please use this option
-#define WONT 252              // 0xFC - I won't use this option
-#define WILL 251              // 0xFB - I will use this option
-#define SB 250                // 0xFA - Subnegotiation begin
-#define GO_AHEAD 249          // 0xF9 - Go Ahead
-#define ERASE_LINE 248        // 0xF8 - Erase Line
-#define ERASE_CHARACTER 247   // 0xF7 - Erase Character
-#define ARE_YOU_THERE 246     // 0xF6 - Are You There
-#define ABORT_OUTPUT 245      // 0xF5 - Abort Output
-#define INTERRUPT_PROCESS 244 // 0xF4 - Interrupt Process
-#define BREAK 243             // 0xF3 - Break
-#define DATA_MARK 242         // 0xF2 - Data Mark
-#define NOP 241               // 0xF1 - No Operation
-#define SE 240                // 0xF0 - Subnegotiation End
-#define EOR 239               // 0xEF - End Of Record
+inline constexpr auto TELOPT_ECHO = TELOPT_ECHO_OPT;
+inline constexpr auto TELOPT_SGA = TELOPT_SGA_OPT;
+inline constexpr auto TELOPT_TERMINAL_TYPE = TELOPT_TERMINAL_TYPE_OPT;
+inline constexpr auto TELOPT_NAWS = TELOPT_NAWS_OPT;
+inline constexpr auto TELOPT_CHARSET = TELOPT_CHARSET_OPT;
+inline constexpr auto TELOPT_COMPRESS = TELOPT_COMPRESS_OPT;
+inline constexpr auto TELOPT_COMPRESS2 = TELOPT_COMPRESS2_OPT;
+inline constexpr auto TELOPT_MSP = TELOPT_MSP_OPT;
+inline constexpr auto TELOPT_MXP = TELOPT_MXP_OPT;
+inline constexpr auto TELOPT_ZMP = TELOPT_ZMP_OPT;
+inline constexpr auto TELOPT_MUD_SPECIFIC = TELOPT_MUD_SPECIFIC_OPT;
+inline constexpr auto TELOPT_ATCP = TELOPT_ATCP_OPT;
+inline constexpr auto TELOPT_GMCP = TELOPT_GMCP_OPT;
 
-// Telnet options (TELOPT)
-#define TELOPT_ECHO 1           // Echo
-#define TELOPT_SGA 3            // Suppress Go Ahead (SGA)
-#define TELOPT_TERMINAL_TYPE 24 // Terminal Type
-#define TELOPT_NAWS 31          // Negotiate About Window Size
-#define TELOPT_CHARSET 42       // Character Set
-#define TELOPT_COMPRESS 85      // MCCP v1 (Mud Client Compression Protocol)
-#define TELOPT_COMPRESS2 86     // MCCP v2
-#define TELOPT_MSP 90           // MSP (MUD Sound Protocol)
-#define TELOPT_MXP 91           // MUD eXtension Protocol
-#define TELOPT_ZMP 93           // ZMP (Zenith MUD Protocol)
-#define TELOPT_MUD_SPECIFIC 102 // Aardwolf telnet option
-#define TELOPT_ATCP 200         // ATCP (Achaea Telnet Client Protocol)
-#define TELOPT_GMCP 201         // GMCP (Generic Mud Communication Protocol)
-
-// Telnet subnegotiation opcodes
-#define WILL_END_OF_RECORD 25 // Will send End Of Record
-
-// MCCP constants
-#define COMPRESS_BUFFER_LENGTH 20000
+inline constexpr auto WILL_END_OF_RECORD = TELNET_WILL_END_OF_RECORD;
+inline constexpr auto COMPRESS_BUFFER_LENGTH = TELNET_COMPRESS_BUFFER_LENGTH;
 
 // MXP line security modes (ESC[<n>z) - doc.h
+// inline constexpr aliases to the values in mxp_engine.h (MXP_MODE_*).
+// Kept here for backward compatibility with world_protocol.cpp, world_mxp.cpp, telnet_parser.cpp.
 // IMPORTANT: These values must match the ANSI escape code values!
-#define eMXP_open 0        // Open mode (all tags allowed)
-#define eMXP_secure 1      // Secure mode (limited tags)
-#define eMXP_locked 2      // Locked mode (no tags)
-#define eMXP_reset 3       // MXP reset (close all open tags)
-#define eMXP_secure_once 4 // Next tag is secure only
-#define eMXP_perm_open 5   // Permanent open mode
-#define eMXP_perm_secure 6 // Permanent secure mode
-#define eMXP_perm_locked 7 // Permanent locked mode
+inline constexpr auto eMXP_open = MXP_MODE_OPEN;
+inline constexpr auto eMXP_secure = MXP_MODE_SECURE;
+inline constexpr auto eMXP_locked = MXP_MODE_LOCKED;
+inline constexpr auto eMXP_reset = MXP_MODE_RESET;
+inline constexpr auto eMXP_secure_once = MXP_MODE_SECURE_ONCE;
+inline constexpr auto eMXP_perm_open = MXP_MODE_PERM_OPEN;
+inline constexpr auto eMXP_perm_secure = MXP_MODE_PERM_SECURE;
+inline constexpr auto eMXP_perm_locked = MXP_MODE_PERM_LOCKED;
 // Room and welcome modes (10-19)
-#define eMXP_room_name 10        // Line is room name
-#define eMXP_room_description 11 // Line is room description
-#define eMXP_room_exits 12       // Line is room exits
-#define eMXP_welcome 19          // Welcome text
+inline constexpr auto eMXP_room_name = MXP_MODE_ROOM_NAME;
+inline constexpr auto eMXP_room_description = MXP_MODE_ROOM_DESCRIPTION;
+inline constexpr auto eMXP_room_exits = MXP_MODE_ROOM_EXITS;
+inline constexpr auto eMXP_welcome = MXP_MODE_WELCOME;
 
-// ========== Speedwalk Direction Mapping ==========
-
-/**
- * DirectionInfo - Information about a speedwalk direction
- *
- * Based on original MUSHclient MapDirectionsMap in mapping.cpp
- */
-struct DirectionInfo {
-    QString m_sDirectionToSend;  // Command to send (e.g., "north")
-    QString m_sReverseDirection; // Reverse direction (e.g., for "n" it's "s")
-
-    DirectionInfo(const QString& toSend = "", const QString& reverse = "")
-        : m_sDirectionToSend(toSend), m_sReverseDirection(reverse)
-    {
-    }
-};
+// DirectionInfo is defined in speedwalk_engine.h (included above)
 
 
 // ========== ANSI Color/Style Constants (stdafx.h) ==========
+// These are ANSI escape code parameter values (the numbers after ESC[), not bit flags.
 
 // ANSI formatting codes
-#define ANSI_RESET 0
-#define ANSI_BOLD 1
-#define ANSI_BLINK 3
-#define ANSI_UNDERLINE 4
-#define ANSI_SLOW_BLINK 5
-#define ANSI_FAST_BLINK 6
-#define ANSI_INVERSE 7
-#define ANSI_STRIKEOUT 9
+inline constexpr int ANSI_RESET = 0;
+inline constexpr int ANSI_BOLD = 1;
+inline constexpr int ANSI_BLINK = 3;
+inline constexpr int ANSI_UNDERLINE = 4;
+inline constexpr int ANSI_SLOW_BLINK = 5;
+inline constexpr int ANSI_FAST_BLINK = 6;
+inline constexpr int ANSI_INVERSE = 7;
+inline constexpr int ANSI_STRIKEOUT = 9;
 
 // Cancel codes (new in MUSHclient 3.27)
-#define ANSI_CANCEL_BOLD 22
-#define ANSI_CANCEL_BLINK 23
-#define ANSI_CANCEL_UNDERLINE 24
-#define ANSI_CANCEL_SLOW_BLINK 25
-#define ANSI_CANCEL_INVERSE 27
-#define ANSI_CANCEL_STRIKEOUT 29
+inline constexpr int ANSI_CANCEL_BOLD = 22;
+inline constexpr int ANSI_CANCEL_BLINK = 23;
+inline constexpr int ANSI_CANCEL_UNDERLINE = 24;
+inline constexpr int ANSI_CANCEL_SLOW_BLINK = 25;
+inline constexpr int ANSI_CANCEL_INVERSE = 27;
+inline constexpr int ANSI_CANCEL_STRIKEOUT = 29;
 
 // Foreground colors (30-37)
-#define ANSI_TEXT_BLACK 30
-#define ANSI_TEXT_RED 31
-#define ANSI_TEXT_GREEN 32
-#define ANSI_TEXT_YELLOW 33
-#define ANSI_TEXT_BLUE 34
-#define ANSI_TEXT_MAGENTA 35
-#define ANSI_TEXT_CYAN 36
-#define ANSI_TEXT_WHITE 37
-#define ANSI_TEXT_256_COLOUR 38 // Extended colors (256-color, 24-bit)
-#define ANSI_SET_FOREGROUND_DEFAULT 39
+inline constexpr int ANSI_TEXT_BLACK = 30;
+inline constexpr int ANSI_TEXT_RED = 31;
+inline constexpr int ANSI_TEXT_GREEN = 32;
+inline constexpr int ANSI_TEXT_YELLOW = 33;
+inline constexpr int ANSI_TEXT_BLUE = 34;
+inline constexpr int ANSI_TEXT_MAGENTA = 35;
+inline constexpr int ANSI_TEXT_CYAN = 36;
+inline constexpr int ANSI_TEXT_WHITE = 37;
+inline constexpr int ANSI_TEXT_256_COLOUR = 38; // Extended colors (256-color, 24-bit)
+inline constexpr int ANSI_SET_FOREGROUND_DEFAULT = 39;
 
 // Background colors (40-47)
-#define ANSI_BACK_BLACK 40
-#define ANSI_BACK_RED 41
-#define ANSI_BACK_GREEN 42
-#define ANSI_BACK_YELLOW 43
-#define ANSI_BACK_BLUE 44
-#define ANSI_BACK_MAGENTA 45
-#define ANSI_BACK_CYAN 46
-#define ANSI_BACK_WHITE 47
-#define ANSI_BACK_256_COLOUR 48 // Extended colors (256-color, 24-bit)
-#define ANSI_SET_BACKGROUND_DEFAULT 49
+inline constexpr int ANSI_BACK_BLACK = 40;
+inline constexpr int ANSI_BACK_RED = 41;
+inline constexpr int ANSI_BACK_GREEN = 42;
+inline constexpr int ANSI_BACK_YELLOW = 43;
+inline constexpr int ANSI_BACK_BLUE = 44;
+inline constexpr int ANSI_BACK_MAGENTA = 45;
+inline constexpr int ANSI_BACK_CYAN = 46;
+inline constexpr int ANSI_BACK_WHITE = 47;
+inline constexpr int ANSI_BACK_256_COLOUR = 48; // Extended colors (256-color, 24-bit)
+inline constexpr int ANSI_SET_BACKGROUND_DEFAULT = 49;
 
 // ========== Style Flag Bits (OtherTypes.h) ==========
-
-// Style flags (stored in CStyle::iFlags)
-#define HILITE 0x0001    // bold
-#define UNDERLINE 0x0002 // underline
-#define BLINK 0x0004     // italic (blink repurposed for italic)
-#define INVERSE 0x0008   // inverted (swap fore/back)
-#define STRIKEOUT 0x0020 // strikethrough
-
-// Color type flags (which color mode)
-#define COLOUR_ANSI 0x0000     // ANSI color from ANSI table (0-7)
-#define COLOUR_CUSTOM 0x0100   // Custom color from custom table
-#define COLOUR_RGB 0x0200      // RGB color in iForeColour/iBackColour
-#define COLOUR_RESERVED 0x0300 // Reserved
-
-#define COLOURTYPE 0x0300 // Mask for color type bits
-#define ACTIONTYPE 0x0C00 // Mask for action type bits
-#define STYLE_BITS 0x0FFF // Mask for all style bits (everything except START_TAG)
+// Defined canonically in src/text/style.h (included above).
+// HILITE, UNDERLINE, BLINK, INVERSE, STRIKEOUT, COLOUR_*, COLOURTYPE, ACTIONTYPE, STYLE_BITS
+// are all available here via the style.h include.
 
 // ========== Color Constants (stdafx.h) ==========
 
@@ -330,54 +308,9 @@ enum {
     ANSI_WHITE
 };
 
-// Telnet Phase State Machine (doc.h)
-// These are the states for parsing the incoming telnet/ANSI stream
-enum Phase {
-    NONE = 0,                // Normal text
-    HAVE_ESC,                // Just received ESC (0x1B)
-    DOING_CODE,              // Processing ANSI escape sequence ESC[...m
-    HAVE_IAC,                // Just received IAC (0xFF)
-    HAVE_WILL,               // Got IAC WILL
-    HAVE_WONT,               // Got IAC WONT
-    HAVE_DO,                 // Got IAC DO
-    HAVE_DONT,               // Got IAC DONT
-    HAVE_SB,                 // Got IAC SB (subnegotiation begin)
-    HAVE_SUBNEGOTIATION,     // In subnegotiation, collecting data
-    HAVE_SUBNEGOTIATION_IAC, // Got IAC inside subnegotiation
-    HAVE_COMPRESS,           // Got IAC SB COMPRESS (MCCP v1)
-    HAVE_COMPRESS_WILL,      // Got IAC SB COMPRESS WILL (MCCP v1)
-
-    // 256-color support (ESC[38;5;<n>m or ESC[48;5;<n>m)
-    HAVE_FOREGROUND_256_START,  // Got ESC[38;
-    HAVE_FOREGROUND_256_FINISH, // Got ESC[38;5;
-    HAVE_BACKGROUND_256_START,  // Got ESC[48;
-    HAVE_BACKGROUND_256_FINISH, // Got ESC[48;5;
-
-    // 24-bit true color support (ESC[38;2;<r>;<g>;<b>m)
-    HAVE_FOREGROUND_24B_FINISH,  // Got ESC[38;2; (waiting for R)
-    HAVE_FOREGROUND_24BR_FINISH, // Got ESC[38;2;<r>; (waiting for G)
-    HAVE_FOREGROUND_24BG_FINISH, // Got ESC[38;2;<r>;<g>; (waiting for B)
-    HAVE_FOREGROUND_24BB_FINISH, // Got ESC[38;2;<r>;<g>;<b>; (complete)
-    HAVE_BACKGROUND_24B_FINISH,  // Got ESC[48;2; (waiting for R)
-    HAVE_BACKGROUND_24BR_FINISH, // Got ESC[48;2;<r>; (waiting for G)
-    HAVE_BACKGROUND_24BG_FINISH, // Got ESC[48;2;<r>;<g>; (waiting for B)
-    HAVE_BACKGROUND_24BB_FINISH, // Got ESC[48;2;<r>;<g>;<b>; (complete)
-
-    // UTF-8 multibyte character handling
-    HAVE_UTF8_CHARACTER, // Receiving UTF-8 continuation bytes
-
-    // MXP (MUD eXtension Protocol) modes
-    HAVE_MXP_ELEMENT, // Collecting MXP element <...>
-    HAVE_MXP_COMMENT, // Collecting MXP comment <!--...-->
-    HAVE_MXP_QUOTE,   // Inside quoted string in MXP element
-    HAVE_MXP_ENTITY,  // Collecting MXP entity &...;
-
-    // MXP special collection modes
-    HAVE_MXP_ROOM_NAME,        // Parsing room name
-    HAVE_MXP_ROOM_DESCRIPTION, // Parsing room description
-    HAVE_MXP_ROOM_EXITS,       // Parsing room exits
-    HAVE_MXP_WELCOME,          // Parsing welcome text
-};
+// Telnet Phase State Machine — defined in telnet_parser.h (included above).
+// The Phase enum and all phase constants (NONE, HAVE_ESC, DOING_CODE, …) are available
+// here because telnet_parser.h is included at the top of this file.
 
 /**
  * WorldDocument - The core document class for a MUD connection
@@ -396,87 +329,207 @@ enum Phase {
  * IMPORTANT: This is intentionally kept as a FLAT structure for initial port.
  * Don't try to organize into sub-objects yet.
  */
-class WorldDocument : public QObject {
+
+class WorldDocument : public QObject, public IWorldContext {
     Q_OBJECT
 
   public:
     explicit WorldDocument(QObject* parent = nullptr);
-    ~WorldDocument();
+    ~WorldDocument() override;
 
     // Public member variables (for direct port compatibility)
-    WorldSocket* m_pSocket;
+
+    // NOTE: m_pSocket is now stored inside m_connectionManager->m_pSocket.
+    // For backward-compat with callers that access it directly, use the wrapper below.
+    // The socket is still created with `new WorldSocket(this, this)` (Qt parent-child).
     std::unique_ptr<RemoteAccessServer> m_pRemoteServer; // Remote access server (runtime only)
 
+    // ========== ConnectionManager (companion object) ==========
+    // Owns connection state, network statistics, timing, and the command queue.
+    // Created in WorldDocument constructor. Access via m_connectionManager->.
+    //
+    // Fields that previously lived directly on WorldDocument and are now in ConnectionManager:
+    //   m_pSocket, m_iConnectPhase,
+    //   m_nBytesIn, m_nBytesOut, m_iInputPacketCount, m_iOutputPacketCount,
+    //   m_nTotalLinesSent, m_nTotalLinesReceived,
+    //   m_tConnectTime, m_tsConnectDuration, m_whenWorldStarted,
+    //   m_whenWorldStartedHighPrecision, m_CommandQueue.
+    // All access via m_connectionManager->fieldName or m_connectionManager->method().
+    std::unique_ptr<ConnectionManager> m_connectionManager;
+    // NOTE: m_pSocket is now at m_connectionManager->m_pSocket.
+    // Direct access to the socket in WorldDocument member functions goes through
+    // m_connectionManager->m_pSocket (see world_document.cpp, world_protocol.cpp).
+
+    // ========== OutputFormatter (companion object) ==========
+    // Owns note/colour/hyperlink output formatting logic.
+    // Extracted from WorldDocument for composability.
+    // All access via m_outputFormatter->method().
+    std::unique_ptr<OutputFormatter> m_outputFormatter;
+
     // ========== Connection Settings ==========
-    QString m_server;      // hostname or IP address
-    QString m_mush_name;   // world name
-    QString m_name;        // player name
-    QString m_password;    // player password
-    quint16 m_port;        // port number (1-65535)
-    quint16 m_connect_now; // auto-connect flag (see enum above)
+    QString m_server;    // hostname or IP address
+    QString m_mush_name; // world name
+    QString m_name;      // player name
+    QString m_password;  // player password
+    quint16 m_port;      // port number (1-65535)
+    bool m_connect_now;  // auto-connect flag (see enum above)
 
-    // ========== Display Settings ==========
-    QString m_font_name;    // output font face name
-    qint32 m_font_height;   // font size in pixels
-    qint32 m_font_weight;   // bold/normal (400=normal, 700=bold)
-    quint32 m_font_charset; // character set
-    quint16 m_wrap;         // word-wrap enabled (boolean: 0=off, non-zero=on)
-    quint16 m_timestamps;   // show timestamps?
-    quint16 m_match_width;  // match width?
+    // ========== Proxy Configuration ==========
+    struct ProxyConfig {
+        quint16 type = 0; // 0=None, 1=SOCKS5, 2=HTTP CONNECT
+        QString server;   // proxy hostname
+        quint16 port = 0; // proxy port (0 = disabled)
+        QString username; // optional auth username
+        QString password; // optional auth password
+    } m_proxy;
 
-    // ========== Colors ==========
-    // ANSI colors 0-7 normal intensity
-    QRgb m_normalcolour[8];
-    // ANSI colors 0-7 bold/bright
-    QRgb m_boldcolour[8];
-    // Custom foreground colors
-    QRgb m_customtext[MAX_CUSTOM];
-    // Custom background colors
-    QRgb m_customback[MAX_CUSTOM];
-    // Custom color names
-    QString m_strCustomColourName[255];
+    // ========== Display Configuration ==========
+    struct DisplayConfig {
+        // Core output display
+        bool wrap = true;                        // word-wrap enabled
+        bool timestamps = false;                 // show timestamps?
+        bool match_width = false;                // match width?
+        qint32 max_lines = 5000;                 // maximum scrollback lines
+        quint16 wrap_column = 80;                // wrap column
+        bool indent_paras = true;                // indent paragraphs?
+        bool line_information = true;            // show line information?
+        bool keep_commands_on_same_line = false; // keep commands on same line?
 
-    // ========== Input Colors and Font ==========
-    QRgb m_input_text_colour;
-    QRgb m_input_background_colour;
-    qint32 m_input_font_height;
-    QString m_input_font_name;
-    quint8 m_input_font_italic;
-    qint32 m_input_font_weight;
-    quint32 m_input_font_charset;
+        // Text style display
+        bool show_bold = true;      // show bold in fonts?
+        bool show_italic = true;    // show italic?
+        bool show_underline = true; // show underline?
 
-    // ========== Output Buffer Settings ==========
-    qint32 m_maxlines;      // maximum scrollback lines
-    qint32 m_nHistoryLines; // command history size
-    quint16 m_nWrapColumn;  // wrap column
+        // Scrolling/freeze
+        quint16 pixel_offset = 1;           // pixel offset from window edge
+        bool auto_freeze = true;            // freeze if not at bottom?
+        bool keep_freeze_at_bottom = false; // don't unfreeze at bottom?
+
+        // Interaction
+        bool double_click_inserts = false;        // double-click inserts word?
+        bool copy_selection_to_clipboard = false; // auto-copy selection?
+        bool auto_copy_in_html = false;           // auto-copy in HTML?
+
+        // Spacing & encoding
+        quint16 line_spacing = 0; // line spacing (0 = auto)
+        bool utf8 = false;        // UTF-8 support?
+
+        // Activity indicators
+        bool flash_icon = false;                    // flash icon for activity?
+        bool do_not_show_outstanding_lines = false; // hide outstanding lines?
+    } m_display;
+
+    // ========== Output Configuration ==========
+    struct OutputConfig {
+        // Font
+        QString font_name = "Courier New"; // output font face name
+        qint32 font_height = 12;           // font size in pixels
+        qint32 font_weight = 400;          // bold/normal (400=normal, 700=bold)
+        quint32 font_charset = 0;          // character set
+
+        // Echo
+        quint16 echo_colour = 65535;                  // SAMECOLOUR
+        bool echo_hyperlink_in_output_window = false; // echo hyperlinks in output?
+
+        // Output line preambles (timestamps)
+        QString preamble_output;                        // preamble for MUD output lines
+        QString preamble_input;                         // preamble for input lines
+        QString preamble_notes;                         // preamble for note lines
+        QRgb preamble_output_text_colour = 0x00FFFFFFu; // text color - output (white BGR)
+        QRgb preamble_output_back_colour = 0x00000000u; // back color - output (black)
+        QRgb preamble_input_text_colour = 0x00800000u;  // text color - input (dark blue BGR)
+        QRgb preamble_input_back_colour = 0x00000000u;  // back color - input (black)
+        QRgb preamble_notes_text_colour = 0x000000FFu;  // text color - notes (blue BGR)
+        QRgb preamble_notes_back_colour = 0x00000000u;  // back color - notes (black)
+
+        // Recall window
+        QString recall_line_preamble; // line preamble for recall
+
+        // Output buffer fading
+        quint16 fade_after_seconds = 0;    // fade after N seconds (0 = disabled)
+        quint16 fade_opacity_percent = 20; // fade opacity %
+        quint16 fade_seconds = 8;          // fade duration
+    } m_output;
+
+    // ========== Color Configuration ==========
+    struct ColorConfig {
+        // ANSI colors 0-7 normal intensity (initialized by initializeColors())
+        std::array<QRgb, 8> normal_colour{};
+        // ANSI colors 0-7 bold/bright (initialized by initializeColors())
+        std::array<QRgb, 8> bold_colour{};
+        // Custom foreground colors (initialized by initializeColors())
+        std::array<QRgb, MAX_CUSTOM> custom_text{};
+        // Custom background colors (initialized by initializeColors())
+        std::array<QRgb, MAX_CUSTOM> custom_back{};
+        // Custom color names (initialized by initializeColors())
+        std::array<QString, 255> custom_colour_name{};
+        // Hyperlink color
+        QRgb hyperlink_colour =
+            0x000080FFu; // Light blue - BGR(255,128,0) = RGB(0,128,255) like original
+        // Note text color index (4 = cyan, 65535 = SAMECOLOUR)
+        quint16 note_text_colour = 4;
+        // Use default colors from parent world?
+        bool use_default_colours = false;
+    } m_colors;
+
+    // ========== Input Configuration ==========
+    struct InputConfig {
+        // Colors
+        QRgb text_colour = 0x000000u;       // input text color (BGR) — black
+        QRgb background_colour = 0xFFFFFFu; // input background color (BGR) — white
+
+        // Font
+        qint32 font_height = 12;           // font size in pixels
+        QString font_name = "Courier New"; // input font face name
+        quint8 font_italic = 0;            // italic flag (0=normal, 1=italic)
+        qint32 font_weight = 400;          // font weight (400=normal, 700=bold)
+        quint32 font_charset = 0;          // character set
+
+        // History
+        qint32 history_lines = 1000; // command history size
+
+        // Behavior flags
+        bool escape_deletes_input = false;      // Escape clears input?
+        bool arrows_change_history = true;      // arrow keys navigate history?
+        qint32 save_deleted_command = 0;        // save command on Escape?
+        bool alt_arrow_recalls_partial = false; // Alt+Up recalls partial match?
+        bool auto_wrap = false;                 // match input wrap to output?
+        bool send_echo = false;                 // echo sends?
+        bool no_echo_off = false;               // ignore echo-off from server?
+        bool enable_command_stack = false;      // split commands on stack char?
+        QString command_stack_character = ";";  // character to split commands
+        bool double_click_sends = false;        // double-click sends to MUD?
+        bool arrow_recalls_partial = false;     // Up/Down recalls partial match?
+    } m_input;
 
     // ========== Triggers, Aliases, Timers - Enable Flags ==========
-    quint16 m_enable_aliases;
-    quint16 m_enable_triggers;
-    quint16 m_bEnableTimers;
+    bool m_enable_aliases;
+    bool m_enable_triggers;
+    bool m_bEnableTimers;
 
-    // ========== Trigger/Alias/Timer Collections (SAVED TO DISK) ==========
-    // These hold all user-created triggers, aliases, and timers
-    // → Triggers and Aliases Data Structures
-    std::map<QString, std::unique_ptr<Alias>>
-        m_AliasMap;               // Map of aliases (name → unique_ptr<Alias>)
-    QVector<Alias*> m_AliasArray; // Aliases sorted by sequence (non-owning)
-    std::map<QString, std::unique_ptr<Trigger>>
-        m_TriggerMap;                 // Map of triggers (name → unique_ptr<Trigger>)
-    QVector<Trigger*> m_TriggerArray; // Triggers sorted by sequence (non-owning)
-    // → Timer Data Structure
-    std::map<QString, std::unique_ptr<Timer>>
-        m_TimerMap;                      // Map of timers (name → unique_ptr<Timer>)
-    QMap<Timer*, QString> m_TimerRevMap; // Reverse map (Timer* → name) for unlabelled timers
-    bool m_triggersNeedSorting;          // Rebuild trigger array on next evaluation
-    bool m_aliasesNeedSorting;           // Rebuild alias array on next evaluation
+    // ========== AutomationRegistry (companion object) ==========
+    // Owns all trigger/alias/timer storage and evaluation pipeline.
+    // Created in WorldDocument constructor. Access via m_automationRegistry->.
+    //
+    // Fields that previously lived directly on WorldDocument and are now in AutomationRegistry:
+    //   m_TriggerMap, m_TriggerArray, m_triggersNeedSorting,
+    //   m_AliasMap, m_AliasArray, m_aliasesNeedSorting,
+    //   m_TimerMap, m_TimerRevMap,
+    //   m_iTriggersEvaluatedCount, m_iTriggersMatchedCount,
+    //   m_iAliasesEvaluatedCount, m_iAliasesMatchedCount,
+    //   m_iTimersFiredCount, m_iTriggersMatchedThisSessionCount,
+    //   m_iAliasesMatchedThisSessionCount, m_iTimersFiredThisSessionCount.
+    // All access via m_automationRegistry->fieldName or m_automationRegistry->method().
+    //
+    // For backward-compat with callers that access the maps directly, use:
+    //   m_automationRegistry->m_TriggerMap  (instead of m_TriggerMap)
+    //   m_automationRegistry->m_AliasMap    (instead of m_AliasMap)
+    //   m_automationRegistry->m_TimerMap    (instead of m_TimerMap)
+    //   m_automationRegistry->m_TimerRevMap (instead of m_TimerRevMap)
+    std::unique_ptr<AutomationRegistry> m_automationRegistry;
 
     // ========== Input Handling ==========
-    quint16 m_display_my_input;
-    quint16 m_echo_colour;
-    quint16 m_bEscapeDeletesInput;
-    quint16 m_bArrowsChangeHistory;
-    quint16 m_bConfirmOnPaste;
+    bool m_display_my_input;
 
     // ========== Command History ==========
     QStringList m_commandHistory;   // List of previous commands
@@ -486,69 +539,105 @@ class WorldDocument : public QObject {
     QString m_last_command;         // Last command sent (for consecutive duplicate check)
     HistoryStatus m_iHistoryStatus; // Current position status (eAtTop, eInMiddle, eAtBottom)
 
-    // ========== Sound ==========
-    quint16 m_enable_beeps;
-    quint16 m_enable_trigger_sounds;
-    QString m_new_activity_sound;
-    QString m_strBeepSound;
+    // ========== Sound Configuration ==========
+    struct SoundConfig {
+        bool enable_beeps = true;          // enable beep on ^G?
+        bool enable_trigger_sounds = true; // enable trigger sound actions?
+        QString new_activity_sound;        // sound played on new activity
+        QString beep_sound;                // sound file for beep (^G)
+        bool play_in_background = false;   // use global sound buffer?
+        bool use_msp = false;              // Use MSP (MUD Sound Protocol)
+    } m_sound;
 
     // ========== Macros (Function Keys) ==========
-    QString m_macros[MACRO_COUNT];     // text for F1-F12
-    quint16 m_macro_type[MACRO_COUNT]; // send types
-    QString m_macro_name[MACRO_COUNT]; // macro names
+    std::array<QString, MACRO_COUNT> m_macros;     // text for F1-F12
+    std::array<quint16, MACRO_COUNT> m_macro_type; // send types
+    std::array<QString, MACRO_COUNT> m_macro_name; // macro names
 
     // ========== Numeric Keypad ==========
-    QString m_keypad[KEYPAD_MAX_ITEMS]; // keypad strings
-    quint16 m_keypad_enable;            // keypad enabled?
+    std::array<QString, KEYPAD_MAX_ITEMS> m_keypad; // keypad strings
+    bool m_keypad_enable;                           // keypad enabled?
 
     // ========== Speed Walking ==========
-    quint16 m_enable_speed_walk;
-    QString m_speed_walk_prefix;
-    QString m_strSpeedWalkFiller;
-    quint16 m_iSpeedWalkDelay; // delay in ms
-
-    // ========== Command Stack ==========
-    quint16 m_enable_command_stack;
-    QString m_strCommandStackCharacter;
+    struct SpeedwalkConfig {
+        bool enabled = false; // enable speedwalk?
+        QString prefix;       // speedwalk prefix (e.g., "#")
+        QString filler;       // filler command ('F' token)
+        quint16 delay = 0;    // delay between commands (ms)
+    } m_speedwalk;
 
     // ========== Connection Text ==========
     QString m_connect_text;
 
-    // ========== File Handling ==========
-    QString m_file_postamble;
-    QString m_file_preamble;
-    QString m_line_postamble;
-    QString m_line_preamble;
-    QString m_strLogFilePreamble;
+    // ========== Paste/Send File Configuration ==========
+    struct PasteSendConfig {
+        // Paste text framing
+        QString paste_preamble;      // sent before pasted block
+        QString paste_postamble;     // sent after pasted block
+        QString pasteline_preamble;  // sent before each pasted line
+        QString pasteline_postamble; // sent after each pasted line
 
-    // ========== Paste Settings ==========
-    QString m_paste_postamble;
-    QString m_paste_preamble;
-    QString m_pasteline_postamble;
-    QString m_pasteline_preamble;
+        // Send-file text framing
+        QString file_preamble;  // sent before file block
+        QString file_postamble; // sent after file block
+        QString line_preamble;  // sent before each file line
+        QString line_postamble; // sent after each file line
+
+        // Paste behavior
+        bool paste_commented_softcode = false; // strip softcode comments when pasting?
+        bool paste_echo = false;               // echo pasted lines?
+        bool confirm_on_paste = true;          // confirm before paste?
+        qint32 paste_delay = 0;                // delay between paste lines (ms)
+        qint32 paste_delay_per_lines = 1;      // lines between paste delays
+
+        // Send-file behavior
+        bool file_commented_softcode = false; // strip softcode comments when sending file?
+        qint32 file_delay = 0;                // delay between file lines (ms)
+        qint32 file_delay_per_lines = 1;      // lines between file delays
+    } m_paste;
 
     // ========== World Notes ==========
     QString m_notes;
 
-    // ========== Scripting ==========
-    QString m_strLanguage;             // script language (e.g., "Lua")
-    quint16 m_bEnableScripts;          // scripting enabled?
-    QString m_strScriptFilename;       // script file path
-    QString m_strScriptPrefix;         // script invocation prefix
-    QString m_strScriptEditor;         // editor path
-    QString m_strScriptEditorArgument; // editor arguments
+    // ========== Scripting Configuration ==========
+    struct ScriptConfig {
+        // Core settings
+        QString language = "Lua"; // script language (e.g., "Lua")
+        bool enabled = true;      // scripting enabled?
+        QString filename;         // script file path
+        QString prefix = "/";     // script invocation prefix
+        QString editor;           // editor path
+        QString editor_argument;  // editor arguments
 
-    // ========== Script Event Handlers ==========
-    QString m_strWorldOpen;       // handler on world open
-    QString m_strWorldClose;      // handler on world close
-    QString m_strWorldSave;       // handler on world save
-    QString m_strWorldConnect;    // handler on connect
-    QString m_strWorldDisconnect; // handler on disconnect
-    QString m_strWorldGetFocus;   // handler on focus gain
-    QString m_strWorldLoseFocus;  // handler on focus loss
+        // Event handlers
+        QString on_world_open;       // handler on world open
+        QString on_world_close;      // handler on world close
+        QString on_world_save;       // handler on world save
+        QString on_world_connect;    // handler on connect
+        QString on_world_disconnect; // handler on disconnect
+        QString on_world_get_focus;  // handler on focus gain
+        QString on_world_lose_focus; // handler on focus loss
+
+        // Reload & error handling
+        ScriptReloadOption reload_option = ScriptReloadOption::eReloadConfirm; // reload behavior
+        bool errors_to_output_window = false; // show errors in output?
+
+        // Execution options (kept as qint32 for integer-valued serialization compat)
+        qint32 edit_with_notepad = 1; // use built-in notepad?
+        qint32 warn_if_inactive = 1;  // warn if can't invoke script?
+
+        // Misc
+        bool tab_complete_functions = true; // show Lua functions in Shift+Tab menu
+
+        // Filters
+        QString triggers_filter;  // Lua filter for triggers
+        QString aliases_filter;   // Lua filter for aliases
+        QString timers_filter;    // Lua filter for timers
+        QString variables_filter; // Lua filter for variables
+    } m_scripting;
 
     // ========== MXP (MUD Extension Protocol) ==========
-    quint16 m_iUseMXP;              // MXP usage (see enum)
+    MXPMode m_iUseMXP;              // MXP usage (see enum)
     quint16 m_iMXPdebugLevel;       // MXP debug level
     QString m_strOnMXP_Start;       // MXP starting
     QString m_strOnMXP_Stop;        // MXP stopping
@@ -557,25 +646,20 @@ class WorldDocument : public QObject {
     QString m_strOnMXP_CloseTag;    // MXP tag close
     QString m_strOnMXP_SetVariable; // MXP variable set
 
-    // ========== Hyperlinks ==========
-    QRgb m_iHyperlinkColour; // hyperlink color
-
     // ========== Miscellaneous Flags ==========
-    quint16 m_indent_paras;
-    quint16 m_bSaveWorldAutomatically;
-    quint16 m_bLineInformation;
-    quint16 m_bStartPaused;
-    quint16 m_iNoteTextColour;
-    quint16 m_bKeepCommandsOnSameLine;
+    bool m_bSaveWorldAutomatically;
+    bool m_bStartPaused;
 
     // ========== Auto-say Settings ==========
-    QString m_strAutoSayString;
-    quint16 m_bEnableAutoSay;
-    quint16 m_bExcludeMacros;
-    quint16 m_bExcludeNonAlpha;
-    QString m_strOverridePrefix;
-    quint16 m_bConfirmBeforeReplacingTyping;
-    quint16 m_bReEvaluateAutoSay;
+    struct AutoSayConfig {
+        QString say_string = "say ";          // string prepended to commands
+        QString override_prefix = "-";        // prefix to bypass auto-say
+        bool enabled = false;                 // auto-say mode enabled?
+        bool exclude_macros = false;          // skip macro/accelerator keys?
+        bool exclude_non_alpha = false;       // skip commands not starting with a letter?
+        bool confirm_before_replacing = true; // confirm before replacing typed text?
+        bool re_evaluate = false;             // re-evaluate after alias expansion?
+    } m_auto_say;
 
     // ========== Script Variables Collection (SAVED TO DISK) ==========
     // Holds all script variables (key-value pairs)
@@ -589,97 +673,61 @@ class WorldDocument : public QObject {
         m_DatabaseMap; // Map of databases (name → LuaDatabase*)
 
     // ========== Print Styles ==========
-    qint32 m_nNormalPrintStyle[8]; // print style for normal colors
-    qint32 m_nBoldPrintStyle[8];   // print style for bold colors
+    std::array<qint32, 8> m_nNormalPrintStyle; // print style for normal colors
+    std::array<qint32, 8> m_nBoldPrintStyle;   // print style for bold colors
 
     // ========== Display Options (Version 9+) ==========
-    quint16 m_bShowBold;               // show bold in fonts?
-    quint16 m_bShowItalic;             // show italic?
-    quint16 m_bShowUnderline;          // show underline?
-    quint16 m_bAltArrowRecallsPartial; // alt+up recalls partial?
-    quint16 m_iPixelOffset;            // pixel offset from window edge
-    quint16 m_bAutoFreeze;             // freeze if not at bottom?
-    quint16 m_bKeepFreezeAtBottom;     // don't unfreeze at bottom?
-    quint16 m_bAutoRepeat;             // auto repeat last command?
-    quint16 m_bDisableCompression;     // disable MCCP?
-    quint16 m_bLowerCaseTabCompletion; // tab complete in lower case?
-    quint16 m_bDoubleClickInserts;     // double-click inserts word?
-    quint16 m_bDoubleClickSends;       // double-click sends to MUD?
-    quint16 m_bConfirmOnSend;          // confirm preamble/postamble?
-    quint16 m_bTranslateGerman;        // translate German chars?
+    bool m_bAutoRepeat;         // auto repeat last command?
+    bool m_bDisableCompression; // disable MCCP?
+    bool m_bConfirmOnSend;      // confirm preamble/postamble?
+    bool m_bTranslateGerman;    // translate German chars?
 
-    // ========== Tab Completion ==========
-    QString m_strTabCompletionDefaults; // initial words
-    quint32 m_iTabCompletionLines;      // lines to search
-    quint16 m_bTabCompletionSpace;      // insert space after word?
-    QString m_strWordDelimiters;        // word delimiters for tab completion
+    // ========== Command Window Configuration ==========
+    struct CommandWindowConfig {
+        // Auto-resize
+        bool auto_resize = false;   // auto-resize command window?
+        quint16 minimum_lines = 1;  // minimum lines when auto-resizing
+        quint16 maximum_lines = 20; // maximum lines when auto-resizing
+
+        // History behavior
+        bool no_macros_in_history = false; // macros not added to history?
+
+        // Tab completion
+        bool lower_case_tab_completion = false; // tab complete in lower case?
+        QString tab_completion_defaults;        // initial words
+        quint32 tab_completion_lines = 200;     // lines to search
+        bool tab_completion_space = false;      // insert space after word?
+        QString word_delimiters = "-._~!@#$%^&*()+=[]{}\\|;:'\",<>?/"; // word delimiters
+
+        // Miscellaneous sending
+        bool arrow_keys_wrap = false;     // arrow keys wrap history?
+        bool spell_check_on_send = false; // spell check on send?
+    } m_command_window;
 
     // Shift+Tab completion (Lua API controlled)
     QSet<QString> m_ExtraShiftTabCompleteItems; // extra items for Shift+Tab menu
-    bool m_bTabCompleteFunctions;               // show Lua functions in Shift+Tab menu
+    // tab_complete_functions moved to m_scripting.tab_complete_functions
 
     // ========== Auto Logging ==========
-    QString m_strAutoLogFileName;        // auto-log filename
-    QString m_strLogLinePreambleOutput;  // log preamble for output
-    QString m_strLogLinePreambleInput;   // log preamble for input
-    QString m_strLogLinePreambleNotes;   // log preamble for notes
-    QString m_strLogFilePostamble;       // log file postamble
-    QString m_strLogLinePostambleOutput; // log postamble for output
-    QString m_strLogLinePostambleInput;  // log postamble for input
-    QString m_strLogLinePostambleNotes;  // log postamble for notes
-
-    // ========== Output Line Preambles ==========
-    QString m_strOutputLinePreambleOutput;     // output preamble for MUD output
-    QString m_strOutputLinePreambleInput;      // output preamble for input
-    QString m_strOutputLinePreambleNotes;      // output preamble for notes
-    QRgb m_OutputLinePreambleOutputTextColour; // text color - output
-    QRgb m_OutputLinePreambleOutputBackColour; // back color - output
-    QRgb m_OutputLinePreambleInputTextColour;  // text color - input
-    QRgb m_OutputLinePreambleInputBackColour;  // back color - input
-    QRgb m_OutputLinePreambleNotesTextColour;  // text color - notes
-    QRgb m_OutputLinePreambleNotesBackColour;  // back color - notes
-
-    // ========== Recall Window ==========
-    QString m_strRecallLinePreamble; // line preamble for recall
-
-    // ========== Paste/File Options ==========
-    quint16 m_bPasteCommentedSoftcode; // paste commented softcode?
-    quint16 m_bFileCommentedSoftcode;  // send commented softcode?
-    quint16 m_bFlashIcon;              // flash icon for activity?
-    quint16 m_bArrowKeysWrap;          // arrow keys wrap history?
-    quint16 m_bSpellCheckOnSend;       // spell check on send?
-    qint32 m_nPasteDelay;              // paste delay (ms)
-    qint32 m_nFileDelay;               // file send delay (ms)
-    qint32 m_nPasteDelayPerLines;      // lines before delay
-    qint32 m_nFileDelayPerLines;       // lines before delay
+    // (fields moved to LoggingConfig m_logging below)
+    // Note: output preambles and recall preamble moved to OutputConfig m_output
 
     // ========== Miscellaneous Options ==========
-    qint32 m_nReloadOption;                // script reload option
+    // m_nReloadOption moved to m_scripting.reload_option
+    // m_bEditScriptWithNotepad moved to m_scripting.edit_with_notepad
+    // m_bWarnIfScriptingInactive moved to m_scripting.warn_if_inactive
     qint32 m_bUseDefaultOutputFont;        // use default output font?
-    qint32 m_bSaveDeletedCommand;          // save deleted command?
     qint32 m_bTranslateBackslashSequences; // interpret \n \r etc.?
-    qint32 m_bEditScriptWithNotepad;       // use built-in notepad?
-    qint32 m_bWarnIfScriptingInactive;     // warn if can't invoke script?
-
-    // ========== Sending Options ==========
-    quint16 m_bWriteWorldNameToLog; // write world name to log?
-    quint16 m_bSendEcho;            // echo sends?
-    quint16 m_bPasteEcho;           // echo pastes?
 
     // ========== Default Options ==========
-    quint16 m_bUseDefaultColours;
-    quint16 m_bUseDefaultTriggers;
-    quint16 m_bUseDefaultAliases;
-    quint16 m_bUseDefaultMacros;
-    quint16 m_bUseDefaultTimers;
-    quint16 m_bUseDefaultInputFont;
+    bool m_bUseDefaultTriggers;
+    bool m_bUseDefaultAliases;
+    bool m_bUseDefaultMacros;
+    bool m_bUseDefaultTimers;
+    bool m_bUseDefaultInputFont;
 
     // ========== Terminal Settings ==========
     QString m_strTerminalIdentification; // telnet negotiation ID
-
-    // ========== Mapping ==========
-    QString m_strMappingFailure; // mapping failure message
-    quint16 m_bMapFailureRegexp; // mapping failure is regexp?
 
     // ========== Flag Containers ==========
     quint16 m_iFlags1; // misc flags (see FLAGS1_* defines)
@@ -689,105 +737,118 @@ class WorldDocument : public QObject {
     QString m_strWorldID; // unique GUID for this world
 
     // ========== More Options (Version 15+) ==========
-    quint16 m_bAlwaysRecordCommandHistory; // record even if echo off?
-    quint16 m_bCopySelectionToClipboard;   // auto-copy selection?
-    quint16 m_bCarriageReturnClearsLine;   // \r clears line?
-    quint16 m_bSendMXP_AFK_Response;       // reply to <afk>?
-    quint16 m_bMudCanChangeOptions;        // server may recommend?
-    quint16 m_bEnableSpamPrevention;       // spam prevention?
-    quint16 m_iSpamLineCount;              // spam line threshold
-    QString m_strSpamMessage;              // spam filler message
-
-    quint16 m_bDoNotShowOutstandingLines; // hide outstanding lines?
-    quint16 m_bDoNotTranslateIACtoIACIAC; // don't translate IAC?
+    bool m_bAlwaysRecordCommandHistory; // record even if echo off?
+    bool m_bSendMXP_AFK_Response;       // reply to <afk>?
+    bool m_bMudCanChangeOptions;        // server may recommend?
 
     // ========== Clipboard and Display ==========
-    quint16 m_bAutoCopyInHTML;      // auto-copy in HTML?
-    quint16 m_iLineSpacing;         // line spacing (0 = auto)
-    quint16 m_bUTF_8;               // UTF-8 support?
-    quint16 m_bConvertGAtoNewline;  // convert IAC/GA to newline?
-    quint32 m_iCurrentActionSource; // what caused current script?
+    ActionSource m_iCurrentActionSource; // what caused current script?
 
     // ========== Filters ==========
-    QString m_strTriggersFilter;  // Lua filter for triggers
-    QString m_strAliasesFilter;   // Lua filter for aliases
-    QString m_strTimersFilter;    // Lua filter for timers
-    QString m_strVariablesFilter; // Lua filter for variables
+    // Moved to m_scripting: triggers_filter, aliases_filter, timers_filter, variables_filter
 
     // ========== Script Errors ==========
-    quint16 m_bScriptErrorsToOutputWindow; // show errors in output?
-    quint16 m_bLogScriptErrors;            // log script errors?
+    // Moved to m_scripting.errors_to_output_window
 
-    // ========== Command Window Auto-resize ==========
-    quint16 m_bAutoResizeCommandWindow;        // auto-resize command window?
-    QString m_strEditorWindowName;             // editor window name
-    quint16 m_iAutoResizeMinimumLines;         // minimum lines
-    quint16 m_iAutoResizeMaximumLines;         // maximum lines
-    quint16 m_bDoNotAddMacrosToCommandHistory; // macros not in history?
-    quint16 m_bSendKeepAlives;                 // use SO_KEEPALIVE?
+    // ========== Editor Window ==========
+    QString m_strEditorWindowName; // editor window name
+    bool m_bSendKeepAlives;        // use SO_KEEPALIVE?
 
-    // ========== Default Trigger Settings ==========
-    quint16 m_iDefaultTriggerSendTo;
-    quint16 m_iDefaultTriggerSequence;
-    quint16 m_bDefaultTriggerRegexp;
-    quint16 m_bDefaultTriggerExpandVariables;
-    quint16 m_bDefaultTriggerKeepEvaluating;
-    quint16 m_bDefaultTriggerIgnoreCase;
+    // ========== Automation Defaults Configuration ==========
+    struct AutomationDefaultsConfig {
+        // Default trigger settings
+        quint16 trigger_send_to = 0;           // default send-to for new triggers
+        quint16 trigger_sequence = 100;        // default sequence for new triggers
+        bool trigger_regexp = false;           // default regexp for new triggers?
+        bool trigger_expand_variables = false; // default expand vars for new triggers?
+        bool trigger_keep_evaluating = false;  // default keep evaluating for new triggers?
+        bool trigger_ignore_case = false;      // default ignore case for new triggers?
 
-    // ========== Default Alias Settings ==========
-    quint16 m_iDefaultAliasSendTo;
-    quint16 m_iDefaultAliasSequence;
-    quint16 m_bDefaultAliasRegexp;
-    quint16 m_bDefaultAliasExpandVariables;
-    quint16 m_bDefaultAliasKeepEvaluating;
-    quint16 m_bDefaultAliasIgnoreCase;
+        // Default alias settings
+        quint16 alias_send_to = 0;           // default send-to for new aliases
+        quint16 alias_sequence = 100;        // default sequence for new aliases
+        bool alias_regexp = false;           // default regexp for new aliases?
+        bool alias_expand_variables = false; // default expand vars for new aliases?
+        bool alias_keep_evaluating = false;  // default keep evaluating for new aliases?
+        bool alias_ignore_case = false;      // default ignore case for new aliases?
 
-    // ========== Default Timer Settings ==========
-    quint16 m_iDefaultTimerSendTo;
-
-    // ========== Sound ==========
-    quint16 m_bPlaySoundsInBackground; // use global sound buffer?
+        // Default timer settings
+        quint16 timer_send_to = 0; // default send-to for new timers
+    } m_automation_defaults;
 
     // ========== HTML Logging ==========
-    quint16 m_bLogHTML;       // convert HTML sequences?
-    quint16 m_bUnpauseOnSend; // cancel pause on send?
+    bool m_bUnpauseOnSend; // cancel pause on send?
 
-    // ========== Logging Options ==========
-    quint16 m_log_input;    // log player input?
-    quint16 m_bLogOutput;   // log MUD output?
-    quint16 m_bLogNotes;    // log notes?
-    quint16 m_bLogInColour; // HTML logging in colour?
-    quint16 m_bLogRaw;      // log raw input from MUD?
+    // ========== Logging Configuration ==========
+    struct LoggingConfig {
+        // Log file settings
+        QString auto_log_file_name;    // auto-log filename
+        QString file_preamble;         // log file preamble
+        QString file_postamble;        // log file postamble
+        QString line_preamble_output;  // log preamble for output
+        QString line_preamble_input;   // log preamble for input
+        QString line_preamble_notes;   // log preamble for notes
+        QString line_postamble_output; // log postamble for output
+        QString line_postamble_input;  // log postamble for input
+        QString line_postamble_notes;  // log postamble for notes
+
+        // Logging flags
+        bool log_html = false;          // convert HTML sequences?
+        bool log_input = false;         // log player input?
+        bool log_output = false;        // log MUD output?
+        bool log_notes = false;         // log notes?
+        bool log_in_colour = false;     // HTML logging in colour?
+        bool log_raw = false;           // log raw input from MUD?
+        bool write_world_name = false;  // write world name to log?
+        bool log_script_errors = false; // log script errors?
+        bool append_to_log_file = true; // append vs overwrite
+        int log_lines = 0;              // max lines (0 = unlimited)
+    } m_logging;
 
     // ========== Tree Views ==========
-    quint16 m_bTreeviewTriggers; // show triggers in tree?
-    quint16 m_bTreeviewAliases;  // show aliases in tree?
-    quint16 m_bTreeviewTimers;   // show timers in tree?
-
-    // ========== Input Wrapping ==========
-    quint16 m_bAutoWrapInput; // match input wrap to output?
+    bool m_bTreeviewTriggers; // show triggers in tree?
+    bool m_bTreeviewAliases;  // show aliases in tree?
+    bool m_bTreeviewTimers;   // show timers in tree?
 
     // ========== Tooltips ==========
     quint32 m_iToolTipVisibleTime; // tooltip visible time (ms)
     quint32 m_iToolTipStartTime;   // tooltip delay time (ms)
 
     // ========== Save File Options ==========
-    quint16 m_bOmitSavedDateFromSaveFiles; // don't write save date?
+    bool m_bOmitSavedDateFromSaveFiles; // don't write save date?
 
-    // ========== Output Buffer Fading ==========
-    quint16 m_iFadeOutputBufferAfterSeconds; // fade after N seconds
-    quint16 m_FadeOutputOpacityPercent;      // fade opacity %
-    quint16 m_FadeOutputSeconds;             // fade duration
-    quint16 m_bCtrlBackspaceDeletesLastWord; // Ctrl+Backspace behavior?
+    // Note: output buffer fading fields moved to OutputConfig m_output
+    bool m_bCtrlBackspaceDeletesLastWord; // Ctrl+Backspace behavior?
 
     // ========== Remote Access Server Settings ==========
-    quint16 m_bEnableRemoteAccess;    // enable remote access server?
-    quint16 m_iRemotePort;            // port to listen on (0 = disabled)
-    QString m_strRemotePassword;      // password for authentication (required)
-    quint16 m_iRemoteScrollbackLines; // lines to send on connect (default 100)
-    quint16 m_iRemoteMaxClients;      // max simultaneous clients (default 5)
-    quint16 m_iRemoteLockoutAttempts; // failed attempts before lockout (default 3)
-    quint16 m_iRemoteLockoutSeconds;  // lockout duration (default 300)
+    struct RemoteAccessConfig {
+        bool enabled = false;           // enable remote access server?
+        quint16 port = 0;               // port to listen on (0 = disabled)
+        QString password;               // password for authentication
+        QString authorized_keys_file;   // path to authorized_keys for pubkey auth
+        quint16 scrollback_lines = 100; // lines to send on connect
+        quint16 max_clients = 5;        // max simultaneous clients
+    } m_remote;
+
+    // ========== Spam Prevention / Protocol Behavior Configuration ==========
+    struct SpamPreventionConfig {
+        bool enabled = false;                     // spam prevention?
+        quint16 line_count = 20;                  // spam line threshold
+        QString message = "look";                 // spam filler message
+        bool carriage_return_clears_line = false; // \r clears line?
+        bool convert_ga_to_newline = false;       // convert IAC/GA to newline?
+        bool do_not_translate_iac = false;        // don't translate IAC?
+    } m_spam;
+
+    // ========== Mapping Configuration ==========
+    struct MappingConfig {
+        bool enabled = false;        // mapping active?
+        bool remove_reverses = true; // auto-cancel opposite directions?
+        QString failure_message = "Alas, you cannot go that way."; // movement failure text
+        bool failure_regexp = false;                               // failure_message is regexp?
+        QString special_forwards;                                  // recorded forward directions
+        QString special_backwards;                                 // recorded backward directions
+    } m_mapping;
 
     // ========== RUNTIME STATE VARIABLES (Not saved to disk) ==========
 
@@ -796,55 +857,53 @@ class WorldDocument : public QObject {
     quint16 m_whisper_colour;
     quint16 m_mail_colour;
     quint16 m_game_colour;
-    quint16 m_remove_channels1;
-    quint16 m_remove_channels2;
-    quint16 m_remove_pages;
-    quint16 m_remove_whispers;
-    quint16 m_remove_set;
-    quint16 m_remove_mail;
-    quint16 m_remove_game;
+    bool m_remove_channels1;
+    bool m_remove_channels2;
+    bool m_remove_pages;
+    bool m_remove_whispers;
+    bool m_remove_set;
+    bool m_remove_mail;
+    bool m_remove_game;
 
     // ========== Runtime State Flags ==========
-    bool m_bNAWS_wanted;          // server wants NAWS messages
-    bool m_bCHARSET_wanted;       // server wants CHARSET messages
+    // NOTE: m_bNAWS_wanted, m_bCHARSET_wanted, m_bNoEcho are now reference members
+    // that delegate to m_telnetParser (see TelnetParser companion object section below).
     bool m_bLoaded;               // true if loaded from disk
     bool m_bSelected;             // true if selected in Send To All Worlds
     bool m_bVariablesChanged;     // true if variables have changed
     bool m_bModified;             // true if document has unsaved changes
-    bool m_bNoEcho;               // set if IAC WILL ECHO
     bool m_bDebugIncomingPackets; // display all incoming text?
 
     // ========== Statistics Counters ==========
-    qint64 m_iInputPacketCount;        // count of packets received
-    qint64 m_iOutputPacketCount;       // count of packets sent
+    // NOTE: m_iInputPacketCount, m_iOutputPacketCount moved to ConnectionManager.
+    // Access via m_connectionManager->m_iInputPacketCount,
+    // m_connectionManager->m_iOutputPacketCount.
     qint32 m_iUTF8ErrorCount;          // count of lines with bad UTF8
     qint32 m_iOutputWindowRedrawCount; // count of times output window redrawn
 
     // ========== UTF-8 Processing State ==========
-    quint8 m_UTF8Sequence[8]; // collect up to 4 UTF8 bytes + null (expanded for safety)
-    qint32 m_iUTF8BytesLeft;  // how many UTF8 bytes to go
+    std::array<quint8, 8> m_UTF8Sequence; // collect up to 4 UTF8 bytes + null (expanded for safety)
+    qint32 m_iUTF8BytesLeft;              // how many UTF8 bytes to go
 
     // ========== Trigger/Alias/Timer Statistics ==========
-    qint32 m_iTriggersEvaluatedCount; // how many triggers evaluated
-    qint32 m_iTriggersMatchedCount;   // how many triggers matched
-    qint32 m_iAliasesEvaluatedCount;  // how many aliases evaluated
-    qint32 m_iAliasesMatchedCount;    // how many aliases matched
-    qint32 m_iTimersFiredCount;       // how many timers fired
-    qint32 m_iTriggersMatchedThisSessionCount;
-    qint32 m_iAliasesMatchedThisSessionCount;
-    qint32 m_iTimersFiredThisSessionCount;
+    // NOTE: These statistics have moved to AutomationRegistry.
+    // Access via m_automationRegistry->m_iTriggersEvaluatedCount, etc.
 
     // ========== UI State ==========
     qint32 m_last_prefs_page;         // last preferences page viewed
-    quint16 m_bConfigEnableTimers;    // used during world config
+    bool m_bConfigEnableTimers;       // used during world config
     QString m_strLastSelectedTrigger; // last selected trigger
     QString m_strLastSelectedAlias;
     QString m_strLastSelectedTimer;
     QString m_strLastSelectedVariable;
 
-    // ========== View Pointers (will be replaced with Qt equivalents) ==========
-    IInputView* m_pActiveInputView;  // Active input view (interface pointer)
-    IOutputView* m_pActiveOutputView; // Active output view (interface pointer)
+    // ========== View Pointers ==========
+    // Non-owning: lifetime managed by the parent QWidget (WorldWidget).
+    // IInputView/IOutputView are pure abstract interfaces (not QObject-derived),
+    // so QPointer cannot be used. Callers must not access these after WorldWidget
+    // has been destroyed.
+    IInputView* m_pActiveInputView;
+    IOutputView* m_pActiveOutputView;
 
     // ========== Text Selection State ==========
     // Selection coordinates (0-based internally, converted to 1-based for Lua API)
@@ -855,9 +914,9 @@ class WorldDocument : public QObject {
     int m_selectionEndChar;
 
     // ========== Line Buffer ==========
-    QList<Line*> m_lineList;  // list of output buffer lines
-    Line* m_currentLine;      // the line currently receiving
-    QString m_strCurrentLine; // current line from MUD (no control codes)
+    std::vector<std::unique_ptr<Line>> m_lineList; // list of output buffer lines
+    std::unique_ptr<Line> m_currentLine;           // the line currently receiving (owns the line)
+    QString m_strCurrentLine;                      // current line from MUD (no control codes)
 
     // ========== Multi-line Trigger Buffer ==========
     // Rolling buffer of recent line text for multi-line trigger matching
@@ -865,25 +924,20 @@ class WorldDocument : public QObject {
     static const int MAX_RECENT_LINES = 200;
     std::deque<QString> m_recentLines;
 
-    // ========== Actions List ==========
-    // CActionList m_ActionList;
-    void* m_ActionList; // placeholder - will be QList<Action*>
-
     // ========== Line Position Tracking ==========
-    void* m_pLinePositions; // array of line positions
     qint32 m_total_lines;
-    qint32 m_new_lines;           // lines they haven't read yet
-    qint32 m_newlines_received;   // lines pushed into m_recentLines
-    qint32 m_nTotalLinesSent;     // lines sent this connection
-    qint32 m_nTotalLinesReceived; // lines received this connection
+    qint32 m_new_lines;         // lines they haven't read yet
+    qint32 m_newlines_received; // lines pushed into m_recentLines
+    // NOTE: m_nTotalLinesSent, m_nTotalLinesReceived moved to ConnectionManager.
+    // Access via m_connectionManager->m_nTotalLinesSent,
+    // m_connectionManager->m_nTotalLinesReceived.
     qint32 m_last_line_with_IAC_GA;
 
     // ========== Timing Variables ==========
-    QDateTime m_tConnectTime;               // when connected to world
-    QDateTime m_tLastPlayerInput;           // last player input (for <afk>)
-    qint64 m_tsConnectDuration;             // ms connected (use qint64 for QTimeSpan)
-    QDateTime m_whenWorldStarted;           // when world document started
-    qint64 m_whenWorldStartedHighPrecision; // high-res timestamp
+    // NOTE: m_tConnectTime, m_tsConnectDuration, m_whenWorldStarted,
+    //       m_whenWorldStartedHighPrecision moved to ConnectionManager.
+    // Access via m_connectionManager->m_tConnectTime, etc.
+    QDateTime m_tLastPlayerInput; // last player input (for <afk>)
 
     QDateTime m_tStatusTime;    // time of line mouse was over
     QPoint m_lastMousePosition; // where mouse last was
@@ -891,96 +945,49 @@ class WorldDocument : public QObject {
     qint32 m_view_number; // sequence in activity view
 
     // ========== Timer Evaluation (1-second check timer) ==========
+    // Qt parent-child owned (parent = this in constructor); do NOT manually delete.
     QTimer* m_timerCheckTimer = nullptr; // Periodic timer that calls checkTimers() every second
 
-    // ========== Telnet Negotiation Phase ==========
-    Phase m_phase;           // telnet negotiation phase (current parser state)
-    qint32 m_ttype_sequence; // for MTTS (terminal type sequence)
+    // ========== TelnetParser (companion object) ==========
+    // Owns all telnet protocol state: Phase, compression, IAC tracking, subnegotiation.
+    // Created in WorldDocument constructor. Access via m_telnetParser->.
+    //
+    // Fields that previously lived directly on WorldDocument and are now in TelnetParser:
+    //   m_phase, m_ttype_sequence, m_zlibStream (ZlibStream RAII), m_bCompress,
+    //   m_CompressInput, m_CompressOutput, m_nTotalUncompressed, m_nTotalCompressed,
+    //   m_iCompressionTimeTaken, m_iMCCP_type, m_bSupports_MCCP_2,
+    //   m_subnegotiation_type, m_IAC_subnegotiation_data,
+    //   m_bClient_sent_IAC_DO/DONT/WILL/WONT, m_bClient_got_IAC_DO/DONT/WILL/WONT,
+    //   m_bNAWS_wanted, m_bCHARSET_wanted, m_bNoEcho, m_bATCP, m_bZMP, m_bMSP,
+    //   m_nCount_IAC_DO/DONT/WILL/WONT/SB.
+    // All access via m_telnetParser->fieldName.
+    std::unique_ptr<TelnetParser> m_telnetParser;
 
-    // ========== MCCP Compression ==========
-    z_stream m_zCompress;    // zlib decompression state
-    bool m_bCompress;        // true if decompressing
-    bool m_bCompressInitOK;  // true if OK to decompress
-    Bytef* m_CompressInput;  // input buffer (may not be needed)
-    Bytef* m_CompressOutput; // output buffer for decompressed data
-    qint64 m_nTotalUncompressed;
-    qint64 m_nTotalCompressed;
-    qint64 m_iCompressionTimeTaken; // time taken to decompress
-    qint32 m_nCompressionOutputBufferSize;
+    // ========== MXPEngine (companion object) ==========
+    // Owns all MXP protocol state: mode, tags, entities, data structures, statistics.
+    // Created in WorldDocument constructor. Access via m_mxpEngine->.
+    //
+    // Fields that previously lived directly on WorldDocument and are now in MXPEngine:
+    //   m_bMXP, m_bPuebloActive, m_iPuebloLevel, m_bPreMode,
+    //   m_iMXP_mode, m_iMXP_defaultMode, m_iMXP_previousMode,
+    //   m_bInParagraph, m_bMXP_script, m_bSuppressNewline,
+    //   m_bMXP_nobr, m_bMXP_preformatted, m_bMXP_centered,
+    //   m_strMXP_link, m_strMXP_hint, m_bMXP_link_prompt,
+    //   m_iMXP_list_depth, m_iMXP_list_counter, m_iListMode, m_iListCount,
+    //   m_strMXPstring, m_strMXPtagcontents, m_cMXPquoteTerminator,
+    //   m_atomicElementMap, m_customElementMap, m_entityMap, m_customEntityMap,
+    //   m_activeTagList, m_gaugeMap,
+    //   m_strPuebloMD5, m_iMXPerrors, m_iMXPtags, m_iMXPentities,
+    //   m_dispidOnMXP_Start/Stop/OpenTag/CloseTag/SetVariable/Error.
+    // All access via m_mxpEngine->fieldName or m_mxpEngine->method().
+    std::unique_ptr<MXPEngine> m_mxpEngine;
 
-    qint32 m_iMCCP_type; // 0=none, 1=v1, 2=v2
-    bool m_bSupports_MCCP_2;
-
-    // ========== Telnet Subnegotiation ==========
-    qint32 m_subnegotiation_type;         // 0-255
-    QByteArray m_IAC_subnegotiation_data; // last IAC SB c x IAC SE data
-
-    // Telnet negotiation tracking arrays
-    bool m_bClient_sent_IAC_DO[256];
-    bool m_bClient_sent_IAC_DONT[256];
-    bool m_bClient_sent_IAC_WILL[256];
-    bool m_bClient_sent_IAC_WONT[256];
-    bool m_bClient_got_IAC_DO[256];
-    bool m_bClient_got_IAC_DONT[256];
-    bool m_bClient_got_IAC_WILL[256];
-    bool m_bClient_got_IAC_WONT[256];
-
-    // ========== MSP (MUD Sound Protocol) ==========
-    bool m_bMSP; // using MSP?
-
-    // ========== ZMP (Zenith MUD Protocol) Runtime State ==========
-    bool m_bZMP;             // ZMP negotiated and active
+    // ZMP package name stays on WorldDocument (it's ZMP state, not pure telnet negotiation)
     QString m_strZMPpackage; // Current ZMP package name during collection
 
-    // ========== ATCP (Achaea Telnet Client Protocol) Runtime State ==========
-    bool m_bATCP; // ATCP negotiated and active
-
-    // ========== MXP/Pueblo Runtime State ==========
-    bool m_bMXP;                // using MXP now?
-    bool m_bPuebloActive;       // Pueblo mode active
-    QString m_iPuebloLevel;     // e.g., "1.0", "1.10"
-    bool m_bPreMode;            // <PRE> tag active
-    qint32 m_iMXP_mode;         // current tag security
-    qint32 m_iMXP_defaultMode;  // default after newline
-    qint32 m_iMXP_previousMode; // previous mode
-    bool m_bInParagraph;        // discard newlines (wrap)
-    bool m_bMXP_script;         // in script collection
-    bool m_bSuppressNewline;    // newline doesn't start new line
-
-    // MXP formatting state
-    bool m_bMXP_nobr;           // <nobr> - non-breaking mode active
-    bool m_bMXP_preformatted;   // <pre> - preformatted text mode
-    bool m_bMXP_centered;       // <center> - centered text mode
-    QString m_strMXP_link;      // current <send> or <a> href
-    QString m_strMXP_hint;      // current link hint/tooltip
-    bool m_bMXP_link_prompt;    // <send prompt> - show prompt before sending
-    qint32 m_iMXP_list_depth;   // current list nesting depth
-    qint32 m_iMXP_list_counter; // counter for ordered lists
-
-    qint32 m_iListMode;  // what sort of list displaying
-    qint32 m_iListCount; // for ordered list
-
-    QString m_strMXPstring;      // currently collecting MXP string
-    QString m_strMXPtagcontents; // stuff inside tag
-    char m_cMXPquoteTerminator;  // ' or "
-
-    // MXP Data Structures
-    AtomicElementMap m_atomicElementMap; // Built-in MXP elements
-    CustomElementMap m_customElementMap; // User-defined elements
-    MXPEntityMap m_entityMap;            // Standard HTML entities
-    MXPEntityMap m_customEntityMap;      // User-defined entities
-    ActiveTagList m_activeTagList;       // Stack of unclosed tags
-    MXPGaugeMap m_gaugeMap;              // Track gauges and stats by entity name
-
-    char m_cLastChar;      // last incoming character
-    qint32 m_lastSpace;    // position of last space in current line (for word-wrap), -1 if none
+    char m_cLastChar;   // last incoming character
+    qint32 m_lastSpace; // position of last space in current line (for word-wrap), -1 if none
     qint32 m_iLastOutstandingTagCount;
-    QString m_strPuebloMD5; // Pueblo hash string
-
-    // ========== MXP Statistics ==========
-    qint64 m_iMXPerrors;
-    qint64 m_iMXPtags;
-    qint64 m_iMXPentities;
 
     // ========== ANSI State ==========
     qint32 m_code;        // current ANSI code
@@ -988,10 +995,14 @@ class WorldDocument : public QObject {
     bool m_bWorldClosing; // world is closing?
 
     // Current style (from MUD)
-    quint16 m_iFlags;                        // style flags
-    QRgb m_iForeColour;                      // foreground color
-    QRgb m_iBackColour;                      // background color
-    std::shared_ptr<Action> m_currentAction; // current hyperlink action (nullptr if no action)
+    quint16 m_iFlags;   // style flags
+    QRgb m_iForeColour; // foreground color
+    QRgb m_iBackColour; // background color
+    // shared_ptr is intentional: m_currentAction is copied into each Style created while the
+    // hyperlink is active. All resulting Style objects co-own the same Action; none is the unique
+    // owner. unique_ptr would require transferring ownership on every AddToLine() call and would
+    // leave m_currentAction empty — breaking multi-style hyperlink runs.
+    std::shared_ptr<Action> m_currentAction; // current hyperlink action (nullptr if none)
 
     // Notes style
     bool m_bNotesInRGB; // notes in RGB mode?
@@ -1000,27 +1011,22 @@ class WorldDocument : public QObject {
     quint16 m_iNoteStyle; // HILITE, UNDERLINE, etc.
 
     // ========== Logging ==========
-    QFile* m_logfile;          // Current open log file (nullptr if not logging)
-    QString m_logfile_name;    // Resolved log filename
-    QDateTime m_LastFlushTime; // Last time log was flushed to disk
+    std::unique_ptr<QFile> m_logfile; // Current open log file (nullptr if not logging)
+    QString m_logfile_name;           // Resolved log filename
+    QDateTime m_LastFlushTime;        // Last time log was flushed to disk
 
-    // ========== Fonts (will use QFont) ==========
-    void* m_font[16]; // placeholder for QFont* array
+    // ========== Fonts ==========
     qint32 m_FontHeight;
     qint32 m_FontWidth;
-    void* m_input_font; // placeholder for QFont*
     qint32 m_InputFontHeight;
     qint32 m_InputFontWidth;
 
     // ========== Byte Counters ==========
-    qint64 m_nBytesIn;
-    qint64 m_nBytesOut;
+    // NOTE: m_nBytesIn, m_nBytesOut moved to ConnectionManager.
+    // Access via m_connectionManager->m_nBytesIn, m_connectionManager->m_nBytesOut.
 
-    // ========== Sockets (will use Qt network classes) ==========
-    void* m_sockAddr;       // SOCKADDR_IN placeholder
-    void* m_hNameLookup;    // HANDLE placeholder
-    void* m_pGetHostStruct; // buffer placeholder
-    qint32 m_iConnectPhase; // connection phase enum
+    // NOTE: m_iConnectPhase moved to ConnectionManager.
+    // Access via m_connectionManager->m_iConnectPhase.
 
     // ========== Scripting Engine ==========
     std::unique_ptr<ScriptEngine> m_ScriptEngine; // Lua scripting engine
@@ -1035,8 +1041,6 @@ class WorldDocument : public QObject {
     QString m_strLastImmediateExpression;
 
     // Script file monitoring
-    void* m_pThread;                // HANDLE placeholder
-    void* m_eventScriptFileChanged; // CEvent placeholder
     bool m_bInScriptFileChanged;
     QDateTime m_timeScriptFileMod;
 
@@ -1061,12 +1065,8 @@ class WorldDocument : public QObject {
     qint32 m_dispidWorldDisconnect;
     qint32 m_dispidWorldGetFocus;
     qint32 m_dispidWorldLoseFocus;
-    qint32 m_dispidOnMXP_Start;
-    qint32 m_dispidOnMXP_Stop;
-    qint32 m_dispidOnMXP_OpenTag;
-    qint32 m_dispidOnMXP_CloseTag;
-    qint32 m_dispidOnMXP_SetVariable;
-    qint32 m_dispidOnMXP_Error;
+    // NOTE: MXP DISPIDs (m_dispidOnMXP_Start/Stop/OpenTag/CloseTag/SetVariable/Error)
+    // moved to MXPEngine. Access via m_mxpEngine->m_dispidOnMXP_*.
 
     // ========== Plugin State ==========
     bool m_bPluginProcessesOpenTag;
@@ -1074,16 +1074,6 @@ class WorldDocument : public QObject {
     bool m_bPluginProcessesSetVariable;
     bool m_bPluginProcessesSetEntity;
     bool m_bPluginProcessesError;
-
-    // ========== Find Info Structures (will use Qt classes) ==========
-    void* m_DisplayFindInfo; // CFindInfo placeholder
-    void* m_RecallFindInfo;
-    void* m_TriggersFindInfo;
-    void* m_AliasesFindInfo;
-    void* m_MacrosFindInfo;
-    void* m_TimersFindInfo;
-    void* m_VariablesFindInfo;
-    void* m_NotesFindInfo;
 
     // Recall flags
     bool m_bRecallCommands;
@@ -1094,19 +1084,13 @@ class WorldDocument : public QObject {
     qint64 m_iUniqueDocumentNumber;
 
     // ========== Mapping ==========
-    void* m_strMapList;       // CStringList placeholder
-    void* m_MapFailureRegexp; // t_regexp* placeholder
-    QString m_strSpecialForwards;
-    QString m_strSpecialBackwards;
-    void* m_pTimerWnd;          // CTimerWnd* placeholder
-    QStringList m_CommandQueue; // Command queue for speedwalking/delays
+    // NOTE: m_CommandQueue moved to ConnectionManager.
+    // Access via m_connectionManager->m_CommandQueue.
     bool m_bShowingMapperStatus;
-    void* m_strIncludeFileList;        // CStringList placeholder
-    void* m_strCurrentIncludeFileList; // CStringList placeholder
 
-    // ========== Configuration Arrays ==========
-    void* m_NumericConfiguration; // array placeholder
-    void* m_AlphaConfiguration;   // array placeholder
+    // Mapper state (Lua API: AddToMapper, GetMappingString, etc.)
+    QStringList m_mapList;                   // Ordered list of map entries (directions/comments)
+    QMap<QRgb, QRgb> m_colourTranslationMap; // Color substitution map for display
 
     // ========== Plugins ==========
     std::vector<std::unique_ptr<Plugin>> m_PluginList; // List of installed plugins
@@ -1119,33 +1103,30 @@ class WorldDocument : public QObject {
     qint32 m_iExecutionDepth;
     bool m_bOmitFromCommandHistory;
 
+    // ========== Option snapshots (for GetLoadedValue API) ==========
+    // Populated after XML load completes; reflects values at load time.
+    std::unordered_map<QString, double> m_loadedNumericOptions;
+    std::unordered_map<QString, QString> m_loadedAlphaOptions;
+
     // ========== Arrays for scripting ==========
     // Named arrays for Lua ArrayCreate/ArrayGet/ArraySet etc.
     // Each array is a map of key->value pairs, organized by array name
     // Uses ArraysMap (QMap<QString, QMap<QString, QString>>) for consistency with Plugin
     ArraysMap m_Arrays;
 
-    // ========== Special Fonts ==========
-    void* m_strSpecialFontName; // ci_set placeholder
-
     // ========== Background Image ==========
     QString m_strBackgroundImageName;
-    void* m_BackgroundBitmap; // CBitmap placeholder
     qint32 m_iBackgroundMode;
     QRgb m_iBackgroundColour;
 
     // ========== Foreground Image ==========
     QString m_strForegroundImageName;
-    void* m_ForegroundBitmap; // CBitmap placeholder
     qint32 m_iForegroundMode;
 
     // ========== MiniWindows ==========
     std::map<QString, std::unique_ptr<MiniWindow>>
         m_MiniWindowMap;                 // Map of miniwindows (name → MiniWindow)
     QVector<QString> m_MiniWindowsOrder; // Z-order sorted list of miniwindow names
-
-    // ========== Databases ==========
-    void* m_Databases; // tDatabaseMap placeholder
 
     // ========== Text Rectangle ==========
     QRect m_TextRectangle; // Configuration (raw coordinates, may be negative for offsets)
@@ -1157,34 +1138,27 @@ class WorldDocument : public QObject {
     QRect m_computedTextRectangle; // Computed/normalized rectangle (updated by OutputView)
 
     // ========== Sound System ==========
-    // Qt Spatial Audio for stereo panning support
-    QAudioEngine* m_audioEngine = nullptr;         // Single spatial audio engine
-    QAudioListener* m_audioListener = nullptr;     // Single listener at origin
-    SoundBuffer m_soundBuffers[MAX_SOUND_BUFFERS]; // Sound buffer array (10 buffers)
+    // SoundManager owns all spatial audio state (engine, listener, 10 buffers).
+    // Lazy-initialized on first playSound() call; nullptr until then.
+    std::unique_ptr<SoundManager> m_soundManager;
 
     // ========== Notepad Windows ==========
-    QList<NotepadWidget*> m_notepadList; // List of notepad windows (non-owning)
+    // Non-owning: NotepadWidget is a QWidget; Qt parent-child manages lifetime.
+    // QPointer<NotepadWidget> auto-nulls if the widget is destroyed before removal.
+    QList<QPointer<NotepadWidget>> m_notepadList;
 
     // ========== Accelerators ==========
-    AcceleratorManager* m_acceleratorManager; // Keyboard shortcut management
+    // Qt parent-child owned (parent = this in constructor); do NOT manually delete.
+    AcceleratorManager* m_acceleratorManager;
 
-    // ========== Color Translation ==========
-    void* m_ColourTranslationMap; // map<COLORREF,COLORREF> placeholder
-
-    // ========== Outstanding Lines ==========
-    void* m_OutstandingLines; // list<CPaneStyle> placeholder
     bool m_bNotesNotWantedNow;
     bool m_bDoingSimulate;
     bool m_bLineOmittedFromOutput;
     bool m_bOmitCurrentLineFromLog; // Trigger omit_from_log flag
     bool m_bScrollBarWanted;
 
-    // ========== IAC Counters ==========
-    qint32 m_nCount_IAC_DO;
-    qint32 m_nCount_IAC_DONT;
-    qint32 m_nCount_IAC_WILL;
-    qint32 m_nCount_IAC_WONT;
-    qint32 m_nCount_IAC_SB;
+    // NOTE: IAC Counters (m_nCount_IAC_DO/DONT/WILL/WONT/SB) moved to TelnetParser.
+    // Access via m_telnetParser->m_nCount_IAC_*.
 
     // ========== UI State Strings ==========
     QString m_strWordUnderMenu;
@@ -1203,19 +1177,16 @@ class WorldDocument : public QObject {
     // void* m_PaneMap;  // only if PANE is defined
 
     // ========== Unpacked flags from m_iFlags1 ==========
-    bool m_bArrowRecallsPartial;
     bool m_bCtrlZGoesToEndOfBuffer;
     bool m_bCtrlPGoesToPreviousCommand;
     bool m_bCtrlNGoesToNextCommand;
     bool m_bHyperlinkAddsToCommandHistory;
-    bool m_bEchoHyperlinkInOutputWindow;
+    // echo_hyperlink_in_output_window moved to m_output.echo_hyperlink_in_output_window
     bool m_bAutoWrapWindowWidth;
-    bool m_bNAWS;      // Negotiate About Window Size
-    bool m_bUseZMP;    // Use ZMP (Zenith MUD Protocol)
-    bool m_bUseATCP;   // Use ATCP (Achaea Telnet Client Protocol)
-    bool m_bUseMSP;    // Use MSP (MUD Sound Protocol)
-    bool m_bPueblo;    // Allow Pueblo
-    bool m_bNoEchoOff; // ignore echo off
+    bool m_bNAWS;    // Negotiate About Window Size
+    bool m_bUseZMP;  // Use ZMP (Zenith MUD Protocol)
+    bool m_bUseATCP; // Use ATCP (Achaea Telnet Client Protocol)
+    bool m_bPueblo;  // Allow Pueblo
     bool m_bUseCustomLinkColour;
     bool m_bMudCanChangeLinkColour;
     bool m_bUnderlineHyperlinks;
@@ -1248,65 +1219,167 @@ class WorldDocument : public QObject {
     }
 
     // Network event handlers
-    void ReceiveMsg();             // Called when socket has data to read
-    void OnConnect(int errorCode); // Called when connection succeeds or fails
+    void ReceiveMsg(); // Called when socket has data to read
 
-    // Connection control methods
-    void connectToMud();                 // Initiate connection to MUD
-    void disconnectFromMud();            // Disconnect from MUD
-    void sendToMud(const QString& text); // Send text to MUD
+    // Forwarding wrappers for WorldSocket callbacks (socket calls these on WorldDocument;
+    // implementation now lives in ConnectionManager).
+    void OnConnect(int errorCode)
+    {
+        m_connectionManager->onConnect(errorCode);
+    }
+    void OnConnectionDisconnect()
+    {
+        m_connectionManager->onConnectionDisconnect();
+    }
 
-    // Connection time methods (for status bar)
-    qint64 connectedTime() const;  // Returns seconds connected, or -1 if not connected
-    void resetConnectedTime();     // Reset connection timer to now
+    // Connection control methods (forwarding wrappers → ConnectionManager)
+    void connectToMud()
+    {
+        m_connectionManager->connectToMud();
+    }
+    void disconnectFromMud()
+    {
+        m_connectionManager->disconnectFromMud();
+    }
+    void sendToMud(const QString& text); // Send text to MUD (stays on WorldDocument)
+
+    // Connection time methods (for status bar) — forwarding wrappers → ConnectionManager
+    [[nodiscard]] qint64 connectedTime() const
+    {
+        return m_connectionManager->connectedTime();
+    }
+    void resetConnectedTime()
+    {
+        m_connectionManager->resetConnectedTime();
+    }
+
+    // ConnectionManager state accessors
+    [[nodiscard]] qint32 connectPhase() const
+    {
+        return m_connectionManager->m_iConnectPhase;
+    }
+    [[nodiscard]] qint64 bytesIn() const
+    {
+        return m_connectionManager->m_nBytesIn;
+    }
+    [[nodiscard]] qint64 bytesOut() const
+    {
+        return m_connectionManager->m_nBytesOut;
+    }
+    [[nodiscard]] qint32 totalLinesSent() const
+    {
+        return m_connectionManager->m_nTotalLinesSent;
+    }
+    [[nodiscard]] qint64 inputPacketCount() const
+    {
+        return m_connectionManager->m_iInputPacketCount;
+    }
+    [[nodiscard]] qint64 outputPacketCount() const
+    {
+        return m_connectionManager->m_iOutputPacketCount;
+    }
+
+    // TelnetParser state accessors
+    [[nodiscard]] bool isEchoOff() const
+    {
+        return m_telnetParser->m_bNoEcho;
+    }
+    [[nodiscard]] bool isCompressing() const
+    {
+        return m_telnetParser->m_bCompress;
+    }
+    [[nodiscard]] qint32 mccpType() const
+    {
+        return m_telnetParser->m_iMCCP_type;
+    }
+    [[nodiscard]] qint64 totalUncompressed() const
+    {
+        return m_telnetParser->m_nTotalUncompressed;
+    }
+    [[nodiscard]] qint64 totalCompressed() const
+    {
+        return m_telnetParser->m_nTotalCompressed;
+    }
+
+    // MXPEngine state accessors
+    [[nodiscard]] bool isMXPActive() const
+    {
+        return m_mxpEngine->m_bMXP;
+    }
+    [[nodiscard]] bool isPuebloActive() const
+    {
+        return m_mxpEngine->m_bPuebloActive;
+    }
+    [[nodiscard]] qint64 mxpErrorCount() const
+    {
+        return m_mxpEngine->m_iMXPerrors;
+    }
+    [[nodiscard]] qint64 mxpTagCount() const
+    {
+        return m_mxpEngine->m_iMXPtags;
+    }
+    [[nodiscard]] qint64 mxpEntityCount() const
+    {
+        return m_mxpEngine->m_iMXPentities;
+    }
+
+    // AutomationRegistry statistics accessors
+    [[nodiscard]] qint32 triggersEvaluatedCount() const
+    {
+        return m_automationRegistry->m_iTriggersEvaluatedCount;
+    }
+    [[nodiscard]] qint32 triggersMatchedCount() const
+    {
+        return m_automationRegistry->m_iTriggersMatchedCount;
+    }
+    [[nodiscard]] qint32 aliasesEvaluatedCount() const
+    {
+        return m_automationRegistry->m_iAliasesEvaluatedCount;
+    }
+    [[nodiscard]] qint32 aliasesMatchedCount() const
+    {
+        return m_automationRegistry->m_iAliasesMatchedCount;
+    }
+    [[nodiscard]] qint32 timersFiredCount() const
+    {
+        return m_automationRegistry->m_iTimersFiredCount;
+    }
 
     // Logging status (for status bar)
-    bool isLogging() const { return m_logfile != nullptr; }
+    bool isLogging() const
+    {
+        return m_logfile != nullptr;
+    }
 
     // ========== Telnet State Machine ==========
 
-    // Main byte processor - routes incoming bytes to phase handlers
+    // Main byte processor - routes incoming bytes to phase handlers.
+    // Telnet-specific phases (HAVE_ESC, HAVE_IAC, HAVE_WILL, etc.) delegate to
+    // m_telnetParser->Phase_*(). MXP phases (HAVE_MXP_ELEMENT etc.) delegate to
+    // m_mxpEngine->Phase_MXP_*().
     void ProcessIncomingByte(unsigned char c);
 
-    // Phase handlers (telnet_phases.cpp)
-    void Phase_ESC(unsigned char c);                // Handle ESC character
-    void Phase_ANSI(unsigned char c);               // Parse ANSI escape sequences
-    void Phase_IAC(unsigned char& c);               // Handle IAC commands (note: reference!)
-    void Phase_WILL(unsigned char c);               // Handle IAC WILL
-    void Phase_WONT(unsigned char c);               // Handle IAC WONT
-    void Phase_DO(unsigned char c);                 // Handle IAC DO
-    void Phase_DONT(unsigned char c);               // Handle IAC DONT
-    void Phase_SB(unsigned char c);                 // Start subnegotiation
-    void Phase_SUBNEGOTIATION(unsigned char c);     // Collect subnegotiation data
-    void Phase_SUBNEGOTIATION_IAC(unsigned char c); // Handle IAC within subnegotiation
-    void Phase_UTF8(unsigned char c);               // Accumulate UTF-8 bytes
-    void Phase_COMPRESS(unsigned char c);           // MCCP v1 start
-    void Phase_COMPRESS_WILL(unsigned char c);      // MCCP v1 activation
-    void Phase_MXP_ELEMENT(unsigned char c);        // Collect MXP element
-    void Phase_MXP_COMMENT(unsigned char c);        // Collect MXP comment
-    void Phase_MXP_QUOTE(unsigned char c);          // Collect quoted string in MXP
-    void Phase_MXP_ENTITY(unsigned char c);         // Collect MXP entity
-
-    // IAC negotiation methods (with loop prevention)
-    void Send_IAC_DO(unsigned char c);
-    void Send_IAC_DONT(unsigned char c);
-    void Send_IAC_WILL(unsigned char c);
-    void Send_IAC_WONT(unsigned char c);
-
-    // Protocol-specific handlers (subnegotiation handlers)
-    void Handle_TELOPT_COMPRESS2();     // MCCP v2
-    void Handle_TELOPT_MXP();           // MXP on command
-    void Handle_TELOPT_CHARSET();       // Character set negotiation
-    void Handle_TELOPT_TERMINAL_TYPE(); // Terminal type/MTTS
-    void Handle_TELOPT_ZMP();           // ZMP (Zenith MUD Protocol)
-    void Handle_TELOPT_ATCP();          // ATCP (Achaea Telnet Client Protocol)
-    void Handle_TELOPT_MSP();           // MSP (MUD Sound Protocol)
+    // MXP phase handler forwarding (called from ProcessIncomingByte, delegate to m_mxpEngine)
+    void Phase_MXP_ELEMENT(unsigned char c)
+    {
+        m_mxpEngine->Phase_MXP_ELEMENT(c);
+    }
+    void Phase_MXP_COMMENT(unsigned char c)
+    {
+        m_mxpEngine->Phase_MXP_COMMENT(c);
+    }
+    void Phase_MXP_QUOTE(unsigned char c)
+    {
+        m_mxpEngine->Phase_MXP_QUOTE(c);
+    }
+    void Phase_MXP_ENTITY(unsigned char c)
+    {
+        m_mxpEngine->Phase_MXP_ENTITY(c);
+    }
 
     // Support methods
-    void SendPacket(const unsigned char* data, qint64 len);        // Send raw bytes
-    bool Handle_Telnet_Request(int iNumber, const QString& sType); // Query plugins
-    void Handle_IAC_GA();                                          // Handle Go Ahead
-    void OutputBadUTF8characters();                                // Fallback for invalid UTF-8
+    void SendPacket(std::span<const unsigned char> data); // Send raw bytes
+    void OutputBadUTF8characters();                       // Fallback for invalid UTF-8
 
     // ========== ANSI Parser ==========
     void InterpretANSIcode(int code);    // Process ANSI color/style codes
@@ -1318,76 +1391,58 @@ class WorldDocument : public QObject {
     void RememberStyle(const Style* pStyle);
     void GetStyleRGB(const Style* pOldStyle, QRgb& iForeColour, QRgb& iBackColour);
 
-    // ========== MXP and NAWS ==========
-    void MXP_On();                    // MXP activation
-    void MXP_Off(bool force = false); // MXP deactivation
-    void MXP_mode_change(int mode);   // MXP mode changes
+    // ========== MXP — forwarding wrappers to m_mxpEngine ==========
+    // These keep the existing call sites in telnet_parser.cpp and
+    // world_protocol.cpp compiling without modification.
+    void MXP_On()
+    {
+        m_mxpEngine->MXP_On();
+    }
+    void MXP_Off(bool force = false)
+    {
+        m_mxpEngine->MXP_Off(force);
+    }
+    void MXP_mode_change(int mode)
+    {
+        m_mxpEngine->MXP_mode_change(mode);
+    }
+    void CleanupMXP()
+    {
+        m_mxpEngine->CleanupMXP();
+    }
+    bool MXP_Open() const
+    {
+        return m_mxpEngine->MXP_Open();
+    }
+    bool MXP_Secure() const
+    {
+        return m_mxpEngine->MXP_Secure();
+    }
 
-    // MXP Initialization
-    void InitializeMXPElements(); // Load built-in MXP elements
-    void InitializeMXPEntities(); // Load standard HTML entities
-    void CleanupMXP();            // Free MXP resources
-
-    // MXP Parsing
-    void MXP_collected_element();                  // Process collected <element>
-    void MXP_collected_entity();                   // Process collected &entity;
-    void MXP_StartTag(const QString& tagString);   // Process opening tag
-    void MXP_EndTag(const QString& tagName);       // Process closing tag
-    void MXP_Definition(const QString& defString); // Process <!ELEMENT> or <!ENTITY>
-
-    // MXP Element Management
-    void MXP_DefineElement(const QString& defString);          // Define custom element
-    void MXP_DefineEntity(const QString& defString);           // Define custom entity
-    AtomicElement* MXP_FindAtomicElement(const QString& name); // Lookup built-in element
-    CustomElement* MXP_FindCustomElement(const QString& name); // Lookup custom element
-
-    // MXP Entity System
-    QString MXP_GetEntity(const QString& entityName); // Resolve &entity; to text
-
-    // MXP Execution
-    void MXP_ExecuteAction(AtomicElement* elem,
-                           const MXPArgumentList& args); // Execute element action
-    void MXP_EndAction(int action);                      // End element action
-    QRgb MXP_GetColor(const QString& colorSpec);         // Resolve color name or #RRGGBB
-
-    // MXP Argument Parsing
-    void ParseMXPTag(const QString& tagString, QString& tagName, MXPArgumentList& args);
-    QString GetMXPArgument(const MXPArgumentList& args, const QString& name);
-    QString MXP_GetArgument(const QString& name,
-                            const MXPArgumentList& args); // Wrapper for GetMXPArgument
-    bool MXP_HasArgument(const QString& name,
-                         const MXPArgumentList& args); // Check if argument exists
-
-    // MXP Tag Stack Management
-    void MXP_CloseOpenTags();                  // Close all unclosed tags
-    void MXP_CloseTag(const QString& tagName); // Close specific tag
-
-    // MXP Mode Helpers
-    bool MXP_Open() const;   // Check if in open mode
-    bool MXP_Secure() const; // Check if in secure/locked mode
-
-    void SendWindowSizes(int width); // NAWS
+    // NOTE: SendWindowSizes moved to TelnetParser::sendWindowSizes(int width).
+    // NOTE: MXP implementation methods (MXP_StartTag, MXP_EndTag, ParseMXPTag, etc.)
+    //       are now on MXPEngine. Access via m_mxpEngine->.
 
     // ========== Line Buffer Management ==========
-    void AddLineToBuffer(Line* line);              // Add line to buffer with size limiting
-    void AddToLine(const char* str, int len = -1); // Add text to current line
-    void AddToLine(unsigned char c);               // Add single character to current line
-    void handleLineWrap();                         // Handle line wrapping when column exceeded
+    void AddLineToBuffer(std::unique_ptr<Line> line); // Add line to buffer with size limiting
+    void AddToLine(const char* str, int len = -1);    // Add text to current line
+    void AddToLine(unsigned char c);                  // Add single character to current line
+    void handleLineWrap();                            // Handle line wrapping when column exceeded
     void adjustStylesForTruncation(qint32 newLength); // Adjust styles when truncating line
     void StartNewLine(bool bNewLine,
                       unsigned char iFlags); // Complete current line and start new one
 
-    // URL Detection and Linkification
-    void DetectAndLinkifyURLs(Line* line); // Detect URLs and convert to hyperlinks
-    void SplitStyleForURL(Line* line, size_t styleIdx,
-                          int urlStart, // Split style to create URL hyperlink
-                          int urlLength, const QString& url);
-
     // ========== Command Window Helpers ==========
     void setActiveInputView(IInputView* inputView);
     void setActiveOutputView(IOutputView* outputView);
-    IInputView* activeInputView() const { return m_pActiveInputView; }
-    IOutputView* activeOutputView() const { return m_pActiveOutputView; }
+    IInputView* activeInputView() const
+    {
+        return m_pActiveInputView;
+    }
+    IOutputView* activeOutputView() const override
+    {
+        return m_pActiveOutputView;
+    }
 
     QString GetCommand() const;
     qint32 SetCommand(const QString& text);
@@ -1395,9 +1450,31 @@ class WorldDocument : public QObject {
     void SelectCommand();
     QString PushCommand();
 
-    QStringList GetCommandQueue() const;
-    qint32 Queue(const QString& message, bool echo);
-    qint32 DiscardQueue();
+    // Forwarding wrappers → ConnectionManager
+    [[nodiscard]] QStringList GetCommandQueue() const
+    {
+        return m_connectionManager->getCommandQueue();
+    }
+    qint32 Queue(const QString& message, bool echo)
+    {
+        // Lua API boundary: convert std::expected<void, WorldError> → legacy integer error code.
+        auto result = m_connectionManager->queue(message, echo);
+        if (result) {
+            return 0; // eOK
+        }
+        switch (result.error().type) {
+            case WorldErrorType::NotConnected:
+                return 30002; // eWorldClosed
+            case WorldErrorType::ItemInUse:
+                return 30063; // eItemInUse
+            default:
+                return 30000; // eUnknownError
+        }
+    }
+    qint32 DiscardQueue()
+    {
+        return m_connectionManager->discardQueue();
+    }
 
     qint32 Send(const QString& message);
     qint32 SendImmediate(const QString& message);
@@ -1428,47 +1505,102 @@ class WorldDocument : public QObject {
 
     // ========== Script Output Methods ==========
 
-    void note(const QString& text); // Display note in output window
-    void colourNote(QRgb foreColor, QRgb backColor, const QString& text); // Display colored note
-    void colourTell(QRgb foreColor, QRgb backColor,
-                    const QString& text); // Display colored text without newline (optional)
+    // Forwarding wrappers — implementation lives in OutputFormatter (output_formatter.cpp)
+    void note(const QString& text)
+    {
+        m_outputFormatter->note(text);
+    }
+    void colourNote(QRgb foreColor, QRgb backColor, const QString& text)
+    {
+        m_outputFormatter->colourNote(foreColor, backColor, text);
+    }
+    void colourTell(QRgb foreColor, QRgb backColor, const QString& text)
+    {
+        m_outputFormatter->colourTell(foreColor, backColor, text);
+    }
     void hyperlink(const QString& action, const QString& text, const QString& hint, QRgb foreColor,
-                   QRgb backColor, bool isUrl); // Display clickable hyperlink
-    void simulate(const QString& text);         // Process text as if received from MUD
-    void noteHr();                              // Display horizontal rule
+                   QRgb backColor, bool isUrl)
+    {
+        m_outputFormatter->hyperlink(action, text, hint, foreColor, backColor, isUrl);
+    }
+    void simulate(const QString& text)
+    {
+        m_outputFormatter->simulate(text);
+    }
+    void noteHr()
+    {
+        m_outputFormatter->noteHr();
+    }
 
     // ========== Script Loading and Parsing ==========
     void loadScriptFile();               // Load and execute script file
     void showErrorLines(int lineNumber); // Display error context around line
     void setupScriptFileWatcher();       // Set up file watcher for script file changes
 
-    // ========== Lua Function Callbacks ==========
-    void onWorldConnect();    // Call OnWorldConnect() if exists
-    void onWorldDisconnect(); // Call OnWorldDisconnect() if exists
+    // NOTE: onWorldConnect() and onWorldDisconnect() moved to ConnectionManager (private).
+    // They are called from ConnectionManager::onConnect() and onConnectionDisconnect().
 
     // ========== Trigger and Alias Management ==========
-    bool addTrigger(const QString& name,
-                    std::unique_ptr<Trigger> trigger); // Add trigger to map and array
-    bool deleteTrigger(const QString& name);           // Delete trigger by name
-    Trigger* getTrigger(const QString& name);          // Get trigger by name
-    bool addAlias(const QString& name,
-                  std::unique_ptr<Alias> alias); // Add alias to map and array
-    bool deleteAlias(const QString& name);       // Delete alias by name
-    Alias* getAlias(const QString& name);        // Get alias by name
+    // Forwarding wrappers — implementation delegates to m_automationRegistry.
+    [[nodiscard]] std::expected<void, WorldError> addTrigger(const QString& name,
+                                                             std::unique_ptr<Trigger> trigger)
+    {
+        return m_automationRegistry->addTrigger(name, std::move(trigger));
+    }
+    [[nodiscard]] std::expected<void, WorldError> deleteTrigger(const QString& name)
+    {
+        return m_automationRegistry->deleteTrigger(name);
+    }
+    Trigger* getTrigger(const QString& name)
+    {
+        return m_automationRegistry->getTrigger(name);
+    }
+    [[nodiscard]] std::expected<void, WorldError> addAlias(const QString& name,
+                                                           std::unique_ptr<Alias> alias)
+    {
+        return m_automationRegistry->addAlias(name, std::move(alias));
+    }
+    [[nodiscard]] std::expected<void, WorldError> deleteAlias(const QString& name)
+    {
+        return m_automationRegistry->deleteAlias(name);
+    }
+    Alias* getAlias(const QString& name)
+    {
+        return m_automationRegistry->getAlias(name);
+    }
 
     // ========== Timer Management ==========
-    bool addTimer(const QString& name, std::unique_ptr<Timer> timer); // Add timer to map
-    bool deleteTimer(const QString& name);                            // Delete timer by name
-    Timer* getTimer(const QString& name);                             // Get timer by name
-    void calculateNextFireTime(Timer* timer); // Calculate when timer should next fire
+    [[nodiscard]] std::expected<void, WorldError> addTimer(const QString& name,
+                                                           std::unique_ptr<Timer> timer)
+    {
+        return m_automationRegistry->addTimer(name, std::move(timer));
+    }
+    [[nodiscard]] std::expected<void, WorldError> deleteTimer(const QString& name)
+    {
+        return m_automationRegistry->deleteTimer(name);
+    }
+    Timer* getTimer(const QString& name)
+    {
+        return m_automationRegistry->getTimer(name);
+    }
+    void calculateNextFireTime(Timer* timer)
+    {
+        m_automationRegistry->resetOneTimer(timer);
+    }
 
     // ========== Trigger Pattern Matching ==========
-    void evaluateTriggers(Line* line); // Evaluate triggers against completed line
-    void rebuildTriggerArray();        // Rebuild trigger array sorted by sequence
+    void evaluateTriggers(Line* line)
+    {
+        m_automationRegistry->evaluateTriggers(line);
+    }
+    void rebuildTriggerArray()
+    {
+        m_automationRegistry->rebuildTriggerArray();
+    }
 
     // ========== Trigger Execution and Actions ==========
     void executeTrigger(Trigger* trigger, Line* line,
-                        const QString& matchedText); // Execute trigger action
+                        const QString& matchedText) override; // Execute trigger action
     void executeTriggerScript(Trigger* trigger,
                               const QString& matchedText); // Execute Lua script callback
     QString replaceWildcards(const QString& text,
@@ -1476,10 +1608,16 @@ class WorldDocument : public QObject {
     void changeLineColors(Trigger* trigger, Line* line);         // Change matched line colors
 
     // ========== Alias Matching and Execution ==========
-    bool evaluateAliases(const QString& command); // Check command against all aliases
-    void rebuildAliasArray();                     // Rebuild alias array sorted by sequence
-    void executeAlias(Alias* alias, const QString& command);       // Execute alias action
-    void executeAliasScript(Alias* alias, const QString& command); // Execute Lua script callback
+    bool evaluateAliases(const QString& command)
+    {
+        return m_automationRegistry->evaluateAliases(command);
+    }
+    void rebuildAliasArray()
+    {
+        m_automationRegistry->rebuildAliasArray();
+    }
+    void executeAlias(Alias* alias, const QString& command) override; // Execute alias action
+    void executeAliasScript(Alias* alias, const QString& command);    // Execute Lua script callback
 
     // ========== Trigger/Alias XML Serialization ==========
     void saveTriggersToXml(class QXmlStreamWriter& xml); // Save triggers to XML
@@ -1542,28 +1680,43 @@ class WorldDocument : public QObject {
     void loadPluginsFromXml(class QXmlStreamReader& xml); // Load plugins from XML
 
     // ========== Timer Fire Time Calculation ==========
-    void resetOneTimer(Timer* timer); // Calculate when timer should next fire
-    void resetAllTimers();            // Reset all timers in m_TimerMap
+    void resetOneTimer(Timer* timer)
+    {
+        m_automationRegistry->resetOneTimer(timer);
+    }
+    void resetAllTimers()
+    {
+        m_automationRegistry->resetAllTimers();
+    }
 
     // ========== Timer Evaluation Loop ==========
-    void checkTimers();    // Housekeeping and timer check (called every second)
-    void checkTimerList(); // Find and execute ready timers
+    void checkTimers()
+    {
+        m_automationRegistry->checkTimers();
+    }
+    void checkTimerList()
+    {
+        m_automationRegistry->checkTimerList();
+    }
 
     // ========== Timer Execution ==========
-    void executeTimer(Timer* timer, const QString& name);       // Execute a fired timer
-    void executeTimerScript(Timer* timer, const QString& name); // Execute Lua script callback
+    void executeTimer(Timer* timer, const QString& name) override; // Execute a fired timer
+    void executeTimerScript(Timer* timer, const QString& name);    // Execute Lua script callback
 
     // ========== Plugin Timer Execution ==========
-    void checkPluginTimerList(Plugin* plugin); // Find and execute ready plugin timers
+    void checkPluginTimerList(Plugin* plugin)
+    {
+        m_automationRegistry->checkPluginTimerList(plugin);
+    }
     void executePluginTimer(Plugin* plugin, Timer* timer,
-                            const QString& name); // Execute plugin timer
+                            const QString& name) override; // Execute plugin timer
     void executePluginTimerScript(Plugin* plugin, Timer* timer,
                                   const QString& name); // Execute plugin timer script
 
     // ========== SendTo() - Central Action Routing ==========
-    void sendTo(quint16 iWhere, const QString& strSendText, bool bOmitFromOutput, bool bOmitFromLog,
-                const QString& strDescription, const QString& strVariable, QString& strOutput,
-                ScriptLanguage scriptLang = ScriptLanguage::Lua);
+    void sendTo(SendTo iWhere, const QString& strSendText, bool omit_from_output,
+                bool omit_from_log, const QString& strDescription, const QString& variable,
+                QString& strOutput, ScriptLanguage scriptLang = ScriptLanguage::Lua);
 
     // ========== Command Execution Pipeline ==========
     void SendMsg(const QString& text, bool bEcho, bool bQueue,
@@ -1603,12 +1756,8 @@ class WorldDocument : public QObject {
                        ProgressCallback progressCallback = nullptr);
 
     // ========== Command Stacking ==========
-    void Execute(const QString& command); // Process command with stacking support
-
-    // ========== Speed Walking ==========
-    QString DoEvaluateSpeedwalk(const QString& speedWalkString); // Parse speedwalk notation
-    QString DoReverseSpeedwalk(const QString& speedWalkString);  // Reverse a speedwalk
-    QString RemoveBacktracks(const QString& speedWalkString);    // Remove redundant movements
+    void Execute(const QString& command,
+                 bool allowScriptPrefix = true); // Process command with stacking support
 
     // ========== Log File Management ==========
     qint32 OpenLog(const QString& filename, bool append); // Open log file for writing
@@ -1637,7 +1786,7 @@ class WorldDocument : public QObject {
     {
         return m_CurrentPlugin;
     } // Get currently executing plugin
-    void setCurrentPlugin(Plugin* plugin)
+    void setCurrentPlugin(Plugin* plugin) override
     {
         m_CurrentPlugin = plugin;
     } // Set currently executing plugin
@@ -1648,9 +1797,10 @@ class WorldDocument : public QObject {
                       qint16 charset, qint16 pitchAndFamily); // Add font to miniwindow
 
     // ========== Plugin Callbacks ==========
-    void SendToAllPluginCallbacks(const QString& callbackName); // Call all plugins (no args)
+    void
+    SendToAllPluginCallbacks(const QString& callbackName) override; // Call all plugins (no args)
     bool SendToAllPluginCallbacks(const QString& callbackName, const QString& arg,
-                                  bool bStopOnFalse = false); // Call all plugins (1 arg)
+                                  bool bStopOnFalse = false) override; // Call all plugins (1 arg)
     bool SendToAllPluginCallbacks(const QString& callbackName, qint32 arg1, const QString& arg2,
                                   bool bStopOnTrue = false); // Call all plugins (int + string)
     bool SendToAllPluginCallbacks(const QString& callbackName, qint32 arg1, qint32 arg2,
@@ -1662,9 +1812,9 @@ class WorldDocument : public QObject {
 
     // ========== Screen Draw Callback ==========
     // Called when lines are displayed on screen for accessibility/screen reader support
-    // iType: 0 = MUD output, 1 = note (COMMENT), 2 = user input (USER_INPUT)
+    // type: 0 = MUD output, 1 = note (COMMENT), 2 = user input (USER_INPUT)
     // iLog: whether line should be logged
-    void Screendraw(qint32 iType, bool iLog, const QString& sText);
+    void Screendraw(qint32 type, bool iLog, const QString& sText);
 
     // ========== Trace Output ==========
     // Output trace message to display (if trace enabled)
@@ -1672,24 +1822,22 @@ class WorldDocument : public QObject {
     void Trace(const QString& message);
 
     // ========== Other stub methods ==========
-    bool InitZlib(z_stream& zInfo); // MCCP
-    void OnConnectionDisconnect();  // Disconnect handling
-    void Repaint();                 // Trigger UI repaint (for miniwindows etc.)
+    // NOTE: InitZlib moved to ZlibStream::init() inside TelnetParser (telnet_parser.h/cpp).
+    // NOTE: OnConnectionDisconnect() moved to ConnectionManager::onConnectionDisconnect().
+    //       The forwarding wrapper above (WorldDocument::OnConnectionDisconnect) calls it.
+    void Repaint(); // Trigger UI repaint (for miniwindows etc.)
 
     // ========== Sound System ==========
-    void InitializeSoundSystem();               // Initialize all sound buffers
-    void CleanupSoundSystem();                  // Stop and delete all sound buffers
-    bool IsSoundBufferAvailable(qint16 buffer); // Check if buffer is free
-    void ReleaseInactiveSoundBuffers();         // Update buffer states (release stopped buffers)
-    qint32 PlaySound(qint16 buffer, const QString& filename, bool loop, double volume,
-                     double pan);                // Play sound in specific buffer
-    qint32 StopSound(qint16 buffer);             // Stop sound in buffer (0 = all)
-    qint32 GetSoundStatus(qint16 buffer);        // Query status of sound buffer (1-based index)
-    bool PlaySoundFile(const QString& filename); // Play sound in first available buffer
+    // All sound functionality is delegated to m_soundManager (SoundManager companion object).
+    // The methods below are thin forwarding wrappers kept for source compatibility with
+    // callers in world_trigger_execution.cpp, telnet_parser.cpp, and Lua API bindings.
+    qint32 PlaySound(qint16 buffer, const QString& filename, bool loop, double volume, double pan);
+    qint32 StopSound(qint16 buffer);
+    bool PlaySoundFile(const QString& filename);
+    qint32 GetSoundStatus(qint16 buffer);
     void PlayMSPSound(const QString& filename, const QString& url, bool loop, double volume,
-                      qint16 buffer);                 // Play MSP sound, downloading if necessary
-    QString ResolveFilePath(const QString& filename); // Resolve relative/absolute sound file paths
-    bool IsWindowActive();                            // Check if main window has focus
+                      qint16 buffer);
+    bool IsWindowActive();
 
     // ========== Notepad Management ==========
     void RegisterNotepad(NotepadWidget* notepad);     // Register notepad with world
@@ -1699,11 +1847,16 @@ class WorldDocument : public QObject {
                                        const QString& contents); // Create new notepad window
 
     // ========== Notepad Operations (Lua API) ==========
-    bool SendToNotepad(const QString& title,
-                       const QString& contents); // Create/replace notepad text
-    bool AppendToNotepad(const QString& title, const QString& contents); // Append to notepad
-    bool ReplaceNotepad(const QString& title, const QString& contents);  // Replace notepad text
-    bool ActivateNotepad(const QString& title); // Activate (raise/focus) notepad window
+    std::expected<void, WorldError>
+    SendToNotepad(const QString& title,
+                  const QString& contents); // Create/replace notepad text
+    std::expected<void, WorldError> AppendToNotepad(const QString& title,
+                                                    const QString& contents); // Append to notepad
+    std::expected<void, WorldError>
+    ReplaceNotepad(const QString& title,
+                   const QString& contents); // Replace notepad text (must exist)
+    std::expected<void, WorldError>
+    ActivateNotepad(const QString& title); // Activate (raise/focus) notepad window
     qint32 CloseNotepad(const QString& title, bool querySave); // Close notepad (with save prompt)
     qint32 SaveNotepad(const QString& title, const QString& filename,
                        bool replaceExisting);          // Save notepad to file
@@ -1714,8 +1867,9 @@ class WorldDocument : public QObject {
                          const QString& backColour);               // Set notepad colors
     qint32 NotepadReadOnly(const QString& title, bool readOnly);   // Set read-only mode
     qint32 NotepadSaveMethod(const QString& title, qint32 method); // Set auto-save method
-    bool MoveNotepadWindow(const QString& title, qint32 left, qint32 top, qint32 width,
-                           qint32 height); // Move/resize notepad window
+    std::expected<void, WorldError> MoveNotepadWindow(const QString& title, qint32 left, qint32 top,
+                                                      qint32 width,
+                                                      qint32 height); // Move/resize notepad window
     QString GetNotepadWindowPosition(
         const QString& title); // Get notepad window position as "left,top,width,height"
 
@@ -1744,6 +1898,34 @@ class WorldDocument : public QObject {
                        bool includeCommands, bool includeNotes, int lineCount,
                        const QString& linePreamble);
 
+    // ========== IWorldContext Implementation ==========
+    const std::vector<std::unique_ptr<Plugin>>& pluginList() const override
+    {
+        return m_PluginList;
+    }
+    Plugin* currentPlugin() const override
+    {
+        return m_CurrentPlugin;
+    }
+    bool triggersEnabled() const override
+    {
+        return m_enable_triggers;
+    }
+    bool timersEnabled() const override
+    {
+        return m_bEnableTimers;
+    }
+    const std::deque<QString>& recentLines() const override
+    {
+        return m_recentLines;
+    }
+    void unregisterNotepad(NotepadWidget* notepad) override
+    {
+        UnregisterNotepad(notepad);
+    }
+    bool isConnectedToMud() const override;
+    void flushLogIfNeeded() override;
+
   signals:
     void worldNameChanged(const QString& name);
     void connectionStateChanged(bool connected);
@@ -1767,7 +1949,9 @@ class WorldDocument : public QObject {
     void initializeColors();
 
     // Script file monitoring
-    QFileSystemWatcher* m_scriptFileWatcher; // Watches script file for changes
+    // Manually owned (NOT Qt parent-child; created without parent to avoid double-free).
+    // Deleted in setupScriptFileWatcher() on reset and in ~WorldDocument() on final cleanup.
+    QFileSystemWatcher* m_scriptFileWatcher;
 };
 
 #endif // WORLD_DOCUMENT_H

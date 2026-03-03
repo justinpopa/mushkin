@@ -5,8 +5,8 @@
  * Colors use BGR format (0x00BBGGRR) for MUSHclient compatibility.
  */
 
-#include "lua_common.h"
 #include "../color_utils.h"
+#include "lua_common.h"
 #include <QColorDialog>
 
 /**
@@ -237,10 +237,8 @@ QString RGBColourToName(QRgb bgr)
  */
 int L_ColourNameToRGB(lua_State* L)
 {
-    const char* name = luaL_checkstring(L, 1);
-    QRgb rgb = ColourNameToRGB(QString::fromUtf8(name));
-    lua_pushinteger(L, (lua_Integer)rgb);
-    return 1;
+    auto [name] = luaArgs<QString>(L);
+    return luaReturn(L, static_cast<lua_Integer>(ColourNameToRGB(name)));
 }
 
 /**
@@ -265,10 +263,8 @@ int L_ColourNameToRGB(lua_State* L)
  */
 int L_RGBColourToName(lua_State* L)
 {
-    lua_Integer rgbValue = luaL_checkinteger(L, 1);
-    QString name = RGBColourToName((QRgb)rgbValue);
-    lua_pushstring(L, name.toUtf8().constData());
-    return 1;
+    auto [rgbValue] = luaArgs<int>(L);
+    return luaReturn(L, RGBColourToName(static_cast<QRgb>(rgbValue)));
 }
 
 /**
@@ -298,7 +294,7 @@ int L_GetNormalColour(lua_State* L)
         return 1;
     }
 
-    lua_pushnumber(L, pDoc->m_normalcolour[whichColour - 1]);
+    lua_pushnumber(L, pDoc->m_colors.normal_colour[whichColour - 1]);
     return 1;
 }
 
@@ -328,7 +324,7 @@ int L_GetBoldColour(lua_State* L)
         return 1;
     }
 
-    lua_pushnumber(L, pDoc->m_boldcolour[whichColour - 1]);
+    lua_pushnumber(L, pDoc->m_colors.bold_colour[whichColour - 1]);
     return 1;
 }
 
@@ -357,7 +353,7 @@ int L_SetNormalColour(lua_State* L)
     if (whichColour < 1 || whichColour > 8)
         return 0;
 
-    pDoc->m_normalcolour[whichColour - 1] = rgb & 0x00FFFFFF;
+    pDoc->m_colors.normal_colour[whichColour - 1] = rgb & 0x00FFFFFF;
     return 0;
 }
 
@@ -386,7 +382,7 @@ int L_SetBoldColour(lua_State* L)
     if (whichColour < 1 || whichColour > 8)
         return 0;
 
-    pDoc->m_boldcolour[whichColour - 1] = rgb & 0x00FFFFFF;
+    pDoc->m_colors.bold_colour[whichColour - 1] = rgb & 0x00FFFFFF;
     return 0;
 }
 
@@ -416,7 +412,7 @@ int L_SetCustomColourText(lua_State* L)
     if (whichColour < 1 || whichColour > MAX_CUSTOM)
         return 0;
 
-    pDoc->m_customtext[whichColour - 1] = rgb & 0x00FFFFFF;
+    pDoc->m_colors.custom_text[whichColour - 1] = rgb & 0x00FFFFFF;
     return 0;
 }
 
@@ -446,7 +442,7 @@ int L_SetCustomColourBackground(lua_State* L)
     if (whichColour < 1 || whichColour > MAX_CUSTOM)
         return 0;
 
-    pDoc->m_customback[whichColour - 1] = rgb & 0x00FFFFFF;
+    pDoc->m_colors.custom_back[whichColour - 1] = rgb & 0x00FFFFFF;
     return 0;
 }
 
@@ -475,7 +471,7 @@ int L_GetCustomColourText(lua_State* L)
         return 1;
     }
 
-    lua_pushnumber(L, pDoc->m_customtext[whichColour - 1]);
+    lua_pushnumber(L, pDoc->m_colors.custom_text[whichColour - 1]);
     return 1;
 }
 
@@ -503,7 +499,7 @@ int L_GetCustomColourBackground(lua_State* L)
         return 1;
     }
 
-    lua_pushnumber(L, pDoc->m_customback[whichColour - 1]);
+    lua_pushnumber(L, pDoc->m_colors.custom_back[whichColour - 1]);
     return 1;
 }
 
@@ -693,17 +689,121 @@ int L_AdjustColour(lua_State* L)
     }
 }
 
-// ========== Registration ==========
+// ========== Bare-name compatibility aliases (dual get/set dispatch) ==========
 
-void register_world_colors_functions(luaL_Reg*& ptr)
+/**
+ * world.NormalColour(whichColour [, newValue])
+ *
+ * Compatibility alias for the MUSHclient COM property NormalColour.
+ * With one argument acts as a getter (returns the current color value).
+ * With two arguments acts as a setter (sets the color and returns nothing).
+ *
+ * @param whichColour (number) Color index 1-8
+ * @param newValue (number, optional) BGR color value to set
+ *
+ * @return (number|nothing) Current BGR value when getting; nothing when setting
+ *
+ * @see GetNormalColour, SetNormalColour
+ */
+int L_NormalColour(lua_State* L)
 {
-    *ptr++ = {"ColourNameToRGB", L_ColourNameToRGB};
-    *ptr++ = {"RGBColourToName", L_RGBColourToName};
-    *ptr++ = {"GetNormalColour", L_GetNormalColour};
-    *ptr++ = {"GetBoldColour", L_GetBoldColour};
-    *ptr++ = {"GetCustomColourText", L_GetCustomColourText};
-    *ptr++ = {"GetCustomColourBackground", L_GetCustomColourBackground};
-    *ptr++ = {"SetCustomColourName", L_SetCustomColourName};
-    *ptr++ = {"PickColour", L_PickColour};
-    *ptr++ = {"AdjustColour", L_AdjustColour};
+    if (lua_gettop(L) >= 2)
+        return L_SetNormalColour(L);
+    return L_GetNormalColour(L);
+}
+
+/**
+ * world.BoldColour(whichColour [, newValue])
+ *
+ * Compatibility alias for the MUSHclient COM property BoldColour.
+ * With one argument acts as a getter; with two acts as a setter.
+ *
+ * @param whichColour (number) Color index 1-8
+ * @param newValue (number, optional) BGR color value to set
+ *
+ * @return (number|nothing) Current BGR value when getting; nothing when setting
+ *
+ * @see GetBoldColour, SetBoldColour
+ */
+int L_BoldColour(lua_State* L)
+{
+    if (lua_gettop(L) >= 2)
+        return L_SetBoldColour(L);
+    return L_GetBoldColour(L);
+}
+
+/**
+ * world.CustomColourText(whichColour [, newValue])
+ *
+ * Compatibility alias for the MUSHclient COM property CustomColourText.
+ * With one argument acts as a getter; with two acts as a setter.
+ *
+ * @param whichColour (number) Custom color index 1-16
+ * @param newValue (number, optional) BGR color value to set
+ *
+ * @return (number|nothing) Current BGR value when getting; nothing when setting
+ *
+ * @see GetCustomColourText, SetCustomColourText
+ */
+int L_CustomColourText(lua_State* L)
+{
+    if (lua_gettop(L) >= 2)
+        return L_SetCustomColourText(L);
+    return L_GetCustomColourText(L);
+}
+
+/**
+ * world.CustomColourBackground(whichColour [, newValue])
+ *
+ * Compatibility alias for the MUSHclient COM property CustomColourBackground.
+ * With one argument acts as a getter; with two acts as a setter.
+ *
+ * @param whichColour (number) Custom color index 1-16
+ * @param newValue (number, optional) BGR color value to set
+ *
+ * @return (number|nothing) Current BGR value when getting; nothing when setting
+ *
+ * @see GetCustomColourBackground, SetCustomColourBackground
+ */
+int L_CustomColourBackground(lua_State* L)
+{
+    if (lua_gettop(L) >= 2)
+        return L_SetCustomColourBackground(L);
+    return L_GetCustomColourBackground(L);
+}
+
+/**
+ * world.GetCustomColourName(which)
+ *
+ * Returns the display name assigned to a custom color slot. Custom color
+ * names are set with SetCustomColourName() and appear in the configuration
+ * UI to help identify each slot's purpose. Returns an empty string if the
+ * slot has no name set or if the index is out of range.
+ *
+ * @param which (number) Custom color index 1-16
+ *
+ * @return (string) Name of the custom color slot, or empty string if not set
+ *
+ * @example
+ * local name = GetCustomColourName(1)
+ * if name ~= "" then
+ *     Note("Custom color 1 is named: " .. name)
+ * else
+ *     Note("Custom color 1 has no name")
+ * end
+ *
+ * @see SetCustomColourName, GetCustomColourText, GetCustomColourBackground
+ */
+int L_GetCustomColourName(lua_State* L)
+{
+    WorldDocument* pDoc = doc(L);
+    int which = luaL_checknumber(L, 1);
+
+    if (which < 1 || which > MAX_CUSTOM) {
+        lua_pushlstring(L, "", 0);
+        return 1;
+    }
+
+    luaPushQString(L, pDoc->m_colors.custom_colour_name[which - 1]);
+    return 1;
 }

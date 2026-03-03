@@ -2,9 +2,11 @@
 #define MXP_TYPES_H
 
 #include <QColor>
-#include <QList>
 #include <QMap>
 #include <QString>
+#include <map>
+#include <memory>
+#include <vector>
 
 // Forward declarations
 class WorldDocument;
@@ -83,12 +85,12 @@ enum MXP_Action {
 // Based on mxp/mxp.h from original MUSHclient
 // These flags control tag behavior and security
 
-#define TAG_OPEN 0x01     // Tag is "open" (insecure) - requires open mode
-#define TAG_COMMAND 0x02  // Tag is self-closing (no </tag> needed)
-#define TAG_PUEBLO 0x04   // Tag is Pueblo-only
-#define TAG_MXP 0x08      // Tag is MXP-only
-#define TAG_NO_RESET 0x10 // Not closed by <reset> (e.g., <body>)
-#define TAG_NOT_IMP 0x20  // Not implemented (for <supports> tag)
+inline constexpr int TAG_OPEN = 0x01;     // Tag is "open" (insecure) - requires open mode
+inline constexpr int TAG_COMMAND = 0x02;  // Tag is self-closing (no </tag> needed)
+inline constexpr int TAG_PUEBLO = 0x04;   // Tag is Pueblo-only
+inline constexpr int TAG_MXP = 0x08;      // Tag is MXP-only
+inline constexpr int TAG_NO_RESET = 0x10; // Not closed by <reset> (e.g., <body>)
+inline constexpr int TAG_NOT_IMP = 0x20;  // Not implemented (for <supports> tag)
 
 // ========== ATOMIC ELEMENT STRUCTURE ==========
 // Based on mxp/mxp.h from original MUSHclient
@@ -117,26 +119,24 @@ struct MXPArgument {
     }
 };
 
-typedef QList<MXPArgument*> MXPArgumentList;
+typedef std::vector<std::unique_ptr<MXPArgument>> MXPArgumentList;
 
 // ========== ELEMENT ITEM STRUCTURE ==========
 // Based on OtherTypes.h from original MUSHclient
 // One atomic element reference in a custom element's expansion
 
 struct ElementItem {
-    AtomicElement* pAtomicElement; // Points to built-in element
-    MXPArgumentList argumentList;  // Arguments for this element
+    AtomicElement*
+        pAtomicElement; // Points to built-in element (non-owning, owned by m_atomicElementMap)
+    MXPArgumentList argumentList; // Arguments for this element
 
     ElementItem() : pAtomicElement(nullptr)
     {
     }
-    ~ElementItem()
-    {
-        qDeleteAll(argumentList);
-    }
+    // unique_ptr elements in argumentList are destroyed automatically
 };
 
-typedef QList<ElementItem*> ElementItemList;
+typedef std::vector<std::unique_ptr<ElementItem>> ElementItemList;
 
 // ========== CUSTOM ELEMENT STRUCTURE ==========
 // Based on OtherTypes.h from original MUSHclient
@@ -155,11 +155,7 @@ struct CustomElement {
     {
     }
 
-    ~CustomElement()
-    {
-        qDeleteAll(elementItemList);
-        qDeleteAll(attributeList);
-    }
+    // unique_ptr elements in elementItemList and attributeList are destroyed automatically
 };
 
 // ========== ENTITY STRUCTURE ==========
@@ -193,10 +189,10 @@ struct ActiveTag {
 
 // ========== TYPE ALIASES ==========
 
-typedef QMap<QString, AtomicElement*> AtomicElementMap;
-typedef QMap<QString, CustomElement*> CustomElementMap;
-typedef QMap<QString, MXPEntity*> MXPEntityMap;
-typedef QList<ActiveTag*> ActiveTagList;
+typedef std::map<QString, std::unique_ptr<AtomicElement>> AtomicElementMap;
+typedef std::map<QString, std::unique_ptr<CustomElement>> CustomElementMap;
+typedef std::map<QString, std::unique_ptr<MXPEntity>> MXPEntityMap;
+typedef std::vector<std::unique_ptr<ActiveTag>> ActiveTagList;
 
 // ========== MXP GAUGE/STAT TRACKING ==========
 // Structure to track gauge and stat elements

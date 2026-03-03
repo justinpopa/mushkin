@@ -13,8 +13,8 @@
 #include <QElapsedTimer>
 #include <QStringList>
 
-#include "logging.h"
 #include "color_utils.h"
+#include "logging.h"
 
 // Lua headers
 extern "C" {
@@ -214,14 +214,14 @@ static void luaError(lua_State* L, const QString& event, const QString& procedur
  * @param szReason Description (e.g., "world connect")
  * @param nparams List of number parameters to pass to function
  * @param sparams List of string parameters to pass to function
- * @param nInvocationCount IN/OUT: Invocation counter (incremented on success)
+ * @param invocation_count IN/OUT: Invocation counter (incremented on success)
  * @param result OUT: Boolean result from function (optional)
  * @return true on error, false on success
  */
-bool ScriptEngine::executeLua(qint32& dispid, const QString& szProcedure, unsigned short iReason,
+bool ScriptEngine::executeLua(qint32& dispid, const QString& szProcedure, ActionSource iReason,
                               const QString& szType, const QString& szReason,
                               QList<double>& nparams, QList<QString>& sparams,
-                              long& nInvocationCount, bool* result)
+                              qint32& invocation_count, bool* result)
 {
     // Safety check
     if (!L) {
@@ -267,11 +267,11 @@ bool ScriptEngine::executeLua(qint32& dispid, const QString& szProcedure, unsign
     }
 
     // Save old action source and note style
-    unsigned short oldActionSource = m_doc->m_iCurrentActionSource;
+    ActionSource oldActionSource = m_doc->m_iCurrentActionSource;
     quint16 oldNoteStyle = m_doc->m_iNoteStyle;
 
     // Set action source (tells scripts what triggered this call)
-    if (iReason != eDontChangeAction) {
+    if (iReason != ActionSource::eDontChangeAction) {
         m_doc->m_iCurrentActionSource = iReason;
     }
     m_doc->m_iNoteStyle = 0; // NORMAL
@@ -280,7 +280,7 @@ bool ScriptEngine::executeLua(qint32& dispid, const QString& szProcedure, unsign
     int error = callLuaWithTraceBack(L, paramCount, LUA_MULTRET);
 
     // Restore old state
-    if (iReason != eDontChangeAction) {
+    if (iReason != ActionSource::eDontChangeAction) {
         m_doc->m_iCurrentActionSource = oldActionSource;
     }
     m_doc->m_iNoteStyle = oldNoteStyle;
@@ -291,7 +291,7 @@ bool ScriptEngine::executeLua(qint32& dispid, const QString& szProcedure, unsign
         return true; // Error
     }
 
-    nInvocationCount++; // Count successful calls
+    invocation_count++; // Count successful calls
 
     // Update timing statistics
     if (m_doc) {

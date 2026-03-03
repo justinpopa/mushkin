@@ -15,7 +15,7 @@
 #   setx VCPKG_ROOT "C:\vcpkg"
 #
 #   # Install dependencies
-#   C:\vcpkg\vcpkg install pcre:x64-windows luajit:x64-windows sqlite3:x64-windows openssl:x64-windows zlib:x64-windows
+#   C:\vcpkg\vcpkg install pcre:x64-windows luajit:x64-windows sqlite3:x64-windows openssl:x64-windows zlib:x64-windows libssh:x64-windows
 #
 #   # Install aqtinstall
 #   pip install aqtinstall
@@ -68,6 +68,7 @@ function Check-Prerequisites {
         if (-not (Test-Path (Join-Path $vcpkgInstalled "lib\lua51.lib"))) { $missing += "luajit:x64-windows" }
         if (-not (Test-Path (Join-Path $vcpkgInstalled "lib\sqlite3.lib"))) { $missing += "sqlite3:x64-windows" }
         if (-not (Test-Path (Join-Path $vcpkgInstalled "lib\libssl.lib"))) { $missing += "openssl:x64-windows" }
+        if (-not (Test-Path (Join-Path $vcpkgInstalled "lib\ssh.lib"))) { $missing += "libssh:x64-windows" }
     } else {
         $missing += "vcpkg packages not installed"
     }
@@ -75,7 +76,7 @@ function Check-Prerequisites {
     if ($missing.Count -gt 0) {
         Write-Err "Missing: $($missing -join ', ')"
         Write-Err "Install vcpkg packages with:"
-        Write-Err "  $env:VCPKG_ROOT\vcpkg install pcre:x64-windows luajit:x64-windows sqlite3:x64-windows openssl:x64-windows zlib:x64-windows"
+        Write-Err "  $env:VCPKG_ROOT\vcpkg install pcre:x64-windows luajit:x64-windows sqlite3:x64-windows openssl:x64-windows zlib:x64-windows libssh:x64-windows"
         exit 1
     }
     Write-Info "Prerequisites OK"
@@ -103,13 +104,24 @@ function Build-StaticQt {
     $QtSrcDir = Join-Path $QtBaseDir "$QtVersion\Src"
     $QtBuildDir = Join-Path $QtSrcDir "build-static"
 
-    # Download Qt source
-    if (-not (Test-Path $QtSrcDir)) {
+    # Download Qt source (verify required submodules exist)
+    $QtMultimediaDir = Join-Path $QtSrcDir "qtmultimedia"
+    if (-not (Test-Path $QtSrcDir) -or -not (Test-Path $QtMultimediaDir)) {
+        if (Test-Path $QtSrcDir) {
+            Write-Warn "Incomplete Qt source detected, re-downloading..."
+            Remove-Item -Recurse -Force $QtSrcDir
+        }
         Write-Info "Downloading Qt source..."
         New-Item -ItemType Directory -Force -Path $QtBaseDir | Out-Null
         Push-Location $QtBaseDir
         aqt install-src windows $QtVersion --outputdir $QtBaseDir
         Pop-Location
+    }
+
+    # Clean stale build dir from previous failed attempt
+    if (Test-Path $QtBuildDir) {
+        Write-Warn "Removing stale Qt build directory..."
+        Remove-Item -Recurse -Force $QtBuildDir
     }
 
     # Configure
@@ -132,7 +144,8 @@ function Build-StaticQt {
         -skip qtdeclarative -skip qtquick3d `
         -nomake examples -nomake tests `
         -no-pch `
-        -- -DSQLite3_ROOT="$vcpkgInstalled" -DFEATURE_system_sqlite=ON -DCMAKE_OBJECT_PATH_MAX=350
+        -- -DSQLite3_ROOT="$vcpkgInstalled" -DFEATURE_system_sqlite=ON -DCMAKE_OBJECT_PATH_MAX=350 `
+        -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl
 
     if ($LASTEXITCODE -ne 0) { throw "Qt configure failed" }
 
@@ -168,7 +181,9 @@ function Build-Mushkin {
         -DCMAKE_BUILD_TYPE=Release `
         -DCMAKE_PREFIX_PATH="$QtStaticDir" `
         -DCMAKE_TOOLCHAIN_FILE="$vcpkgToolchain" `
-        -DVCPKG_TARGET_TRIPLET=x64-windows
+        -DVCPKG_TARGET_TRIPLET=x64-windows `
+        -DCMAKE_C_COMPILER=clang-cl `
+        -DCMAKE_CXX_COMPILER=clang-cl
 
     if ($LASTEXITCODE -ne 0) { throw "CMake configure failed" }
 

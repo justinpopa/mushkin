@@ -9,10 +9,9 @@
 #include "../src/automation/plugin.h"
 #include "../src/world/world_document.h"
 #include "../src/world/xml_serialization.h"
-#include <QCoreApplication>
+#include "fixtures/world_fixtures.h"
 #include <QFile>
 #include <QTemporaryDir>
-#include <gtest/gtest.h>
 
 // Test fixture for plugin serialization tests
 class PluginSerializationTest : public ::testing::Test {
@@ -211,17 +210,4 @@ TEST_F(PluginSerializationTest, VerifyPluginSortingBySequence)
     EXPECT_EQ(doc2.m_PluginList[0]->m_iSequence, -100) << "First plugin sequence should be -100";
 
     EXPECT_EQ(doc2.m_PluginList[1]->m_iSequence, 100) << "Second plugin sequence should be 100";
-}
-
-// GoogleTest main function
-int main(int argc, char** argv)
-{
-    // Initialize Qt application (required for Qt types)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

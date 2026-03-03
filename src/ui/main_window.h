@@ -71,6 +71,14 @@ class MainWindow : public QMainWindow {
     int getToolBarInfo(int which, int infoType);
 
     /**
+     * Execute a named UI command (for Lua DoCommand API)
+     * Dispatches MUSHclient-compatible command names to MainWindow slots/actions.
+     * @param name Command name (case-sensitive, e.g. "NewWorld", "Find")
+     * @return 0 (eOK) on success, 30054 (eNoSuchCommand) if not found in UI table
+     */
+    int executeDoCommand(const char* name);
+
+    /**
      * Info Bar Lua API methods
      */
     void showInfoBar(bool visible);
@@ -280,12 +288,6 @@ class MainWindow : public QMainWindow {
     // System tray
     void trayIconActivated(QSystemTrayIcon::ActivationReason reason);
 
-#ifdef Q_OS_MACOS
-    // Minimized bar management (macOS only)
-    void onSubWindowStateChanged(Qt::WindowStates oldState, Qt::WindowStates newState);
-    void updateMinimizedBar();
-#endif
-
   private:
     /**
      * Open worlds queued from command line or startup list
@@ -367,13 +369,6 @@ class MainWindow : public QMainWindow {
     // UI Components
     QMdiArea* m_mdiArea;
 
-#ifdef Q_OS_MACOS
-    // Minimized bar (macOS only - frameless MDI windows need custom minimized representation)
-    QWidget* m_minimizedBarContainer;
-    QHBoxLayout* m_minimizedBarLayout;
-    QMap<QMdiSubWindow*, QWidget*> m_minimizedBars; // Maps subwindow to its minimized bar widget
-#endif
-
     // Toolbars
     QToolBar* m_mainToolBar;
     QToolBar* m_gameToolBar;
@@ -393,7 +388,7 @@ class MainWindow : public QMainWindow {
     QLabel* m_timeIndicator;
     QLabel* m_linesIndicator;
     QLabel* m_logIndicator;
-    QTimer* m_statusBarTimer;  // Updates time indicator every second
+    QTimer* m_statusBarTimer; // Updates time indicator every second
 
     // Currently tracked world for status updates
     QPointer<class WorldWidget> m_trackedWorld;

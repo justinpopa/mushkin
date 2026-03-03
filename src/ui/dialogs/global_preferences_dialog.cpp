@@ -1,7 +1,6 @@
 #include "global_preferences_dialog.h"
-#include "../main_window.h"
-#include "../../storage/database.h"
 #include "../../storage/global_options.h"
+#include "../main_window.h"
 
 #include "logging.h"
 #include <QCheckBox>
@@ -231,7 +230,7 @@ QWidget* GlobalPreferencesDialog::createWorldsPage()
     m_addCurrentWorld = new QPushButton("Add Current World");
     m_addCurrentWorld->setMinimumWidth(120);
     connect(m_addCurrentWorld, &QPushButton::clicked, [this]() {
-        // TODO: Add logic to get current world file path from main window
+        // TODO(ui): Query active WorldDocument file path from MainWindow for display.
         qWarning() << "Add Current World not yet implemented";
     });
     buttonLayout->addWidget(m_addCurrentWorld);
@@ -1199,105 +1198,87 @@ QWidget* GlobalPreferencesDialog::createTrayIconPage()
 
 void GlobalPreferencesDialog::loadSettings()
 {
-    Database* db = Database::instance();
+    auto& opts = GlobalOptions::instance();
 
     // === Worlds Page ===
     // Default to relative path like original MUSHclient (resolves relative to working directory)
-    m_worldDirectory->setText(db->getPreference("DefaultWorldFileDirectory", "./worlds/"));
+    m_worldDirectory->setText(opts.defaultWorldFileDirectory());
 
     // World list
-    QString worldList = db->getPreference("WorldList", "");
-    if (!worldList.isEmpty()) {
-        QStringList worlds = worldList.split("\n", Qt::SkipEmptyParts);
-        for (const QString& world : worlds) {
-            m_worldList->addItem(world);
-        }
+    for (const QString& world : opts.worldList()) {
+        m_worldList->addItem(world);
     }
 
     // === General Page ===
-    m_themeMode->setCurrentIndex(db->getPreferenceInt("ThemeMode", ThemeSystem));
-    m_autoConnectWorlds->setChecked(db->getPreferenceInt("AutoConnectWorlds", 1) != 0);
-    m_reconnectOnDisconnect->setChecked(db->getPreferenceInt("ReconnectOnLinkFailure", 0) != 0);
-    m_openWorldsMaximized->setChecked(db->getPreferenceInt("OpenWorldsMaximised", 0) != 0);
-    m_notifyIfCannotConnect->setChecked(db->getPreferenceInt("NotifyIfCannotConnect", 1) != 0);
-    m_notifyOnDisconnect->setChecked(db->getPreferenceInt("NotifyOnDisconnect", 1) != 0);
+    m_themeMode->setCurrentIndex(opts.themeMode());
+    m_autoConnectWorlds->setChecked(opts.autoConnectWorlds());
+    m_reconnectOnDisconnect->setChecked(opts.reconnectOnLinkFailure());
+    m_openWorldsMaximized->setChecked(opts.openWorldsMaximized());
+    m_notifyIfCannotConnect->setChecked(opts.notifyIfCannotConnect());
+    m_notifyOnDisconnect->setChecked(opts.notifyOnDisconnect());
 
-    m_allTypingToCommandWindow->setChecked(db->getPreferenceInt("AllTypingToCommandWindow", 1) !=
-                                           0);
-    m_altKeyActivatesMenu->setChecked(db->getPreferenceInt("DisableKeyboardMenuActivation", 0) !=
-                                      0);
-    m_fixedFontForEditing->setChecked(db->getPreferenceInt("FixedFontForEditing", 1) != 0);
-    m_f1Macro->setChecked(db->getPreferenceInt("F1macro", 0) != 0);
-    m_regexpMatchEmpty->setChecked(db->getPreferenceInt("RegexpMatchEmpty", 1) != 0);
-    m_triggerRemoveCheck->setChecked(db->getPreferenceInt("TriggerRemoveCheck", 1) != 0);
-    m_errorNotificationToOutput->setChecked(
-        db->getPreferenceInt("ErrorNotificationToOutputWindow", 1) != 0);
+    m_allTypingToCommandWindow->setChecked(opts.allTypingToCommandWindow());
+    m_altKeyActivatesMenu->setChecked(opts.disableKeyboardMenuActivation());
+    m_fixedFontForEditing->setChecked(opts.fixedFontForEditing());
+    m_f1Macro->setChecked(opts.f1Macro());
+    m_regexpMatchEmpty->setChecked(opts.regexpMatchEmpty());
+    m_triggerRemoveCheck->setChecked(opts.triggerRemoveCheck());
+    m_errorNotificationToOutput->setChecked(opts.errorNotificationToOutputWindow());
 
-    m_wordDelimiters->setText(db->getPreference("WordDelimiters", ".,()[]\"'"));
-    m_wordDelimitersDblClick->setText(db->getPreference("WordDelimitersDblClick", ".,()[]\"'"));
+    m_wordDelimiters->setText(opts.wordDelimiters());
+    m_wordDelimitersDblClick->setText(opts.wordDelimitersDblClick());
 
-    m_windowTabsStyle->setCurrentIndex(db->getPreferenceInt("WindowTabsStyle", 0));
-    m_localeCode->setText(db->getPreference("Locale", "EN"));
+    m_windowTabsStyle->setCurrentIndex(opts.windowTabsStyle());
+    m_localeCode->setText(opts.locale());
 
-    m_autoExpandConfig->setChecked(db->getPreferenceInt("AutoExpandConfig", 1) != 0);
-    m_colourGradientConfig->setChecked(db->getPreferenceInt("ColourGradientConfig", 1) != 0);
-    m_bleedBackground->setChecked(db->getPreferenceInt("BleedBackground", 0) != 0);
-    m_smoothScrolling->setChecked(db->getPreferenceInt("SmoothScrolling", 0) != 0);
-    m_smootherScrolling->setChecked(db->getPreferenceInt("SmootherScrolling", 0) != 0);
-    m_showGridLinesInListViews->setChecked(db->getPreferenceInt("ShowGridLinesInListViews", 1) !=
-                                           0);
-    m_flatToolbars->setChecked(db->getPreferenceInt("FlatToolbars", 1) != 0);
+    m_autoExpandConfig->setChecked(opts.autoExpandConfig());
+    m_colourGradientConfig->setChecked(opts.colourGradientConfig());
+    m_bleedBackground->setChecked(opts.bleedBackground());
+    m_smoothScrolling->setChecked(opts.smoothScrolling());
+    m_smootherScrolling->setChecked(opts.smootherScrolling());
+    m_showGridLinesInListViews->setChecked(opts.showGridLinesInListViews());
+    m_flatToolbars->setChecked(opts.flatToolbars());
 
     // === Closing Page ===
-    m_confirmBeforeClosingMushclient->setChecked(
-        db->getPreferenceInt("ConfirmBeforeClosingMushclient", 0) != 0);
-    m_confirmBeforeClosingWorld->setChecked(db->getPreferenceInt("ConfirmBeforeClosingWorld", 1) !=
-                                            0);
-    m_confirmBeforeClosingMXPdebug->setChecked(
-        db->getPreferenceInt("ConfirmBeforeClosingMXPdebug", 0) != 0);
-    m_confirmBeforeSavingVariables->setChecked(
-        db->getPreferenceInt("ConfirmBeforeSavingVariables", 1) != 0);
+    m_confirmBeforeClosingMushclient->setChecked(opts.confirmBeforeClosingMushclient());
+    m_confirmBeforeClosingWorld->setChecked(opts.confirmBeforeClosingWorld());
+    m_confirmBeforeClosingMXPdebug->setChecked(opts.confirmBeforeClosingMXPdebug());
+    m_confirmBeforeSavingVariables->setChecked(opts.confirmBeforeSavingVariables());
 
     // === Logging Page ===
-    m_autoLogWorld->setChecked(db->getPreferenceInt("AutoLogWorld", 0) != 0);
-    m_appendToLogFiles->setChecked(db->getPreferenceInt("AppendToLogFiles", 0) != 0);
-    m_confirmLogFileClose->setChecked(db->getPreferenceInt("ConfirmLogFileClose", 1) != 0);
+    m_autoLogWorld->setChecked(opts.autoLogWorld());
+    m_appendToLogFiles->setChecked(opts.appendToLogFiles());
+    m_confirmLogFileClose->setChecked(opts.confirmLogFileClose());
     // Default to relative path like original MUSHclient
-    m_logDirectory->setText(db->getPreference("DefaultLogFileDirectory", "./logs/"));
+    m_logDirectory->setText(opts.defaultLogFileDirectory());
 
     // === Plugins Page ===
     // Default to relative paths like original MUSHclient
-    m_pluginsDirectory->setText(db->getPreference("PluginsDirectory", "./worlds/plugins/"));
-    m_stateFilesDirectory->setText(db->getPreference("StateFilesDirectory", "./worlds/plugins/state/"));
+    m_pluginsDirectory->setText(opts.pluginsDirectory());
+    m_stateFilesDirectory->setText(opts.stateFilesDirectory());
 
     // Plugin list
-    QString pluginList = db->getPreference("PluginList", "");
-    if (!pluginList.isEmpty()) {
-        QStringList plugins = pluginList.split("\n", Qt::SkipEmptyParts);
-        for (const QString& plugin : plugins) {
-            m_pluginList->addItem(plugin);
-        }
+    for (const QString& plugin : opts.globalPluginList()) {
+        m_pluginList->addItem(plugin);
     }
 
     // === Notepad Page ===
-    m_notepadWordWrap->setChecked(db->getPreferenceInt("NotepadWordWrap", 1) != 0);
-    m_tabInsertsTab->setChecked(db->getPreferenceInt("TabInsertsTabInMultiLineDialogs", 0) != 0);
+    m_notepadWordWrap->setChecked(opts.notepadWordWrap());
+    m_tabInsertsTab->setChecked(opts.tabInsertsTab());
 
     // Notepad font
-    QString notepadFontFamily = db->getPreference("NotepadFont", "Courier");
-    int notepadFontSize = db->getPreferenceInt("NotepadFontHeight", 10);
-    m_notepadFont.setFamily(notepadFontFamily);
-    m_notepadFont.setPointSize(notepadFontSize);
+    m_notepadFont.setFamily(opts.notepadFontName());
+    m_notepadFont.setPointSize(opts.notepadFontHeight());
     m_notepadFontLabel->setText(formatFontInfo(m_notepadFont));
 
-    m_notepadBackColour = db->getPreferenceInt("NotepadBackColour", 0xFFFFFF);
-    m_notepadTextColour = db->getPreferenceInt("NotepadTextColour", 0x000000);
-    m_notepadQuoteString->setText(db->getPreference("NotepadQuoteString", "> "));
+    m_notepadBackColour = opts.notepadBackColour();
+    m_notepadTextColour = opts.notepadTextColour();
+    m_notepadQuoteString->setText(opts.notepadQuoteString());
     updateColorButton(m_notepadBackColourButton, m_notepadBackColour);
     updateColorButton(m_notepadTextColourButton, m_notepadTextColour);
 
     // Paren matching flags (default: 0x0061 = NEST_BRACES | BACKSLASH_ESCAPES | PERCENT_ESCAPES)
-    int parenFlags = db->getPreferenceInt("ParenMatchFlags", 0x0061);
+    int parenFlags = opts.parenMatchFlags();
     m_parenMatchNestBraces->setChecked(parenFlags & 0x0001);
     m_parenMatchSingleQuotes->setChecked(parenFlags & 0x0002);
     m_parenMatchDoubleQuotes->setChecked(parenFlags & 0x0004);
@@ -1307,155 +1288,138 @@ void GlobalPreferencesDialog::loadSettings()
     m_parenMatchPercentEscapes->setChecked(parenFlags & 0x0040);
 
     // === Lua Scripts Page ===
-    m_luaScript->setPlainText(db->getPreference("LuaScript", ""));
-    m_enablePackageLibrary->setChecked(db->getPreferenceInt("EnablePackageLibrary", 0) != 0);
+    m_luaScript->setPlainText(opts.luaScript());
+    m_enablePackageLibrary->setChecked(opts.enablePackageLibrary());
 
     // === Timers Page ===
-    m_timerInterval->setValue(db->getPreferenceInt("TimerInterval", 0));
+    m_timerInterval->setValue(opts.timerInterval());
 
     // === Activity Page ===
-    m_openActivityWindow->setChecked(db->getPreferenceInt("OpenActivityWindow", 0) != 0);
-    m_activityRefreshInterval->setValue(db->getPreferenceInt("ActivityWindowRefreshInterval", 15));
-    int refreshType = db->getPreferenceInt("ActivityWindowRefreshType", 2); // Default: eRefreshBoth
+    m_openActivityWindow->setChecked(opts.openActivityWindow());
+    m_activityRefreshInterval->setValue(opts.activityWindowRefreshInterval());
+    int refreshType = opts.activityWindowRefreshType();
     if (refreshType == 0)
         m_refreshOnActivity->setChecked(true);
     else if (refreshType == 1)
         m_refreshPeriodically->setChecked(true);
     else
         m_refreshBoth->setChecked(true);
-    m_activityButtonBarStyle->setCurrentIndex(db->getPreferenceInt("ActivityButtonBarStyle", 0));
+    m_activityButtonBarStyle->setCurrentIndex(opts.activityButtonBarStyle());
 
     // === Tray Icon Page ===
-    m_iconPlacement->setCurrentIndex(
-        db->getPreferenceInt("IconPlacement", 0)); // Default: taskbar only
-    int trayIcon = db->getPreferenceInt("TrayIcon", 0);
+    m_iconPlacement->setCurrentIndex(opts.iconPlacement()); // Default: taskbar only
+    int trayIcon = opts.trayIcon();
     if (trayIcon == 10) {
         // Custom icon
         m_useCustomIcon->setChecked(true);
     } else {
         m_useMushclientIcon->setChecked(true);
     }
-    m_customIconFile->setText(db->getPreference("TrayIconFileName", ""));
+    m_customIconFile->setText(opts.trayIconFileName());
 
     // === Defaults Page ===
     // Output font
-    QString outputFontFamily = db->getPreference("DefaultOutputFont", "Courier");
-    int outputFontSize = db->getPreferenceInt("DefaultOutputFontHeight", 10);
-    m_defaultOutputFont.setFamily(outputFontFamily);
-    m_defaultOutputFont.setPointSize(outputFontSize);
+    m_defaultOutputFont.setFamily(opts.defaultOutputFont());
+    m_defaultOutputFont.setPointSize(opts.defaultOutputFontHeight());
     m_defaultOutputFontLabel->setText(formatFontInfo(m_defaultOutputFont));
 
     // Input font
-    QString inputFontFamily = db->getPreference("DefaultInputFont", "Courier");
-    int inputFontSize = db->getPreferenceInt("DefaultInputFontHeight", 10);
-    int inputFontWeight = db->getPreferenceInt("DefaultInputFontWeight", QFont::Normal);
-    bool inputFontItalic = db->getPreferenceInt("DefaultInputFontItalic", 0) != 0;
-    m_defaultInputFont.setFamily(inputFontFamily);
-    m_defaultInputFont.setPointSize(inputFontSize);
-    m_defaultInputFont.setWeight(static_cast<QFont::Weight>(inputFontWeight));
-    m_defaultInputFont.setItalic(inputFontItalic);
+    m_defaultInputFont.setFamily(opts.defaultInputFont());
+    m_defaultInputFont.setPointSize(opts.defaultInputFontHeight());
+    m_defaultInputFont.setWeight(static_cast<QFont::Weight>(opts.defaultInputFontWeight()));
+    m_defaultInputFont.setItalic(opts.defaultInputFontItalic() != 0);
     m_defaultInputFontLabel->setText(formatFontInfo(m_defaultInputFont));
 
     // Fixed pitch font
-    QString fixedFontFamily = db->getPreference("FixedPitchFont", "Courier");
-    int fixedFontSize = db->getPreferenceInt("FixedPitchFontSize", 10);
-    m_fixedPitchFont.setFamily(fixedFontFamily);
-    m_fixedPitchFont.setPointSize(fixedFontSize);
+    m_fixedPitchFont.setFamily(opts.fixedPitchFont());
+    m_fixedPitchFont.setPointSize(opts.fixedPitchFontSize());
     m_fixedPitchFontLabel->setText(formatFontInfo(m_fixedPitchFont));
 
     // Import files
-    m_defaultAliasesFile->setText(db->getPreference("DefaultAliasesFile", ""));
-    m_defaultTriggersFile->setText(db->getPreference("DefaultTriggersFile", ""));
-    m_defaultTimersFile->setText(db->getPreference("DefaultTimersFile", ""));
-    m_defaultMacrosFile->setText(db->getPreference("DefaultMacrosFile", ""));
-    m_defaultColoursFile->setText(db->getPreference("DefaultColoursFile", ""));
+    m_defaultAliasesFile->setText(opts.defaultAliasesFile());
+    m_defaultTriggersFile->setText(opts.defaultTriggersFile());
+    m_defaultTimersFile->setText(opts.defaultTimersFile());
+    m_defaultMacrosFile->setText(opts.defaultMacrosFile());
+    m_defaultColoursFile->setText(opts.defaultColoursFile());
 
-    qCDebug(lcDialog) << "GlobalPreferencesDialog::loadSettings() - loaded from database";
+    qCDebug(lcDialog) << "GlobalPreferencesDialog::loadSettings() - loaded from QSettings";
 }
 
 void GlobalPreferencesDialog::saveSettings()
 {
-    Database* db = Database::instance();
+    auto& opts = GlobalOptions::instance();
 
     // === Worlds Page ===
-    db->setPreference("DefaultWorldFileDirectory", m_worldDirectory->text());
+    opts.setDefaultWorldFileDirectory(m_worldDirectory->text());
 
     // World list
     QStringList worlds;
     for (int i = 0; i < m_worldList->count(); ++i) {
         worlds.append(m_worldList->item(i)->text());
     }
-    db->setPreference("WorldList", worlds.join("\n"));
+    opts.setWorldList(worlds);
 
     // === General Page ===
-    db->setPreferenceInt("ThemeMode", m_themeMode->currentIndex());
-    db->setPreferenceInt("AutoConnectWorlds", m_autoConnectWorlds->isChecked() ? 1 : 0);
-    db->setPreferenceInt("ReconnectOnLinkFailure", m_reconnectOnDisconnect->isChecked() ? 1 : 0);
-    db->setPreferenceInt("OpenWorldsMaximised", m_openWorldsMaximized->isChecked() ? 1 : 0);
-    db->setPreferenceInt("NotifyIfCannotConnect", m_notifyIfCannotConnect->isChecked() ? 1 : 0);
-    db->setPreferenceInt("NotifyOnDisconnect", m_notifyOnDisconnect->isChecked() ? 1 : 0);
+    opts.setThemeMode(m_themeMode->currentIndex());
+    opts.setAutoConnectWorlds(m_autoConnectWorlds->isChecked());
+    opts.setReconnectOnLinkFailure(m_reconnectOnDisconnect->isChecked());
+    opts.setOpenWorldsMaximized(m_openWorldsMaximized->isChecked());
+    opts.setNotifyIfCannotConnect(m_notifyIfCannotConnect->isChecked());
+    opts.setNotifyOnDisconnect(m_notifyOnDisconnect->isChecked());
 
-    db->setPreferenceInt("AllTypingToCommandWindow",
-                         m_allTypingToCommandWindow->isChecked() ? 1 : 0);
-    db->setPreferenceInt("DisableKeyboardMenuActivation",
-                         m_altKeyActivatesMenu->isChecked() ? 1 : 0);
-    db->setPreferenceInt("FixedFontForEditing", m_fixedFontForEditing->isChecked() ? 1 : 0);
-    db->setPreferenceInt("F1macro", m_f1Macro->isChecked() ? 1 : 0);
-    db->setPreferenceInt("RegexpMatchEmpty", m_regexpMatchEmpty->isChecked() ? 1 : 0);
-    db->setPreferenceInt("TriggerRemoveCheck", m_triggerRemoveCheck->isChecked() ? 1 : 0);
-    db->setPreferenceInt("ErrorNotificationToOutputWindow",
-                         m_errorNotificationToOutput->isChecked() ? 1 : 0);
+    opts.setAllTypingToCommandWindow(m_allTypingToCommandWindow->isChecked());
+    opts.setDisableKeyboardMenuActivation(m_altKeyActivatesMenu->isChecked());
+    opts.setFixedFontForEditing(m_fixedFontForEditing->isChecked());
+    opts.setF1Macro(m_f1Macro->isChecked());
+    opts.setRegexpMatchEmpty(m_regexpMatchEmpty->isChecked());
+    opts.setTriggerRemoveCheck(m_triggerRemoveCheck->isChecked());
+    opts.setErrorNotificationToOutputWindow(m_errorNotificationToOutput->isChecked());
 
-    db->setPreference("WordDelimiters", m_wordDelimiters->text());
-    db->setPreference("WordDelimitersDblClick", m_wordDelimitersDblClick->text());
+    opts.setWordDelimiters(m_wordDelimiters->text());
+    opts.setWordDelimitersDblClick(m_wordDelimitersDblClick->text());
 
-    db->setPreferenceInt("WindowTabsStyle", m_windowTabsStyle->currentIndex());
-    db->setPreference("Locale", m_localeCode->text());
+    opts.setWindowTabsStyle(m_windowTabsStyle->currentIndex());
+    opts.setLocale(m_localeCode->text());
 
-    db->setPreferenceInt("AutoExpandConfig", m_autoExpandConfig->isChecked() ? 1 : 0);
-    db->setPreferenceInt("ColourGradientConfig", m_colourGradientConfig->isChecked() ? 1 : 0);
-    db->setPreferenceInt("BleedBackground", m_bleedBackground->isChecked() ? 1 : 0);
-    db->setPreferenceInt("SmoothScrolling", m_smoothScrolling->isChecked() ? 1 : 0);
-    db->setPreferenceInt("SmootherScrolling", m_smootherScrolling->isChecked() ? 1 : 0);
-    db->setPreferenceInt("ShowGridLinesInListViews",
-                         m_showGridLinesInListViews->isChecked() ? 1 : 0);
-    db->setPreferenceInt("FlatToolbars", m_flatToolbars->isChecked() ? 1 : 0);
+    opts.setAutoExpandConfig(m_autoExpandConfig->isChecked());
+    opts.setColourGradientConfig(m_colourGradientConfig->isChecked());
+    opts.setBleedBackground(m_bleedBackground->isChecked());
+    opts.setSmoothScrolling(m_smoothScrolling->isChecked());
+    opts.setSmootherScrolling(m_smootherScrolling->isChecked());
+    opts.setShowGridLinesInListViews(m_showGridLinesInListViews->isChecked());
+    opts.setFlatToolbars(m_flatToolbars->isChecked());
 
     // === Closing Page ===
-    db->setPreferenceInt("ConfirmBeforeClosingMushclient",
-                         m_confirmBeforeClosingMushclient->isChecked() ? 1 : 0);
-    db->setPreferenceInt("ConfirmBeforeClosingWorld",
-                         m_confirmBeforeClosingWorld->isChecked() ? 1 : 0);
-    db->setPreferenceInt("ConfirmBeforeClosingMXPdebug",
-                         m_confirmBeforeClosingMXPdebug->isChecked() ? 1 : 0);
-    db->setPreferenceInt("ConfirmBeforeSavingVariables",
-                         m_confirmBeforeSavingVariables->isChecked() ? 1 : 0);
+    opts.setConfirmBeforeClosingMushclient(m_confirmBeforeClosingMushclient->isChecked());
+    opts.setConfirmBeforeClosingWorld(m_confirmBeforeClosingWorld->isChecked());
+    opts.setConfirmBeforeClosingMXPdebug(m_confirmBeforeClosingMXPdebug->isChecked());
+    opts.setConfirmBeforeSavingVariables(m_confirmBeforeSavingVariables->isChecked());
 
     // === Logging Page ===
-    db->setPreferenceInt("AutoLogWorld", m_autoLogWorld->isChecked() ? 1 : 0);
-    db->setPreferenceInt("AppendToLogFiles", m_appendToLogFiles->isChecked() ? 1 : 0);
-    db->setPreferenceInt("ConfirmLogFileClose", m_confirmLogFileClose->isChecked() ? 1 : 0);
-    db->setPreference("DefaultLogFileDirectory", m_logDirectory->text());
+    opts.setAutoLogWorld(m_autoLogWorld->isChecked());
+    opts.setAppendToLogFiles(m_appendToLogFiles->isChecked());
+    opts.setConfirmLogFileClose(m_confirmLogFileClose->isChecked());
+    opts.setDefaultLogFileDirectory(m_logDirectory->text());
 
     // === Plugins Page ===
-    db->setPreference("PluginsDirectory", m_pluginsDirectory->text());
-    db->setPreference("StateFilesDirectory", m_stateFilesDirectory->text());
+    opts.setPluginsDirectory(m_pluginsDirectory->text());
+    opts.setStateFilesDirectory(m_stateFilesDirectory->text());
 
     // Plugin list
     QStringList plugins;
     for (int i = 0; i < m_pluginList->count(); ++i) {
         plugins.append(m_pluginList->item(i)->text());
     }
-    db->setPreference("PluginList", plugins.join("\n"));
+    opts.setGlobalPluginList(plugins);
 
     // === Notepad Page ===
-    db->setPreferenceInt("NotepadWordWrap", m_notepadWordWrap->isChecked() ? 1 : 0);
-    db->setPreferenceInt("TabInsertsTabInMultiLineDialogs", m_tabInsertsTab->isChecked() ? 1 : 0);
-    db->setPreference("NotepadFont", m_notepadFont.family());
-    db->setPreferenceInt("NotepadFontHeight", m_notepadFont.pointSize());
-    db->setPreferenceInt("NotepadBackColour", m_notepadBackColour);
-    db->setPreferenceInt("NotepadTextColour", m_notepadTextColour);
-    db->setPreference("NotepadQuoteString", m_notepadQuoteString->text());
+    opts.setNotepadWordWrap(m_notepadWordWrap->isChecked());
+    opts.setTabInsertsTab(m_tabInsertsTab->isChecked());
+    opts.setNotepadFontName(m_notepadFont.family());
+    opts.setNotepadFontHeight(m_notepadFont.pointSize());
+    opts.setNotepadBackColour(m_notepadBackColour);
+    opts.setNotepadTextColour(m_notepadTextColour);
+    opts.setNotepadQuoteString(m_notepadQuoteString->text());
 
     // Paren matching flags
     int parenFlags = 0;
@@ -1473,18 +1437,18 @@ void GlobalPreferencesDialog::saveSettings()
         parenFlags |= 0x0020;
     if (m_parenMatchPercentEscapes->isChecked())
         parenFlags |= 0x0040;
-    db->setPreferenceInt("ParenMatchFlags", parenFlags);
+    opts.setParenMatchFlags(parenFlags);
 
     // === Lua Scripts Page ===
-    db->setPreference("LuaScript", m_luaScript->toPlainText());
-    db->setPreferenceInt("EnablePackageLibrary", m_enablePackageLibrary->isChecked() ? 1 : 0);
+    opts.setLuaScript(m_luaScript->toPlainText());
+    opts.setEnablePackageLibrary(m_enablePackageLibrary->isChecked());
 
     // === Timers Page ===
-    db->setPreferenceInt("TimerInterval", m_timerInterval->value());
+    opts.setTimerInterval(m_timerInterval->value());
 
     // === Activity Page ===
-    db->setPreferenceInt("OpenActivityWindow", m_openActivityWindow->isChecked() ? 1 : 0);
-    db->setPreferenceInt("ActivityWindowRefreshInterval", m_activityRefreshInterval->value());
+    opts.setOpenActivityWindow(m_openActivityWindow->isChecked());
+    opts.setActivityWindowRefreshInterval(m_activityRefreshInterval->value());
     int refreshType = 2; // Default: eRefreshBoth
     if (m_refreshOnActivity->isChecked())
         refreshType = 0; // eRefreshOnActivity
@@ -1492,40 +1456,39 @@ void GlobalPreferencesDialog::saveSettings()
         refreshType = 1; // eRefreshPeriodically
     else
         refreshType = 2; // eRefreshBoth
-    db->setPreferenceInt("ActivityWindowRefreshType", refreshType);
-    db->setPreferenceInt("ActivityButtonBarStyle", m_activityButtonBarStyle->currentIndex());
+    opts.setActivityWindowRefreshType(refreshType);
+    opts.setActivityButtonBarStyle(m_activityButtonBarStyle->currentIndex());
 
     // === Tray Icon Page ===
-    db->setPreferenceInt("IconPlacement", m_iconPlacement->currentIndex());
-    db->setPreferenceInt("TrayIcon", m_useCustomIcon->isChecked() ? 10 : 0);
-    db->setPreference("TrayIconFileName", m_customIconFile->text());
+    opts.setIconPlacement(m_iconPlacement->currentIndex());
+    opts.setTrayIcon(m_useCustomIcon->isChecked() ? 10 : 0);
+    opts.setTrayIconFileName(m_customIconFile->text());
 
     // === Defaults Page ===
     // Output font
-    db->setPreference("DefaultOutputFont", m_defaultOutputFont.family());
-    db->setPreferenceInt("DefaultOutputFontHeight", m_defaultOutputFont.pointSize());
+    opts.setDefaultOutputFont(m_defaultOutputFont.family());
+    opts.setDefaultOutputFontHeight(m_defaultOutputFont.pointSize());
 
     // Input font
-    db->setPreference("DefaultInputFont", m_defaultInputFont.family());
-    db->setPreferenceInt("DefaultInputFontHeight", m_defaultInputFont.pointSize());
-    db->setPreferenceInt("DefaultInputFontWeight", static_cast<int>(m_defaultInputFont.weight()));
-    db->setPreferenceInt("DefaultInputFontItalic", m_defaultInputFont.italic() ? 1 : 0);
+    opts.setDefaultInputFont(m_defaultInputFont.family());
+    opts.setDefaultInputFontHeight(m_defaultInputFont.pointSize());
+    opts.setDefaultInputFontWeight(static_cast<int>(m_defaultInputFont.weight()));
+    opts.setDefaultInputFontItalic(m_defaultInputFont.italic() ? 1 : 0);
 
     // Fixed pitch font
-    db->setPreference("FixedPitchFont", m_fixedPitchFont.family());
-    db->setPreferenceInt("FixedPitchFontSize", m_fixedPitchFont.pointSize());
+    opts.setFixedPitchFont(m_fixedPitchFont.family());
+    opts.setFixedPitchFontSize(m_fixedPitchFont.pointSize());
 
     // Import files
-    db->setPreference("DefaultAliasesFile", m_defaultAliasesFile->text());
-    db->setPreference("DefaultTriggersFile", m_defaultTriggersFile->text());
-    db->setPreference("DefaultTimersFile", m_defaultTimersFile->text());
-    db->setPreference("DefaultMacrosFile", m_defaultMacrosFile->text());
-    db->setPreference("DefaultColoursFile", m_defaultColoursFile->text());
+    opts.setDefaultAliasesFile(m_defaultAliasesFile->text());
+    opts.setDefaultTriggersFile(m_defaultTriggersFile->text());
+    opts.setDefaultTimersFile(m_defaultTimersFile->text());
+    opts.setDefaultMacrosFile(m_defaultMacrosFile->text());
+    opts.setDefaultColoursFile(m_defaultColoursFile->text());
 
-    // Refresh GlobalOptions cache so other code sees the changes
-    GlobalOptions::instance()->load();
+    opts.save();
 
-    qCDebug(lcDialog) << "GlobalPreferencesDialog::saveSettings() - saved to database";
+    qCDebug(lcDialog) << "GlobalPreferencesDialog::saveSettings() - saved to QSettings";
 }
 
 void GlobalPreferencesDialog::applySettings()

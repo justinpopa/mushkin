@@ -5,6 +5,7 @@
 #include <QDateTime>
 #include <QtGlobal>
 #include <memory>
+#include <span>
 #include <vector>
 
 // Forward declaration
@@ -88,14 +89,11 @@ class Line {
     qint32 m_nLineNumber;                          // Sequential line number
     qint16 m_iPreambleOffset;                      // How far the preamble text extends
 
-    // Compatibility accessors for code that expects raw pointer
-    char* text()
+    // Span-based accessors (size excludes null terminator, matching len())
+    // Read-only view only. Callers needing mutation should use textBuffer.data() directly.
+    std::span<const char> text() const
     {
-        return textBuffer.data();
-    }
-    const char* text() const
-    {
-        return textBuffer.data();
+        return {textBuffer.data(), static_cast<std::size_t>(len())};
     }
     qint32 len() const
     {

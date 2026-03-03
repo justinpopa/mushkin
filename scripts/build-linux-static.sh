@@ -7,7 +7,7 @@
 # Prerequisites (Debian/Ubuntu):
 #   sudo apt install cmake ninja-build build-essential pkg-config \
 #       libpcre3-dev libsqlite3-dev luajit libluajit-5.1-dev \
-#       libssl-dev zlib1g-dev libgl1-mesa-dev libglu1-mesa-dev \
+#       libssl-dev zlib1g-dev libssh-dev libgl1-mesa-dev libglu1-mesa-dev \
 #       libxkbcommon-dev libxcb1-dev libxcb-cursor-dev libxcb-icccm4-dev \
 #       libxcb-keysyms1-dev libxcb-shape0-dev libxcb-xfixes0-dev \
 #       libxcb-sync-dev libxcb-randr0-dev libxcb-render-util0-dev \
@@ -22,6 +22,8 @@
 #
 # Output:
 #   build-static/mushkin - Binary with static Qt
+#   build-static/lib/    - Bundled dynamic libraries
+#   build-static/lua/    - Lua scripts
 #
 # Note: First run takes ~60 minutes to build Qt.
 #       Subsequent builds take ~2 minutes (Qt is cached).
@@ -46,6 +48,25 @@ echo_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
 NUM_CORES=$(nproc)
 
+# Find the highest available clang version (C++26 requires clang 19+)
+find_clang() {
+    for ver in 22 21 20 19; do
+        if command -v "clang-$ver" &>/dev/null; then
+            echo "$ver"
+            return
+        fi
+    done
+    echo ""
+}
+
+CLANG_VER=$(find_clang)
+if [ -n "$CLANG_VER" ]; then
+    export CC="clang-$CLANG_VER"
+    export CXX="clang++-$CLANG_VER"
+else
+    echo_warn "No clang 19+ found, falling back to system compiler"
+fi
+
 # ============================================================
 # Prerequisites
 # ============================================================
@@ -65,13 +86,14 @@ check_prerequisites() {
     pkg-config --exists luajit 2>/dev/null || missing+=("libluajit-5.1-dev")
     pkg-config --exists openssl 2>/dev/null || missing+=("libssl-dev")
     pkg-config --exists zlib 2>/dev/null || missing+=("zlib1g-dev")
+    pkg-config --exists libssh 2>/dev/null || missing+=("libssh-dev")
     pkg-config --exists xcb 2>/dev/null || missing+=("libxcb1-dev")
     pkg-config --exists xkbcommon 2>/dev/null || missing+=("libxkbcommon-dev")
 
     if [ ${#missing[@]} -gt 0 ]; then
         echo_error "Missing: ${missing[*]}"
         echo_error "Install with: sudo apt install cmake ninja-build build-essential pkg-config \\"
-        echo_error "    libpcre3-dev libsqlite3-dev luajit libluajit-5.1-dev libssl-dev zlib1g-dev \\"
+        echo_error "    libpcre3-dev libsqlite3-dev luajit libluajit-5.1-dev libssl-dev zlib1g-dev libssh-dev \\"
         echo_error "    libgl1-mesa-dev libxkbcommon-dev libxcb1-dev libxcb-cursor-dev libxcb-icccm4-dev \\"
         echo_error "    libxcb-keysyms1-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb-sync-dev \\"
         echo_error "    libxcb-randr0-dev libxcb-render-util0-dev libxcb-image0-dev libxcb-glx0-dev \\"
@@ -103,8 +125,12 @@ build_static_qt() {
     local QT_SRC_DIR="$QT_BASE_DIR/$QT_VERSION/Src"
     local QT_BUILD_DIR="$QT_SRC_DIR/build-static"
 
-    # Download Qt source
-    if [ ! -d "$QT_SRC_DIR" ]; then
+    # Download Qt source (verify required submodules exist)
+    if [ ! -d "$QT_SRC_DIR" ] || [ ! -d "$QT_SRC_DIR/qtmultimedia" ]; then
+        if [ -d "$QT_SRC_DIR" ]; then
+            echo_warn "Incomplete Qt source detected, re-downloading..."
+            rm -rf "$QT_SRC_DIR"
+        fi
         echo_info "Downloading Qt source..."
         mkdir -p "$QT_BASE_DIR"
         aqt install-src linux "$QT_VERSION" --outputdir "$QT_BASE_DIR"
@@ -144,12 +170,99 @@ build_mushkin() {
     mkdir -p "$BUILD_DIR"
     cd "$BUILD_DIR"
 
-    cmake "$PROJECT_ROOT" \
-        -DSTATIC_BUILD=ON \
-        -DCMAKE_BUILD_TYPE=Release \
+    local cmake_args=(
+        -DSTATIC_BUILD=ON
+        -DCMAKE_BUILD_TYPE=Release
         -DCMAKE_PREFIX_PATH="$QT_STATIC_DIR"
+    )
+    if [ -n "$CLANG_VER" ]; then
+        cmake_args+=(
+            -DCMAKE_C_COMPILER="clang-$CLANG_VER"
+            -DCMAKE_CXX_COMPILER="clang++-$CLANG_VER"
+        )
+    fi
+
+    cmake "$PROJECT_ROOT" "${cmake_args[@]}"
 
     cmake --build . --target mushkin -j"$NUM_CORES"
+}
+
+# ============================================================
+# Bundle Dynamic Libraries
+# ============================================================
+
+bundle_dylibs() {
+    echo_info "Bundling dynamic libraries..."
+
+    local lib_dir="$BUILD_DIR/lib"
+    mkdir -p "$lib_dir"
+
+    # Whitelist of libraries to bundle (these are the non-system deps)
+    local whitelist=(
+        "libpcre.so"
+        "libluajit-5.1.so"
+        "libsqlite3.so"
+        "libssl.so"
+        "libcrypto.so"
+        "libssh.so"
+        "libz.so"
+    )
+
+    local binary="$BUILD_DIR/mushkin"
+
+    # For each whitelisted library, find it via ldd and copy
+    for lib_pattern in "${whitelist[@]}"; do
+        # Find the actual path from ldd output
+        local lib_path
+        lib_path=$(ldd "$binary" 2>/dev/null | grep "$lib_pattern" | awk '{print $3}')
+
+        if [ -z "$lib_path" ] || [ ! -f "$lib_path" ]; then
+            echo_warn "  $lib_pattern not found in ldd output (may be statically linked)"
+            continue
+        fi
+
+        # Resolve symlinks to get the real file
+        local real_path
+        real_path=$(realpath "$lib_path")
+        local real_name
+        real_name=$(basename "$real_path")
+
+        # Copy the real library file
+        if [ ! -f "$lib_dir/$real_name" ]; then
+            echo_info "  Copying $real_name"
+            cp "$real_path" "$lib_dir/$real_name"
+        fi
+
+        # Recreate symlinks that the linker uses
+        # e.g., libpcre.so.3 -> libpcre.so.3.13.3
+        #        libpcre.so -> libpcre.so.3
+        local link_name
+        link_name=$(basename "$lib_path")
+        if [ "$link_name" != "$real_name" ] && [ ! -e "$lib_dir/$link_name" ]; then
+            ln -sf "$real_name" "$lib_dir/$link_name"
+        fi
+
+        # Also create the base .so symlink if it doesn't exist
+        # e.g., libpcre.so -> libpcre.so.3.13.3
+        local base_name="$lib_pattern"
+        if [ ! -e "$lib_dir/$base_name" ] && [ "$base_name" != "$real_name" ]; then
+            ln -sf "$real_name" "$lib_dir/$base_name"
+        fi
+    done
+
+    # Lua .so modules should already be in build-static/lib/ from cmake build
+    # Verify they exist
+    local lua_modules=("socket/core.so" "socket/unix.so" "mime/core.so" "ssl.so" "yue.so" "llthreads2.so")
+    echo_info "Checking Lua C modules..."
+    for mod in "${lua_modules[@]}"; do
+        if [ -f "$lib_dir/$mod" ]; then
+            echo_info "  Found $mod"
+        else
+            echo_warn "  Missing $mod (may not have been built)"
+        fi
+    done
+
+    echo_info "Bundling complete"
 }
 
 # ============================================================
@@ -170,7 +283,35 @@ verify_build() {
     echo "  Location: $binary"
     echo ""
 
-    # Check for dynamic dependencies
+    # Show bundled libraries
+    local lib_dir="$BUILD_DIR/lib"
+    if [ -d "$lib_dir" ]; then
+        echo_info "Bundled libraries:"
+        find "$lib_dir" -maxdepth 1 -type f -name "*.so*" | sort | while read -r f; do
+            echo "  $(basename "$f") ($(du -h "$f" | cut -f1))"
+        done
+        echo ""
+        echo_info "Bundled Lua modules:"
+        find "$lib_dir" -name "*.so" -not -maxdepth 1 2>/dev/null | sort | while read -r f; do
+            echo "  $(echo "$f" | sed "s|$lib_dir/||")"
+        done
+    fi
+
+    echo ""
+
+    # Verify RPATH is set correctly
+    echo_info "Checking RPATH..."
+    local rpath
+    rpath=$(readelf -d "$binary" 2>/dev/null | grep -E "RPATH|RUNPATH" || true)
+    if echo "$rpath" | grep -q 'RPATH.*\$ORIGIN/lib'; then
+        echo_info "  OK - RPATH set to \$ORIGIN/lib"
+    elif echo "$rpath" | grep -q 'RUNPATH.*\$ORIGIN/lib'; then
+        echo_warn "  RUNPATH set (not RPATH) - transitive deps may not resolve"
+    else
+        echo_warn "  RPATH not found - bundled libs may not be found at runtime"
+    fi
+
+    # Check dynamic dependencies resolve correctly
     echo_info "Dynamic dependencies:"
     ldd "$binary" | grep -v "linux-vdso\|ld-linux" | head -20
 }
@@ -188,6 +329,7 @@ main() {
     check_prerequisites
     build_static_qt
     build_mushkin
+    bundle_dylibs
     verify_build
 
     echo ""

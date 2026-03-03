@@ -66,6 +66,9 @@ if(APPLE)
     set_target_properties(ssl_core PROPERTIES SUFFIX ".so")
 endif()
 
+# Suppress warnings from vendored code (OpenSSL deprecated APIs, etc.)
+target_compile_options(ssl_core PRIVATE -w)
+
 # Copy Lua files to build directory
 set(LUA_SSL_FILES
     src/ssl.lua

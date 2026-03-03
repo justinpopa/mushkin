@@ -8,26 +8,16 @@
  * fixtures, and assertion messages.
  */
 
-#include "../src/text/line.h"
-#include "../src/text/style.h"
-#include "../src/world/world_document.h"
-#include <QCoreApplication>
+#include "fixtures/world_fixtures.h"
 #include <QDir>
 #include <QFile>
 #include <QTextStream>
 #include <cstring>
-#include <gtest/gtest.h>
 
 // Test fixture for retrospective logging tests
 // Provides common setup/teardown and helper methods
-class RetrospectiveLoggingTest : public ::testing::Test {
+class RetrospectiveLoggingTest : public WorldDocumentTest {
   protected:
-    void SetUp() override
-    {
-        // Create world document
-        doc = new WorldDocument();
-    }
-
     void TearDown() override
     {
         // Clean up any test log files
@@ -35,8 +25,6 @@ class RetrospectiveLoggingTest : public ::testing::Test {
             QFile::remove(file);
         }
         tempLogFiles.clear();
-
-        delete doc;
     }
 
     // Helper method to read file contents
@@ -61,15 +49,14 @@ class RetrospectiveLoggingTest : public ::testing::Test {
     }
 
     // Helper method to create a line with text
-    Line* createLine(int lineNumber, const char* text, int flags,
-                     QDateTime time = QDateTime::currentDateTime())
+    std::unique_ptr<Line> createLine(int lineNumber, const char* text, int flags,
+                                     QDateTime time = QDateTime::currentDateTime())
     {
-        Line* line = new Line(lineNumber, 80, flags & (COMMENT | USER_INPUT), qRgb(255, 255, 255),
-                              qRgb(0, 0, 0), false);
-        // memcpy already done above
-        int len = strlen(text);
+        auto line = std::make_unique<Line>(lineNumber, 80, flags & (COMMENT | USER_INPUT),
+                                           qRgb(255, 255, 255), qRgb(0, 0, 0), false);
+        int len = static_cast<int>(strlen(text));
         line->textBuffer.resize(len);
-        memcpy(line->text(), text, len);
+        memcpy(line->textBuffer.data(), text, len);
         line->textBuffer.push_back('\0');
         line->flags = flags;
         line->hard_return = true;
@@ -77,7 +64,6 @@ class RetrospectiveLoggingTest : public ::testing::Test {
         return line;
     }
 
-    WorldDocument* doc = nullptr;
     QStringList tempLogFiles;
 };
 
@@ -86,31 +72,25 @@ class RetrospectiveLoggingTest : public ::testing::Test {
 // Verifies that all flagged lines are written to the log.
 TEST_F(RetrospectiveLoggingTest, WriteBufferedLines)
 {
-    doc->m_bLogHTML = false;
-    doc->m_bLogRaw = false;
-    doc->m_bLogOutput = true;
-    doc->m_bLogNotes = true;
-    doc->m_log_input = true;
-    doc->m_strLogLinePreambleOutput = "[OUT] ";
-    doc->m_strLogLinePreambleNotes = "[NOTE] ";
-    doc->m_strLogLinePreambleInput = "[IN] ";
-    doc->m_strLogLinePostambleOutput = "";
-    doc->m_strLogLinePostambleNotes = "";
-    doc->m_strLogLinePostambleInput = "";
+    doc->m_logging.log_html = false;
+    doc->m_logging.log_raw = false;
+    doc->m_logging.log_output = true;
+    doc->m_logging.log_notes = true;
+    doc->m_logging.log_input = true;
+    doc->m_logging.line_preamble_output = "[OUT] ";
+    doc->m_logging.line_preamble_notes = "[NOTE] ";
+    doc->m_logging.line_preamble_input = "[IN] ";
+    doc->m_logging.line_postamble_output = "";
+    doc->m_logging.line_postamble_notes = "";
+    doc->m_logging.line_postamble_input = "";
 
     // Create 3 buffered lines with LOG_LINE flag set
-    Line* line1 = createLine(1, "First line from MUD", LOG_LINE);
-    Line* line2 = createLine(2, "A note from script", COMMENT | LOG_LINE);
-    Line* line3 = createLine(3, "look", USER_INPUT | LOG_LINE);
+    doc->m_lineList.push_back(createLine(1, "First line from MUD", LOG_LINE));
+    doc->m_lineList.push_back(createLine(2, "A note from script", COMMENT | LOG_LINE));
+    doc->m_lineList.push_back(createLine(3, "look", USER_INPUT | LOG_LINE));
 
     // Create one line WITHOUT LOG_LINE flag (should not be logged)
-    Line* line4 = createLine(4, "Password line omitted by trigger", 0);
-
-    // Add lines to buffer
-    doc->m_lineList.append(line1);
-    doc->m_lineList.append(line2);
-    doc->m_lineList.append(line3);
-    doc->m_lineList.append(line4);
+    doc->m_lineList.push_back(createLine(4, "Password line omitted by trigger", 0));
 
     // Now open log - should trigger retrospective logging
     QString logFile = getTempLogFile("test_retrospective.log");
@@ -143,13 +123,13 @@ TEST_F(RetrospectiveLoggingTest, WriteBufferedLines)
 // Verifies that raw mode skips preambles, postambles, and HTML escaping.
 TEST_F(RetrospectiveLoggingTest, RawLoggingMode)
 {
-    doc->m_bLogHTML = false;
-    doc->m_bLogRaw = true; // Raw mode enabled
-    doc->m_bLogOutput = true;
-    doc->m_strLogLinePreambleOutput = "[OUT] ";        // Should be ignored
-    doc->m_strLogLinePostambleOutput = " [END]";       // Should be ignored
-    doc->m_strLogFilePreamble = "==== Log Start ===="; // Should be ignored
-    doc->m_strLogFilePostamble = "==== Log End ====";  // Should be ignored
+    doc->m_logging.log_html = false;
+    doc->m_logging.log_raw = true; // Raw mode enabled
+    doc->m_logging.log_output = true;
+    doc->m_logging.line_preamble_output = "[OUT] ";       // Should be ignored
+    doc->m_logging.line_postamble_output = " [END]";      // Should be ignored
+    doc->m_logging.file_preamble = "==== Log Start ===="; // Should be ignored
+    doc->m_logging.file_postamble = "==== Log End ====";  // Should be ignored
 
     QString logFile = getTempLogFile("test_raw_logging.log");
 
@@ -157,9 +137,10 @@ TEST_F(RetrospectiveLoggingTest, RawLoggingMode)
     EXPECT_EQ(result, 0) << "OpenLog should succeed";
 
     // Log a line with special characters
-    Line* line = createLine(1, "<html> & \"special\" chars", 0);
+    auto lineOwner = createLine(1, "<html> & \"special\" chars", 0);
+    Line* line = lineOwner.get();
 
-    doc->m_currentLine = line;
+    doc->m_currentLine = std::move(lineOwner);
     doc->logCompletedLine(line);
 
     doc->CloseLog();
@@ -175,28 +156,23 @@ TEST_F(RetrospectiveLoggingTest, RawLoggingMode)
     EXPECT_FALSE(content.contains("==== Log End ====")) << "No file postamble in raw mode";
     EXPECT_FALSE(content.contains("&lt;")) << "No HTML escaping in raw mode";
 
-    // Clear m_currentLine pointer before deleting the line to avoid dangling pointer
-    doc->m_currentLine = nullptr;
-
-    // Note: Manually delete line because it was NOT added to m_lineList
-    delete line;
+    // Release m_currentLine (unique_ptr reset handles cleanup)
+    doc->m_currentLine.reset();
 }
 
 // Test 3: Retrospective Logging with HTML Mode
 // Verifies that retrospective logging respects HTML mode.
 TEST_F(RetrospectiveLoggingTest, RetrospectiveLoggingWithHTML)
 {
-    doc->m_bLogHTML = true;
-    doc->m_bLogInColour = false; // HTML without colors
-    doc->m_bLogRaw = false;
-    doc->m_bLogOutput = true;
-    doc->m_strLogLinePreambleOutput = "";
-    doc->m_strLogLinePostambleOutput = "";
+    doc->m_logging.log_html = true;
+    doc->m_logging.log_in_colour = false; // HTML without colors
+    doc->m_logging.log_raw = false;
+    doc->m_logging.log_output = true;
+    doc->m_logging.line_preamble_output = "";
+    doc->m_logging.line_postamble_output = "";
 
     // Create line with HTML special characters
-    Line* line = createLine(1, "<script>alert('XSS')</script>", LOG_LINE);
-
-    doc->m_lineList.append(line);
+    doc->m_lineList.push_back(createLine(1, "<script>alert('XSS')</script>", LOG_LINE));
 
     QString logFile = getTempLogFile("test_retrospective_html.log");
 
@@ -217,12 +193,12 @@ TEST_F(RetrospectiveLoggingTest, RetrospectiveLoggingWithHTML)
 // Verifies that opening log with empty buffer doesn't crash.
 TEST_F(RetrospectiveLoggingTest, EmptyBufferRetrospectiveLogging)
 {
-    doc->m_bLogHTML = false;
-    doc->m_bLogRaw = false;
-    doc->m_bLogOutput = true;
+    doc->m_logging.log_html = false;
+    doc->m_logging.log_raw = false;
+    doc->m_logging.log_output = true;
 
     // No lines in buffer
-    EXPECT_TRUE(doc->m_lineList.isEmpty()) << "Buffer should be empty";
+    EXPECT_TRUE(doc->m_lineList.empty()) << "Buffer should be empty";
 
     QString logFile = getTempLogFile("test_empty_buffer.log");
 
@@ -242,30 +218,22 @@ TEST_F(RetrospectiveLoggingTest, EmptyBufferRetrospectiveLogging)
 // Tests that different line types (output, notes, input) use correct preambles.
 TEST_F(RetrospectiveLoggingTest, MixedLineTypesRetrospectiveLogging)
 {
-    doc->m_bLogHTML = false;
-    doc->m_bLogRaw = false;
-    doc->m_bLogOutput = true;
-    doc->m_bLogNotes = true;
-    doc->m_log_input = true;
-    doc->m_strLogLinePreambleOutput = "[OUT] ";
-    doc->m_strLogLinePreambleNotes = "[NOTE] ";
-    doc->m_strLogLinePreambleInput = "[CMD] ";
-    doc->m_strLogLinePostambleOutput = "";
-    doc->m_strLogLinePostambleNotes = "";
-    doc->m_strLogLinePostambleInput = "";
+    doc->m_logging.log_html = false;
+    doc->m_logging.log_raw = false;
+    doc->m_logging.log_output = true;
+    doc->m_logging.log_notes = true;
+    doc->m_logging.log_input = true;
+    doc->m_logging.line_preamble_output = "[OUT] ";
+    doc->m_logging.line_preamble_notes = "[NOTE] ";
+    doc->m_logging.line_preamble_input = "[CMD] ";
+    doc->m_logging.line_postamble_output = "";
+    doc->m_logging.line_postamble_notes = "";
+    doc->m_logging.line_postamble_input = "";
 
-    // Output line
-    Line* line1 = createLine(1, "MUD says hello", LOG_LINE);
-
-    // Note line
-    Line* line2 = createLine(2, "Script note", COMMENT | LOG_LINE);
-
-    // Input line
-    Line* line3 = createLine(3, "kill orc", USER_INPUT | LOG_LINE);
-
-    doc->m_lineList.append(line1);
-    doc->m_lineList.append(line2);
-    doc->m_lineList.append(line3);
+    // Output line, Note line, Input line
+    doc->m_lineList.push_back(createLine(1, "MUD says hello", LOG_LINE));
+    doc->m_lineList.push_back(createLine(2, "Script note", COMMENT | LOG_LINE));
+    doc->m_lineList.push_back(createLine(3, "kill orc", USER_INPUT | LOG_LINE));
 
     QString logFile = getTempLogFile("test_mixed_types.log");
 
@@ -289,18 +257,4 @@ TEST_F(RetrospectiveLoggingTest, MixedLineTypesRetrospectiveLogging)
     EXPECT_LT(notePos, cmdPos) << "Note line should come before input line";
 
     // Note: Don't delete lines - WorldDocument destructor handles them
-}
-
-// Main function required for GoogleTest
-// Note: QCoreApplication must be created before any Qt objects
-int main(int argc, char** argv)
-{
-    // Initialize Qt (required for Qt objects like WorldDocument)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

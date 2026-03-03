@@ -5,44 +5,32 @@
  * 1. Alias evaluation intercepts commands
  * 2. Commands without aliases go to MUD
  * 3. Alias execution handles all actions correctly
- * 4. Command history respects bOmitFromCommandHistory
+ * 4. Command history respects omit_from_command_history
  */
 
 #include "../src/automation/alias.h"
 #include "../src/world/world_document.h"
-#include <QCoreApplication>
-#include <gtest/gtest.h>
+#include "fixtures/world_fixtures.h"
 
 // Test fixture for alias integration tests
-class AliasIntegrationTest : public ::testing::Test {
+class AliasIntegrationTest : public WorldDocumentTest {
   protected:
-    void SetUp() override
-    {
-        doc = new WorldDocument();
-    }
-
-    void TearDown() override
-    {
-        delete doc;
-    }
-
     // Helper to add and enable an alias
     Alias* addAlias(const QString& label, const QString& pattern)
     {
         auto alias = std::make_unique<Alias>();
         alias->name = pattern;
-        alias->bEnabled = true;
-        alias->strLabel = label;
-        alias->iSendTo = 0; // eSendToWorld
-        alias->iSequence = 100;
+        alias->enabled = true;
+        alias->label = label;
+        alias->send_to = eSendToWorld;
+        alias->sequence = 100;
 
         Alias* aliasPtr = alias.get();
-        doc->addAlias(label, std::move(alias));
+        auto addResult = doc->addAlias(label, std::move(alias));
+        EXPECT_TRUE(addResult.has_value());
 
         return aliasPtr;
     }
-
-    WorldDocument* doc = nullptr;
 };
 
 // Test 1: Alias Intercepts Command (Prevents MUD Send)
@@ -62,7 +50,7 @@ TEST_F(AliasIntegrationTest, AliasInterceptsCommand)
     EXPECT_TRUE(aliasHandled) << "Alias should intercept command 'n'";
 
     // Verify alias was executed
-    EXPECT_EQ(a->nMatched, 1) << "Alias should be executed once";
+    EXPECT_EQ(a->matched, 1) << "Alias should be executed once";
 }
 
 // Test 2: Non-Matching Command Goes to MUD
@@ -80,16 +68,16 @@ TEST_F(AliasIntegrationTest, NonMatchingCommandGoesToMUD)
     EXPECT_FALSE(aliasHandled) << "No alias should match 'south'";
 
     // Verify alias was NOT executed
-    EXPECT_EQ(a->nMatched, 0) << "Alias should not be executed";
+    EXPECT_EQ(a->matched, 0) << "Alias should not be executed";
 }
 
-// Test 3: Command History - bOmitFromCommandHistory = false (default)
+// Test 3: Command History - omit_from_command_history = false (default)
 TEST_F(AliasIntegrationTest, CommandHistoryIncludesCommand)
 {
-    // Alias with bOmitFromCommandHistory = false (default)
+    // Alias with omit_from_command_history = false (default)
     Alias* a = addAlias("heal_alias", "heal");
     a->contents = "cast heal self";
-    a->bOmitFromCommandHistory = false; // Should add to history
+    a->omit_from_command_history = false; // Should add to history
 
     // Clear command history
     doc->m_commandHistory.clear();
@@ -99,16 +87,16 @@ TEST_F(AliasIntegrationTest, CommandHistoryIncludesCommand)
 
     // Check if added to history
     EXPECT_TRUE(doc->m_commandHistory.contains("heal"))
-        << "Command should be added to history (bOmitFromCommandHistory = false)";
+        << "Command should be added to history (omit_from_command_history = false)";
 }
 
-// Test 4: Command History - bOmitFromCommandHistory = true
+// Test 4: Command History - omit_from_command_history = true
 TEST_F(AliasIntegrationTest, CommandHistoryOmitsCommand)
 {
-    // Alias with bOmitFromCommandHistory = true
+    // Alias with omit_from_command_history = true
     Alias* a = addAlias("secret_alias", "secret");
     a->contents = "say secret password";
-    a->bOmitFromCommandHistory = true; // Should NOT add to history
+    a->omit_from_command_history = true; // Should NOT add to history
 
     // Clear command history
     doc->m_commandHistory.clear();
@@ -118,7 +106,7 @@ TEST_F(AliasIntegrationTest, CommandHistoryOmitsCommand)
 
     // Check if NOT in history
     EXPECT_FALSE(doc->m_commandHistory.contains("secret"))
-        << "Command should not be added to history (bOmitFromCommandHistory = true)";
+        << "Command should not be added to history (omit_from_command_history = true)";
 }
 
 // Test 5: Wildcard Alias End-to-End
@@ -146,20 +134,20 @@ TEST_F(AliasIntegrationTest, AliasPriorityBySequence)
     // Higher priority (lower sequence number) should execute first
     Alias* a1 = addAlias("high_priority", "go *");
     a1->contents = "walk %1";
-    a1->iSequence = 50; // Higher priority
-    a1->bKeepEvaluating = false;
+    a1->sequence = 50; // Higher priority
+    a1->keep_evaluating = false;
 
     Alias* a2 = addAlias("low_priority", "go *");
     a2->contents = "run %1";
-    a2->iSequence = 150; // Lower priority
+    a2->sequence = 150; // Lower priority
 
     // Execute
     doc->evaluateAliases("go north");
 
     // Higher priority should execute
-    EXPECT_EQ(a1->nMatched, 1) << "Higher priority alias should execute";
-    // Lower priority should not execute (bKeepEvaluating = false)
-    EXPECT_EQ(a2->nMatched, 0) << "Lower priority alias should not execute";
+    EXPECT_EQ(a1->matched, 1) << "Higher priority alias should execute";
+    // Lower priority should not execute (keep_evaluating = false)
+    EXPECT_EQ(a2->matched, 0) << "Lower priority alias should not execute";
 }
 
 // Test 7: Disabled Alias Does Not Execute
@@ -168,14 +156,14 @@ TEST_F(AliasIntegrationTest, DisabledAliasDoesNotExecute)
     // Create disabled alias
     Alias* a = addAlias("disabled_alias", "test");
     a->contents = "say testing";
-    a->bEnabled = false; // Disabled
+    a->enabled = false; // Disabled
 
     // Execute
     bool handled = doc->evaluateAliases("test");
 
     // Verify alias did not handle command
     EXPECT_FALSE(handled) << "Disabled alias should not handle command";
-    EXPECT_EQ(a->nMatched, 0) << "Disabled alias should not execute";
+    EXPECT_EQ(a->matched, 0) << "Disabled alias should not execute";
 }
 
 // Test 8: Exact Match Takes Precedence Over Wildcard
@@ -184,32 +172,19 @@ TEST_F(AliasIntegrationTest, ExactMatchPrecedence)
     // Wildcard pattern (lower priority)
     Alias* a1 = addAlias("wildcard_alias", "look *");
     a1->contents = "examine %1";
-    a1->iSequence = 100;
-    a1->bKeepEvaluating = false;
+    a1->sequence = 100;
+    a1->keep_evaluating = false;
 
     // Exact match (higher priority)
     Alias* a2 = addAlias("exact_alias", "look");
     a2->contents = "glance";
-    a2->iSequence = 50; // Higher priority
+    a2->sequence = 50; // Higher priority
 
     // Execute exact match
     doc->evaluateAliases("look");
 
     // Exact match should execute
-    EXPECT_EQ(a2->nMatched, 1) << "Exact match should execute";
+    EXPECT_EQ(a2->matched, 1) << "Exact match should execute";
     // Wildcard should not execute
-    EXPECT_EQ(a1->nMatched, 0) << "Wildcard match should not execute";
-}
-
-// GoogleTest main function
-int main(int argc, char** argv)
-{
-    // Initialize Qt application (required for Qt types)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
+    EXPECT_EQ(a1->matched, 0) << "Wildcard match should not execute";
 }

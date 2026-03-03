@@ -28,7 +28,7 @@ void register_miniwindow_functions(lua_State* L);
 /**
  * register_setting_functions - Register all world settings and info API functions
  *
- * Registers GetInfo, GetWorldName, SetOption, GetOption, SetStatus, Repaint,
+ * Registers GetInfo, SetOption, GetOption, SetStatus, Repaint,
  * TextRectangle, SetBackgroundImage, GetCommand, SetCommandWindowHeight,
  * SetScroll, AddFont, and SetCursor.
  *

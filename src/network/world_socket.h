@@ -5,6 +5,8 @@
 #include <QObject>
 #include <QString>
 #include <QTcpSocket>
+#include <expected>
+#include <span>
 
 class WorldDocument;
 
@@ -19,13 +21,14 @@ class WorldSocket : public QObject {
 
   public:
     explicit WorldSocket(WorldDocument* doc, QObject* parent = nullptr);
-    ~WorldSocket();
+    ~WorldSocket() override;
 
     void connectToHost(const QString& host, quint16 port);
     void disconnectFromHost();
-    qint64 send(const char* data, qint64 len);
-    qint64 receive(char* buffer, qint64 maxLen);
+    std::expected<qint64, QString> send(std::span<const char> data);
+    std::expected<qint64, QString> receive(std::span<char> buffer);
     bool isConnected() const;
+    [[nodiscard]] QString peerAddress() const;
 
     WorldDocument* m_pDoc;
     QString m_outstanding_data;

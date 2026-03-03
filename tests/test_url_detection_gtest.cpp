@@ -10,10 +10,10 @@
 #include "../src/text/action.h"
 #include "../src/text/line.h"
 #include "../src/text/style.h"
+#include "../src/utils/url_linkifier.h"
 #include "../src/world/color_utils.h"
 #include "../src/world/world_document.h"
-#include <QCoreApplication>
-#include <gtest/gtest.h>
+#include "fixtures/world_fixtures.h"
 
 // Test fixture for URL detection tests
 class URLDetectionTest : public ::testing::Test {
@@ -21,19 +21,17 @@ class URLDetectionTest : public ::testing::Test {
     void SetUp() override
     {
         // Create a WorldDocument instance for testing
-        m_doc = new WorldDocument();
+        m_doc = std::make_unique<WorldDocument>();
     }
 
     void TearDown() override
     {
-        delete m_doc;
-        m_doc = nullptr;
     }
 
     // Helper: Create a line with text and a single style
-    Line* createTestLine(const QString& text)
+    std::unique_ptr<Line> createTestLine(const QString& text)
     {
-        Line* line = new Line(1, 80, 0, qRgb(255, 255, 255), qRgb(0, 0, 0), false);
+        auto line = std::make_unique<Line>(1, 80, 0, qRgb(255, 255, 255), qRgb(0, 0, 0), false);
 
         // Add text to line's textBuffer
         QByteArray textBytes = text.toUtf8();
@@ -81,255 +79,231 @@ class URLDetectionTest : public ::testing::Test {
         }
 
         Style* style = line->styleList[styleIdx].get();
-        return QString::fromUtf8(line->text() + currentPos, style->iLength);
+        return QString::fromUtf8(line->text().data() + currentPos, style->iLength);
     }
 
-    WorldDocument* m_doc = nullptr;
+    std::unique_ptr<WorldDocument> m_doc;
 };
 
 // Test 1: Detect simple HTTP URL
 TEST_F(URLDetectionTest, SimpleHTTPURL)
 {
-    Line* line = createTestLine("Visit http://example.com for more info");
+    auto line = createTestLine("Visit http://example.com for more info");
 
     ASSERT_EQ(line->styleList.size(), 1); // One style before detection
     EXPECT_GT(line->len(), 0);            // Just check that there's text
 
     // Run URL detection
-    m_doc->DetectAndLinkifyURLs(line);
+    URLLinkifier::detectAndLinkifyURLs(line.get(), m_doc.get());
 
     // Should split into 3 styles: before, URL, after
     ASSERT_EQ(line->styleList.size(), 3);
 
     // Check first style (before URL)
-    EXPECT_EQ(getStyleText(line, 0), "Visit ");
+    EXPECT_EQ(getStyleText(line.get(), 0), "Visit ");
     EXPECT_EQ(line->styleList[0]->iFlags & ACTION_HYPERLINK, 0);
 
     // Check second style (URL)
-    EXPECT_EQ(getStyleText(line, 1), "http://example.com");
+    EXPECT_EQ(getStyleText(line.get(), 1), "http://example.com");
     EXPECT_NE(line->styleList[1]->iFlags & ACTION_HYPERLINK, 0);
     ASSERT_NE(line->styleList[1]->pAction, nullptr);
     EXPECT_EQ(line->styleList[1]->pAction->m_strAction, "http://example.com");
 
     // Check third style (after URL)
-    EXPECT_EQ(getStyleText(line, 2), " for more info");
+    EXPECT_EQ(getStyleText(line.get(), 2), " for more info");
     EXPECT_EQ(line->styleList[2]->iFlags & ACTION_HYPERLINK, 0);
-
-    delete line;
 }
 
 // Test 2: Detect HTTPS URL
 TEST_F(URLDetectionTest, HTTPSURL)
 {
-    Line* line = createTestLine("Secure site: https://secure.example.com/path");
+    auto line = createTestLine("Secure site: https://secure.example.com/path");
 
-    m_doc->DetectAndLinkifyURLs(line);
+    URLLinkifier::detectAndLinkifyURLs(line.get(), m_doc.get());
 
     ASSERT_GE(line->styleList.size(), 2);
-    int hyperlinkCount = countHyperlinkStyles(line);
+    int hyperlinkCount = countHyperlinkStyles(line.get());
     EXPECT_EQ(hyperlinkCount, 1);
 
     // Find the hyperlink style
     for (size_t i = 0; i < line->styleList.size(); ++i) {
         if (line->styleList[i]->iFlags & ACTION_HYPERLINK) {
-            EXPECT_TRUE(getStyleText(line, i).startsWith("https://"));
+            EXPECT_TRUE(getStyleText(line.get(), i).startsWith("https://"));
             ASSERT_NE(line->styleList[i]->pAction, nullptr);
             EXPECT_TRUE(line->styleList[i]->pAction->m_strAction.startsWith("https://"));
             break;
         }
     }
-
-    delete line;
 }
 
 // Test 3: Detect FTP URL
 TEST_F(URLDetectionTest, FTPURL)
 {
-    Line* line = createTestLine("Download from ftp://files.example.com/file.zip");
+    auto line = createTestLine("Download from ftp://files.example.com/file.zip");
 
-    m_doc->DetectAndLinkifyURLs(line);
+    URLLinkifier::detectAndLinkifyURLs(line.get(), m_doc.get());
 
-    int hyperlinkCount = countHyperlinkStyles(line);
+    int hyperlinkCount = countHyperlinkStyles(line.get());
     EXPECT_EQ(hyperlinkCount, 1);
-
-    delete line;
 }
 
 // Test 4: Detect mailto: URL
 TEST_F(URLDetectionTest, MailtoURL)
 {
-    Line* line = createTestLine("Contact mailto:support@example.com");
+    auto line = createTestLine("Contact mailto:support@example.com");
 
-    m_doc->DetectAndLinkifyURLs(line);
+    URLLinkifier::detectAndLinkifyURLs(line.get(), m_doc.get());
 
-    int hyperlinkCount = countHyperlinkStyles(line);
+    int hyperlinkCount = countHyperlinkStyles(line.get());
     EXPECT_EQ(hyperlinkCount, 1);
 
     // Find the mailto style
     for (size_t i = 0; i < line->styleList.size(); ++i) {
         if (line->styleList[i]->iFlags & ACTION_HYPERLINK) {
-            QString text = getStyleText(line, i);
+            QString text = getStyleText(line.get(), i);
             EXPECT_TRUE(text.startsWith("mailto:"));
             break;
         }
     }
-
-    delete line;
 }
 
 // Test 5: Multiple URLs in one line
 TEST_F(URLDetectionTest, MultipleURLs)
 {
-    Line* line = createTestLine("Visit http://example.com or https://other.com");
+    auto line = createTestLine("Visit http://example.com or https://other.com");
 
-    m_doc->DetectAndLinkifyURLs(line);
+    URLLinkifier::detectAndLinkifyURLs(line.get(), m_doc.get());
 
-    int hyperlinkCount = countHyperlinkStyles(line);
+    int hyperlinkCount = countHyperlinkStyles(line.get());
     EXPECT_EQ(hyperlinkCount, 2);
-
-    delete line;
 }
 
 // Test 6: URL at start of line
 TEST_F(URLDetectionTest, URLAtStart)
 {
-    Line* line = createTestLine("http://example.com is our website");
+    auto line = createTestLine("http://example.com is our website");
 
-    m_doc->DetectAndLinkifyURLs(line);
+    URLLinkifier::detectAndLinkifyURLs(line.get(), m_doc.get());
 
     // Should split into 2 styles: URL, after
     ASSERT_GE(line->styleList.size(), 2);
 
     // First style should be the URL
-    EXPECT_EQ(getStyleText(line, 0), "http://example.com");
+    EXPECT_EQ(getStyleText(line.get(), 0), "http://example.com");
     EXPECT_NE(line->styleList[0]->iFlags & ACTION_HYPERLINK, 0);
-
-    delete line;
 }
 
 // Test 7: URL at end of line
 TEST_F(URLDetectionTest, URLAtEnd)
 {
-    Line* line = createTestLine("Visit us at http://example.com");
+    auto line = createTestLine("Visit us at http://example.com");
 
-    m_doc->DetectAndLinkifyURLs(line);
+    URLLinkifier::detectAndLinkifyURLs(line.get(), m_doc.get());
 
     // Should split into 2 styles: before, URL
     ASSERT_GE(line->styleList.size(), 2);
 
     // Last style should be the URL
     size_t lastIdx = line->styleList.size() - 1;
-    EXPECT_EQ(getStyleText(line, lastIdx), "http://example.com");
+    EXPECT_EQ(getStyleText(line.get(), lastIdx), "http://example.com");
     EXPECT_NE(line->styleList[lastIdx]->iFlags & ACTION_HYPERLINK, 0);
-
-    delete line;
 }
 
 // Test 8: No URLs in line
 TEST_F(URLDetectionTest, NoURLs)
 {
-    Line* line = createTestLine("This line has no URLs at all");
+    auto line = createTestLine("This line has no URLs at all");
 
     size_t originalStyleCount = line->styleList.size();
-    m_doc->DetectAndLinkifyURLs(line);
+    URLLinkifier::detectAndLinkifyURLs(line.get(), m_doc.get());
 
     // Should not change style count
     EXPECT_EQ(line->styleList.size(), originalStyleCount);
 
-    int hyperlinkCount = countHyperlinkStyles(line);
+    int hyperlinkCount = countHyperlinkStyles(line.get());
     EXPECT_EQ(hyperlinkCount, 0);
-
-    delete line;
 }
 
 // Test 9: URL with query parameters
 TEST_F(URLDetectionTest, URLWithQueryParams)
 {
-    Line* line = createTestLine("Search: https://example.com/search?q=test&lang=en");
+    auto line = createTestLine("Search: https://example.com/search?q=test&lang=en");
 
-    m_doc->DetectAndLinkifyURLs(line);
+    URLLinkifier::detectAndLinkifyURLs(line.get(), m_doc.get());
 
-    int hyperlinkCount = countHyperlinkStyles(line);
+    int hyperlinkCount = countHyperlinkStyles(line.get());
     EXPECT_EQ(hyperlinkCount, 1);
 
     // Find the URL and verify it includes query params
     for (size_t i = 0; i < line->styleList.size(); ++i) {
         if (line->styleList[i]->iFlags & ACTION_HYPERLINK) {
-            QString url = getStyleText(line, i);
+            QString url = getStyleText(line.get(), i);
             EXPECT_TRUE(url.contains("?"));
             EXPECT_TRUE(url.contains("&"));
             break;
         }
     }
-
-    delete line;
 }
 
 // Test 10: URL with port number
 TEST_F(URLDetectionTest, URLWithPort)
 {
-    Line* line = createTestLine("Connect to http://example.com:8080/api");
+    auto line = createTestLine("Connect to http://example.com:8080/api");
 
-    m_doc->DetectAndLinkifyURLs(line);
+    URLLinkifier::detectAndLinkifyURLs(line.get(), m_doc.get());
 
-    int hyperlinkCount = countHyperlinkStyles(line);
+    int hyperlinkCount = countHyperlinkStyles(line.get());
     EXPECT_EQ(hyperlinkCount, 1);
 
     // Find the URL and verify it includes port
     for (size_t i = 0; i < line->styleList.size(); ++i) {
         if (line->styleList[i]->iFlags & ACTION_HYPERLINK) {
-            QString url = getStyleText(line, i);
+            QString url = getStyleText(line.get(), i);
             EXPECT_TRUE(url.contains(":8080"));
             break;
         }
     }
-
-    delete line;
 }
 
 // Test 11: URL surrounded by punctuation
 TEST_F(URLDetectionTest, URLWithPunctuation)
 {
-    Line* line = createTestLine("Visit (http://example.com).");
+    auto line = createTestLine("Visit (http://example.com).");
 
-    m_doc->DetectAndLinkifyURLs(line);
+    URLLinkifier::detectAndLinkifyURLs(line.get(), m_doc.get());
 
-    int hyperlinkCount = countHyperlinkStyles(line);
+    int hyperlinkCount = countHyperlinkStyles(line.get());
     EXPECT_EQ(hyperlinkCount, 1);
 
     // The URL should not include surrounding punctuation
     for (size_t i = 0; i < line->styleList.size(); ++i) {
         if (line->styleList[i]->iFlags & ACTION_HYPERLINK) {
-            QString url = getStyleText(line, i);
+            QString url = getStyleText(line.get(), i);
             // Should be just the URL, not including the )
             EXPECT_FALSE(url.endsWith(")"));
             EXPECT_FALSE(url.startsWith("("));
             break;
         }
     }
-
-    delete line;
 }
 
 // Test 12: Empty line
 TEST_F(URLDetectionTest, EmptyLine)
 {
-    Line* line = new Line(1, 80, 0, qRgb(255, 255, 255), qRgb(0, 0, 0), false);
+    auto line = std::make_unique<Line>(1, 80, 0, qRgb(255, 255, 255), qRgb(0, 0, 0), false);
 
-    m_doc->DetectAndLinkifyURLs(line);
+    URLLinkifier::detectAndLinkifyURLs(line.get(), m_doc.get());
 
     // Should handle empty line gracefully
     EXPECT_EQ(line->len(), 0);
-
-    delete line;
 }
 
 // Test 13: Hyperlink style attributes
 TEST_F(URLDetectionTest, HyperlinkStyleAttributes)
 {
-    Line* line = createTestLine("Link: http://example.com");
+    auto line = createTestLine("Link: http://example.com");
 
-    m_doc->DetectAndLinkifyURLs(line);
+    URLLinkifier::detectAndLinkifyURLs(line.get(), m_doc.get());
 
     // Find the hyperlink style
     for (size_t i = 0; i < line->styleList.size(); ++i) {
@@ -346,13 +320,4 @@ TEST_F(URLDetectionTest, HyperlinkStyleAttributes)
             break;
         }
     }
-
-    delete line;
-}
-
-int main(int argc, char** argv)
-{
-    QCoreApplication app(argc, argv);
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
 }

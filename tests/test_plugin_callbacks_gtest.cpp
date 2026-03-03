@@ -10,18 +10,9 @@
  */
 
 #include "../src/automation/plugin.h"
-#include "../src/world/script_engine.h"
-#include "../src/world/world_document.h"
-#include <QCoreApplication>
+#include "fixtures/world_fixtures.h"
 #include <QFile>
 #include <QTemporaryFile>
-#include <gtest/gtest.h>
-
-extern "C" {
-#include <lauxlib.h>
-#include <lua.h>
-#include <lualib.h>
-}
 
 // Test fixture for plugin callback tests
 class PluginCallbacksTest : public ::testing::Test {
@@ -29,7 +20,7 @@ class PluginCallbacksTest : public ::testing::Test {
     void SetUp() override
     {
         // Create world document
-        doc = new WorldDocument();
+        doc = std::make_unique<WorldDocument>();
 
         // Create test plugin XML file
         pluginFile = new QTemporaryFile();
@@ -114,10 +105,9 @@ end
     void TearDown() override
     {
         delete pluginFile;
-        delete doc;
     }
 
-    WorldDocument* doc = nullptr;
+    std::unique_ptr<WorldDocument> doc;
     Plugin* plugin = nullptr;
     QTemporaryFile* pluginFile = nullptr;
     lua_State* L = nullptr;
@@ -286,17 +276,4 @@ TEST_F(PluginCallbacksTest, ExecutePluginScript_NonExistentCallback)
     doc->m_CurrentPlugin = nullptr;
 
     EXPECT_TRUE(result) << "Non-existent callback should return true (default = continue)";
-}
-
-// GoogleTest main function
-int main(int argc, char** argv)
-{
-    // Initialize Qt application (required for Qt types)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

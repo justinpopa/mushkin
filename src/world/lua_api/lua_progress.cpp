@@ -42,8 +42,7 @@ static QProgressDialog* getProgressDialog(lua_State* L)
 static int Lprogress_status(lua_State* L)
 {
     QProgressDialog* dlg = getProgressDialog(L);
-    const char* text = luaL_checkstring(L, 2);
-    dlg->setLabelText(QString::fromUtf8(text));
+    dlg->setLabelText(QString::fromUtf8(luaL_checkstring(L, 2)));
 
     // Process events to keep UI responsive
     QApplication::processEvents();

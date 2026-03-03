@@ -37,19 +37,19 @@ class Variable {
     /**
      * Constructor - initializes to defaults
      */
-    Variable() : nUpdateNumber(0), bSelected(false)
+    Variable() : update_number(0), selected(false)
     {
     }
 
     // ========== Fields ==========
 
-    QString strLabel;    // Variable name (key)
-    QString strContents; // Variable value (always string)
+    QString label;       // Variable name (key)
+    QString contents; // Variable value (always string)
 
     // ========== Runtime Fields ==========
 
-    qint64 nUpdateNumber; // For detecting update clashes
-    bool bSelected;       // If true, selected for use in a plugin
+    qint64 update_number; // For detecting update clashes
+    bool selected;        // If true, selected for use in a plugin
 };
 
 // Type definitions

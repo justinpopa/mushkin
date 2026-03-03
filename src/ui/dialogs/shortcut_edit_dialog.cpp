@@ -6,6 +6,7 @@
  */
 
 #include "shortcut_edit_dialog.h"
+#include "../../automation/sendto.h"
 #include "../../world/accelerator_manager.h"
 #include "../../world/world_document.h"
 #include <QDialogButtonBox>
@@ -14,25 +15,6 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QVBoxLayout>
-
-// SendTo constants (from world_document.h)
-enum eSendTo {
-    eSendToWorld = 0,
-    eSendToCommand = 1,
-    eSendToOutput = 2,
-    eSendToStatus = 3,
-    eSendToNotepad = 4,
-    eSendToNotepadAppend = 5,
-    eSendToLogFile = 6,
-    eSendToNotepadReplace = 7,
-    eSendToCommandQueue = 8,
-    eSendToVariable = 9,
-    eSendToExecute = 12,
-    eSendToSpeedwalk = 13,
-    eSendToScript = 14,
-    eSendToImmediate = 15,
-    eSendToScriptAfterOmit = 16
-};
 
 ShortcutEditDialog::ShortcutEditDialog(WorldDocument* doc, QWidget* parent)
     : QDialog(parent), m_doc(doc), m_isEditMode(false)
@@ -84,8 +66,8 @@ void ShortcutEditDialog::setupUi()
     m_sendToCombo->addItem("Output window", eSendToOutput);
     m_sendToCombo->addItem("Variable", eSendToVariable);
     m_sendToCombo->addItem("Notepad (new)", eSendToNotepad);
-    m_sendToCombo->addItem("Notepad (append)", eSendToNotepadAppend);
-    m_sendToCombo->addItem("Notepad (replace)", eSendToNotepadReplace);
+    m_sendToCombo->addItem("Notepad (append)", eAppendToNotepad);
+    m_sendToCombo->addItem("Notepad (replace)", eReplaceNotepad);
     m_sendToCombo->addItem("Log file", eSendToLogFile);
     formLayout->addRow("Send to:", m_sendToCombo);
 

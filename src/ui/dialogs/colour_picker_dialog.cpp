@@ -62,12 +62,12 @@ void ColourPickerDialog::setupUi()
 
         if (i < 8) {
             // Normal colors (first row)
-            color = m_doc ? m_doc->m_normalcolour[i] : qRgb(0, 0, 0);
+            color = m_doc ? m_doc->m_colors.normal_colour[i] : qRgb(0, 0, 0);
             tooltip = QString("%1 (Normal %2)").arg(ANSI_NORMAL_NAMES[i]).arg(i + 1);
         } else {
             // Bold colors (second row)
             int boldIndex = i - 8;
-            color = m_doc ? m_doc->m_boldcolour[boldIndex] : qRgb(255, 255, 255);
+            color = m_doc ? m_doc->m_colors.bold_colour[boldIndex] : qRgb(255, 255, 255);
             tooltip = QString("%1 (Bold %2)").arg(ANSI_BOLD_NAMES[boldIndex]).arg(boldIndex + 1);
         }
 
@@ -93,12 +93,12 @@ void ColourPickerDialog::setupUi()
 
     // Create 16 custom color buttons (2 rows x 8 columns)
     for (int i = 0; i < MAX_CUSTOM; i++) {
-        QRgb color = m_doc ? m_doc->m_customtext[i] : qRgb(255, 255, 255);
+        QRgb color = m_doc ? m_doc->m_colors.custom_text[i] : qRgb(255, 255, 255);
 
         // Check if there's a custom name for this color
         QString tooltip = QString("Custom %1").arg(i + 1);
-        if (m_doc && !m_doc->m_strCustomColourName[i].isEmpty()) {
-            tooltip = QString("%1 (Custom %2)").arg(m_doc->m_strCustomColourName[i]).arg(i + 1);
+        if (m_doc && !m_doc->m_colors.custom_colour_name[i].isEmpty()) {
+            tooltip = QString("%1 (Custom %2)").arg(m_doc->m_colors.custom_colour_name[i]).arg(i + 1);
         }
 
         QPushButton* btn = createColorButton(color, tooltip);
@@ -182,11 +182,11 @@ void ColourPickerDialog::updateColorSwatch()
     if (m_doc) {
         // Simple check against ANSI colors
         for (int i = 0; i < 8; i++) {
-            if (m_doc->m_normalcolour[i] == m_selectedColor) {
+            if (m_doc->m_colors.normal_colour[i] == m_selectedColor) {
                 info += QString("\n%1").arg(ANSI_NORMAL_NAMES[i]);
                 break;
             }
-            if (m_doc->m_boldcolour[i] == m_selectedColor) {
+            if (m_doc->m_colors.bold_colour[i] == m_selectedColor) {
                 info += QString("\n%1").arg(ANSI_BOLD_NAMES[i]);
                 break;
             }
@@ -194,9 +194,9 @@ void ColourPickerDialog::updateColorSwatch()
 
         // Check custom colors
         for (int i = 0; i < MAX_CUSTOM; i++) {
-            if (m_doc->m_customtext[i] == m_selectedColor) {
-                if (!m_doc->m_strCustomColourName[i].isEmpty()) {
-                    info += QString("\n%1").arg(m_doc->m_strCustomColourName[i]);
+            if (m_doc->m_colors.custom_text[i] == m_selectedColor) {
+                if (!m_doc->m_colors.custom_colour_name[i].isEmpty()) {
+                    info += QString("\n%1").arg(m_doc->m_colors.custom_colour_name[i]);
                 } else {
                     info += QString("\nCustom %1").arg(i + 1);
                 }

@@ -17,8 +17,8 @@
 
 FindDialog::FindDialog(WorldDocument* doc, QWidget* parent)
     : QDialog(parent), m_doc(doc), m_lastMatchCase(false), m_lastUseRegex(false),
-      m_lastSearchForward(true), m_lastFoundLine(-1), m_lastFoundChar(-1),
-      m_totalMatches(0), m_currentMatchIndex(0)
+      m_lastSearchForward(true), m_lastFoundLine(-1), m_lastFoundChar(-1), m_totalMatches(0),
+      m_currentMatchIndex(0)
 {
     setWindowTitle("Find");
     setupUi();
@@ -96,10 +96,10 @@ void FindDialog::setupUi()
 
 void FindDialog::loadSettings()
 {
-    Database* db = Database::instance();
+    auto& db = Database::instance();
 
     // Load search history
-    QString historyStr = db->getPreference("FindHistory", "");
+    QString historyStr = db.getPreference("FindHistory", "");
     if (!historyStr.isEmpty()) {
         m_searchHistory = historyStr.split('\n', Qt::SkipEmptyParts);
         for (const QString& text : m_searchHistory) {
@@ -108,27 +108,27 @@ void FindDialog::loadSettings()
     }
 
     // Load last search options
-    m_matchCase->setChecked(db->getPreferenceInt("FindMatchCase", 0) != 0);
-    m_useRegex->setChecked(db->getPreferenceInt("FindUseRegex", 0) != 0);
-    m_searchForward->setChecked(db->getPreferenceInt("FindForward", 1) != 0);
+    m_matchCase->setChecked(db.getPreferenceInt("FindMatchCase", 0) != 0);
+    m_useRegex->setChecked(db.getPreferenceInt("FindUseRegex", 0) != 0);
+    m_searchForward->setChecked(db.getPreferenceInt("FindForward", 1) != 0);
     m_searchBackward->setChecked(!m_searchForward->isChecked());
 }
 
 void FindDialog::saveSettings()
 {
-    Database* db = Database::instance();
+    auto& db = Database::instance();
 
     // Save search history (limit to 20)
     while (m_searchHistory.size() > 20) {
         m_searchHistory.removeLast();
     }
     QString historyStr = m_searchHistory.join('\n');
-    db->setPreference("FindHistory", historyStr);
+    db.setPreference("FindHistory", historyStr);
 
     // Save search options
-    db->setPreferenceInt("FindMatchCase", m_matchCase->isChecked() ? 1 : 0);
-    db->setPreferenceInt("FindUseRegex", m_useRegex->isChecked() ? 1 : 0);
-    db->setPreferenceInt("FindForward", m_searchForward->isChecked() ? 1 : 0);
+    db.setPreferenceInt("FindMatchCase", m_matchCase->isChecked() ? 1 : 0);
+    db.setPreferenceInt("FindUseRegex", m_useRegex->isChecked() ? 1 : 0);
+    db.setPreferenceInt("FindForward", m_searchForward->isChecked() ? 1 : 0);
 }
 
 void FindDialog::findNext()
@@ -177,7 +177,7 @@ bool FindDialog::performSearch(bool forward)
     m_lastSearchForward = forward;
 
     // Perform search
-    if (!m_doc || m_doc->m_lineList.isEmpty()) {
+    if (!m_doc || m_doc->m_lineList.empty()) {
         QMessageBox::information(this, "Find", "No text to search.");
         return false;
     }
@@ -195,12 +195,12 @@ bool FindDialog::performSearch(bool forward)
 
     // Search forward
     if (forward) {
-        for (int i = startLine; i < m_doc->m_lineList.count(); i++) {
-            Line* pLine = m_doc->m_lineList[i];
+        for (int i = startLine; i < static_cast<int>(m_doc->m_lineList.size()); i++) {
+            Line* pLine = m_doc->m_lineList[i].get();
             if (!pLine || pLine->len() == 0)
                 continue;
 
-            QString lineText = QString::fromUtf8(pLine->text(), pLine->len());
+            QString lineText = QString::fromUtf8(pLine->text().data(), pLine->text().size());
 
             int index = -1;
             if (m_lastUseRegex) {
@@ -240,11 +240,11 @@ bool FindDialog::performSearch(bool forward)
     // Search backward
     else {
         for (int i = startLine; i >= 0; i--) {
-            Line* pLine = m_doc->m_lineList[i];
+            Line* pLine = m_doc->m_lineList[i].get();
             if (!pLine || pLine->len() == 0)
                 continue;
 
-            QString lineText = QString::fromUtf8(pLine->text(), pLine->len());
+            QString lineText = QString::fromUtf8(pLine->text().data(), pLine->text().size());
 
             int index = -1;
             if (m_lastUseRegex) {
@@ -294,7 +294,7 @@ bool FindDialog::performSearch(bool forward)
 int FindDialog::countAllMatches()
 {
     QString searchText = m_searchText->currentText();
-    if (searchText.isEmpty() || !m_doc || m_doc->m_lineList.isEmpty()) {
+    if (searchText.isEmpty() || !m_doc || m_doc->m_lineList.empty()) {
         return 0;
     }
 
@@ -303,12 +303,12 @@ int FindDialog::countAllMatches()
     int totalMatches = 0;
 
     // Count matches in all lines
-    for (int i = 0; i < m_doc->m_lineList.count(); i++) {
-        Line* pLine = m_doc->m_lineList[i];
+    for (int i = 0; i < static_cast<int>(m_doc->m_lineList.size()); i++) {
+        Line* pLine = m_doc->m_lineList[i].get();
         if (!pLine || pLine->len() == 0)
             continue;
 
-        QString lineText = QString::fromUtf8(pLine->text(), pLine->len());
+        QString lineText = QString::fromUtf8(pLine->text().data(), pLine->text().size());
 
         if (useRegex) {
             QRegularExpression re(searchText, m_matchCase->isChecked()
@@ -348,12 +348,12 @@ void FindDialog::updateMatchCounter()
     bool useRegex = m_useRegex->isChecked();
     int matchesSoFar = 0;
 
-    for (int i = 0; i < m_doc->m_lineList.count(); i++) {
-        Line* pLine = m_doc->m_lineList[i];
+    for (int i = 0; i < static_cast<int>(m_doc->m_lineList.size()); i++) {
+        Line* pLine = m_doc->m_lineList[i].get();
         if (!pLine || pLine->len() == 0)
             continue;
 
-        QString lineText = QString::fromUtf8(pLine->text(), pLine->len());
+        QString lineText = QString::fromUtf8(pLine->text().data(), pLine->text().size());
 
         if (useRegex) {
             QRegularExpression re(searchText, m_matchCase->isChecked()

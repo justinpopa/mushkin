@@ -11,49 +11,27 @@
  * 6. Unicode text handling
  */
 
-#include "../src/text/line.h"
-#include "../src/text/style.h"
-#include "../src/world/world_document.h"
-#include <QCoreApplication>
-#include <gtest/gtest.h>
+#include "fixtures/world_fixtures.h"
 
 // Test fixture for note methods tests
-class NoteMethodsTest : public ::testing::Test {
+class NoteMethodsTest : public ConnectedWorldTest {
   protected:
     void SetUp() override
     {
-        doc = new WorldDocument();
+        ConnectedWorldTest::SetUp();
 
-        // Initialize basic state
-        doc->m_phase = NONE;
-        doc->m_bUTF_8 = true; // UTF-8 mode
+        // Additional state beyond ConnectedWorldTest defaults
+        doc->m_telnetParser->m_phase = Phase::NONE;
         doc->m_bNotesInRGB = true;
         doc->m_iNoteColourFore = qRgb(255, 255, 255); // White
         doc->m_iNoteColourBack = qRgb(0, 0, 0);       // Black
         doc->m_iNoteStyle = 0;                        // No special styling
 
-        // Create initial line (simulating active connection)
-        doc->m_currentLine = new Line(1, 80, 0, qRgb(192, 192, 192), qRgb(0, 0, 0), true);
-        auto initialStyle = std::make_unique<Style>();
-        initialStyle->iLength = 0;
-        initialStyle->iFlags = COLOUR_RGB;
-        initialStyle->iForeColour = qRgb(192, 192, 192);
-        initialStyle->iBackColour = qRgb(0, 0, 0);
-        initialStyle->pAction = nullptr;
-        doc->m_currentLine->styleList.push_back(std::move(initialStyle));
-
-        // Set current style (simulating MUD output in progress)
+        // Override current style to simulate MUD output in progress (bold red)
         doc->m_iFlags = COLOUR_RGB | HILITE;  // Bold text
         doc->m_iForeColour = qRgb(255, 0, 0); // Red
         doc->m_iBackColour = qRgb(0, 0, 0);   // Black
     }
-
-    void TearDown() override
-    {
-        delete doc;
-    }
-
-    WorldDocument* doc = nullptr;
 };
 
 // Test 1: Basic note() functionality
@@ -62,10 +40,10 @@ TEST_F(NoteMethodsTest, BasicNote)
     doc->note("This is a test note");
 
     // Verify the note was added
-    ASSERT_GE(doc->m_lineList.count(), 1) << "Note should be added to buffer";
+    ASSERT_GE(static_cast<int>(doc->m_lineList.size()), 1) << "Note should be added to buffer";
 
-    Line* line = doc->m_lineList.last();
-    QString text = QString::fromUtf8(line->text(), line->len());
+    Line* line = doc->m_lineList.back().get();
+    QString text = QString::fromUtf8(line->text().data(), line->text().size());
 
     // Check COMMENT flag
     EXPECT_TRUE(line->flags & COMMENT) << "COMMENT flag should be set";
@@ -77,7 +55,7 @@ TEST_F(NoteMethodsTest, BasicNote)
     EXPECT_TRUE(line->hard_return) << "Hard return should be set (newline completed)";
 
     // Check that a new line was created for continued output
-    EXPECT_NE(doc->m_currentLine, line)
+    EXPECT_NE(doc->m_currentLine.get(), line)
         << "New current line should be created for continued output";
 
     // Verify style was restored
@@ -95,10 +73,10 @@ TEST_F(NoteMethodsTest, ColourNoteWithCustomColors)
     doc->colourNote(greenColor, blueColor, "Green text on blue background");
 
     // Verify the colored note
-    ASSERT_GE(doc->m_lineList.count(), 1) << "Colored note should be added";
+    ASSERT_GE(static_cast<int>(doc->m_lineList.size()), 1) << "Colored note should be added";
 
-    Line* line = doc->m_lineList.last();
-    QString text = QString::fromUtf8(line->text(), line->len());
+    Line* line = doc->m_lineList.back().get();
+    QString text = QString::fromUtf8(line->text().data(), line->text().size());
 
     // Check COMMENT flag
     EXPECT_TRUE(line->flags & COMMENT) << "COMMENT flag should be set";
@@ -136,7 +114,7 @@ TEST_F(NoteMethodsTest, ColourNoteWithCustomColors)
 // Test 3: colourTell() without newline
 TEST_F(NoteMethodsTest, ColourTellWithoutNewline)
 {
-    int lineCountBefore = doc->m_lineList.count();
+    int lineCountBefore = static_cast<int>(doc->m_lineList.size());
 
     QRgb yellowColor = qRgb(255, 255, 0); // Yellow
     QRgb blackColor = qRgb(0, 0, 0);      // Black
@@ -146,13 +124,14 @@ TEST_F(NoteMethodsTest, ColourTellWithoutNewline)
     doc->colourTell(qRgb(0, 255, 255), blackColor, "Part 3");  // Cyan
 
     // Verify no new lines were added yet
-    EXPECT_EQ(doc->m_lineList.count(), lineCountBefore)
+    EXPECT_EQ(static_cast<int>(doc->m_lineList.size()), lineCountBefore)
         << "No lines should be added yet (text on current line)";
 
     // Check current line has the text
     ASSERT_NE(doc->m_currentLine, nullptr) << "Current line should exist";
 
-    QString text = QString::fromUtf8(doc->m_currentLine->text(), doc->m_currentLine->len());
+    QString text =
+        QString::fromUtf8(doc->m_currentLine->text().data(), doc->m_currentLine->text().size());
 
     EXPECT_TRUE(text.contains("Part 1")) << "Part 1 should be in current line";
     EXPECT_TRUE(text.contains("Part 2")) << "Part 2 should be in current line";
@@ -165,10 +144,12 @@ TEST_F(NoteMethodsTest, ColourTellWithoutNewline)
     doc->note(""); // Empty note to complete the line
 
     // Verify the line was completed
-    EXPECT_GT(doc->m_lineList.count(), lineCountBefore) << "Line should be completed";
+    EXPECT_GT(static_cast<int>(doc->m_lineList.size()), lineCountBefore)
+        << "Line should be completed";
 
-    Line* completedLine = doc->m_lineList[lineCountBefore];
-    QString completedText = QString::fromUtf8(completedLine->text(), completedLine->len());
+    Line* completedLine = doc->m_lineList[lineCountBefore].get();
+    QString completedText =
+        QString::fromUtf8(completedLine->text().data(), completedLine->text().size());
 
     EXPECT_TRUE(completedText.contains("Part 1")) << "Part 1 should be in completed line";
     EXPECT_TRUE(completedText.contains("Part 2")) << "Part 2 should be in completed line";
@@ -179,11 +160,11 @@ TEST_F(NoteMethodsTest, ColourTellWithoutNewline)
 TEST_F(NoteMethodsTest, NotesSuppression)
 {
     doc->m_bNotesNotWantedNow = true; // Disable notes
-    int lineCountBeforeSuppressed = doc->m_lineList.count();
+    int lineCountBeforeSuppressed = static_cast<int>(doc->m_lineList.size());
 
     doc->note("This should not appear");
 
-    EXPECT_EQ(doc->m_lineList.count(), lineCountBeforeSuppressed)
+    EXPECT_EQ(static_cast<int>(doc->m_lineList.size()), lineCountBeforeSuppressed)
         << "Note should be suppressed when m_bNotesNotWantedNow = true";
 
     doc->m_bNotesNotWantedNow = false; // Re-enable notes
@@ -192,30 +173,18 @@ TEST_F(NoteMethodsTest, NotesSuppression)
 // Test 5: Unicode text in notes
 TEST_F(NoteMethodsTest, UnicodeTextHandling)
 {
-    int lineCountBefore = doc->m_lineList.count();
+    int lineCountBefore = static_cast<int>(doc->m_lineList.size());
 
     doc->note("Unicode test: Café ☕ 你好 ");
 
-    ASSERT_GT(doc->m_lineList.count(), lineCountBefore) << "Unicode note should be added";
+    ASSERT_GT(static_cast<int>(doc->m_lineList.size()), lineCountBefore)
+        << "Unicode note should be added";
 
-    Line* line = doc->m_lineList.last();
-    QString text = QString::fromUtf8(line->text(), line->len());
+    Line* line = doc->m_lineList.back().get();
+    QString text = QString::fromUtf8(line->text().data(), line->text().size());
 
     EXPECT_TRUE(text.contains("Café")) << "Café should be preserved";
     EXPECT_TRUE(text.contains("☕")) << "Coffee emoji should be preserved";
     EXPECT_TRUE(text.contains("你好")) << "Chinese characters should be preserved";
     EXPECT_TRUE(text.contains("")) << "Emoji should be preserved";
-}
-
-// GoogleTest main function
-int main(int argc, char** argv)
-{
-    // Initialize Qt application (required for Qt types)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

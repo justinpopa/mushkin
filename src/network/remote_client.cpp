@@ -7,43 +7,22 @@
 #include "../text/line.h"
 #include "../world/world_document.h"
 #include "ansi_formatter.h"
-#include "telnet_server_session.h"
-#include <QTcpSocket>
+#include "i_remote_transport.h"
+#include <QObject>
 
-namespace {
-constexpr int kMaxPasswordAttempts = 3;
-}
-
-RemoteClient::RemoteClient(QTcpSocket* socket, WorldDocument* doc, const QString& password,
-                           int scrollbackLines, QObject* parent)
-    : QObject(parent), m_pSocket(socket), m_pDoc(doc),
-      m_telnet(std::make_unique<TelnetServerSession>(socket, this)),
-      m_formatter(std::make_unique<AnsiFormatter>(doc)), m_password(password),
-      m_scrollbackLines(scrollbackLines), m_state(State::Negotiating), m_failedAttempts(0),
-      m_maxFailedAttempts(kMaxPasswordAttempts), m_connectedAt(QDateTime::currentDateTime())
+RemoteClient::RemoteClient(IRemoteTransport* transport, WorldDocument* doc, int scrollbackLines,
+                           QObject* parent)
+    : QObject(parent), m_transport(transport), m_pDoc(doc),
+      m_formatter(std::make_unique<AnsiFormatter>(doc)), m_scrollbackLines(scrollbackLines),
+      m_state(State::Connecting), m_connectedAt(QDateTime::currentDateTime())
 {
-    // Take ownership of socket
-    m_pSocket->setParent(this);
-
-    // Connect socket signals
-    connect(m_pSocket, &QTcpSocket::readyRead, this, &RemoteClient::onReadyRead);
-    connect(m_pSocket, &QTcpSocket::disconnected, this, &RemoteClient::onDisconnected);
-    connect(m_pSocket, &QTcpSocket::errorOccurred, this, &RemoteClient::onError);
-
-    // Connect telnet session signals
-    connect(m_telnet.get(), &TelnetServerSession::negotiationComplete, this,
-            &RemoteClient::onNegotiationComplete);
-
-    // Start telnet negotiation
-    m_telnet->initiateNegotiation();
+    // Connect transport signals.
+    connect(m_transport, &IRemoteTransport::ready, this, &RemoteClient::onTransportReady);
+    connect(m_transport, &IRemoteTransport::dataAvailable, this, &RemoteClient::onReadyRead);
+    connect(m_transport, &IRemoteTransport::closed, this, &RemoteClient::onDisconnected);
 }
 
-RemoteClient::~RemoteClient()
-{
-    if (m_pSocket && m_pSocket->isOpen()) {
-        m_pSocket->close();
-    }
-}
+RemoteClient::~RemoteClient() = default;
 
 bool RemoteClient::isAuthenticated() const
 {
@@ -52,10 +31,7 @@ bool RemoteClient::isAuthenticated() const
 
 QString RemoteClient::address() const
 {
-    if (m_pSocket) {
-        return QString("%1:%2").arg(m_pSocket->peerAddress().toString()).arg(m_pSocket->peerPort());
-    }
-    return QString();
+    return m_transport ? m_transport->peerAddress() : QString();
 }
 
 QDateTime RemoteClient::connectedAt() const
@@ -63,7 +39,7 @@ QDateTime RemoteClient::connectedAt() const
     return m_connectedAt;
 }
 
-void RemoteClient::sendLine(Line* line)
+void RemoteClient::sendLine(const Line* line)
 {
     if (m_state != State::Authenticated || !line) {
         return;
@@ -73,7 +49,7 @@ void RemoteClient::sendLine(Line* line)
     sendBytes(formatted);
 }
 
-void RemoteClient::sendIncompleteLine(Line* line)
+void RemoteClient::sendIncompleteLine(const Line* line)
 {
     if (m_state != State::Authenticated || !line) {
         return;
@@ -92,23 +68,21 @@ void RemoteClient::sendRawText(const QString& text, bool includeNewline)
 void RemoteClient::disconnect()
 {
     m_state = State::Disconnecting;
-    if (m_pSocket) {
-        m_pSocket->close();
+    if (m_transport) {
+        m_transport->close();
     }
 }
 
 void RemoteClient::sendBytes(const QByteArray& data)
 {
-    if (m_pSocket && m_pSocket->isOpen()) {
-        QByteArray escaped = TelnetServerSession::escapeOutgoing(data);
-        m_pSocket->write(escaped);
+    if (m_transport) {
+        m_transport->writeRaw(m_transport->escapeOutgoing(data));
     }
 }
 
 void RemoteClient::onReadyRead()
 {
-    QByteArray raw = m_pSocket->readAll();
-    QByteArray clean = m_telnet->processIncoming(raw);
+    QByteArray clean = m_transport->processIncoming();
 
     if (!clean.isEmpty()) {
         processInput(clean);
@@ -121,47 +95,42 @@ void RemoteClient::onDisconnected()
     emit disconnected();
 }
 
-void RemoteClient::onError(QAbstractSocket::SocketError socketError)
+void RemoteClient::onTransportReady()
 {
-    Q_UNUSED(socketError);
-    if (m_pSocket) {
-        emit error(m_pSocket->errorString());
-    }
-}
-
-void RemoteClient::onNegotiationComplete()
-{
-    // Telnet negotiation done, send welcome and password prompt
+    // SSH transport has completed key exchange and authentication.
+    // The connection is already authenticated — go straight to active state.
+    m_state = State::Authenticated;
+    m_formatter->reset(); // Reset ANSI state for clean output.
     sendWelcome();
-    sendPasswordPrompt();
-    m_state = State::AwaitingPassword;
+    sendScrollback();
+    emit authenticated();
 }
 
 void RemoteClient::processInput(const QByteArray& data)
 {
     m_inputBuffer.append(QString::fromUtf8(data));
 
-    // Process complete lines (telnet sends \r\n, some clients send just \n)
+    // Security: cap input buffer to prevent OOM from clients sending
+    // continuous data without newlines.
+    constexpr int kMaxInputBuffer = 4096;
+    if (m_inputBuffer.size() > kMaxInputBuffer) {
+        sendRawText("\r\nInput too long. Disconnecting.\r\n");
+        disconnect();
+        return;
+    }
+
+    // Process complete lines (SSH clients typically send \r\n or just \n).
     int nlPos;
     while ((nlPos = m_inputBuffer.indexOf('\n')) != -1) {
         QString line = m_inputBuffer.left(nlPos);
         m_inputBuffer.remove(0, nlPos + 1);
 
-        // Strip trailing \r if present (handles \r\n)
+        // Strip trailing \r if present (handles \r\n).
         if (line.endsWith('\r')) {
             line.chop(1);
         }
 
-        // Handle based on state
         switch (m_state) {
-            case State::AwaitingPassword:
-                if (checkPassword(line)) {
-                    handleAuthSuccess();
-                } else {
-                    handleAuthFailure();
-                }
-                break;
-
             case State::Authenticated:
                 if (!line.isEmpty()) {
                     emit commandReceived(line);
@@ -169,7 +138,7 @@ void RemoteClient::processInput(const QByteArray& data)
                 break;
 
             default:
-                // Ignore input in other states
+                // Ignore input in other states.
                 break;
         }
     }
@@ -181,46 +150,10 @@ void RemoteClient::sendWelcome()
     QString banner = QString("\r\n"
                              "=== MUSHclient Qt Remote Access ===\r\n"
                              "World: %1\r\n"
+                             "Streaming output...\r\n"
                              "\r\n")
                          .arg(worldName);
     sendBytes(banner.toUtf8());
-}
-
-void RemoteClient::sendPasswordPrompt()
-{
-    sendBytes(QByteArray("Password: "));
-}
-
-bool RemoteClient::checkPassword(const QString& attempt)
-{
-    return attempt == m_password;
-}
-
-void RemoteClient::handleAuthSuccess()
-{
-    m_state = State::Authenticated;
-    m_formatter->reset(); // Reset ANSI state for clean output
-
-    sendRawText("\r\nAuthenticated. Streaming output...\r\n");
-
-    // Send scrollback
-    sendScrollback();
-
-    emit authenticated();
-}
-
-void RemoteClient::handleAuthFailure()
-{
-    m_failedAttempts++;
-
-    if (m_failedAttempts >= m_maxFailedAttempts) {
-        sendRawText("\r\nToo many failed attempts. Disconnecting.\r\n");
-        disconnect();
-    } else {
-        int remaining = m_maxFailedAttempts - m_failedAttempts;
-        sendRawText(QString("\r\nIncorrect password. %1 attempt(s) remaining.\r\n").arg(remaining));
-        sendPasswordPrompt();
-    }
 }
 
 void RemoteClient::sendScrollback()
@@ -229,7 +162,7 @@ void RemoteClient::sendScrollback()
         return;
     }
 
-    int totalLines = m_pDoc->m_lineList.count();
+    int totalLines = static_cast<int>(m_pDoc->m_lineList.size());
     int startLine = qMax(0, totalLines - m_scrollbackLines);
 
     if (startLine < totalLines) {
@@ -237,7 +170,7 @@ void RemoteClient::sendScrollback()
     }
 
     for (int i = startLine; i < totalLines; ++i) {
-        Line* line = m_pDoc->m_lineList.at(i);
+        Line* line = m_pDoc->m_lineList.at(i).get();
         if (line) {
             sendLine(line);
         }

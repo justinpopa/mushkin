@@ -35,15 +35,15 @@ QString WorldDocument::RecallText(const QString& searchText, bool matchCase, boo
 {
     QString result;
 
-    if (m_lineList.isEmpty()) {
+    if (m_lineList.empty()) {
         return result;
     }
 
     // Determine starting position
     int startIndex = 0;
-    if (lineCount > 0 && lineCount < m_lineList.count()) {
+    if (lineCount > 0 && lineCount < static_cast<int>(m_lineList.size())) {
         // Start from lineCount lines back
-        startIndex = m_lineList.count() - lineCount;
+        startIndex = static_cast<int>(m_lineList.size()) - lineCount;
     }
 
     // Setup case sensitivity
@@ -66,8 +66,8 @@ QString WorldDocument::RecallText(const QString& searchText, bool matchCase, boo
     QString searchTextLower = matchCase ? searchText : searchText.toLower();
 
     // Iterate through lines
-    for (int i = startIndex; i < m_lineList.count(); i++) {
-        Line* pLine = m_lineList[i];
+    for (int i = startIndex; i < static_cast<int>(m_lineList.size()); i++) {
+        Line* pLine = m_lineList[i].get();
         if (!pLine) {
             continue;
         }
@@ -79,13 +79,13 @@ QString WorldDocument::RecallText(const QString& searchText, bool matchCase, boo
 
         // Collect all text for this logical line (until hard_return)
         int j = i;
-        while (j < m_lineList.count()) {
-            Line* pCurrentLine = m_lineList[j];
+        while (j < static_cast<int>(m_lineList.size())) {
+            Line* pCurrentLine = m_lineList[j].get();
             if (!pCurrentLine) {
                 break;
             }
 
-            lineText += QString::fromUtf8(pCurrentLine->text(), pCurrentLine->len());
+            lineText += QString::fromUtf8(pCurrentLine->text().data(), pCurrentLine->text().size());
 
             if (pCurrentLine->hard_return) {
                 i = j; // Advance outer loop past this logical line

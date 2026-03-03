@@ -12,25 +12,11 @@
  */
 
 #include "../src/world/world_document.h"
-#include <QCoreApplication>
-#include <gtest/gtest.h>
+#include "fixtures/world_fixtures.h"
 
 // Test fixture for command stacking tests
 // Provides common setup/teardown and helper methods
-class CommandStackingTest : public ::testing::Test {
-  protected:
-    void SetUp() override
-    {
-        doc = new WorldDocument();
-    }
-
-    void TearDown() override
-    {
-        delete doc;
-    }
-
-    WorldDocument* doc = nullptr;
-};
+class CommandStackingTest : public WorldDocumentTest {};
 
 /**
  * Test 1: Basic command stacking
@@ -39,8 +25,8 @@ class CommandStackingTest : public ::testing::Test {
  */
 TEST_F(CommandStackingTest, BasicStacking)
 {
-    doc->m_enable_command_stack = true;
-    doc->m_strCommandStackCharacter = ";";
+    doc->m_input.enable_command_stack = true;
+    doc->m_input.command_stack_character = ";";
     doc->m_enable_aliases = false; // Disable aliases for simplicity
 
     doc->Execute("north;south;east");
@@ -59,8 +45,8 @@ TEST_F(CommandStackingTest, BasicStacking)
  */
 TEST_F(CommandStackingTest, EscapeSequence)
 {
-    doc->m_enable_command_stack = true;
-    doc->m_strCommandStackCharacter = ";";
+    doc->m_input.enable_command_stack = true;
+    doc->m_input.command_stack_character = ";";
     doc->m_enable_aliases = false;
 
     doc->Execute("say Hello;;there");
@@ -78,8 +64,8 @@ TEST_F(CommandStackingTest, EscapeSequence)
  */
 TEST_F(CommandStackingTest, LeadingDelimiterBypass)
 {
-    doc->m_enable_command_stack = true;
-    doc->m_strCommandStackCharacter = ";";
+    doc->m_input.enable_command_stack = true;
+    doc->m_input.command_stack_character = ";";
     doc->m_enable_aliases = false;
 
     doc->Execute(";north;south");
@@ -97,8 +83,8 @@ TEST_F(CommandStackingTest, LeadingDelimiterBypass)
  */
 TEST_F(CommandStackingTest, WhitespacePreservation)
 {
-    doc->m_enable_command_stack = true;
-    doc->m_strCommandStackCharacter = ";";
+    doc->m_input.enable_command_stack = true;
+    doc->m_input.command_stack_character = ";";
     doc->m_enable_aliases = false;
 
     doc->Execute("north ; south");
@@ -116,8 +102,8 @@ TEST_F(CommandStackingTest, WhitespacePreservation)
  */
 TEST_F(CommandStackingTest, StackingDisabled)
 {
-    doc->m_enable_command_stack = false; // Disabled!
-    doc->m_strCommandStackCharacter = ";";
+    doc->m_input.enable_command_stack = false; // Disabled!
+    doc->m_input.command_stack_character = ";";
     doc->m_enable_aliases = false;
 
     doc->Execute("north;south;east");
@@ -135,8 +121,8 @@ TEST_F(CommandStackingTest, StackingDisabled)
  */
 TEST_F(CommandStackingTest, EmptyCommandsDisabled)
 {
-    doc->m_enable_command_stack = false;
-    doc->m_strCommandStackCharacter = ";";
+    doc->m_input.enable_command_stack = false;
+    doc->m_input.command_stack_character = ";";
     doc->m_enable_aliases = false;
 
     doc->Execute("north;;south");
@@ -154,8 +140,8 @@ TEST_F(CommandStackingTest, EmptyCommandsDisabled)
  */
 TEST_F(CommandStackingTest, EmptyCommandAtEnd)
 {
-    doc->m_enable_command_stack = true;
-    doc->m_strCommandStackCharacter = ";";
+    doc->m_input.enable_command_stack = true;
+    doc->m_input.command_stack_character = ";";
     doc->m_enable_aliases = false;
 
     doc->Execute("north;south;");
@@ -174,8 +160,8 @@ TEST_F(CommandStackingTest, EmptyCommandAtEnd)
  */
 TEST_F(CommandStackingTest, ComplexEscape)
 {
-    doc->m_enable_command_stack = true;
-    doc->m_strCommandStackCharacter = ";";
+    doc->m_input.enable_command_stack = true;
+    doc->m_input.command_stack_character = ";";
     doc->m_enable_aliases = false;
 
     doc->Execute("say ;;;test");
@@ -194,8 +180,8 @@ TEST_F(CommandStackingTest, ComplexEscape)
  */
 TEST_F(CommandStackingTest, CustomDelimiter)
 {
-    doc->m_enable_command_stack = true;
-    doc->m_strCommandStackCharacter = "|"; // Custom delimiter
+    doc->m_input.enable_command_stack = true;
+    doc->m_input.command_stack_character = "|"; // Custom delimiter
     doc->m_enable_aliases = false;
 
     doc->Execute("north|south|east");
@@ -214,8 +200,8 @@ TEST_F(CommandStackingTest, CustomDelimiter)
  */
 TEST_F(CommandStackingTest, CustomDelimiterBypass)
 {
-    doc->m_enable_command_stack = true;
-    doc->m_strCommandStackCharacter = "|";
+    doc->m_input.enable_command_stack = true;
+    doc->m_input.command_stack_character = "|";
     doc->m_enable_aliases = false;
 
     doc->Execute("|north|south");
@@ -224,18 +210,4 @@ TEST_F(CommandStackingTest, CustomDelimiterBypass)
     ASSERT_EQ(doc->m_commandHistory.size(), 1) << "Should have 1 command in history";
     EXPECT_EQ(doc->m_commandHistory[0], "north|south")
         << "Leading delimiter should bypass stacking with custom delimiter";
-}
-
-// Main function required for GoogleTest
-// Note: QCoreApplication must be created before any Qt objects
-int main(int argc, char** argv)
-{
-    // Initialize Qt (required for Qt objects like WorldDocument)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

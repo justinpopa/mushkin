@@ -2,15 +2,18 @@
 #include "world/world_document.h"
 
 #include "logging.h"
+#include "network/ssh_host_key_manager.h"
 #include <QCheckBox>
 #include <QColor>
 #include <QColorDialog>
 #include <QComboBox>
 #include <QDebug>
 #include <QDialogButtonBox>
+#include <QFileDialog>
 #include <QFontDialog>
 #include <QFormLayout>
 #include <QGridLayout>
+#include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
@@ -102,6 +105,34 @@ void WorldPropertiesDialog::setupConnectionTab()
     m_autoConnectCheck = new QCheckBox("Connect automatically on startup");
     layout->addRow("", m_autoConnectCheck);
 
+    // Proxy settings
+    QGroupBox* proxyGroup = new QGroupBox("Proxy");
+    QFormLayout* proxyLayout = new QFormLayout(proxyGroup);
+
+    m_proxyTypeCombo = new QComboBox();
+    m_proxyTypeCombo->addItems({"None", "SOCKS5", "HTTP CONNECT"});
+    proxyLayout->addRow("Type:", m_proxyTypeCombo);
+
+    m_proxyServerEdit = new QLineEdit();
+    m_proxyServerEdit->setPlaceholderText("proxy.example.com");
+    proxyLayout->addRow("Server:", m_proxyServerEdit);
+
+    m_proxyPortSpin = new QSpinBox();
+    m_proxyPortSpin->setRange(0, 65535);
+    m_proxyPortSpin->setSpecialValueText("Disabled");
+    proxyLayout->addRow("Port:", m_proxyPortSpin);
+
+    m_proxyUsernameEdit = new QLineEdit();
+    m_proxyUsernameEdit->setPlaceholderText("Optional");
+    proxyLayout->addRow("Username:", m_proxyUsernameEdit);
+
+    m_proxyPasswordEdit = new QLineEdit();
+    m_proxyPasswordEdit->setEchoMode(QLineEdit::Password);
+    m_proxyPasswordEdit->setPlaceholderText("Optional");
+    proxyLayout->addRow("Password:", m_proxyPasswordEdit);
+
+    layout->addRow(proxyGroup);
+
     // Add some spacing
     layout->addRow("", new QWidget()); // Spacer
 
@@ -134,7 +165,7 @@ void WorldPropertiesDialog::setupOutputTab()
 
     QGridLayout* colorGrid = new QGridLayout();
 
-    const char* colorNames[16] = {
+    static constexpr std::array<const char*, 16> colorNames = {
         "Black",        "Red",           "Green",       "Yellow",         "Blue",
         "Magenta",      "Cyan",          "White",       "Bright Black",   "Bright Red",
         "Bright Green", "Bright Yellow", "Bright Blue", "Bright Magenta", "Bright Cyan",
@@ -232,7 +263,7 @@ void WorldPropertiesDialog::setupLoggingTab()
     fileLayout->addWidget(m_logFileEdit);
 
     m_logFileBrowse = new QPushButton("Browse...");
-    // TODO: Connect to file browser when implemented
+    // TODO(ui): Connect Browse button to QFileDialog for file selection.
     fileLayout->addWidget(m_logFileBrowse);
 
     layout->addRow("Log file:", fileLayout);
@@ -264,7 +295,7 @@ void WorldPropertiesDialog::setupScriptingTab()
     fileLayout->addWidget(m_scriptFileEdit);
 
     m_scriptFileBrowse = new QPushButton("Browse...");
-    // TODO: Connect to file browser when implemented
+    // TODO(ui): Connect Browse button to QFileDialog for file selection.
     fileLayout->addWidget(m_scriptFileBrowse);
 
     layout->addRow("Script file:", fileLayout);
@@ -413,27 +444,53 @@ void WorldPropertiesDialog::setupRemoteAccessTab()
     // Info label
     QLabel* infoLabel =
         new QLabel("Remote Access allows you to connect to this world from another device "
-                   "(phone, tablet, SSH session) via telnet while away from your computer.");
+                   "(phone, tablet) via SSH while away from your computer.");
     infoLabel->setWordWrap(true);
     layout->addRow(infoLabel);
 
     // Enable remote access
-    m_enableRemoteAccessCheck = new QCheckBox("Enable remote access server");
+    m_enableRemoteAccessCheck = new QCheckBox("Enable SSH remote access server");
     layout->addRow("", m_enableRemoteAccessCheck);
 
     // Port
     m_remotePortSpin = new QSpinBox();
     m_remotePortSpin->setRange(1, 65535);
     m_remotePortSpin->setValue(4001);
-    m_remotePortSpin->setToolTip("Port to listen on for remote connections");
+    m_remotePortSpin->setToolTip("Port to listen on for SSH connections");
     layout->addRow("Port:", m_remotePortSpin);
 
     // Password
     m_remotePasswordEdit = new QLineEdit();
     m_remotePasswordEdit->setEchoMode(QLineEdit::Password);
-    m_remotePasswordEdit->setPlaceholderText("Required for security");
-    m_remotePasswordEdit->setToolTip("Password required to authenticate remote clients");
+    m_remotePasswordEdit->setPlaceholderText("For password authentication");
+    m_remotePasswordEdit->setToolTip(
+        "Password for SSH password authentication (optional if using public keys)");
     layout->addRow("Password:", m_remotePasswordEdit);
+
+    // Authorized keys file
+    m_remoteAuthorizedKeysEdit = new QLineEdit();
+    m_remoteAuthorizedKeysEdit->setPlaceholderText("Path to authorized_keys file (optional)");
+    m_remoteAuthorizedKeysEdit->setToolTip(
+        "Path to an authorized_keys file for public key authentication");
+    auto* browseBtn = new QPushButton("Browse...");
+    auto* keysLayout = new QHBoxLayout();
+    keysLayout->addWidget(m_remoteAuthorizedKeysEdit);
+    keysLayout->addWidget(browseBtn);
+    layout->addRow("Authorized keys:", keysLayout);
+    connect(browseBtn, &QPushButton::clicked, this, [this]() {
+        QString path = QFileDialog::getOpenFileName(this, "Select authorized_keys file");
+        if (!path.isEmpty()) {
+            m_remoteAuthorizedKeysEdit->setText(path);
+        }
+    });
+
+    // Host key fingerprint (read-only)
+    m_hostKeyFingerprintLabel = new QLabel();
+    m_hostKeyFingerprintLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    m_hostKeyFingerprintLabel->setStyleSheet("font-family: monospace; color: gray;");
+    auto fp = SshHostKeyManager::fingerprint();
+    m_hostKeyFingerprintLabel->setText(fp ? *fp : "No host key generated yet");
+    layout->addRow("Host key:", m_hostKeyFingerprintLabel);
 
     // Scrollback lines
     m_remoteScrollbackSpin = new QSpinBox();
@@ -447,19 +504,16 @@ void WorldPropertiesDialog::setupRemoteAccessTab()
     m_remoteMaxClientsSpin = new QSpinBox();
     m_remoteMaxClientsSpin->setRange(1, 100);
     m_remoteMaxClientsSpin->setValue(5);
-    m_remoteMaxClientsSpin->setToolTip("Maximum simultaneous remote client connections");
+    m_remoteMaxClientsSpin->setToolTip("Maximum simultaneous SSH client connections");
     layout->addRow("Max clients:", m_remoteMaxClientsSpin);
 
     // Usage hint
     QLabel* usageLabel =
-        new QLabel("To connect: telnet yourhost <port>\n"
+        new QLabel("To connect: ssh -p <port> user@yourhost\n"
                    "The server starts when you connect to a MUD and stops when you disconnect.");
     usageLabel->setWordWrap(true);
     usageLabel->setStyleSheet("color: gray; font-style: italic;");
     layout->addRow("", usageLabel);
-
-    // Add some spacing
-    layout->addRow("", new QWidget()); // Spacer
 
     m_tabWidget->addTab(tab, "Remote Access");
 }
@@ -474,19 +528,21 @@ void WorldPropertiesDialog::loadSettings()
     m_portSpin->setValue(m_doc->m_port);
     m_nameEdit->setText(m_doc->m_mush_name);
     m_passwordEdit->setText(m_doc->m_password);
-    m_autoConnectCheck->setChecked(m_doc->m_connect_now != 0);
+    m_autoConnectCheck->setChecked(m_doc->m_connect_now);
 
     // Output tab
     // Reconstruct QFont from WorldDocument font properties
-    m_outputFont.setFamily(m_doc->m_font_name);
-    m_outputFont.setPointSize(qAbs(m_doc->m_font_height)); // Convert pixels to points approximation
-    m_outputFont.setWeight(m_doc->m_font_weight >= 700 ? QFont::Bold : QFont::Normal);
+    m_outputFont.setFamily(m_doc->m_output.font_name);
+    m_outputFont.setPointSize(
+        qAbs(m_doc->m_output.font_height)); // Convert pixels to points approximation
+    m_outputFont.setWeight(m_doc->m_output.font_weight >= 700 ? QFont::Bold : QFont::Normal);
     m_outputFontLabel->setText(
         QString("%1, %2pt").arg(m_outputFont.family()).arg(m_outputFont.pointSize()));
 
-    // TODO: ANSI colors - WorldDocument needs m_normalColour[8] and m_boldColour[8] arrays
-    // For now, initialize with default colors
-    QRgb defaultColors[16] = {
+    // TODO(feature): Wire ANSI color picker to WorldDocument m_normalColour/m_boldColour arrays.
+    // WorldDocument has m_colors.normal_colour[8] and m_colors.bold_colour[8] — initialize from
+    // them here. For now, initialize with default colors
+    const std::array<QRgb, 16> defaultColors = {
         qRgb(0, 0, 0),       // Black
         qRgb(128, 0, 0),     // Red
         qRgb(0, 128, 0),     // Green
@@ -510,60 +566,75 @@ void WorldPropertiesDialog::loadSettings()
     }
 
     // Activity settings
-    m_flashIconCheck->setChecked(m_doc->m_bFlashIcon != 0);
+    m_flashIconCheck->setChecked(m_doc->m_display.flash_icon);
 
     // Input tab
-    m_inputFont.setFamily(m_doc->m_input_font_name);
-    m_inputFont.setPointSize(qAbs(m_doc->m_input_font_height));
-    m_inputFont.setWeight(m_doc->m_input_font_weight >= 700 ? QFont::Bold : QFont::Normal);
-    m_inputFont.setItalic(m_doc->m_input_font_italic != 0);
+    m_inputFont.setFamily(m_doc->m_input.font_name);
+    m_inputFont.setPointSize(qAbs(m_doc->m_input.font_height));
+    m_inputFont.setWeight(m_doc->m_input.font_weight >= 700 ? QFont::Bold : QFont::Normal);
+    m_inputFont.setItalic(m_doc->m_input.font_italic != 0);
     m_inputFontLabel->setText(
         QString("%1, %2pt").arg(m_inputFont.family()).arg(m_inputFont.pointSize()));
 
-    m_echoInputCheck->setChecked(m_doc->m_display_my_input != 0);
-    // TODO: m_echoColorCombo - needs echo color setting in WorldDocument
+    m_echoInputCheck->setChecked(m_doc->m_display_my_input);
+    // TODO(feature): Wire echo color combo to WorldDocument m_output.echo_colour (quint16, index
+    // into color table).
 
     // Command history size
     m_historySizeSpin->setValue(m_doc->m_maxCommandHistory);
 
     // Logging tab
-    m_enableLogCheck->setChecked(m_doc->m_bLogOutput != 0);
-    m_logFileEdit->setText(m_doc->m_strAutoLogFileName);
-    // TODO: m_logFormatCombo - WorldDocument needs log format enum
+    m_enableLogCheck->setChecked(m_doc->m_logging.log_output);
+    m_logFileEdit->setText(m_doc->m_logging.auto_log_file_name);
+    // Log format: Text=0, HTML=1, Raw=2
+    if (m_doc->m_logging.log_html)
+        m_logFormatCombo->setCurrentIndex(1);
+    else if (m_doc->m_logging.log_raw)
+        m_logFormatCombo->setCurrentIndex(2);
+    else
+        m_logFormatCombo->setCurrentIndex(0);
 
     // Scripting tab
-    m_enableScriptCheck->setChecked(m_doc->m_bEnableScripts != 0);
-    m_scriptFileEdit->setText(m_doc->m_strScriptFilename);
-    // TODO: m_scriptLanguageCombo - WorldDocument needs script language setting
+    m_enableScriptCheck->setChecked(m_doc->m_scripting.enabled);
+    m_scriptFileEdit->setText(m_doc->m_scripting.filename);
+    // Not applicable: Script language is always Lua — no multi-language support needed.
 
     // Paste to World tab
-    m_pastePreambleEdit->setText(m_doc->m_paste_preamble);
-    m_pastePostambleEdit->setText(m_doc->m_paste_postamble);
-    m_pasteLinePreambleEdit->setText(m_doc->m_pasteline_preamble);
-    m_pasteLinePostambleEdit->setText(m_doc->m_pasteline_postamble);
-    m_pasteDelaySpin->setValue(m_doc->m_nPasteDelay);
-    m_pasteDelayPerLinesSpin->setValue(m_doc->m_nPasteDelayPerLines);
-    m_pasteCommentedSoftcodeCheck->setChecked(m_doc->m_bPasteCommentedSoftcode != 0);
-    m_pasteEchoCheck->setChecked(m_doc->m_bPasteEcho != 0);
-    m_pasteConfirmCheck->setChecked(m_doc->m_bConfirmOnPaste != 0);
+    m_pastePreambleEdit->setText(m_doc->m_paste.paste_preamble);
+    m_pastePostambleEdit->setText(m_doc->m_paste.paste_postamble);
+    m_pasteLinePreambleEdit->setText(m_doc->m_paste.pasteline_preamble);
+    m_pasteLinePostambleEdit->setText(m_doc->m_paste.pasteline_postamble);
+    m_pasteDelaySpin->setValue(m_doc->m_paste.paste_delay);
+    m_pasteDelayPerLinesSpin->setValue(m_doc->m_paste.paste_delay_per_lines);
+    m_pasteCommentedSoftcodeCheck->setChecked(m_doc->m_paste.paste_commented_softcode);
+    m_pasteEchoCheck->setChecked(m_doc->m_paste.paste_echo);
+    m_pasteConfirmCheck->setChecked(m_doc->m_paste.confirm_on_paste);
 
     // Send File tab
-    m_filePreambleEdit->setText(m_doc->m_file_preamble);
-    m_filePostambleEdit->setText(m_doc->m_file_postamble);
-    m_fileLinePreambleEdit->setText(m_doc->m_line_preamble);
-    m_fileLinePostambleEdit->setText(m_doc->m_line_postamble);
-    m_fileDelaySpin->setValue(m_doc->m_nFileDelay);
-    m_fileDelayPerLinesSpin->setValue(m_doc->m_nFileDelayPerLines);
-    m_fileCommentedSoftcodeCheck->setChecked(m_doc->m_bFileCommentedSoftcode != 0);
-    m_fileEchoCheck->setChecked(m_doc->m_bSendEcho != 0);
-    m_fileConfirmCheck->setChecked(m_doc->m_bConfirmOnSend != 0);
+    m_filePreambleEdit->setText(m_doc->m_paste.file_preamble);
+    m_filePostambleEdit->setText(m_doc->m_paste.file_postamble);
+    m_fileLinePreambleEdit->setText(m_doc->m_paste.line_preamble);
+    m_fileLinePostambleEdit->setText(m_doc->m_paste.line_postamble);
+    m_fileDelaySpin->setValue(m_doc->m_paste.file_delay);
+    m_fileDelayPerLinesSpin->setValue(m_doc->m_paste.file_delay_per_lines);
+    m_fileCommentedSoftcodeCheck->setChecked(m_doc->m_paste.file_commented_softcode);
+    m_fileEchoCheck->setChecked(m_doc->m_input.send_echo);
+    m_fileConfirmCheck->setChecked(m_doc->m_bConfirmOnSend);
 
     // Remote Access tab
-    m_enableRemoteAccessCheck->setChecked(m_doc->m_bEnableRemoteAccess != 0);
-    m_remotePortSpin->setValue(m_doc->m_iRemotePort > 0 ? m_doc->m_iRemotePort : 4001);
-    m_remotePasswordEdit->setText(m_doc->m_strRemotePassword);
-    m_remoteScrollbackSpin->setValue(m_doc->m_iRemoteScrollbackLines);
-    m_remoteMaxClientsSpin->setValue(m_doc->m_iRemoteMaxClients);
+    m_enableRemoteAccessCheck->setChecked(m_doc->m_remote.enabled);
+    m_remotePortSpin->setValue(m_doc->m_remote.port > 0 ? m_doc->m_remote.port : 4001);
+    m_remotePasswordEdit->setText(m_doc->m_remote.password);
+    m_remoteAuthorizedKeysEdit->setText(m_doc->m_remote.authorized_keys_file);
+    m_remoteScrollbackSpin->setValue(m_doc->m_remote.scrollback_lines);
+    m_remoteMaxClientsSpin->setValue(m_doc->m_remote.max_clients);
+
+    // Proxy settings
+    m_proxyTypeCombo->setCurrentIndex(m_doc->m_proxy.type);
+    m_proxyServerEdit->setText(m_doc->m_proxy.server);
+    m_proxyPortSpin->setValue(m_doc->m_proxy.port);
+    m_proxyUsernameEdit->setText(m_doc->m_proxy.username);
+    m_proxyPasswordEdit->setText(m_doc->m_proxy.password);
 
     qCDebug(lcDialog) << "WorldPropertiesDialog::loadSettings() - loaded from WorldDocument";
 }
@@ -578,65 +649,79 @@ void WorldPropertiesDialog::saveSettings()
     m_doc->m_port = m_portSpin->value();
     m_doc->m_mush_name = m_nameEdit->text();
     m_doc->m_password = m_passwordEdit->text();
-    m_doc->m_connect_now = m_autoConnectCheck->isChecked() ? 1 : 0;
+    m_doc->m_connect_now = m_autoConnectCheck->isChecked();
 
     // Output tab
-    m_doc->m_font_name = m_outputFont.family();
-    m_doc->m_font_height = m_outputFont.pointSize(); // Store as points
-    m_doc->m_font_weight = m_outputFont.weight();
-    // TODO: ANSI colors - save to m_normalColour[] and m_boldColour[] when they exist
+    m_doc->m_output.font_name = m_outputFont.family();
+    m_doc->m_output.font_height = m_outputFont.pointSize(); // Store as points
+    m_doc->m_output.font_weight = m_outputFont.weight();
+    // TODO(feature): Wire ANSI color picker to WorldDocument m_normalColour/m_boldColour arrays.
+    // WorldDocument has m_colors.normal_colour[8] and m_colors.bold_colour[8] — save m_ansiColors[]
+    // to them here.
 
     // Activity settings
-    m_doc->m_bFlashIcon = m_flashIconCheck->isChecked() ? 1 : 0;
+    m_doc->m_display.flash_icon = m_flashIconCheck->isChecked();
 
     // Input tab
-    m_doc->m_input_font_name = m_inputFont.family();
-    m_doc->m_input_font_height = m_inputFont.pointSize();
-    m_doc->m_input_font_weight = m_inputFont.weight();
-    m_doc->m_input_font_italic = m_inputFont.italic() ? 1 : 0;
-    m_doc->m_display_my_input = m_echoInputCheck->isChecked() ? 1 : 0;
-    // TODO: m_echoColorCombo - save when WorldDocument has echo color setting
+    m_doc->m_input.font_name = m_inputFont.family();
+    m_doc->m_input.font_height = m_inputFont.pointSize();
+    m_doc->m_input.font_weight = m_inputFont.weight();
+    m_doc->m_input.font_italic = m_inputFont.italic() ? 1 : 0;
+    m_doc->m_display_my_input = m_echoInputCheck->isChecked();
+    // TODO(feature): Wire echo color combo to WorldDocument m_output.echo_colour (quint16, index
+    // into color table).
 
     // Command history size
     m_doc->m_maxCommandHistory = m_historySizeSpin->value();
 
     // Logging tab
-    m_doc->m_bLogOutput = m_enableLogCheck->isChecked() ? 1 : 0;
-    m_doc->m_strAutoLogFileName = m_logFileEdit->text();
+    m_doc->m_logging.log_output = m_enableLogCheck->isChecked();
+    m_doc->m_logging.auto_log_file_name = m_logFileEdit->text();
+    // Log format: Text=0, HTML=1, Raw=2
+    m_doc->m_logging.log_html = (m_logFormatCombo->currentIndex() == 1);
+    m_doc->m_logging.log_raw = (m_logFormatCombo->currentIndex() == 2);
 
     // Scripting tab
-    m_doc->m_bEnableScripts = m_enableScriptCheck->isChecked() ? 1 : 0;
-    m_doc->m_strScriptFilename = m_scriptFileEdit->text();
-    // TODO: m_scriptLanguageCombo - save when WorldDocument has script language
+    m_doc->m_scripting.enabled = m_enableScriptCheck->isChecked();
+    m_doc->m_scripting.filename = m_scriptFileEdit->text();
+    // Not applicable: Script language is always Lua — no multi-language support needed.
 
     // Paste to World tab
-    m_doc->m_paste_preamble = m_pastePreambleEdit->text();
-    m_doc->m_paste_postamble = m_pastePostambleEdit->text();
-    m_doc->m_pasteline_preamble = m_pasteLinePreambleEdit->text();
-    m_doc->m_pasteline_postamble = m_pasteLinePostambleEdit->text();
-    m_doc->m_nPasteDelay = m_pasteDelaySpin->value();
-    m_doc->m_nPasteDelayPerLines = m_pasteDelayPerLinesSpin->value();
-    m_doc->m_bPasteCommentedSoftcode = m_pasteCommentedSoftcodeCheck->isChecked() ? 1 : 0;
-    m_doc->m_bPasteEcho = m_pasteEchoCheck->isChecked() ? 1 : 0;
-    m_doc->m_bConfirmOnPaste = m_pasteConfirmCheck->isChecked() ? 1 : 0;
+    m_doc->m_paste.paste_preamble = m_pastePreambleEdit->text();
+    m_doc->m_paste.paste_postamble = m_pastePostambleEdit->text();
+    m_doc->m_paste.pasteline_preamble = m_pasteLinePreambleEdit->text();
+    m_doc->m_paste.pasteline_postamble = m_pasteLinePostambleEdit->text();
+    m_doc->m_paste.paste_delay = m_pasteDelaySpin->value();
+    m_doc->m_paste.paste_delay_per_lines = m_pasteDelayPerLinesSpin->value();
+    m_doc->m_paste.paste_commented_softcode = m_pasteCommentedSoftcodeCheck->isChecked();
+    m_doc->m_paste.paste_echo = m_pasteEchoCheck->isChecked();
+    m_doc->m_paste.confirm_on_paste = m_pasteConfirmCheck->isChecked();
 
     // Send File tab
-    m_doc->m_file_preamble = m_filePreambleEdit->text();
-    m_doc->m_file_postamble = m_filePostambleEdit->text();
-    m_doc->m_line_preamble = m_fileLinePreambleEdit->text();
-    m_doc->m_line_postamble = m_fileLinePostambleEdit->text();
-    m_doc->m_nFileDelay = m_fileDelaySpin->value();
-    m_doc->m_nFileDelayPerLines = m_fileDelayPerLinesSpin->value();
-    m_doc->m_bFileCommentedSoftcode = m_fileCommentedSoftcodeCheck->isChecked() ? 1 : 0;
-    m_doc->m_bSendEcho = m_fileEchoCheck->isChecked() ? 1 : 0;
-    m_doc->m_bConfirmOnSend = m_fileConfirmCheck->isChecked() ? 1 : 0;
+    m_doc->m_paste.file_preamble = m_filePreambleEdit->text();
+    m_doc->m_paste.file_postamble = m_filePostambleEdit->text();
+    m_doc->m_paste.line_preamble = m_fileLinePreambleEdit->text();
+    m_doc->m_paste.line_postamble = m_fileLinePostambleEdit->text();
+    m_doc->m_paste.file_delay = m_fileDelaySpin->value();
+    m_doc->m_paste.file_delay_per_lines = m_fileDelayPerLinesSpin->value();
+    m_doc->m_paste.file_commented_softcode = m_fileCommentedSoftcodeCheck->isChecked();
+    m_doc->m_input.send_echo = m_fileEchoCheck->isChecked();
+    m_doc->m_bConfirmOnSend = m_fileConfirmCheck->isChecked();
 
     // Remote Access tab
-    m_doc->m_bEnableRemoteAccess = m_enableRemoteAccessCheck->isChecked() ? 1 : 0;
-    m_doc->m_iRemotePort = m_remotePortSpin->value();
-    m_doc->m_strRemotePassword = m_remotePasswordEdit->text();
-    m_doc->m_iRemoteScrollbackLines = m_remoteScrollbackSpin->value();
-    m_doc->m_iRemoteMaxClients = m_remoteMaxClientsSpin->value();
+    m_doc->m_remote.enabled = m_enableRemoteAccessCheck->isChecked();
+    m_doc->m_remote.port = m_remotePortSpin->value();
+    m_doc->m_remote.password = m_remotePasswordEdit->text();
+    m_doc->m_remote.authorized_keys_file = m_remoteAuthorizedKeysEdit->text();
+    m_doc->m_remote.scrollback_lines = m_remoteScrollbackSpin->value();
+    m_doc->m_remote.max_clients = m_remoteMaxClientsSpin->value();
+
+    // Proxy settings
+    m_doc->m_proxy.type = static_cast<quint16>(m_proxyTypeCombo->currentIndex());
+    m_doc->m_proxy.server = m_proxyServerEdit->text();
+    m_doc->m_proxy.port = static_cast<quint16>(m_proxyPortSpin->value());
+    m_doc->m_proxy.username = m_proxyUsernameEdit->text();
+    m_doc->m_proxy.password = m_proxyPasswordEdit->text();
 
     m_doc->setModified(true);
 

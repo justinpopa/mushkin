@@ -19,13 +19,13 @@ class AnsiFormatter {
   public:
     explicit AnsiFormatter(WorldDocument* doc = nullptr);
 
-    QByteArray formatLine(Line* line, bool includeNewline = true);
-    QByteArray formatIncompleteLine(Line* line);
+    QByteArray formatLine(const Line* line, bool includeNewline = true);
+    QByteArray formatIncompleteLine(const Line* line);
     void reset();
     static QByteArray formatRaw(const QString& text, bool includeNewline = true);
 
   private:
-    QByteArray styleToAnsi(Style* style);
+    QByteArray styleToAnsi(const Style& style);
     QByteArray colorToAnsi(QRgb color, quint16 colorType, bool isForeground);
     static QByteArray resetAnsi();
 

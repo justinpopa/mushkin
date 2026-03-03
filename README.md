@@ -1,21 +1,24 @@
 # Mushkin
 
+[![CI](https://github.com/justinpopa/mushkin/actions/workflows/ci.yml/badge.svg)](https://github.com/justinpopa/mushkin/actions/workflows/ci.yml)
+
 A modern MUD client built with Qt. Mushkin is a cross-platform rewrite of [MUSHclient](http://www.gammon.com.au/mushclient/) designed to run natively on macOS, Linux, and Windows.
 
 ## Features
 
-- **MUSHclient Compatibility**: Lua scripting API compatible with existing MUSHclient plugins
-- **Plugin Support**: Load and run MUSHclient plugins with triggers, aliases, timers, and miniwindows
-- **Miniwindows**: Plugin-driven UI with drawing, hotspots, and mouse interaction
-- **Modern Codebase**: Built with Qt 6 and C++17
+- **MUSHclient Compatibility**: 424/428 Lua API functions ported (~99%) - existing plugins work without modification
+- **Plugin Support**: Triggers, aliases, timers, miniwindows, GMCP, database (SQLite), sound, and more
+- **Cross-Platform**: Native builds on macOS (ARM/Intel), Linux (x86_64), and Windows (x64)
+- **Modern Codebase**: C++26, Qt 6.9.3 Widgets, CMake + Ninja
 
 ## Status
 
-**Alpha** - Core functionality is working but rough edges remain. Many MUSHclient plugins work out of the box, but some features are incomplete or missing.
+**Beta** - Core functionality is working across all three platforms. The Lua API is near-complete and tested against MUSHclient for behavioral parity. Many MUSHclient plugins work out of the box.
 
 ## Requirements
 
-- **Qt 6.9+**
+- **Clang 19+** (22 recommended for full C++26 support)
+- **Qt 6.9.3**
 - **CMake 3.16+**
 - **Ninja** (recommended)
 
@@ -23,145 +26,118 @@ A modern MUD client built with Qt. Mushkin is a cross-platform rewrite of [MUSHc
 
 ### macOS
 
-#### Development Build
-
-For contributors and active development. This build links dynamically against Qt - meant for fast iteration and debugging, not distribution.
-
 ```bash
 # Prerequisites
 xcode-select --install
-brew install cmake ninja pcre luajit sqlite openssl aqtinstall
+brew install llvm cmake ninja pcre luajit sqlite openssl libssh
+pip3 install aqtinstall
+aqt install-qt mac desktop 6.9.3 -m qtmultimedia --outputdir ~/Qt
 
 # Clone and build
 git clone https://github.com/justinpopa/mushkin.git
 cd mushkin
-./scripts/build-macos.sh
 
-open build/mushkin.app
+LLVM_PREFIX=$(brew --prefix llvm)
+cmake -B build -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_C_COMPILER=${LLVM_PREFIX}/bin/clang \
+    -DCMAKE_CXX_COMPILER=${LLVM_PREFIX}/bin/clang++ \
+    -DCMAKE_CXX_FLAGS="-stdlib=libc++"
+cmake --build build --parallel
+
+# Run
+open build/bin/mushkin.app
 ```
 
-#### Static Build (Release Binary)
-
-**This is the recommended build for end users.** Creates a native binary (arm64 on Apple Silicon, x86_64 on Intel) with Qt statically linked. Other dependencies are dynamically linked from Homebrew.
+### Linux (Ubuntu 24.04)
 
 ```bash
-# Prerequisites
-xcode-select --install
-brew install cmake ninja pcre luajit sqlite openssl aqtinstall
+# Clang 22 from LLVM repos
+wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
+echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-22 main" | \
+    sudo tee /etc/apt/sources.list.d/llvm.list
+sudo apt-get update
+sudo apt-get install -y clang-22
 
-# Build (first run ~60 min for Qt, subsequent runs ~2 min)
-git clone https://github.com/justinpopa/mushkin.git
-cd mushkin
-./scripts/build-macos-static.sh
+# Dependencies
+sudo apt-get install -y \
+    cmake ninja-build g++ python3-pip \
+    libgl1-mesa-dev libxkbcommon-dev \
+    libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 \
+    libluajit-5.1-dev libpcre3-dev libsqlite3-dev \
+    libssl-dev zlib1g-dev libssh-dev \
+    libpulse-dev libasound2-dev libpipewire-0.3-dev
 
-# Output: build-static/mushkin
-```
-
-The binary requires the Homebrew dependencies to be installed, but Qt is embedded so users don't need to install Qt separately.
-
-### Linux (Debian/Ubuntu)
-
-#### Development Build
-
-For contributors and active development. Links dynamically against Qt.
-
-```bash
-# Prerequisites
-sudo apt install cmake ninja-build build-essential pkg-config \
-    libpcre3-dev libsqlite3-dev luajit libluajit-5.1-dev \
-    libssl-dev zlib1g-dev libgl1-mesa-dev libxkbcommon-dev \
-    libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0
-pip3 install aqtinstall
+# Qt
+pip3 install --break-system-packages aqtinstall
+aqt install-qt linux desktop 6.9.3 linux_gcc_64 -m qtmultimedia --outputdir ~/Qt
 
 # Clone and build
 git clone https://github.com/justinpopa/mushkin.git
 cd mushkin
-./scripts/build-linux.sh
 
-./build/mushkin
+cmake -B build -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_C_COMPILER=clang-22 \
+    -DCMAKE_CXX_COMPILER=clang++-22
+cmake --build build --parallel
+
+# Run
+export QT_QPA_PLATFORM=xcb  # or wayland
+./build/bin/mushkin
 ```
-
-#### Static Build (Release Binary)
-
-**This is the recommended build for end users.** Creates a binary with Qt statically linked. Other dependencies are dynamically linked from system packages.
-
-```bash
-# Prerequisites
-sudo apt install cmake ninja-build build-essential pkg-config \
-    libpcre3-dev libsqlite3-dev luajit libluajit-5.1-dev \
-    libssl-dev zlib1g-dev libgl1-mesa-dev libglu1-mesa-dev \
-    libxkbcommon-dev libxcb1-dev libxcb-cursor-dev libxcb-icccm4-dev \
-    libxcb-keysyms1-dev libxcb-shape0-dev libxcb-xfixes0-dev \
-    libxcb-sync-dev libxcb-randr0-dev libxcb-render-util0-dev \
-    libxcb-image0-dev libxcb-glx0-dev libxcb-shm0-dev \
-    libfontconfig1-dev libfreetype6-dev libx11-dev libx11-xcb-dev \
-    libxext-dev libxfixes-dev libxi-dev libxrender-dev \
-    libatspi2.0-dev libglib2.0-dev
-pip3 install aqtinstall
-
-# Build (first run ~60 min for Qt, subsequent runs ~2 min)
-git clone https://github.com/justinpopa/mushkin.git
-cd mushkin
-./scripts/build-linux-static.sh
-
-# Output: build-static/mushkin
-```
-
-The binary requires the apt packages to be installed, but Qt is embedded so users don't need to install Qt separately.
 
 ### Windows
 
-#### Prerequisites
-
-1. **Visual Studio 2022** with C++ workload
-2. **Git for Windows**
-3. **Python 3.x** and aqtinstall: `pip install aqtinstall`
-4. **vcpkg** for dependencies:
-
 ```powershell
-# Install vcpkg (one-time setup)
+# Prerequisites: Visual Studio 2022 Build Tools, Chocolatey
+choco install cmake ninja llvm python3 git -y
+
+# Qt
+python -m pip install aqtinstall
+python -m aqt install-qt windows desktop 6.9.3 win64_msvc2022_64 -m qtmultimedia --outputdir C:\Qt
+
+# vcpkg dependencies
 git clone https://github.com/microsoft/vcpkg.git C:\vcpkg
 C:\vcpkg\bootstrap-vcpkg.bat
-[Environment]::SetEnvironmentVariable("VCPKG_ROOT", "C:\vcpkg", "User")
+C:\vcpkg\vcpkg install pcre:x64-windows luajit:x64-windows sqlite3:x64-windows `
+    openssl:x64-windows zlib:x64-windows libssh:x64-windows
 
-# Install dependencies
-C:\vcpkg\vcpkg install pcre:x64-windows luajit:x64-windows sqlite3:x64-windows openssl:x64-windows zlib:x64-windows
-```
-
-5. **Enable Long Paths** (required for Qt build):
-
-```powershell
-# Run as Administrator
-Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' -Name 'LongPathsEnabled' -Value 1 -Type DWord
-```
-
-Qt's source tree has deeply nested paths that exceed Windows' default 260 character limit. This registry change enables long path support system-wide.
-
-#### Static Build (Release Binary)
-
-Run from **Developer PowerShell for VS 2022**:
-
-```powershell
+# Clone and build
 git clone https://github.com/justinpopa/mushkin.git
 cd mushkin
-.\scripts\build-windows-static.ps1
 
-# Output: build-static\mushkin.exe
+cmake -B build -G Ninja `
+    -DCMAKE_BUILD_TYPE=Release `
+    -DCMAKE_C_COMPILER=clang-cl `
+    -DCMAKE_CXX_COMPILER=clang-cl `
+    -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake `
+    -DVCPKG_TARGET_TRIPLET=x64-windows
+cmake --build build --config Release --parallel
+
+# Run
+.\build\bin\mushkin.exe
 ```
 
-First run takes ~60 minutes to build Qt. Subsequent builds take ~5 minutes.
+### Running Tests
+
+```bash
+# Unix
+export QT_QPA_PLATFORM=offscreen
+ctest --test-dir build --output-on-failure
+
+# Windows
+ctest --test-dir build --output-on-failure --build-config Release
+```
 
 ## Configuration
 
-Mushkin uses portable relative paths like the original MUSHclient. By default, all data directories are relative to the current working directory:
+Mushkin uses portable relative paths like the original MUSHclient. All data directories are relative to the current working directory:
 
-**Default directories (relative to working directory):**
 - `./worlds/` - World files (.mcl)
 - `./worlds/plugins/` - Plugin files
 - `./worlds/plugins/state/` - Plugin state files
 - `./logs/` - Log files
-
-This means you can put Mushkin in any folder and run it from there - all your worlds, plugins, and logs stay together in that folder.
 
 **Settings storage:**
 - macOS: `~/Library/Preferences/com.Gammon.MUSHclient.plist`
@@ -170,13 +146,15 @@ This means you can put Mushkin in any folder and run it from there - all your wo
 
 ## Plugin Compatibility
 
-Mushkin aims for compatibility with MUSHclient's Lua API. Many plugins work without modification, including:
-- Miniwindow-based UIs
-- GMCP handlers
+Mushkin aims for behavioral parity with MUSHclient's Lua API. Most plugins work without modification, including:
+- Miniwindow-based UIs (Aardwolf plugins, etc.)
+- GMCP/MSDP handlers
 - Trigger/alias/timer systems
 - Database plugins (SQLite)
+- Sound playback
+- Notepad windows
 
-Some Windows-specific features (COM, certain system calls) are not available.
+The 4 unported functions are zChat-related (deprecated protocol, won't-implement).
 
 ## Contributing
 
@@ -184,7 +162,7 @@ Contributions are welcome! Please:
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Run the test suite: `cd build && ctest`
+4. Run the test suite: `ctest --test-dir build --output-on-failure`
 5. Submit a pull request
 
 ## License

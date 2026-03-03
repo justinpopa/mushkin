@@ -14,18 +14,9 @@
 #include "../src/automation/plugin.h"
 #include "../src/automation/variable.h"
 #include "../src/storage/global_options.h"
-#include "../src/world/script_engine.h"
-#include "../src/world/world_document.h"
-#include <QCoreApplication>
+#include "fixtures/world_fixtures.h"
 #include <QFile>
 #include <QTemporaryDir>
-#include <gtest/gtest.h>
-
-extern "C" {
-#include <lauxlib.h>
-#include <lua.h>
-#include <lualib.h>
-}
 
 // Helper to create test plugin XML
 QString createTestPluginXML(const QString& id, const QString& name, const QString& script)
@@ -97,14 +88,14 @@ class PluginApiTest : public ::testing::Test {
         ASSERT_TRUE(tempDir->isValid()) << "Could not create temp directory";
 
         // Create world document
-        doc = new WorldDocument();
+        doc = std::make_unique<WorldDocument>();
         doc->m_mush_name = "Test World";
         doc->m_server = "localhost";
         doc->m_port = 4000;
         doc->m_strWorldID = "{API-TEST-WORLD-ID-1234567890}";
 
         // Configure state files directory
-        GlobalOptions::instance()->setStateFilesDirectory(tempDir->path());
+        GlobalOptions::instance().setStateFilesDirectory(tempDir->path());
 
         // Create test plugin files
         plugin1Path = tempDir->path() + "/plugin1.xml";
@@ -167,12 +158,11 @@ end
 
     void TearDown() override
     {
-        delete doc;
         delete tempDir;
     }
 
     QTemporaryDir* tempDir = nullptr;
-    WorldDocument* doc = nullptr;
+    std::unique_ptr<WorldDocument> doc;
     Plugin* plugin1 = nullptr;
     Plugin* plugin2 = nullptr;
     QString plugin1Path;
@@ -375,8 +365,8 @@ TEST_F(PluginApiTest, GetPluginVariable)
 {
     // Add a variable to plugin1
     auto var = std::make_unique<Variable>();
-    var->strLabel = "test_var";
-    var->strContents = "test_value";
+    var->label = "test_var";
+    var->contents = "test_value";
     plugin1->m_VariableMap["test_var"] = std::move(var);
 
     lua_State* L2 = plugin2->m_ScriptEngine->L;
@@ -401,8 +391,8 @@ TEST_F(PluginApiTest, GetPluginVariableList)
 {
     // Add a variable to plugin1
     auto var = std::make_unique<Variable>();
-    var->strLabel = "test_var";
-    var->strContents = "test_value";
+    var->label = "test_var";
+    var->contents = "test_value";
     plugin1->m_VariableMap["test_var"] = std::move(var);
 
     lua_State* L2 = plugin2->m_ScriptEngine->L;
@@ -699,17 +689,4 @@ TEST_F(PluginApiTest, ReloadPlugin)
     ASSERT_NE(plugin1, nullptr) << "ReloadPlugin should succeed: " << errorMsg.toStdString();
     EXPECT_EQ(plugin1->m_strName, QString("TestPlugin1"))
         << "Reloaded plugin should have correct name";
-}
-
-// GoogleTest main function
-int main(int argc, char** argv)
-{
-    // Initialize Qt application (required for Qt types)
-    QCoreApplication app(argc, argv);
-
-    // Initialize GoogleTest
-    ::testing::InitGoogleTest(&argc, argv);
-
-    // Run all tests
-    return RUN_ALL_TESTS();
 }

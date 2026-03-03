@@ -66,7 +66,7 @@ void register_variable_functions(lua_State* L);
  * register_world_info_functions - Register world info API functions
  *
  * Registers functions for world information and configuration:
- * - GetInfo, GetWorldName, SetOption, SetStatus, Repaint, TextRectangle
+ * - GetInfo, SetOption, SetStatus, Repaint, TextRectangle
  *
  * @param L Lua state
  */

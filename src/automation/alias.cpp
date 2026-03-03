@@ -7,6 +7,7 @@
 #include "alias.h"
 #include "sendto.h"
 #include <QDebug>
+#include <expected>
 
 // Default alias sequence (OtherTypes.h)
 #define DEFAULT_ALIAS_SEQUENCE 100
@@ -19,18 +20,15 @@
  *
  * Based on CAlias::CAlias() from OtherTypes.h
  */
-Alias::Alias(QObject* parent) : QObject(parent), regexp(nullptr)
+Alias::Alias(QObject* parent) : QObject(parent)
 {
     initializeDefaults();
 }
 
 /**
- * Destructor - Clean up regexp
+ * Destructor - unique_ptr handles regexp cleanup automatically
  */
-Alias::~Alias()
-{
-    delete regexp;
-}
+Alias::~Alias() = default;
 
 /**
  * Initialize all fields to default values
@@ -40,40 +38,40 @@ Alias::~Alias()
 void Alias::initializeDefaults()
 {
     // Pattern matching
-    bIgnoreCase = false;
-    bRegexp = false;
+    ignore_case = false;
+    use_regexp = false;
 
     // Actions
-    bExpandVariables = false;
-    iSendTo = eSendToWorld;
+    expand_variables = false;
+    send_to = eSendToWorld;
     scriptLanguage = ScriptLanguage::Lua;
 
     // Behavior
-    bEnabled = true;
-    bKeepEvaluating = true; // MUSHclient default: continue evaluating other aliases after match
+    enabled = true;
+    keep_evaluating = true; // MUSHclient default: continue evaluating other aliases after match
 
     // Display
-    bOmitFromLog = false;
-    bOmitFromOutput = false;
-    bEchoAlias = false;
-    bOmitFromCommandHistory = false;
+    omit_from_log = false;
+    omit_from_output = false;
+    echo_alias = false;
+    omit_from_command_history = false;
 
     // Metadata
-    iSequence = DEFAULT_ALIAS_SEQUENCE;
-    bMenu = false;
-    iUserOption = 0;
-    bOneShot = false;
+    sequence = DEFAULT_ALIAS_SEQUENCE;
+    menu = false;
+    user_option = 0;
+    one_shot = false;
 
     // Runtime state
     dispid = DISPID_UNKNOWN;
-    nUpdateNumber = 0;
-    nInvocationCount = 0;
-    nMatched = 0;
-    tWhenMatched = QDateTime();
-    bTemporary = false;
-    bIncluded = false;
-    bSelected = false;
-    bExecutingScript = false;
+    update_number = 0;
+    invocation_count = 0;
+    matched = 0;
+    when_matched = QDateTime();
+    temporary = false;
+    included = false;
+    selected = false;
+    executing_script = false;
 
     // Resize wildcards vector
     wildcards.resize(MAX_WILDCARDS);
@@ -86,54 +84,51 @@ void Alias::initializeDefaults()
  */
 bool Alias::operator==(const Alias& rhs) const
 {
-    return name == rhs.name && contents == rhs.contents && bIgnoreCase == rhs.bIgnoreCase &&
-           strLabel == rhs.strLabel && strProcedure == rhs.strProcedure &&
-           scriptLanguage == rhs.scriptLanguage && bEnabled == rhs.bEnabled &&
-           bExpandVariables == rhs.bExpandVariables &&
-           bOmitFromLog == rhs.bOmitFromLog && bRegexp == rhs.bRegexp &&
-           bOmitFromOutput == rhs.bOmitFromOutput && iSequence == rhs.iSequence &&
-           bMenu == rhs.bMenu && strGroup == rhs.strGroup && strVariable == rhs.strVariable &&
-           iSendTo == rhs.iSendTo && bKeepEvaluating == rhs.bKeepEvaluating &&
-           bEchoAlias == rhs.bEchoAlias && iUserOption == rhs.iUserOption &&
-           bOmitFromCommandHistory == rhs.bOmitFromCommandHistory && bOneShot == rhs.bOneShot;
+    return name == rhs.name && contents == rhs.contents && ignore_case == rhs.ignore_case &&
+           label == rhs.label && procedure == rhs.procedure &&
+           scriptLanguage == rhs.scriptLanguage && enabled == rhs.enabled &&
+           expand_variables == rhs.expand_variables && omit_from_log == rhs.omit_from_log &&
+           use_regexp == rhs.use_regexp && omit_from_output == rhs.omit_from_output &&
+           sequence == rhs.sequence && menu == rhs.menu && group == rhs.group &&
+           variable == rhs.variable && send_to == rhs.send_to &&
+           keep_evaluating == rhs.keep_evaluating && echo_alias == rhs.echo_alias &&
+           user_option == rhs.user_option &&
+           omit_from_command_history == rhs.omit_from_command_history && one_shot == rhs.one_shot;
 }
 
 /**
  * Compile regular expression
  *
  * Compiles the alias pattern into a QRegularExpression.
- * Handles case-sensitivity based on bIgnoreCase flag.
+ * Handles case-sensitivity based on ignore_case flag.
  *
- * @return true on success, false on error
+ * @return empty expected on success, error string on failure
  */
-bool Alias::compileRegexp()
+std::expected<void, QString> Alias::compileRegexp()
 {
-    if (!bRegexp) {
+    if (!use_regexp) {
         // Not a regexp alias, nothing to compile
-        return true;
+        return {};
     }
 
-    // Clean up old regexp if exists
-    delete regexp;
-    regexp = nullptr;
-
-    // Compile new regexp
+    // Compile new regexp (reset releases old one)
     QRegularExpression::PatternOptions options = QRegularExpression::NoPatternOption;
-    if (bIgnoreCase) {
+    if (ignore_case) {
         options |= QRegularExpression::CaseInsensitiveOption;
     }
 
-    regexp = new QRegularExpression(name, options);
+    auto compiled = std::make_unique<QRegularExpression>(name, options);
 
-    if (!regexp->isValid()) {
+    if (!compiled->isValid()) {
+        QString error = compiled->errorString();
         qWarning() << "Failed to compile alias regexp:" << name;
-        qWarning() << "Error:" << regexp->errorString();
-        delete regexp;
-        regexp = nullptr;
-        return false;
+        qWarning() << "Error:" << error;
+        regexp.reset();
+        return std::unexpected(error);
     }
 
-    return true;
+    regexp = std::move(compiled);
+    return {};
 }
 
 /**
@@ -175,9 +170,9 @@ static QRegularExpression wildcardToRegex(const QString& pattern, bool ignoreCas
  * Match alias against user input
  *
  * Performs pattern matching based on alias settings:
- * - Regular expression matching (if bRegexp is true)
+ * - Regular expression matching (if use_regexp is true)
  * - Wildcard pattern matching (* wildcards converted to regex)
- * - Case sensitivity (if bIgnoreCase is true)
+ * - Case sensitivity (if ignore_case is true)
  *
  * Populates wildcards vector on successful match.
  *
@@ -187,25 +182,25 @@ static QRegularExpression wildcardToRegex(const QString& pattern, bool ignoreCas
 bool Alias::match(const QString& text)
 {
     // Check if alias is enabled
-    if (!bEnabled) {
+    if (!enabled) {
         return false;
     }
 
-    bool matched = false;
+    bool did_match = false;
 
-    if (bRegexp) {
+    if (use_regexp) {
         // Regular expression matching
         if (!regexp) {
             // Regexp not compiled yet
-            if (!compileRegexp()) {
+            if (!compileRegexp().has_value()) {
                 return false;
             }
         }
 
         QRegularExpressionMatch match = regexp->match(text);
-        matched = match.hasMatch();
+        did_match = match.hasMatch();
 
-        if (matched) {
+        if (did_match) {
             // Extract wildcards (captured groups)
             wildcards.clear();
             wildcards.resize(match.lastCapturedIndex() + 1);
@@ -226,11 +221,11 @@ bool Alias::match(const QString& text)
         // Wildcard pattern matching
         // Convert wildcard pattern (e.g., "n*" or "l*") to regex
         // This matches the pattern used for triggers
-        QRegularExpression re = wildcardToRegex(name, bIgnoreCase, true);
+        QRegularExpression re = wildcardToRegex(name, ignore_case, true);
         QRegularExpressionMatch match = re.match(text);
-        matched = match.hasMatch();
+        did_match = match.hasMatch();
 
-        if (matched) {
+        if (did_match) {
             // Extract wildcards from pattern match
             wildcards.clear();
             wildcards.resize(match.lastCapturedIndex() + 1);
@@ -240,11 +235,11 @@ bool Alias::match(const QString& text)
         }
     }
 
-    if (matched) {
+    if (did_match) {
         // Update statistics
-        nMatched++;
-        tWhenMatched = QDateTime::currentDateTime();
+        matched++;
+        when_matched = QDateTime::currentDateTime();
     }
 
-    return matched;
+    return did_match;
 }

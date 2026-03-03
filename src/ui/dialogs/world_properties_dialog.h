@@ -3,6 +3,7 @@
 
 #include <QDialog>
 #include <QFont>
+#include <array>
 
 // Forward declarations
 class WorldDocument;
@@ -14,6 +15,7 @@ class QSpinBox;
 class QCheckBox;
 class QLabel;
 class QComboBox;
+class QGroupBox;
 
 /**
  * WorldPropertiesDialog - World configuration dialog
@@ -100,12 +102,19 @@ class WorldPropertiesDialog : public QDialog {
     QLineEdit* m_passwordEdit;
     QCheckBox* m_autoConnectCheck;
 
+    // Proxy widgets
+    QComboBox* m_proxyTypeCombo;
+    QLineEdit* m_proxyServerEdit;
+    QSpinBox* m_proxyPortSpin;
+    QLineEdit* m_proxyUsernameEdit;
+    QLineEdit* m_proxyPasswordEdit;
+
     // Output tab widgets
     QPushButton* m_outputFontButton;
     QLabel* m_outputFontLabel;
     QFont m_outputFont;
-    QPushButton* m_colorButtons[16]; // 8 normal + 8 bright ANSI colors
-    QRgb m_ansiColors[16];
+    std::array<QPushButton*, 16> m_colorButtons{}; // 8 normal + 8 bright ANSI colors
+    std::array<QRgb, 16> m_ansiColors{};
     QCheckBox* m_flashIconCheck;
 
     // Helper for Output tab
@@ -157,6 +166,8 @@ class WorldPropertiesDialog : public QDialog {
     QCheckBox* m_enableRemoteAccessCheck;
     QSpinBox* m_remotePortSpin;
     QLineEdit* m_remotePasswordEdit;
+    QLineEdit* m_remoteAuthorizedKeysEdit;
+    QLabel* m_hostKeyFingerprintLabel;
     QSpinBox* m_remoteScrollbackSpin;
     QSpinBox* m_remoteMaxClientsSpin;
 };
