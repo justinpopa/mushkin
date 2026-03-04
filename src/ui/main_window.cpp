@@ -2040,6 +2040,29 @@ void MainWindow::newWorld()
         db.saveWindowGeometry(worldWidget->worldName(), geometry);
     });
 
+    // Auto-apply default files on new world creation (matches original MUSHclient
+    // doc_construct.cpp:641-684 — only for new worlds, not loaded ones).
+    {
+        const auto& opts = GlobalOptions::instance();
+        const std::array<std::pair<QString, int>, 5> defaultFiles = {{
+            {opts.defaultTriggersFile(), XML_TRIGGERS},
+            {opts.defaultAliasesFile(), XML_ALIASES},
+            {opts.defaultTimersFile(), XML_TIMERS},
+            {opts.defaultMacrosFile(), XML_MACROS},
+            {opts.defaultColoursFile(), XML_COLOURS},
+        }};
+
+        WorldDocument* doc = worldWidget->document();
+        for (const auto& [path, flag] : defaultFiles) {
+            if (path.isEmpty())
+                continue;
+            QFile file(path);
+            if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+                continue;
+            XmlSerialization::ImportXML(doc, QString::fromUtf8(file.readAll()), flag);
+        }
+    }
+
     // Show the subwindow
     if (GlobalOptions::instance().openWorldsMaximized()) {
         subWindow->showMaximized();

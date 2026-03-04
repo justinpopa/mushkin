@@ -38,8 +38,8 @@ All P0 items fixed — `GlobalOptions` now backed by SQLite. Key-name bug (`Reco
 | ~~ConfirmBeforeClosingMushclient~~ | ~~closeEvent ignores it~~ | ~~`App.m_bConfirmBeforeClosingMushclient`~~ |
 | ~~ConfirmBeforeClosingWorld~~ | ~~Not implemented~~ | ~~`App.m_bConfirmBeforeClosingWorld`~~ |
 | ~~ConfirmLogFileClose~~ | ~~Not implemented~~ | ~~`App.m_bConfirmLogFileClose`~~ |
-| DefaultTriggersFile | Used by "Load Default Files" action, but not auto-applied on world creation | `doc_construct.cpp:664` |
-| DefaultColoursFile | Used by "Load Default Files" action, but not auto-applied on world creation | `doc_construct.cpp:670` |
+| ~~DefaultTriggersFile~~ | ~~Used by "Load Default Files" action, but not auto-applied on world creation~~ | ~~`doc_construct.cpp:664`~~ |
+| ~~DefaultColoursFile~~ | ~~Used by "Load Default Files" action, but not auto-applied on world creation~~ | ~~`doc_construct.cpp:670`~~ |
 
 ### Applied (working correctly)
 
@@ -55,6 +55,7 @@ All P0 items fixed — `GlobalOptions` now backed by SQLite. Key-name bug (`Reco
 | OpenActivityWindow | Shown at startup if preference set |
 | ConfirmBeforeClosingWorld | `closeWorld()` confirms when connected |
 | ConfirmLogFileClose | `toggleLogSession()` confirms before closing log |
+| DefaultTriggersFile/AliasesFile/TimersFile/MacrosFile/ColoursFile | Auto-applied in `newWorld()` |
 | OpenWorldsMaximized | `newWorld()` and `openWorld()` call `showMaximized()` |
 
 ## How the Original MUSHclient Works
