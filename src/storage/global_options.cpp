@@ -72,7 +72,7 @@ void GlobalOptions::load()
     m_printerLinesPerPage = db.getPreferenceInt("PrinterLinesPerPage", 60);
     m_timerInterval = db.getPreferenceInt("TimerInterval", 0);
     m_activityWindowRefreshInterval = db.getPreferenceInt("ActivityWindowRefreshInterval", 15);
-    m_activityWindowRefreshType = db.getPreferenceInt("ActivityWindowRefreshType", 0);
+    m_activityWindowRefreshType = db.getPreferenceInt("ActivityWindowRefreshType", 2);
     m_windowTabsStyle = db.getPreferenceInt("WindowTabsStyle", 0);
     m_iconPlacement = db.getPreferenceInt("IconPlacement", 0);
     m_trayIcon = db.getPreferenceInt("TrayIcon", 0);
@@ -237,7 +237,7 @@ void GlobalOptions::resetToDefaults()
     m_printerLinesPerPage = 60;
     m_timerInterval = 0;
     m_activityWindowRefreshInterval = 15;
-    m_activityWindowRefreshType = 0;
+    m_activityWindowRefreshType = 2; // eRefreshBoth
     m_windowTabsStyle = 0;
     m_iconPlacement = 0;
     m_trayIcon = 0;

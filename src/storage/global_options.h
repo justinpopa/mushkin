@@ -817,7 +817,7 @@ class GlobalOptions {
     int m_printerLinesPerPage = 60;
     int m_timerInterval = 0;
     int m_activityWindowRefreshInterval = 15;
-    int m_activityWindowRefreshType = 0; // eRefreshBoth
+    int m_activityWindowRefreshType = 2; // eRefreshBoth (matches original default)
     int m_windowTabsStyle = 0;
     int m_iconPlacement = 0; // ICON_PLACEMENT_TASKBAR
     int m_trayIcon = 0;

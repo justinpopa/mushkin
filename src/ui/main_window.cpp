@@ -1514,9 +1514,10 @@ void MainWindow::writeSettings()
 
 void MainWindow::closeEvent(QCloseEvent* event)
 {
-    // Confirm before closing if preference is set
-    // (matches original MUSHclient.cpp SaveAllModified — OK/Cancel, not Yes/No)
-    if (GlobalOptions::instance().confirmBeforeClosingMushclient()) {
+    // Confirm before closing if preference is set and worlds are open
+    // (matches original MUSHclient.cpp SaveAllModified — only if gdoccount > 0)
+    if (GlobalOptions::instance().confirmBeforeClosingMushclient() &&
+        !m_mdiArea->subWindowList().isEmpty()) {
         auto reply =
             QMessageBox::information(this, "Mushkin", "This will end your Mushkin session.",
                                      QMessageBox::Ok | QMessageBox::Cancel, QMessageBox::Cancel);
@@ -2190,9 +2191,9 @@ void MainWindow::closeWorld()
         if (widget) {
             WorldDocument* doc = widget->document();
             if (doc && doc->isConnectedToMud()) {
-                auto reply = QMessageBox::question(
-                    this, "Confirm Close",
-                    QString("This will end your %1 session. Continue?").arg(doc->worldName()),
+                auto reply = QMessageBox::information(
+                    this, "Mushkin",
+                    QString("This will end your %1 session.").arg(doc->worldName()),
                     QMessageBox::Ok | QMessageBox::Cancel, QMessageBox::Cancel);
                 if (reply != QMessageBox::Ok) {
                     return;
