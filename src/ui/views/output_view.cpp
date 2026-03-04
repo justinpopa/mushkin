@@ -988,19 +988,17 @@ void OutputView::mouseDoubleClickEvent(QMouseEvent* event)
 
 void OutputView::keyPressEvent(QKeyEvent* event)
 {
-    if (event->matches(QKeySequence::Copy)) {
-        // Ctrl+C always handled locally (copy selection)
-        copyToClipboard();
+    // AllTypingToCommandWindow: redirect ALL keys to the command input.
+    // Must be first — the original MUSHclient (mushview.cpp OnKeyDown)
+    // redirects every key unconditionally, including Ctrl+C, PageUp/Down, etc.
+    if (GlobalOptions::instance().allTypingToCommandWindow()) {
+        emit keyRedirected(event);
         event->accept();
         return;
     }
 
-    // AllTypingToCommandWindow: redirect ALL keys to the command input.
-    // Must be checked before scroll handling — the original MUSHclient
-    // (mushview.cpp OnKeyDown) redirects every key unconditionally,
-    // including PageUp/PageDown/arrows/etc.
-    if (GlobalOptions::instance().allTypingToCommandWindow()) {
-        emit keyRedirected(event);
+    if (event->matches(QKeySequence::Copy)) {
+        copyToClipboard();
         event->accept();
         return;
     }
