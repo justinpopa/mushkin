@@ -8,6 +8,8 @@
 #include "plugin.h"
 #include "world_document.h"
 
+#include "../../storage/database.h"
+#include "../../storage/global_options.h"
 #include "logging.h"
 #include <QCloseEvent>
 #include <QDesktopServices>
@@ -219,8 +221,10 @@ void PluginDialog::updateButtonStates()
 
 void PluginDialog::onAddPlugin()
 {
-    QSettings settings;
-    QString pluginDir = settings.value("PluginsDirectory", QDir::homePath()).toString();
+    QString pluginDir = GlobalOptions::instance().pluginsDirectory();
+    if (pluginDir.isEmpty()) {
+        pluginDir = QDir::homePath();
+    }
 
     QStringList files = QFileDialog::getOpenFileNames(
         this, tr("Add Plugin"), pluginDir,
@@ -231,9 +235,11 @@ void PluginDialog::onAddPlugin()
     }
 
     // Save directory for next time
-    if (!files.isEmpty()) {
+    {
         QFileInfo fi(files.first());
-        settings.setValue("PluginsDirectory", fi.absolutePath());
+        QString dir = fi.absolutePath();
+        GlobalOptions::instance().setPluginsDirectory(dir);
+        Database::instance().setPreference("PluginsDirectory", dir);
     }
 
     bool anyLoaded = false;
