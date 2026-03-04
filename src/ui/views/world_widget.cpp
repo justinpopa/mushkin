@@ -101,6 +101,12 @@ void WorldWidget::setupUi()
     // Connect input signal (commandEntered emitted when Enter pressed without Shift)
     connect(m_inputView, &InputView::commandEntered, this, &WorldWidget::sendCommand);
 
+    // AllTypingToCommandWindow: redirect keys from output view to input view
+    connect(m_outputView, &OutputView::keyRedirected, this, [this](QKeyEvent* event) {
+        m_inputView->setFocus();
+        QApplication::sendEvent(m_inputView, event);
+    });
+
     // Connect command text changed signal for plugin notification
     // Use a static flag to prevent recursion (matches original sendvw.cpp behavior)
     connect(m_inputView, &InputView::commandTextChanged, this, [this](const QString& text) {

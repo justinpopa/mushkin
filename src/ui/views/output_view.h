@@ -253,6 +253,13 @@ class OutputView : public QWidget, public IOutputView {
      */
     void freezeStateChanged(bool frozen, bool atBottom);
 
+    /**
+     * keyRedirected - Emitted when AllTypingToCommandWindow is enabled and
+     * a key press should be forwarded to the command input.
+     * @param event The key event to forward
+     */
+    void keyRedirected(QKeyEvent* event);
+
   protected:
     // Qt event handlers
     void paintEvent(QPaintEvent* event) override;

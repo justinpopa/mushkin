@@ -22,7 +22,7 @@ All P0 items fixed — `GlobalOptions` now backed by SQLite. Key-name bug (`Reco
 | ~~DefaultOutputFontHeight~~ | ~~9~~ | ~~WorldDocument hardcodes 12~~ | ~~`doc_construct.cpp:696-703`~~ |
 | ~~DefaultInputFont~~ | ~~"Courier New"~~ | ~~Never applied~~ | ~~`doc_construct.cpp:686-695`~~ |
 | ~~DefaultInputFontHeight~~ | ~~9~~ | ~~WorldDocument hardcodes 12~~ | ~~`doc_construct.cpp:686-695`~~ |
-| AllTypingToCommandWindow | false | No input routing logic | `App.m_bAllTypingToCommandWindow` |
+| ~~AllTypingToCommandWindow~~ | ~~false~~ | ~~No input routing logic~~ | ~~`App.m_bAllTypingToCommandWindow`~~ |
 | ~~AppendToLogFiles~~ | ~~true~~ | ~~`main_window.cpp` hardcodes `true` in `OpenLog()` call~~ | ~~`App.m_bAppendToLogFiles`~~ |
 | ~~AutoLogWorld~~ | ~~false~~ | ~~Not implemented~~ | ~~`App.m_bAutoLogWorld`~~ |
 
@@ -47,6 +47,7 @@ All P0 items fixed — `GlobalOptions` now backed by SQLite. Key-name bug (`Reco
 |:---|:---|
 | AlwaysOnTop | Applied at startup in MainWindow constructor |
 | AppendToLogFiles | `toggleLogSession()` reads from GlobalOptions |
+| AllTypingToCommandWindow | OutputView redirects keys to InputView |
 | ConfirmBeforeClosingMushclient | `closeEvent()` shows confirmation dialog |
 | DefaultLogFileDirectory | Save/Open dialogs |
 | DefaultWorldFileDirectory | Save/Open dialogs |
@@ -101,8 +102,8 @@ Removing these would allow dropping the `QSettings` include and Qt Core5Compat d
 ### Separate bugs (not fixed by backend unification)
 
 - **`SetGlobalOption` missing from Lua API** — only `GetGlobalOption` is registered. The original MUSHclient also does not expose `SetGlobalOption` to Lua (confirmed: no such function exists in the original). Not a gap.
-- **P1 dead code** — settings stored but never applied (AllTypingToCommandWindow, AppendToLogFiles, AutoLogWorld) require separate implementation work.
-- **P2 unimplemented behaviors** — settings that need runtime logic added (AlwaysOnTop at startup, confirmation dialogs, etc.).
+- ~~**P1 dead code** — settings stored but never applied (AllTypingToCommandWindow, AppendToLogFiles, AutoLogWorld) require separate implementation work.~~ All resolved.
+- ~~**P2 unimplemented behaviors** — settings that need runtime logic added (AlwaysOnTop at startup, confirmation dialogs, etc.).~~ All resolved.
 
 ## Key Files
 

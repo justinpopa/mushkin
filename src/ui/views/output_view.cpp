@@ -1,4 +1,5 @@
 #include "output_view.h"
+#include "../../storage/global_options.h"
 #include "../../text/action.h"
 #include "../../utils/font_utils.h"
 #include "../../world/color_utils.h"
@@ -1118,6 +1119,25 @@ void OutputView::keyPressEvent(QKeyEvent* event)
         toggleFreeze();
         event->accept();
         return;
+    }
+
+    // AllTypingToCommandWindow: redirect unhandled keys that produce text
+    // (or navigation keys like Enter, Backspace, arrows) to the command input.
+    // Matches original MUSHclient mushview.cpp OnChar/OnKeyDown behavior.
+    if (GlobalOptions::instance().allTypingToCommandWindow()) {
+        const bool hasText = !event->text().isEmpty();
+        const bool isNavKey = event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter ||
+                              event->key() == Qt::Key_Backspace || event->key() == Qt::Key_Delete ||
+                              event->key() == Qt::Key_Up || event->key() == Qt::Key_Down ||
+                              event->key() == Qt::Key_Left || event->key() == Qt::Key_Right ||
+                              event->key() == Qt::Key_Home || event->key() == Qt::Key_End ||
+                              event->key() == Qt::Key_Tab || event->key() == Qt::Key_Escape;
+
+        if (hasText || isNavKey) {
+            emit keyRedirected(event);
+            event->accept();
+            return;
+        }
     }
 
     QWidget::keyPressEvent(event);
