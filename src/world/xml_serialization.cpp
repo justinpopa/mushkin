@@ -7,7 +7,7 @@
 // Ported from: xml/xml_serialize.cpp (original MUSHclient)
 
 #include "xml_serialization.h"
-#include "../storage/database.h"
+#include "../storage/global_options.h"
 #include "../utils/app_paths.h"
 #include "config_options.h"
 #include "logging.h"
@@ -51,8 +51,7 @@ QString resolvePluginPath(const QString& pluginPath, const QString& worldFilePat
     QString worldDir = worldFileInfo.absolutePath();
 
     // Get plugins directory
-    auto& db = Database::instance();
-    QString pluginsDir = db.getPreference("PluginsDirectory", "./worlds/plugins/");
+    QString pluginsDir = GlobalOptions::instance().pluginsDirectory();
 
     // Convert Windows backslashes in plugins directory path
     pluginsDir.replace('\\', '/');

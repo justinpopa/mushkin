@@ -8,7 +8,6 @@
 #include <QMessageBox>
 #include <QVBoxLayout>
 
-#include "../../storage/database.h"
 #include "../../storage/global_options.h"
 #include "../main_window.h"
 #include "views/world_widget.h"
@@ -62,8 +61,7 @@ ActivityWindow::ActivityWindow(MainWindow* mainWindow)
     connect(m_refreshTimer, &QTimer::timeout, this, &ActivityWindow::refresh);
 
     // Get refresh interval from preferences (default 15 seconds)
-    auto& db = Database::instance();
-    int intervalSecs = db.getPreferenceInt("ActivityWindowRefreshInterval", 15);
+    int intervalSecs = GlobalOptions::instance().activityWindowRefreshInterval();
     m_refreshTimer->start(intervalSecs * 1000);
 
     // Initial refresh

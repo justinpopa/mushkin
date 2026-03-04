@@ -27,7 +27,6 @@
 #include <QHostInfo>
 #include <QLocale>
 #include <QRegularExpression>
-#include <QSettings>
 #include <QSysInfo>
 #include <algorithm>
 #include <sqlite3.h>
@@ -639,8 +638,7 @@ int L_GetInfo(lua_State* L)
         case 60: // Plugins directory (global)
         {
             // Return global plugins directory, resolved to absolute path
-            auto& db = Database::instance();
-            QString pluginsDir = db.getPreference("PluginsDirectory", "./worlds/plugins/");
+            QString pluginsDir = GlobalOptions::instance().pluginsDirectory();
             pluginsDir.replace('\\', '/');
 
             // If relative, resolve against application directory
@@ -801,9 +799,7 @@ int L_GetInfo(lua_State* L)
 
         case 82: // Preferences database name
         {
-            // QSettings uses platform-native storage (plist on macOS, registry on Windows, conf on
-            // Linux). Return the settings file path where available.
-            luaPushQString(L, QSettings().fileName());
+            luaPushQString(L, Database::instance().databasePath());
         } break;
 
         case 83: // SQLite version

@@ -466,12 +466,10 @@ void MainWindow::createMenus()
     connect(m_connectToStartupListAction, &QAction::triggered, this,
             &MainWindow::connectToStartupList);
 
-    // Set initial state from database
-    auto& db = Database::instance();
-    bool autoConnect = db.getPreferenceInt("AutoConnectWorlds", 0) != 0;
-    m_autoConnectAction->setChecked(autoConnect);
-    bool reconnectOnDisconnect = db.getPreferenceInt("ReconnectOnDisconnect", 0) != 0;
-    m_reconnectOnDisconnectAction->setChecked(reconnectOnDisconnect);
+    // Set initial state from global options
+    auto& opts = GlobalOptions::instance();
+    m_autoConnectAction->setChecked(opts.autoConnectWorlds());
+    m_reconnectOnDisconnectAction->setChecked(opts.reconnectOnLinkFailure());
 
     // Game Menu (matches original MUSHclient structure)
     m_gameMenu = menuBar()->addMenu("&Game");
@@ -1265,12 +1263,11 @@ void MainWindow::infoBarSetBackground(const QColor& color)
 
 void MainWindow::applyToolbarPreferences()
 {
-    auto& db = Database::instance();
+    auto& opts = GlobalOptions::instance();
 
     // Apply flat toolbar style
-    bool flatToolbars = db.getPreferenceInt("FlatToolbars", 1) != 0;
     QString toolbarStyle;
-    if (flatToolbars) {
+    if (opts.flatToolbars()) {
         // Flat style - no button borders
         toolbarStyle = "QToolBar { border: none; } "
                        "QToolButton { border: none; padding: 3px; } "
@@ -1285,7 +1282,7 @@ void MainWindow::applyToolbarPreferences()
 
     // Apply activity button bar style
     // Style values: 0-5 correspond to different Qt::ToolButtonStyle options
-    int buttonStyle = db.getPreferenceInt("ActivityButtonBarStyle", 0);
+    int buttonStyle = opts.activityButtonBarStyle();
     Qt::ToolButtonStyle tbStyle;
     switch (buttonStyle) {
         case 1:
@@ -1312,8 +1309,7 @@ void MainWindow::applyToolbarPreferences()
 
 void MainWindow::applyTheme()
 {
-    auto& db = Database::instance();
-    int mode = db.getPreferenceInt("ThemeMode", ThemeSystem);
+    int mode = GlobalOptions::instance().themeMode();
 
     qDebug() << "applyTheme: mode =" << mode << "(0=Light, 1=Dark, 2=System)";
 
@@ -1348,8 +1344,7 @@ QIcon MainWindow::loadThemedIcon(const QString& name)
     file.close();
 
     // Determine icon color based on effective color scheme
-    auto& db = Database::instance();
-    int mode = db.getPreferenceInt("ThemeMode", ThemeSystem);
+    int mode = GlobalOptions::instance().themeMode();
 
     bool useDark = false;
     if (mode == ThemeDark) {
@@ -1578,8 +1573,7 @@ void MainWindow::changeEvent(QEvent* event)
     if (event->type() == QEvent::WindowStateChange) {
         // Check if minimizing and tray is enabled
         if (isMinimized() && m_trayIcon && m_trayIcon->isVisible()) {
-            auto& db = Database::instance();
-            int iconPlacement = db.getPreferenceInt("IconPlacement", 0);
+            int iconPlacement = GlobalOptions::instance().iconPlacement();
 
             // If system tray only (1), hide from taskbar when minimized
             if (iconPlacement == 1) {
@@ -1627,8 +1621,8 @@ void MainWindow::setupSystemTray()
         return;
     }
 
-    auto& db = Database::instance();
-    int iconPlacement = db.getPreferenceInt("IconPlacement", 0);
+    auto& opts = GlobalOptions::instance();
+    int iconPlacement = opts.iconPlacement();
 
     // 0 = taskbar only (no tray icon)
     // 1 = system tray only
@@ -1641,11 +1635,11 @@ void MainWindow::setupSystemTray()
     m_trayIcon = new QSystemTrayIcon(this);
 
     // Set icon - check for custom icon first
-    int trayIconType = db.getPreferenceInt("TrayIcon", 0);
+    int trayIconType = opts.trayIcon();
     QIcon trayIcon;
 
     if (trayIconType == 10) {
-        QString customIconPath = db.getPreference("TrayIconFileName", "");
+        QString customIconPath = opts.trayIconFileName();
         if (!customIconPath.isEmpty() && QFile::exists(customIconPath)) {
             trayIcon = QIcon(customIconPath);
         }
@@ -1804,9 +1798,7 @@ void MainWindow::updateMenus()
     m_autoSayAction->setEnabled(hasActiveWorld);
 
     // Connection menu - startup list action enabled only if startup list exists
-    auto& db = Database::instance();
-    QString startupList = db.getPreference("WorldList", "");
-    m_connectToStartupListAction->setEnabled(!startupList.isEmpty());
+    m_connectToStartupListAction->setEnabled(!GlobalOptions::instance().worldList().isEmpty());
 
     // Update Log Session checked state
     m_logSessionAction->setChecked(isLogOpen);
@@ -1945,14 +1937,11 @@ void MainWindow::openStartupWorlds()
 
     QStringList worldsToOpen;
 
-    // Read WorldList preference (asterisk-separated paths)
+    // Read WorldList preference (already split by GlobalOptions)
     // Matches original MUSHclient.cpp
-    auto& db = Database::instance();
-    QString worldList = db.getPreference("WorldList", "");
+    const QStringList worldListFiles = GlobalOptions::instance().worldList();
 
-    if (!worldList.isEmpty()) {
-        // Split by asterisk delimiter
-        QStringList worldListFiles = worldList.split('*', Qt::SkipEmptyParts);
+    if (!worldListFiles.isEmpty()) {
         for (const QString& path : worldListFiles) {
             QString trimmedPath = path.trimmed();
             if (trimmedPath.isEmpty()) {
@@ -2118,8 +2107,7 @@ void MainWindow::openWorld(const QString& filename)
     updateMenus();
 
     // Check if auto-connect is enabled (matches original MUSHclient doc.cpp)
-    bool autoConnect = db.getPreferenceInt("AutoConnectWorlds", 0) != 0;
-    if (autoConnect) {
+    if (GlobalOptions::instance().autoConnectWorlds()) {
         worldWidget->connectToMud();
         statusBar()->showMessage(
             QString("Opened %1 - Auto-connecting...").arg(worldWidget->worldName()), 3000);
@@ -2935,23 +2923,19 @@ void MainWindow::disconnectFromMud()
 
 void MainWindow::toggleAutoConnect()
 {
-    // Toggle the global AutoConnectWorlds preference
-    auto& db = Database::instance();
-    bool currentValue = db.getPreferenceInt("AutoConnectWorlds", 0) != 0;
-    bool newValue = !currentValue;
-
-    db.setPreferenceInt("AutoConnectWorlds", newValue ? 1 : 0);
+    auto& opts = GlobalOptions::instance();
+    bool newValue = !opts.autoConnectWorlds();
+    opts.setAutoConnectWorlds(newValue);
+    Database::instance().setPreferenceInt("AutoConnectWorlds", newValue ? 1 : 0);
     m_autoConnectAction->setChecked(newValue);
 }
 
 void MainWindow::toggleReconnectOnDisconnect()
 {
-    // Toggle the global ReconnectOnDisconnect preference
-    auto& db = Database::instance();
-    bool currentValue = db.getPreferenceInt("ReconnectOnDisconnect", 0) != 0;
-    bool newValue = !currentValue;
-
-    db.setPreferenceInt("ReconnectOnDisconnect", newValue ? 1 : 0);
+    auto& opts = GlobalOptions::instance();
+    bool newValue = !opts.reconnectOnLinkFailure();
+    opts.setReconnectOnLinkFailure(newValue);
+    Database::instance().setPreferenceInt("ReconnectOnLinkFailure", newValue ? 1 : 0);
     m_reconnectOnDisconnectAction->setChecked(newValue);
 }
 

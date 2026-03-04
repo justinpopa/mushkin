@@ -1342,7 +1342,7 @@ void GlobalPreferencesDialog::loadSettings()
     m_defaultMacrosFile->setText(opts.defaultMacrosFile());
     m_defaultColoursFile->setText(opts.defaultColoursFile());
 
-    qCDebug(lcDialog) << "GlobalPreferencesDialog::loadSettings() - loaded from QSettings";
+    qCDebug(lcDialog) << "GlobalPreferencesDialog::loadSettings() - loaded from database";
 }
 
 void GlobalPreferencesDialog::saveSettings()
@@ -1488,7 +1488,7 @@ void GlobalPreferencesDialog::saveSettings()
 
     opts.save();
 
-    qCDebug(lcDialog) << "GlobalPreferencesDialog::saveSettings() - saved to QSettings";
+    qCDebug(lcDialog) << "GlobalPreferencesDialog::saveSettings() - saved to database";
 }
 
 void GlobalPreferencesDialog::applySettings()
