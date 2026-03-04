@@ -9,6 +9,7 @@
 
 #include "../automation/plugin.h" // ON_PLUGIN_CONNECT, ON_PLUGIN_DISCONNECT
 #include "../network/remote_access_server.h"
+#include "../storage/global_options.h"
 #include "../text/line.h"  // Line (std::make_unique<Line>)
 #include "../text/style.h" // Style
 #include "logging.h"
@@ -143,6 +144,15 @@ void ConnectionManager::onConnect(int errorCode)
             }
         } else {
             qCDebug(lcWorld) << "Remote access server not starting (conditions not met)";
+        }
+
+        // Auto-log if world has an auto-log filename configured
+        // Matches original MUSHclient: doc.cpp ConnectionEstablished()
+        if (!m_doc.m_logging.auto_log_file_name.isEmpty() && !m_doc.IsLogOpen()) {
+            bool append = GlobalOptions::instance().appendToLogFiles();
+            if (m_doc.OpenLog(QString(), append) != 0) {
+                qCWarning(lcWorld) << "Auto-log: could not open log file for" << m_doc.worldName();
+            }
         }
 
         emit m_doc.connectionStateChanged(true);

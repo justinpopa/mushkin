@@ -24,7 +24,7 @@ All P0 items fixed — `GlobalOptions` now backed by SQLite. Key-name bug (`Reco
 | ~~DefaultInputFontHeight~~ | ~~9~~ | ~~WorldDocument hardcodes 12~~ | ~~`doc_construct.cpp:686-695`~~ |
 | AllTypingToCommandWindow | false | No input routing logic | `App.m_bAllTypingToCommandWindow` |
 | ~~AppendToLogFiles~~ | ~~true~~ | ~~`main_window.cpp` hardcodes `true` in `OpenLog()` call~~ | ~~`App.m_bAppendToLogFiles`~~ |
-| AutoLogWorld | false | Not implemented | `App.m_bAutoLogWorld` |
+| ~~AutoLogWorld~~ | ~~false~~ | ~~Not implemented~~ | ~~`App.m_bAutoLogWorld`~~ |
 
 ~~Strikethrough~~ = fixed in `feat/ci-artifacts-and-font-research` branch.
 
