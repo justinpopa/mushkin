@@ -1514,12 +1514,13 @@ void MainWindow::writeSettings()
 
 void MainWindow::closeEvent(QCloseEvent* event)
 {
-    // Confirm before closing if preference is set (matches original MUSHclient)
+    // Confirm before closing if preference is set
+    // (matches original MUSHclient.cpp SaveAllModified — OK/Cancel, not Yes/No)
     if (GlobalOptions::instance().confirmBeforeClosingMushclient()) {
-        QMessageBox::StandardButton reply =
-            QMessageBox::question(this, "Confirm Exit", "Are you sure you want to close Mushkin?",
-                                  QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
-        if (reply != QMessageBox::Yes) {
+        auto reply =
+            QMessageBox::information(this, "Mushkin", "This will end your Mushkin session.",
+                                     QMessageBox::Ok | QMessageBox::Cancel, QMessageBox::Cancel);
+        if (reply != QMessageBox::Ok) {
             event->ignore();
             return;
         }
@@ -3875,6 +3876,10 @@ void MainWindow::toggleAlwaysOnTop(bool enabled)
         flags &= ~Qt::WindowStaysOnTopHint;
     }
     setWindowFlags(flags);
+
+    // Persist immediately (matches original mainfrm.cpp OnViewAlwaysontop).
+    GlobalOptions::instance().setAlwaysOnTop(enabled);
+    Database::instance().setPreferenceInt("AlwaysOnTop", enabled ? 1 : 0);
 
     // setWindowFlags hides the window, so we need to show it again
     show();
