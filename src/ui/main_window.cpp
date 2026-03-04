@@ -118,6 +118,17 @@ MainWindow::MainWindow(QWidget* parent)
     // Read saved window geometry
     readSettings();
 
+    // Apply AlwaysOnTop preference (must be after readSettings to avoid flag conflict)
+    if (GlobalOptions::instance().alwaysOnTop()) {
+        setWindowFlags(windowFlags() | Qt::WindowStaysOnTopHint);
+        show(); // Re-show after setWindowFlags hides window
+    }
+
+    // Show activity window if preference is set
+    if (GlobalOptions::instance().openActivityWindow()) {
+        m_activityWindow->show();
+    }
+
     // Update menus initial state
     updateMenus();
 
@@ -1503,6 +1514,17 @@ void MainWindow::writeSettings()
 
 void MainWindow::closeEvent(QCloseEvent* event)
 {
+    // Confirm before closing if preference is set (matches original MUSHclient)
+    if (GlobalOptions::instance().confirmBeforeClosingMushclient()) {
+        QMessageBox::StandardButton reply =
+            QMessageBox::question(this, "Confirm Exit", "Are you sure you want to close Mushkin?",
+                                  QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+        if (reply != QMessageBox::Yes) {
+            event->ignore();
+            return;
+        }
+    }
+
     // Check if any worlds have unsaved changes
     QList<QMdiSubWindow*> windows = m_mdiArea->subWindowList();
     QStringList unsavedWorlds;
@@ -2019,10 +2041,12 @@ void MainWindow::newWorld()
     });
 
     // Show the subwindow
-    subWindow->show();
-
-    // New worlds get default size (no saved geometry yet)
-    subWindow->resize(800, 600);
+    if (GlobalOptions::instance().openWorldsMaximized()) {
+        subWindow->showMaximized();
+    } else {
+        subWindow->show();
+        subWindow->resize(800, 600);
+    }
 
     // Update menus
     updateMenus();
@@ -2090,17 +2114,22 @@ void MainWindow::openWorld(const QString& filename)
     });
 
     // Show the subwindow
-    subWindow->show();
-
-    // Try to restore saved window geometry from database
-    // Matches original MUSHclient winplace.cpp behavior
-    auto& db = Database::instance();
-    if (auto geom = db.loadWindowGeometry(worldWidget->worldName())) {
-        subWindow->setGeometry(*geom);
-        qCDebug(lcUI) << "Restored window geometry for" << worldWidget->worldName() << ":" << *geom;
+    if (GlobalOptions::instance().openWorldsMaximized()) {
+        subWindow->showMaximized();
     } else {
-        // No saved geometry - use reasonable default size
-        subWindow->resize(800, 600);
+        subWindow->show();
+
+        // Try to restore saved window geometry from database
+        // Matches original MUSHclient winplace.cpp behavior
+        auto& db = Database::instance();
+        if (auto geom = db.loadWindowGeometry(worldWidget->worldName())) {
+            subWindow->setGeometry(*geom);
+            qCDebug(lcUI) << "Restored window geometry for" << worldWidget->worldName() << ":"
+                          << *geom;
+        } else {
+            // No saved geometry - use reasonable default size
+            subWindow->resize(800, 600);
+        }
     }
 
     // Update menus
@@ -2321,8 +2350,8 @@ void MainWindow::toggleLogSession()
             return;
         }
 
-        // Open the log (append = true by default)
-        qint32 result = doc->OpenLog(filename, true);
+        // Open the log (append mode from global preference)
+        qint32 result = doc->OpenLog(filename, GlobalOptions::instance().appendToLogFiles());
         if (result == 0) {
             statusBar()->showMessage(QString("Logging to %1").arg(QFileInfo(filename).fileName()),
                                      3000);

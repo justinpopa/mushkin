@@ -23,19 +23,19 @@ All P0 items fixed — `GlobalOptions` now backed by SQLite. Key-name bug (`Reco
 | ~~DefaultInputFont~~ | ~~"Courier New"~~ | ~~Never applied~~ | ~~`doc_construct.cpp:686-695`~~ |
 | ~~DefaultInputFontHeight~~ | ~~9~~ | ~~WorldDocument hardcodes 12~~ | ~~`doc_construct.cpp:686-695`~~ |
 | AllTypingToCommandWindow | false | No input routing logic | `App.m_bAllTypingToCommandWindow` |
-| AppendToLogFiles | true | `main_window.cpp` hardcodes `true` in `OpenLog()` call (WorldDocument supports both modes) | `App.m_bAppendToLogFiles` |
+| ~~AppendToLogFiles~~ | ~~true~~ | ~~`main_window.cpp` hardcodes `true` in `OpenLog()` call~~ | ~~`App.m_bAppendToLogFiles`~~ |
 | AutoLogWorld | false | Not implemented | `App.m_bAutoLogWorld` |
 
-~~Strikethrough~~ = fixed in `feat/ci-artifacts-and-font-research` branch (applyGlobalFontDefaults).
+~~Strikethrough~~ = fixed in `feat/ci-artifacts-and-font-research` branch.
 
 ### P2 — Unimplemented Behaviors
 
 | Setting | Issue | Original MUSHclient Reference |
 |:---|:---|:---|
-| AlwaysOnTop | Not applied at startup | `App.m_bAlwaysOnTop` |
-| OpenWorldsMaximized | Child windows use default geometry | `App.m_bOpenWorldsMaximised` |
-| OpenActivityWindow | Never checked on startup | `App.m_bOpenActivityWindow` |
-| ConfirmBeforeClosingMushclient | closeEvent ignores it | `App.m_bConfirmBeforeClosingMushclient` |
+| ~~AlwaysOnTop~~ | ~~Not applied at startup~~ | ~~`App.m_bAlwaysOnTop`~~ |
+| ~~OpenWorldsMaximized~~ | ~~Child windows use default geometry~~ | ~~`App.m_bOpenWorldsMaximised`~~ |
+| ~~OpenActivityWindow~~ | ~~Never checked on startup~~ | ~~`App.m_bOpenActivityWindow`~~ |
+| ~~ConfirmBeforeClosingMushclient~~ | ~~closeEvent ignores it~~ | ~~`App.m_bConfirmBeforeClosingMushclient`~~ |
 | ConfirmBeforeClosingWorld | Not implemented | `App.m_bConfirmBeforeClosingWorld` |
 | ConfirmLogFileClose | Not implemented | `App.m_bConfirmLogFileClose` |
 | DefaultTriggersFile | Used by "Load Default Files" action, but not auto-applied on world creation | `doc_construct.cpp:664` |
@@ -45,10 +45,15 @@ All P0 items fixed — `GlobalOptions` now backed by SQLite. Key-name bug (`Reco
 
 | Setting | Used Where |
 |:---|:---|
+| AlwaysOnTop | Applied at startup in MainWindow constructor |
+| AppendToLogFiles | `toggleLogSession()` reads from GlobalOptions |
+| ConfirmBeforeClosingMushclient | `closeEvent()` shows confirmation dialog |
 | DefaultLogFileDirectory | Save/Open dialogs |
 | DefaultWorldFileDirectory | Save/Open dialogs |
 | DefaultInputFont/Height | `WorldDocument::applyGlobalFontDefaults()` (called from constructor) |
 | DefaultOutputFont/Height | `WorldDocument::applyGlobalFontDefaults()` (called from constructor) |
+| OpenActivityWindow | Shown at startup if preference set |
+| OpenWorldsMaximized | `newWorld()` and `openWorld()` call `showMaximized()` |
 
 ## How the Original MUSHclient Works
 
