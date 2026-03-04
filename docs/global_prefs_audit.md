@@ -36,8 +36,8 @@ All P0 items fixed — `GlobalOptions` now backed by SQLite. Key-name bug (`Reco
 | ~~OpenWorldsMaximized~~ | ~~Child windows use default geometry~~ | ~~`App.m_bOpenWorldsMaximised`~~ |
 | ~~OpenActivityWindow~~ | ~~Never checked on startup~~ | ~~`App.m_bOpenActivityWindow`~~ |
 | ~~ConfirmBeforeClosingMushclient~~ | ~~closeEvent ignores it~~ | ~~`App.m_bConfirmBeforeClosingMushclient`~~ |
-| ConfirmBeforeClosingWorld | Not implemented | `App.m_bConfirmBeforeClosingWorld` |
-| ConfirmLogFileClose | Not implemented | `App.m_bConfirmLogFileClose` |
+| ~~ConfirmBeforeClosingWorld~~ | ~~Not implemented~~ | ~~`App.m_bConfirmBeforeClosingWorld`~~ |
+| ~~ConfirmLogFileClose~~ | ~~Not implemented~~ | ~~`App.m_bConfirmLogFileClose`~~ |
 | DefaultTriggersFile | Used by "Load Default Files" action, but not auto-applied on world creation | `doc_construct.cpp:664` |
 | DefaultColoursFile | Used by "Load Default Files" action, but not auto-applied on world creation | `doc_construct.cpp:670` |
 
@@ -53,6 +53,8 @@ All P0 items fixed — `GlobalOptions` now backed by SQLite. Key-name bug (`Reco
 | DefaultInputFont/Height | `WorldDocument::applyGlobalFontDefaults()` (called from constructor) |
 | DefaultOutputFont/Height | `WorldDocument::applyGlobalFontDefaults()` (called from constructor) |
 | OpenActivityWindow | Shown at startup if preference set |
+| ConfirmBeforeClosingWorld | `closeWorld()` confirms when connected |
+| ConfirmLogFileClose | `toggleLogSession()` confirms before closing log |
 | OpenWorldsMaximized | `newWorld()` and `openWorld()` call `showMaximized()` |
 
 ## How the Original MUSHclient Works

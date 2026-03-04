@@ -2155,9 +2155,29 @@ void MainWindow::openStartupList()
 
 void MainWindow::closeWorld()
 {
-    if (m_mdiArea->activeSubWindow()) {
-        m_mdiArea->activeSubWindow()->close();
+    QMdiSubWindow* sub = m_mdiArea->activeSubWindow();
+    if (!sub) {
+        return;
     }
+
+    // Confirm before closing a connected world (matches original MUSHclient SaveModified).
+    if (GlobalOptions::instance().confirmBeforeClosingWorld()) {
+        auto* widget = qobject_cast<WorldWidget*>(sub->widget());
+        if (widget) {
+            WorldDocument* doc = widget->document();
+            if (doc && doc->isConnectedToMud()) {
+                auto reply = QMessageBox::question(
+                    this, "Confirm Close",
+                    QString("This will end your %1 session. Continue?").arg(doc->worldName()),
+                    QMessageBox::Ok | QMessageBox::Cancel, QMessageBox::Cancel);
+                if (reply != QMessageBox::Ok) {
+                    return;
+                }
+            }
+        }
+    }
+
+    sub->close();
 }
 
 void MainWindow::saveWorld()
@@ -2327,6 +2347,16 @@ void MainWindow::toggleLogSession()
 
     // Toggle log state
     if (doc->IsLogOpen()) {
+        // Confirm before closing the log file (matches original MUSHclient OnFileLogsession).
+        if (GlobalOptions::instance().confirmLogFileClose()) {
+            auto reply = QMessageBox::question(
+                this, "Confirm Close Log", QString("Close log file %1?").arg(doc->m_logfile_name),
+                QMessageBox::Ok | QMessageBox::Cancel, QMessageBox::Cancel);
+            if (reply != QMessageBox::Ok) {
+                return;
+            }
+        }
+
         // Close the log
         qint32 result = doc->CloseLog();
         if (result != 0) {
