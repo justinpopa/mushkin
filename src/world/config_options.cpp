@@ -251,7 +251,7 @@ const tConfigurationNumericOption OptionsTable[] = {
     {"send_file_delay_per_lines", 1, O(m_paste.file_delay_per_lines), 1, 100000, 0},
     {"send_keep_alives", 0, O(m_bSendKeepAlives), 0, 0, 0},
     {"send_mxp_afk_response", true, O(m_bSendMXP_AFK_Response), 0, 0, 0},
-    {"show_bold", true, O(m_display.show_bold), 0, 0, OPT_UPDATE_VIEWS | OPT_UPDATE_OUTPUT_FONT},
+    {"show_bold", false, O(m_display.show_bold), 0, 0, OPT_UPDATE_VIEWS | OPT_UPDATE_OUTPUT_FONT},
     {"show_connect_disconnect", true, O(m_bShowConnectDisconnect), 0, 0, 0},
     {"show_italic", true, O(m_display.show_italic), 0, 0,
      OPT_UPDATE_VIEWS | OPT_UPDATE_OUTPUT_FONT},

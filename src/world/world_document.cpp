@@ -244,7 +244,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     // (AutomationDefaultsConfig m_automation_defaults uses default member initializers)
 
     // ========== Initialize HTML logging ==========
-    m_bUnpauseOnSend = false;
+    m_bUnpauseOnSend = true;
     // (LoggingConfig m_logging bool flags use default member initializers)
 
     // ========== Initialize tree views ==========
@@ -253,8 +253,8 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_bTreeviewTimers = true;
 
     // ========== Initialize tooltips ==========
-    m_iToolTipVisibleTime = 30000; // 30 seconds
-    m_iToolTipStartTime = 500;     // 0.5 seconds
+    m_iToolTipVisibleTime = 5000; // 5 seconds (matches table default)
+    m_iToolTipStartTime = 400;    // 0.4 seconds (matches table default)
 
     // ========== Initialize save file options ==========
     m_bOmitSavedDateFromSaveFiles = false;
@@ -394,7 +394,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     }
 
     m_bSyntaxErrorOnly = false;
-    m_bDisconnectOK = false;
+    m_bDisconnectOK = true;
     m_bTrace = false;
     m_bInSendToScript = false;
     m_iScriptTimeTaken = 0;
@@ -489,7 +489,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_bDoingSimulate = false;
     m_bLineOmittedFromOutput = false;
     m_bOmitCurrentLineFromLog = false; //
-    m_bScrollBarWanted = false;
+    m_bScrollBarWanted = true;
 
     // ========== IAC Counters ==========
     // Moved to TelnetParser; initialized to 0 by TelnetParser constructor.
