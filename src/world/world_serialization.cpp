@@ -85,8 +85,9 @@ void WorldDocument::saveTriggersToXml(QXmlStreamWriter& xml)
     for (const auto& [name, triggerPtr] : m_automationRegistry->m_TriggerMap) {
         Trigger* trigger = triggerPtr.get();
 
-        // Skip temporary triggers
-        if (trigger->temporary)
+        // Skip temporary and included triggers (included = loaded from include file)
+        // Original: xml_save_world.cpp skips bTemporary and bIncluded
+        if (trigger->temporary || trigger->included)
             continue;
 
         xml.writeStartElement("trigger");
@@ -392,8 +393,8 @@ void WorldDocument::saveAliasesToXml(QXmlStreamWriter& xml)
     for (const auto& [name, aliasPtr] : m_automationRegistry->m_AliasMap) {
         Alias* alias = aliasPtr.get();
 
-        // Skip temporary aliases
-        if (alias->temporary)
+        // Skip temporary and included aliases
+        if (alias->temporary || alias->included)
             continue;
 
         xml.writeStartElement("alias");
