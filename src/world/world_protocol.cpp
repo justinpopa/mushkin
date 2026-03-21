@@ -285,6 +285,9 @@ void WorldDocument::SendPacket(std::span<const unsigned char> data)
         return;
     }
 
+    m_connectionManager->m_iOutputPacketCount++;
+    m_connectionManager->m_nBytesOut += static_cast<qint64>(data.size());
+
     // Ignore send errors — callers don't check return value for protocol packets
     (void)m_connectionManager->m_pSocket->send(
         {reinterpret_cast<const char*>(data.data()), data.size()});
