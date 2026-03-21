@@ -20,6 +20,7 @@
 #include <deque>         // For m_recentLines (multi-line triggers)
 #include <expected>      // For std::expected (fallible operations)
 #include <functional>    // For std::function (progress callback)
+#include <list>          // For m_OutstandingLines (deferred note queue)
 #include <memory>        // For std::unique_ptr
 #include <span>          // For std::span (buffer parameters)
 #include <unordered_map> // For std::unordered_map (option snapshots)
@@ -1163,6 +1164,19 @@ class WorldDocument : public QObject, public IWorldContext {
 
     bool m_bNotesNotWantedNow;
     bool m_bDoingSimulate;
+
+    // ========== Deferred Note Queue ==========
+    // Notes/tells issued during plugin callbacks (OnPluginPacketReceived,
+    // OnPluginLineReceived, etc.) are queued here while m_bNotesNotWantedNow
+    // is true, then replayed via OutputOutstandingLines() after the callback
+    // returns. Matches MUSHclient m_OutstandingLines / OutputOutstandingLines().
+    struct DeferredNote {
+        QString text;
+        QRgb foreColor;
+        QRgb backColor;
+        quint16 style;
+    };
+    std::list<DeferredNote> m_OutstandingLines;
     bool m_bLineOmittedFromOutput;
     bool m_bOmitCurrentLineFromLog; // Trigger omit_from_log flag
     bool m_bScrollBarWanted;
@@ -1968,6 +1982,7 @@ class WorldDocument : public QObject, public IWorldContext {
   private:
     void initializeDefaults();
     void initializeColors();
+    void OutputOutstandingLines();
 
     // Script file monitoring
     // Manually owned (NOT Qt parent-child; created without parent to avoid double-free).

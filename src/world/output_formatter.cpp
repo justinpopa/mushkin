@@ -44,8 +44,9 @@ void OutputFormatter::note(const QString& text)
  */
 void OutputFormatter::colourNote(QRgb foreColor, QRgb backColor, const QString& text)
 {
-    // Don't output notes if disabled
+    // Queue the note for deferred output during plugin callbacks
     if (m_doc.m_bNotesNotWantedNow) {
+        m_doc.m_OutstandingLines.push_back({text, foreColor, backColor, m_doc.m_iNoteStyle});
         return;
     }
 
@@ -94,8 +95,9 @@ void OutputFormatter::colourNote(QRgb foreColor, QRgb backColor, const QString& 
  */
 void OutputFormatter::colourTell(QRgb foreColor, QRgb backColor, const QString& text)
 {
-    // Don't output notes if disabled
+    // Queue the tell for deferred output during plugin callbacks
     if (m_doc.m_bNotesNotWantedNow) {
+        m_doc.m_OutstandingLines.push_back({text, foreColor, backColor, m_doc.m_iNoteStyle});
         return;
     }
 

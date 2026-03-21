@@ -777,6 +777,8 @@ void WorldDocument::ReceiveMsg()
     // modify the packet string. If a plugin empties it, the packet is discarded.
     QString packetData = QString::fromLatin1(buffer.data(), nRead);
     SendToAllPluginCallbacksRtn(ON_PLUGIN_PACKET_RECEIVED, packetData);
+    // Replay any notes/tells queued by plugins during the packet callback.
+    OutputOutstandingLines();
     if (packetData.isEmpty()) {
         return; // Plugin discarded the packet
     }
@@ -2036,6 +2038,8 @@ void WorldDocument::StartNewLine(bool bNewLine, unsigned char iFlags)
             }
 
             evaluateTriggers(m_currentLine.get());
+            // Replay any notes/tells that plugins queued during trigger callbacks.
+            OutputOutstandingLines();
         }
 
         // Line-level logging integration
@@ -2657,6 +2661,47 @@ qint32 WorldDocument::GetSelectionEndColumn() const
 bool WorldDocument::isConnectedToMud() const
 {
     return m_connectionManager && m_connectionManager->m_iConnectPhase == eConnectConnectedToMud;
+}
+
+/**
+ * OutputOutstandingLines - Replay notes/tells queued during plugin callbacks.
+ *
+ * While m_bNotesNotWantedNow is true (e.g. during OnPluginPacketReceived or
+ * OnPluginLineReceived), colourNote/colourTell push to m_OutstandingLines
+ * instead of writing directly. This function flushes that queue once the
+ * callback returns and normal output is permitted again.
+ *
+ * Matches MUSHclient doc.cpp OutputOutstandingLines().
+ */
+void WorldDocument::OutputOutstandingLines()
+{
+    if (m_OutstandingLines.empty()) {
+        return;
+    }
+
+    // Save current display state so we can restore it afterward.
+    quint16 savedFlags = m_iFlags;
+    QRgb savedFore = m_iForeColour;
+    QRgb savedBack = m_iBackColour;
+    quint16 savedNoteStyle = m_iNoteStyle;
+
+    for (const auto& deferred : m_OutstandingLines) {
+        m_iForeColour = deferred.foreColor;
+        m_iBackColour = deferred.backColor;
+        m_iNoteStyle = deferred.style;
+        m_iFlags = COLOUR_RGB | deferred.style;
+        // Route through colourNote — m_bNotesNotWantedNow is now false so
+        // this outputs immediately and won't re-queue.
+        m_outputFormatter->colourNote(deferred.foreColor, deferred.backColor, deferred.text);
+    }
+
+    m_OutstandingLines.clear();
+
+    // Restore display state.
+    m_iFlags = savedFlags;
+    m_iForeColour = savedFore;
+    m_iBackColour = savedBack;
+    m_iNoteStyle = savedNoteStyle;
 }
 
 void WorldDocument::flushLogIfNeeded()
