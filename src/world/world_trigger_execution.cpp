@@ -199,8 +199,8 @@ void WorldDocument::executeTrigger(Trigger* trigger, Line* line, const QString& 
         qCDebug(lcWorld) << "Trigger omit from log: set m_bOmitCurrentLineFromLog flag";
     }
 
-    // Play sound
-    if (!trigger->sound_to_play.isEmpty()) {
+    // Play sound (original: ProcessPreviousLine.cpp:985 checks m_enable_trigger_sounds)
+    if (!trigger->sound_to_play.isEmpty() && m_sound.enable_trigger_sounds) {
         // Check sound_if_inactive flag - only play if window is inactive, or flag is not set
         if (!trigger->sound_if_inactive || !IsWindowActive()) {
             PlaySoundFile(trigger->sound_to_play);
