@@ -109,9 +109,9 @@ int L_Accelerator(lua_State* L)
         pluginId = pDoc->m_CurrentPlugin->id();
     }
 
-    // Register the accelerator with eSendToExecute (12)
+    // Register the accelerator with eSendToExecute (10)
     int result = pDoc->m_acceleratorManager->addAccelerator(key_string, send_string,
-                                                            12, // eSendToExecute
+                                                            10, // eSendToExecute
                                                             pluginId);
 
     lua_pushnumber(L, result);
@@ -157,8 +157,8 @@ int L_AcceleratorList(lua_State* L)
     for (const AcceleratorEntry& entry : accelerators) {
         QString str = entry.keyString + " = " + entry.action;
 
-        // Add sendto suffix if not eSendToExecute (12)
-        if (entry.sendTo != 12) {
+        // Add sendto suffix if not eSendToExecute (10)
+        if (entry.sendTo != 10) {
             str += QString("\t[%1]").arg(entry.sendTo);
         }
 

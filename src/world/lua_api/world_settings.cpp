@@ -1630,8 +1630,8 @@ int L_GetOption(lua_State* L)
         }
     }
 
-    // Option not found
-    lua_pushnil(L);
+    // Option not found — return -1 to match original MUSHclient behavior
+    lua_pushnumber(L, -1);
     return 1;
 }
 

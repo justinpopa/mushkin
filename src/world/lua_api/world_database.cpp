@@ -810,14 +810,14 @@ int L_DatabaseColumnNames(lua_State* L)
     WorldDocument* pDoc = doc(L);
     QString qName = luaCheckQString(L, 1);
 
-    lua_newtable(L);
-
     auto it = pDoc->m_DatabaseMap.find(qName);
     if (it == pDoc->m_DatabaseMap.end() || it->second->db == nullptr ||
         it->second->pStmt == nullptr) {
-        return 1; // Return empty table
+        lua_pushnil(L);
+        return 1;
     }
 
+    lua_newtable(L);
     for (int i = 0; i < it->second->iColumns; i++) {
         const char* colName = sqlite3_column_name(it->second->pStmt, i);
         lua_pushstring(L, colName ? colName : "");
@@ -850,14 +850,14 @@ int L_DatabaseColumnValues(lua_State* L)
     WorldDocument* pDoc = doc(L);
     QString qName = luaCheckQString(L, 1);
 
-    lua_newtable(L);
-
     auto it = pDoc->m_DatabaseMap.find(qName);
     if (it == pDoc->m_DatabaseMap.end() || it->second->db == nullptr ||
         it->second->pStmt == nullptr || !it->second->bValidRow) {
-        return 1; // Return empty table
+        lua_pushnil(L);
+        return 1;
     }
 
+    lua_newtable(L);
     for (int i = 0; i < it->second->iColumns; i++) {
         pushDatabaseColumnValue(L, it->second->pStmt, i);
         lua_rawseti(L, -2, i + 1);
