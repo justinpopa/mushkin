@@ -1067,6 +1067,30 @@ QVariant MiniWindow::FontInfo(const QString& fontId, qint32 infoType)
             return font.weight(); // tmWeight (QFont::Weight enum, compatible with Windows values)
         case 9:
             return fm.leftBearing('x') + fm.rightBearing('x'); // tmOverhang approximation
+        case 10:
+            return 0; // tmDigitizedAspectX (not available in Qt)
+        case 11:
+            return 0; // tmDigitizedAspectY (not available in Qt)
+        case 12:
+            return 0; // tmFirstChar (not available in Qt)
+        case 13:
+            return 65535; // tmLastChar (Unicode range, approximate)
+        case 14:
+            return 0; // tmDefaultChar (not available in Qt)
+        case 15:
+            return 0; // tmBreakChar (not available in Qt)
+        case 16:
+            return font.italic() ? 1 : 0; // tmItalic
+        case 17:
+            return font.underline() ? 1 : 0; // tmUnderlined
+        case 18:
+            return font.strikeOut() ? 1 : 0; // tmStruckOut
+        case 19:
+            return 0; // tmPitchAndFamily (not available in Qt)
+        case 20:
+            return 0; // tmCharSet (not available in Qt, DEFAULT_CHARSET = 1)
+        case 21:
+            return font.family(); // Font face name (string)
         default:
             return QVariant();
     }
