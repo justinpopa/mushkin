@@ -184,6 +184,10 @@ class Plugin : public QObject {
      * @return 1 if function exists, DISPID_UNKNOWN if not
      */
     qint32 GetPluginDispid(const QString& callbackName);
+    bool hasCallback(const QString& callbackName)
+    {
+        return GetPluginDispid(callbackName) != -1;
+    }
 
     /**
      * Execute plugin callback with no parameters

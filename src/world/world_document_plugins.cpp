@@ -857,6 +857,7 @@ bool WorldDocument::SendToAllPluginCallbacks(const QString& callbackName, qint32
 bool WorldDocument::SendToFirstPluginCallbacks(const QString& callbackName, const QString& arg)
 {
     Plugin* savedPlugin = m_CurrentPlugin;
+    m_bNotesNotWantedNow = true;
 
     for (const auto& plugin : m_PluginList) {
         if (!plugin || !plugin->m_bEnabled) {
@@ -864,16 +865,22 @@ bool WorldDocument::SendToFirstPluginCallbacks(const QString& callbackName, cons
         }
 
         m_CurrentPlugin = plugin.get();
-        bool pluginResult = plugin->ExecutePluginScript(callbackName, arg);
 
-        if (pluginResult) {
-            m_CurrentPlugin = savedPlugin;
-            return true; // First plugin handled it
+        // Original plugins.cpp:1380 — stops on the first plugin that HAS the callback
+        // defined (isvalid), regardless of what the callback returns.
+        if (!plugin->hasCallback(callbackName)) {
+            continue;
         }
+
+        plugin->ExecutePluginScript(callbackName, arg);
+        m_CurrentPlugin = savedPlugin;
+        m_bNotesNotWantedNow = false;
+        return true; // Found a plugin with this callback
     }
 
     m_CurrentPlugin = savedPlugin;
-    return false; // No plugin handled it
+    m_bNotesNotWantedNow = false;
+    return false; // No plugin has this callback
 }
 
 // ============================================================================
