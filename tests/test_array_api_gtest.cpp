@@ -288,10 +288,10 @@ TEST_F(ArrayAPITest, ArrayListKeys)
     )");
     EXPECT_EQ(getInt("keycount"), 3) << "ArrayListKeys should return 3 keys";
 
-    // Empty result for nonexistent array
+    // Original returns nil for nonexistent array (not empty table)
     runLua("keys = ArrayListKeys('noarray')");
-    runLua("keycount = #keys");
-    EXPECT_EQ(getInt("keycount"), 0) << "ArrayListKeys should return empty for nonexistent array";
+    runLua("is_nil = (keys == nil) and 1 or 0");
+    EXPECT_EQ(getInt("is_nil"), 1) << "ArrayListKeys should return nil for nonexistent array";
 }
 
 // Test ArrayListValues

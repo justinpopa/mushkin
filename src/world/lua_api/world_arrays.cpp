@@ -346,8 +346,13 @@ static int L_ArrayListAll(lua_State* L)
     WorldDocument* pDoc = doc(L);
     const ArraysMap& arrays = pDoc->getArrayMap();
 
-    lua_newtable(L);
+    // Original returns nil (VT_EMPTY via SAFEARRAY) when no arrays exist
+    if (arrays.isEmpty()) {
+        lua_pushnil(L);
+        return 1;
+    }
 
+    lua_newtable(L);
     int index = 1;
     for (auto it = arrays.constBegin(); it != arrays.constEnd(); ++it) {
         luaPushQString(L, it.key());
@@ -372,13 +377,14 @@ static int L_ArrayListKeys(lua_State* L)
     QString arrayName = luaCheckQString(L, 1);
     const ArraysMap& arrays = pDoc->getArrayMap();
 
-    lua_newtable(L);
-
-    if (!arrays.contains(arrayName)) {
-        return 1; // Return empty table
+    // Original returns nil when array not found or empty
+    if (!arrays.contains(arrayName) || arrays[arrayName].isEmpty()) {
+        lua_pushnil(L);
+        return 1;
     }
 
     const QMap<QString, QString>& arr = arrays[arrayName];
+    lua_newtable(L);
     int index = 1;
     for (auto it = arr.constBegin(); it != arr.constEnd(); ++it) {
         luaPushQString(L, it.key());
@@ -403,13 +409,14 @@ static int L_ArrayListValues(lua_State* L)
     QString arrayName = luaCheckQString(L, 1);
     const ArraysMap& arrays = pDoc->getArrayMap();
 
-    lua_newtable(L);
-
-    if (!arrays.contains(arrayName)) {
-        return 1; // Return empty table
+    // Original returns nil when array not found or empty
+    if (!arrays.contains(arrayName) || arrays[arrayName].isEmpty()) {
+        lua_pushnil(L);
+        return 1;
     }
 
     const QMap<QString, QString>& arr = arrays[arrayName];
+    lua_newtable(L);
     int index = 1;
     for (auto it = arr.constBegin(); it != arr.constEnd(); ++it) {
         luaPushQString(L, it.value());
