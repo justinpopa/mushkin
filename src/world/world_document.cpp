@@ -645,6 +645,7 @@ void WorldDocument::applyGlobalFontDefaults()
         m_input.font_name = inputFont;
         m_input.font_height = opts.defaultInputFontHeight();
         m_input.font_weight = opts.defaultInputFontWeight();
+        m_input.font_italic = opts.defaultInputFontItalic(); // original: doc_construct.cpp:691
         m_bUseDefaultInputFont = true;
     }
 }

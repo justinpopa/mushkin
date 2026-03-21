@@ -973,7 +973,7 @@ void MainWindow::createMenus()
 
     m_alwaysOnTopAction = m_viewMenu->addAction("Always &On Top");
     m_alwaysOnTopAction->setCheckable(true);
-    m_alwaysOnTopAction->setChecked(false);
+    m_alwaysOnTopAction->setChecked(GlobalOptions::instance().alwaysOnTop());
     m_alwaysOnTopAction->setStatusTip("Keep window above all other windows");
     connect(m_alwaysOnTopAction, &QAction::triggered, this, &MainWindow::toggleAlwaysOnTop);
 
@@ -2046,12 +2046,13 @@ void MainWindow::newWorld()
     // doc_construct.cpp:641-684 — only for new worlds, not loaded ones).
     {
         const auto& opts = GlobalOptions::instance();
+        // Original doc_construct.cpp:656-663 loads colours FIRST
         const std::array<std::pair<QString, int>, 5> defaultFiles = {{
+            {opts.defaultColoursFile(), XML_COLOURS},
             {opts.defaultTriggersFile(), XML_TRIGGERS},
             {opts.defaultAliasesFile(), XML_ALIASES},
             {opts.defaultTimersFile(), XML_TIMERS},
             {opts.defaultMacrosFile(), XML_MACROS},
-            {opts.defaultColoursFile(), XML_COLOURS},
         }};
 
         WorldDocument* doc = worldWidget->document();
@@ -2323,11 +2324,11 @@ void MainWindow::reloadDefaults()
     const auto& opts = GlobalOptions::instance();
 
     const std::array<std::pair<QString, int>, 5> defaultFiles = {{
+        {opts.defaultColoursFile(), XML_COLOURS},
         {opts.defaultTriggersFile(), XML_TRIGGERS},
         {opts.defaultAliasesFile(), XML_ALIASES},
         {opts.defaultTimersFile(), XML_TIMERS},
         {opts.defaultMacrosFile(), XML_MACROS},
-        {opts.defaultColoursFile(), XML_COLOURS},
     }};
 
     int totalImported = 0;
