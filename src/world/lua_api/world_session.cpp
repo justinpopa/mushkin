@@ -36,20 +36,8 @@ int L_Execute(lua_State* L)
     WorldDocument* pDoc = doc(L);
     auto [str] = luaArgs<QString>(L);
 
-    // Call ON_PLUGIN_COMMAND callback with recursion guard
-    if (!pDoc->m_bPluginProcessingCommand) {
-        pDoc->m_bPluginProcessingCommand = true;
-        bool shouldSend = pDoc->SendToAllPluginCallbacks(ON_PLUGIN_COMMAND, str, true);
-        pDoc->m_bPluginProcessingCommand = false;
-
-        if (!shouldSend) {
-            lua_pushinteger(L, eOK);
-            return 1;
-        }
-    }
-
-    // Call Execute() to process command stacking, aliases, etc.
-    // (not sendToMud which sends raw - would miss semicolon prefix handling)
+    // ON_PLUGIN_COMMAND is now fired per stacked sub-command inside Execute(),
+    // matching original methods_commands.cpp:362 behavior.
     pDoc->Execute(str);
     lua_pushinteger(L, eOK);
     return 1;

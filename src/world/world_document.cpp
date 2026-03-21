@@ -1338,6 +1338,17 @@ void WorldDocument::Execute(const QString& command, bool allowScriptPrefix)
 
     // Process each command individually
     for (const QString& str : strList) {
+        // Fire ON_PLUGIN_COMMAND per stacked sub-command (original: methods_commands.cpp:362).
+        // Plugin can return false to suppress this individual sub-command.
+        if (!m_bPluginProcessingCommand) {
+            m_bPluginProcessingCommand = true;
+            bool shouldSend = SendToAllPluginCallbacks(ON_PLUGIN_COMMAND, str, true);
+            m_bPluginProcessingCommand = false;
+            if (!shouldSend) {
+                continue; // Plugin suppressed this sub-command
+            }
+        }
+
         QString processedCommand = str;
         bool bypassAliases = false;
 
