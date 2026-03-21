@@ -513,9 +513,12 @@ Plugin* WorldDocument::LoadPlugin(const QString& filepath, QString& errorMsg)
         bool error = pluginPtr->m_ScriptEngine->parseScript(
             pluginPtr->m_strScript, QString("Plugin %1").arg(pluginPtr->m_strName), pluginLang);
         if (error) {
+            // Original: script parse error causes the entire plugin load to fail.
+            // The plugin is not added to the list.
             errorMsg = QString("Script error in plugin '%1'").arg(pluginPtr->m_strName);
             qWarning() << errorMsg;
-            // Don't fail - plugin may still be useful without script
+            m_CurrentPlugin = savedPlugin;
+            return nullptr;
         }
 
         // Restore previous plugin context
