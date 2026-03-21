@@ -299,10 +299,12 @@ TEST_F(PluginEvaluationTest, KeepEvaluatingStopsAtNegativePhase)
     // Evaluate triggers
     doc->evaluateTriggers(testLine3.get());
 
-    // Check that only negative plugin trigger matched (others should not match)
+    // keep_evaluating=false stops the current phase only (original MUSHclient behavior).
+    // Other phases (world, positive plugins) still run.
     EXPECT_EQ(trigNeg3->matched, 1) << "Negative plugin trigger should have matched";
-    EXPECT_EQ(trigWorld3->matched, 0) << "World trigger should not have matched";
-    EXPECT_EQ(trigPos3->matched, 0) << "Positive plugin trigger should not have matched";
+    EXPECT_EQ(trigWorld3->matched, 1) << "World trigger should have matched (different phase)";
+    EXPECT_EQ(trigPos3->matched, 1)
+        << "Positive plugin trigger should have matched (different phase)";
 }
 
 // Test 4: keep_evaluating = false stops at world phase
@@ -352,10 +354,12 @@ TEST_F(PluginEvaluationTest, KeepEvaluatingStopsAtWorldPhase)
     // Evaluate triggers
     doc->evaluateTriggers(testLine4.get());
 
-    // Check that negative and world matched, but not positive
+    // keep_evaluating=false on world trigger stops the world phase only.
+    // Positive plugin phase still runs (original MUSHclient behavior).
     EXPECT_EQ(trigNeg4->matched, 1) << "Negative plugin trigger should have matched";
     EXPECT_EQ(trigWorld4->matched, 1) << "World trigger should have matched";
-    EXPECT_EQ(trigPos4->matched, 0) << "Positive plugin trigger should not have matched";
+    EXPECT_EQ(trigPos4->matched, 1)
+        << "Positive plugin trigger should have matched (different phase)";
 }
 
 // Test 5: One-shot trigger deleted from correct plugin context

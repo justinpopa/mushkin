@@ -426,6 +426,10 @@ static bool evaluateOneTriggerSequence(const QVector<Trigger*>& triggerArray, Li
             if (!trigger->keep_evaluating) {
                 return true;
             }
+            // Check if a script called StopEvaluatingTriggers()
+            if (ctx->stopTriggerEvaluation() > 0) {
+                return true;
+            }
         }
     }
     return false;
@@ -460,6 +464,9 @@ void AutomationRegistry::evaluateTriggers(Line* line)
     m_ctx.setCurrentPlugin(nullptr);
     bool stopEvaluation = false;
 
+    // Reset stop flag at start of trigger evaluation (original: ProcessPreviousLine.cpp)
+    m_ctx.resetStopTriggerEvaluation();
+
     // Phase 1: plugins with negative sequence
     for (const auto& plugin : m_ctx.pluginList()) {
         if (plugin->m_iSequence >= 0) {
@@ -473,6 +480,10 @@ void AutomationRegistry::evaluateTriggers(Line* line)
         }
         m_ctx.setCurrentPlugin(plugin.get());
         m_iTriggersEvaluatedCount += plugin->m_TriggerArray.size();
+        // Reset per-phase flag (value 1 stops only current phase; original resets between plugins)
+        if (m_ctx.stopTriggerEvaluation() == 1) {
+            m_ctx.resetStopTriggerEvaluation();
+        }
         stopEvaluation = evaluateOneTriggerSequence(plugin->m_TriggerArray, line, lineText, &m_ctx,
                                                     this, oneShotToDelete);
         if (stopEvaluation) {
@@ -480,13 +491,26 @@ void AutomationRegistry::evaluateTriggers(Line* line)
                 plugin->m_TriggerMap.erase(oneShotToDelete);
                 plugin->m_triggersNeedSorting = true;
             }
-            m_ctx.setCurrentPlugin(savedPlugin);
-            return;
+            // Value 1 = stop this phase only; value 2 = stop all phases
+            if (m_ctx.stopTriggerEvaluation() >= 2) {
+                m_ctx.setCurrentPlugin(savedPlugin);
+                return;
+            }
+            break; // Stop this phase, continue to next
         }
+    }
+
+    // Check if all-plugins stop was requested
+    if (m_ctx.stopTriggerEvaluation() >= 2) {
+        m_ctx.setCurrentPlugin(savedPlugin);
+        return;
     }
 
     // Phase 2: world triggers
     m_ctx.setCurrentPlugin(nullptr);
+    if (m_ctx.stopTriggerEvaluation() == 1) {
+        m_ctx.resetStopTriggerEvaluation();
+    }
     stopEvaluation =
         evaluateOneTriggerSequence(m_TriggerArray, line, lineText, &m_ctx, this, oneShotToDelete);
     if (stopEvaluation) {
@@ -494,6 +518,14 @@ void AutomationRegistry::evaluateTriggers(Line* line)
             qCDebug(lcWorld) << "Deleting one-shot world trigger:" << oneShotToDelete;
             (void)deleteTrigger(oneShotToDelete);
         }
+        if (m_ctx.stopTriggerEvaluation() >= 2) {
+            m_ctx.setCurrentPlugin(savedPlugin);
+            return;
+        }
+    }
+
+    // Check if all-plugins stop was requested
+    if (m_ctx.stopTriggerEvaluation() >= 2) {
         m_ctx.setCurrentPlugin(savedPlugin);
         return;
     }
@@ -511,6 +543,9 @@ void AutomationRegistry::evaluateTriggers(Line* line)
         }
         m_ctx.setCurrentPlugin(plugin.get());
         m_iTriggersEvaluatedCount += plugin->m_TriggerArray.size();
+        if (m_ctx.stopTriggerEvaluation() == 1) {
+            m_ctx.resetStopTriggerEvaluation();
+        }
         stopEvaluation = evaluateOneTriggerSequence(plugin->m_TriggerArray, line, lineText, &m_ctx,
                                                     this, oneShotToDelete);
         if (stopEvaluation) {
@@ -518,8 +553,11 @@ void AutomationRegistry::evaluateTriggers(Line* line)
                 plugin->m_TriggerMap.erase(oneShotToDelete);
                 plugin->m_triggersNeedSorting = true;
             }
-            m_ctx.setCurrentPlugin(savedPlugin);
-            return;
+            if (m_ctx.stopTriggerEvaluation() >= 2) {
+                m_ctx.setCurrentPlugin(savedPlugin);
+                return;
+            }
+            break;
         }
     }
 

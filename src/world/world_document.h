@@ -337,6 +337,8 @@ class WorldDocument : public QObject, public IWorldContext {
     explicit WorldDocument(QObject* parent = nullptr);
     ~WorldDocument() override;
 
+    void applyGlobalFontDefaults();
+
     // Public member variables (for direct port compatibility)
 
     // NOTE: m_pSocket is now stored inside m_connectionManager->m_pSocket.
@@ -1925,6 +1927,14 @@ class WorldDocument : public QObject, public IWorldContext {
     }
     bool isConnectedToMud() const override;
     void flushLogIfNeeded() override;
+    quint16 stopTriggerEvaluation() const override
+    {
+        return m_iStopTriggerEvaluation;
+    }
+    void resetStopTriggerEvaluation() override
+    {
+        m_iStopTriggerEvaluation = 0;
+    }
 
   signals:
     void worldNameChanged(const QString& name);

@@ -53,6 +53,11 @@ class IWorldContext {
     virtual bool isConnectedToMud() const = 0;
     virtual const std::deque<QString>& recentLines() const = 0;
 
+    // ========== Trigger Evaluation Control ==========
+    // 0 = keep evaluating, 1 = stop current phase, 2 = stop all phases
+    virtual quint16 stopTriggerEvaluation() const = 0;
+    virtual void resetStopTriggerEvaluation() = 0;
+
     // ========== Logging ==========
     virtual void flushLogIfNeeded() = 0;
 
