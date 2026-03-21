@@ -7,6 +7,7 @@
 #include "../notepad_widget.h"
 #include "../world_document.h"
 #include "lua_common.h"
+#include <QMdiSubWindow>
 
 extern "C" {
 #include <lauxlib.h>
@@ -112,11 +113,14 @@ int L_GetNotepadText(lua_State* L)
     NotepadWidget* notepad = pDoc->FindNotepad(title);
 
     if (!notepad) {
-        lua_pushnil(L);
-        return 1;
+        // Original returns empty string, not nil (CString initialized empty)
+        return luaReturn(L, QString());
     }
 
-    return luaReturn(L, notepad->GetText());
+    // Original uses CEdit::GetWindowText which returns \r\n line endings
+    QString text = notepad->GetText();
+    text.replace('\n', QStringLiteral("\r\n"));
+    return luaReturn(L, text);
 }
 
 /**
@@ -173,7 +177,8 @@ int L_GetNotepadList(lua_State* L)
 int L_SaveNotepad(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    bool replaceExisting = lua_isboolean(L, 3) ? lua_toboolean(L, 3) : true;
+    // Original: optboolean(L, 3, 0) — default false (do not overwrite)
+    bool replaceExisting = lua_isboolean(L, 3) ? lua_toboolean(L, 3) : false;
 
     qint32 result =
         pDoc->SaveNotepad(luaCheckQString(L, 1), luaCheckQString(L, 2), replaceExisting);
@@ -307,15 +312,24 @@ int L_MoveNotepadWindow(lua_State* L)
 int L_GetNotepadWindowPosition(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
+    NotepadWidget* notepad = pDoc->FindNotepad(luaCheckQString(L, 1));
 
-    QString position = pDoc->GetNotepadWindowPosition(luaCheckQString(L, 1));
-
-    if (position.isEmpty()) {
-        lua_pushnil(L);
-        return 1;
+    if (!notepad || !notepad->m_pMdiSubWindow) {
+        // Original returns nil (no push, return 0) when notepad not found
+        return 0;
     }
 
-    luaPushQString(L, position);
-
+    // Original Lua API returns a table with named keys (not a comma string)
+    // Reference: lua_methods.cpp L_GetNotepadWindowPosition uses lua_newtable + MakeTableItem
+    QRect geometry = notepad->m_pMdiSubWindow->geometry();
+    lua_newtable(L);
+    lua_pushnumber(L, geometry.left());
+    lua_setfield(L, -2, "left");
+    lua_pushnumber(L, geometry.top());
+    lua_setfield(L, -2, "top");
+    lua_pushnumber(L, geometry.width());
+    lua_setfield(L, -2, "width");
+    lua_pushnumber(L, geometry.height());
+    lua_setfield(L, -2, "height");
     return 1;
 }

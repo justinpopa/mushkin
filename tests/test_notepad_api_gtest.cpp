@@ -112,11 +112,13 @@ TEST_F(NotepadApiTest, GetNotepadTextRetrievesContent)
 }
 
 // Test 8: GetNotepadText returns nil for non-existent notepad
-TEST_F(NotepadApiTest, GetNotepadTextReturnsNilIfNotExists)
+TEST_F(NotepadApiTest, GetNotepadTextReturnsEmptyIfNotExists)
 {
+    // Original returns empty string "" (CString initialized empty), not nil
     executeLua("text = world.GetNotepadText('DoesNotExist')");
     lua_getglobal(L, "text");
-    EXPECT_TRUE(lua_isnil(L, -1));
+    EXPECT_TRUE(lua_isstring(L, -1));
+    EXPECT_STREQ(lua_tostring(L, -1), "");
     lua_pop(L, 1);
 }
 
