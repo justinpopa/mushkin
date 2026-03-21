@@ -935,7 +935,22 @@ return re
         lua_pop(L, 1);
     }
 
-    // 10. Clear stack to ensure clean state
+    // 10. Sandbox: disable dangerous functions (original: DisableDLLs in lua_scripting.cpp)
+    // Replace os.exit with a no-op to prevent plugins from terminating the application
+    const char* sandbox_code = R"(
+        -- Replace os.exit with no-op (original MUSHclient does this)
+        os.exit = function() end
+        -- Replace io.popen with no-op (prevents shell command execution)
+        io.popen = function() return nil, "io.popen is disabled" end
+        -- Remove package.loadlib (prevents loading arbitrary native DLLs)
+        package.loadlib = nil
+    )";
+    if (luaL_dostring(L, sandbox_code) != 0) {
+        qWarning() << "Sandbox setup error:" << lua_tostring(L, -1);
+        lua_pop(L, 1);
+    }
+
+    // 11. Clear stack to ensure clean state
     lua_settop(L, 0);
 }
 
