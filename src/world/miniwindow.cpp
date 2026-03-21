@@ -1167,20 +1167,34 @@ qint32 MiniWindow::DrawImage(const QString& imageId, qint32 left, qint32 top, qi
         srcRect = QRect(0, 0, img->width(), img->height());
     }
 
-    // Set composition mode based on draw mode
+    // Draw modes (original miniwindow.cpp:1403-1448):
+    //   1 = BitBlt SRCCOPY (straight copy, no stretch — uses source dimensions)
+    //   2 = StretchBlt (stretch source to dest rect)
+    //   3 = Transparency (top-left pixel is color key)
     switch (mode) {
-        case 1: // image_copy (overwrite)
+        case 1: { // Straight copy — use source dimensions, not dest rect
             painter.setCompositionMode(QPainter::CompositionMode_Source);
+            QRect copyDest(left, top, srcRect.width(), srcRect.height());
+            painter.drawImage(copyDest, *img, srcRect);
             break;
-        case 2: // image_transparent_copy (respect alpha)
+        }
+        case 2: // Stretch — scale source to dest rect
+            painter.setCompositionMode(QPainter::CompositionMode_Source);
+            painter.drawImage(destRect, *img, srcRect);
+            break;
+        case 3: { // Transparency — top-left pixel (0,0) of source is the transparent color
+            QImage copy = img->copy(srcRect);
+            QRgb transparentColor = img->pixel(0, 0); // Always from full image (0,0)
+            QImage mask = copy.createMaskFromColor(transparentColor, Qt::MaskOutColor);
+            copy.setAlphaChannel(mask);
             painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
+            QRect copyDest(left, top, srcRect.width(), srcRect.height());
+            painter.drawImage(copyDest, copy);
             break;
+        }
         default:
-            painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
-            break;
+            return eBadParameter;
     }
-
-    painter.drawImage(destRect, *img, srcRect);
 
     dirty = true;
     emit needsRedraw();
