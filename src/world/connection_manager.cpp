@@ -117,6 +117,12 @@ void ConnectionManager::onConnect(int errorCode)
             m_doc.m_currentLine->styleList.push_back(std::move(initial_style));
         }
 
+        // Activate MXP if always-on mode is configured.
+        // Original: doc.cpp:6611-6612 — MXP_On() called at connect when m_iUseMXP == eUseMXP
+        if (m_doc.m_iUseMXP == MXPMode::eMXP_On) {
+            m_doc.MXP_On();
+        }
+
         // Lua callback: OnWorldConnect.
         onWorldConnect();
 
