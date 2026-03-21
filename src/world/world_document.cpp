@@ -1241,7 +1241,7 @@ void WorldDocument::logCommand(const QString& text)
  *
  * @param command - User-entered command (may contain multiple commands)
  */
-void WorldDocument::Execute(const QString& command, bool allowScriptPrefix)
+void WorldDocument::Execute(const QString& command, bool allowScriptPrefix, bool addHistory)
 {
     // Recursion depth guard — prevents infinite alias loops from crashing.
     // Original: methods_commands.cpp:254 — MAX_EXECUTION_DEPTH = 100
@@ -1391,8 +1391,10 @@ void WorldDocument::Execute(const QString& command, bool allowScriptPrefix)
 
             SendMsg(processedCommand, bEcho, bQueue, bLog);
 
-            // Add to command history
-            addToCommandHistory(processedCommand);
+            // Add to command history (only from UI path, not Lua Execute())
+            if (addHistory) {
+                addToCommandHistory(processedCommand);
+            }
         }
         // Note: If alias handled, the alias execution already added to history (if
         // !omit_from_command_history)
