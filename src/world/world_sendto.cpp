@@ -80,10 +80,11 @@ void WorldDocument::sendTo(SendTo iWhere, const QString& strSendText, bool omit_
             break;
 
         // ========== eSendToCommandQueue: Add to command queue ==========
-        // Original: doc.cpp
+        // Original: doc.cpp:6231-6236 — SendMsg with queue=true
         case eSendToCommandQueue:
-            // TODO(feature): Command queue not yet implemented — eSendToCommandQueue is a no-op.
-            qCDebug(lcWorld) << "SendTo: eSendToCommandQueue:" << strSendText;
+            SendMsg(strSendText, omit_from_output ? false : m_display_my_input,
+                    true, // queue it
+                    omit_from_log ? false : m_logging.log_input);
             break;
 
         // ========== eSendToStatus: Set status line message ==========
