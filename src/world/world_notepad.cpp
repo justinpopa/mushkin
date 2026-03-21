@@ -114,15 +114,9 @@ NotepadWidget* WorldDocument::CreateNotepadWindow(const QString& title, const QS
 std::expected<void, WorldError> WorldDocument::SendToNotepad(const QString& title,
                                                              const QString& contents)
 {
-    NotepadWidget* notepad = FindNotepad(title);
-
-    if (notepad) {
-        // Notepad exists - replace contents
-        notepad->ReplaceText(contents);
-    } else {
-        // Create new notepad
-        notepad = CreateNotepadWindow(title, contents);
-    }
+    // Original always creates a new notepad — does NOT check for existing.
+    // Two notepads with the same title can coexist.
+    NotepadWidget* notepad = CreateNotepadWindow(title, contents);
 
     if (!notepad) {
         return std::unexpected(WorldError{WorldErrorType::NotepadNotFound,
@@ -174,12 +168,18 @@ std::expected<void, WorldError> WorldDocument::ReplaceNotepad(const QString& tit
 {
     NotepadWidget* notepad = FindNotepad(title);
 
-    if (!notepad) {
-        return std::unexpected(WorldError{WorldErrorType::NotepadNotFound,
-                                          QString("Notepad not found: %1").arg(title)});
+    if (notepad) {
+        // Existing notepad — replace contents
+        notepad->ReplaceText(contents);
+    } else {
+        // Original: creates new notepad when not found
+        // (AppendToTheNotepad with bReplace=true calls CreateTextWindow if not found)
+        notepad = CreateNotepadWindow(title, contents);
+        if (!notepad) {
+            return std::unexpected(WorldError{WorldErrorType::NotepadNotFound,
+                                              QString("Failed to create notepad: %1").arg(title)});
+        }
     }
-
-    notepad->ReplaceText(contents);
     return {};
 }
 

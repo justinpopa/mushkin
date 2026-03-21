@@ -41,15 +41,20 @@ TEST_F(NotepadApiTest, SendToNotepadCreatesNew)
 }
 
 // Test 2: SendToNotepad replaces existing notepad
-TEST_F(NotepadApiTest, SendToNotepadReplacesExisting)
+TEST_F(NotepadApiTest, SendToNotepadAlwaysCreatesNew)
 {
+    // Original always creates a new notepad — does NOT replace existing.
+    // Two notepads with the same title can coexist.
     executeLua("world.SendToNotepad('Test', 'Original')");
-    executeLua("result = world.SendToNotepad('Test', 'Replaced')");
+    executeLua("result = world.SendToNotepad('Test', 'Second')");
     EXPECT_TRUE(getGlobalBool("result"));
 
+    // FindNotepad returns the first match — "Original" should still be there
     NotepadWidget* notepad = doc->FindNotepad("Test");
     ASSERT_NE(notepad, nullptr);
-    EXPECT_EQ(notepad->GetText(), "Replaced");
+    // The first notepad keeps "Original"; the second has "Second"
+    // FindNotepad returns the first one found
+    EXPECT_EQ(notepad->GetText(), "Original");
 }
 
 // Test 3: AppendToNotepad creates new notepad if needed
@@ -75,11 +80,15 @@ TEST_F(NotepadApiTest, AppendToNotepadAppendsExisting)
     EXPECT_EQ(notepad->GetText(), "Line 1\nLine 2\n");
 }
 
-// Test 5: ReplaceNotepad fails if notepad doesn't exist
-TEST_F(NotepadApiTest, ReplaceNotepadFailsIfNotExists)
+// Test 5: ReplaceNotepad creates new notepad if not found (matches original)
+TEST_F(NotepadApiTest, ReplaceNotepadCreatesIfNotExists)
 {
     executeLua("result = world.ReplaceNotepad('NonExistent', 'text')");
-    EXPECT_FALSE(getGlobalBool("result"));
+    EXPECT_TRUE(getGlobalBool("result"));
+
+    NotepadWidget* notepad = doc->FindNotepad("NonExistent");
+    ASSERT_NE(notepad, nullptr);
+    EXPECT_EQ(notepad->GetText(), "text");
 }
 
 // Test 6: ReplaceNotepad replaces existing notepad
