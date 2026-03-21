@@ -1161,7 +1161,9 @@ void TelnetParser::sendWindowSizes(int width)
         return;
     }
 
-    quint16 height = static_cast<quint16>(width);
+    // Original computes height from pixel dimensions: (r.bottom - r.top) / m_FontHeight
+    // TODO(naws): Get actual row count from output view. For now use 24 (standard terminal).
+    quint16 height = 24;
 
     // Build NAWS packet: IAC SB TELOPT_NAWS <width> <height> IAC SE
     unsigned char packet[20];
