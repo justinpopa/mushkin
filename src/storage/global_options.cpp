@@ -11,15 +11,36 @@
 #include "global_options.h"
 #include "database.h"
 
-GlobalOptions& GlobalOptions::instance()
+#include <QDir>
+
+// Capture CWD at static-init time, matching original MUSHclient's working_dir
+// (MUSHclient.cpp:238). The original uses _getdcwd() at app startup.
+// AppPaths::getAppDirectory() is wrong here — on macOS it returns inside the .app bundle.
+static auto startupWorkingDir() -> const QString&
+{
+    static const QString dir = QDir::currentPath() + "/";
+    return dir;
+}
+
+static auto resolveDirectory(const QString& path) -> QString
+{
+    if (path.isEmpty() || QDir::isAbsolutePath(path))
+        return path;
+    // Strip leading ./ or .\ like original Utilities.cpp:2503-2505
+    QString cleaned = path;
+    if (cleaned.startsWith(QStringLiteral("./")) || cleaned.startsWith(QStringLiteral(".\\"))) {
+        cleaned = cleaned.mid(2);
+    }
+    return QDir::cleanPath(startupWorkingDir() + cleaned) + "/";
+}
+
+auto GlobalOptions::instance() -> GlobalOptions&
 {
     static GlobalOptions instance;
     return instance;
 }
 
-GlobalOptions::GlobalOptions()
-{
-}
+GlobalOptions::GlobalOptions() = default;
 
 void GlobalOptions::load()
 {
@@ -85,6 +106,12 @@ void GlobalOptions::load()
     m_defaultWorldFileDirectory = db.getPreference("DefaultWorldFileDirectory", "./worlds/");
     m_pluginsDirectory = db.getPreference("PluginsDirectory", "./worlds/plugins/");
     m_stateFilesDirectory = db.getPreference("StateFilesDirectory", "./worlds/plugins/state/");
+
+    m_defaultLogFileDirectory = resolveDirectory(m_defaultLogFileDirectory);
+    m_defaultWorldFileDirectory = resolveDirectory(m_defaultWorldFileDirectory);
+    m_pluginsDirectory = resolveDirectory(m_pluginsDirectory);
+    m_stateFilesDirectory = resolveDirectory(m_stateFilesDirectory);
+
     m_defaultTriggersFile = db.getPreference("DefaultTriggersFile", "");
     m_defaultAliasesFile = db.getPreference("DefaultAliasesFile", "");
     m_defaultTimersFile = db.getPreference("DefaultTimersFile", "");
@@ -250,6 +277,12 @@ void GlobalOptions::resetToDefaults()
     m_defaultWorldFileDirectory = "./worlds/";
     m_pluginsDirectory = "./worlds/plugins/";
     m_stateFilesDirectory = "./worlds/plugins/state/";
+
+    m_defaultLogFileDirectory = resolveDirectory(m_defaultLogFileDirectory);
+    m_defaultWorldFileDirectory = resolveDirectory(m_defaultWorldFileDirectory);
+    m_pluginsDirectory = resolveDirectory(m_pluginsDirectory);
+    m_stateFilesDirectory = resolveDirectory(m_stateFilesDirectory);
+
     m_defaultTriggersFile.clear();
     m_defaultAliasesFile.clear();
     m_defaultTimersFile.clear();
