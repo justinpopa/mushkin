@@ -477,21 +477,30 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
 
     QXmlStreamReader reader(&file);
 
-    // Skip to <muclient> root element
+    // Skip to <muclient> root element, or treat the first element as root.
+    // Original: xml_load_world.cpp:380-383 — if no <muclient>, uses document root.
+    // This allows bare files like <triggers>...</triggers> to be loaded.
     while (!reader.atEnd()) {
         reader.readNext();
-        if (reader.isStartElement() && reader.name() == QLatin1String("muclient")) {
+        if (reader.isStartElement()) {
+            if (reader.name() == QLatin1String("muclient")) {
+                break; // Found <muclient>, proceed to search for children
+            }
+            // No <muclient> wrapper — treat this element as if it's inside <muclient>.
+            // Re-seek to beginning so the child-element loop below can find it.
+            file.seek(0);
+            reader.setDevice(&file);
             break;
         }
     }
 
     if (reader.atEnd() || reader.hasError()) {
-        qWarning() << "LoadWorldXML: no <muclient> root element found";
+        qWarning() << "LoadWorldXML: no XML elements found";
         file.close();
         return false;
     }
 
-    // Read <world> element
+    // Read <world> element and siblings (triggers, aliases, etc.)
     while (!reader.atEnd()) {
         reader.readNext();
 
