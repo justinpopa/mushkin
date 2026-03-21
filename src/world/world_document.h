@@ -1815,6 +1815,9 @@ class WorldDocument : public QObject, public IWorldContext {
     bool SendToAllPluginCallbacks(const QString& callbackName, qint32 arg1, qint32 arg2,
                                   const QString& arg3); // Call all plugins (int + int + string)
 
+    // Filter-chain callback (each plugin can modify the string)
+    void SendToAllPluginCallbacksRtn(const QString& callbackName, QString& strResult);
+
     // First-match callbacks (stop on first true response)
     bool SendToFirstPluginCallbacks(const QString& callbackName,
                                     const QString& arg); // Stop on first true

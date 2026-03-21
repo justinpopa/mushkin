@@ -741,6 +741,30 @@ bool WorldDocument::SendToAllPluginCallbacks(const QString& callbackName, const 
 }
 
 /**
+ * SendToAllPluginCallbacksRtn - Filter chain: each plugin can modify the string.
+ *
+ * Matches original plugins.cpp:1435-1459 (SendToAllPluginCallbacksRtn).
+ * Used by OnPluginPacketReceived to let plugins modify incoming data.
+ */
+void WorldDocument::SendToAllPluginCallbacksRtn(const QString& callbackName, QString& strResult)
+{
+    Plugin* savedPlugin = m_CurrentPlugin;
+    m_bNotesNotWantedNow = true;
+
+    for (const auto& plugin : m_PluginList) {
+        if (!plugin || !plugin->m_bEnabled) {
+            continue;
+        }
+
+        m_CurrentPlugin = plugin.get();
+        plugin->ExecutePluginScriptRtn(callbackName, strResult);
+        m_CurrentPlugin = savedPlugin;
+    }
+
+    m_bNotesNotWantedNow = false;
+}
+
+/**
  * SendToAllPluginCallbacks - Call all plugins with int + string arguments
  *
  * Plugin Callbacks

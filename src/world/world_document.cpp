@@ -772,11 +772,18 @@ void WorldDocument::ReceiveMsg()
     m_connectionManager->m_nBytesIn += nRead;
     m_connectionManager->m_iInputPacketCount++;
 
-    // Notify plugins of raw packet received (for protocol debugging)
-    // Note: Original MUSHclient uses SendToAllPluginCallbacksRtn which can modify the data
-    // For now, we just notify without modification capability
+    // Let plugins modify the raw packet (filter chain pattern).
+    // Original: doc.cpp:1769 — SendToAllPluginCallbacksRtn allows each plugin to
+    // modify the packet string. If a plugin empties it, the packet is discarded.
     QString packetData = QString::fromLatin1(buffer.data(), nRead);
-    SendToAllPluginCallbacks(ON_PLUGIN_PACKET_RECEIVED, packetData, false);
+    SendToAllPluginCallbacksRtn(ON_PLUGIN_PACKET_RECEIVED, packetData);
+    if (packetData.isEmpty()) {
+        return; // Plugin discarded the packet
+    }
+    // Update buffer with potentially modified data
+    QByteArray modified = packetData.toLatin1();
+    nRead = std::min(static_cast<qint64>(modified.size()), static_cast<qint64>(buffer.size()));
+    std::memcpy(buffer.data(), modified.constData(), static_cast<size_t>(nRead));
 
     // Check if we need to decompress the data
     auto& tp = *m_telnetParser;

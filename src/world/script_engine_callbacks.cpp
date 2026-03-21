@@ -221,7 +221,7 @@ static void luaError(lua_State* L, const QString& event, const QString& procedur
 bool ScriptEngine::executeLua(qint32& dispid, const QString& szProcedure, ActionSource iReason,
                               const QString& szType, const QString& szReason,
                               QList<double>& nparams, QList<QString>& sparams,
-                              qint32& invocation_count, bool* result)
+                              qint32& invocation_count, bool* result, QString* returnString)
 {
     // Safety check
     if (!L) {
@@ -310,6 +310,15 @@ bool ScriptEngine::executeLua(qint32& dispid, const QString& szProcedure, Action
                 // Lua treats 0 as true, so check number
                 *result = lua_tonumber(L, 1) != 0;
             }
+        }
+    }
+
+    // Get string return value (for filter-chain callbacks like OnPluginPacketReceived)
+    if (returnString && lua_gettop(L) > 0 && lua_isstring(L, 1)) {
+        size_t len = 0;
+        const char* str = lua_tolstring(L, 1, &len);
+        if (str) {
+            *returnString = QString::fromUtf8(str, static_cast<int>(len));
         }
     }
 

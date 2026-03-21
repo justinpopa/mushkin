@@ -8,6 +8,7 @@
 #include "../storage/global_options.h"
 #include "../world/script_engine.h"
 #include "../world/world_document.h"
+
 #include "alias.h"
 #include "logging.h"
 #include "timer.h"
@@ -391,6 +392,44 @@ bool Plugin::ExecutePluginScript(const QString& callbackName, const QString& arg
     }
 
     return result;
+}
+
+/**
+ * Execute plugin callback that can modify a string (filter chain).
+ *
+ * Calls the callback with strText as argument. If the function returns
+ * a string, strText is replaced. This matches the original's
+ * ExecutePluginScriptRtn used by OnPluginPacketReceived.
+ */
+void Plugin::ExecutePluginScriptRtn(const QString& callbackName, QString& strText)
+{
+    qint32 dispid = GetPluginDispid(callbackName);
+    if (dispid == DISPID_UNKNOWN || !m_ScriptEngine) {
+        return;
+    }
+
+    QList<double> nparams;
+    QList<QString> sparams;
+    sparams.append(strText);
+
+    QString strType = QString("Plugin %1").arg(m_strName);
+    QString strReason = QString("Executing plugin %1 sub %2").arg(m_strName, callbackName);
+
+    qint32 invocation_count = 0;
+    QString returnString;
+    bool bError = m_ScriptEngine->executeLua(dispid, callbackName, ActionSource::eDontChangeAction,
+                                             strType, strReason, nparams, sparams, invocation_count,
+                                             nullptr, &returnString);
+
+    if (bError) {
+        m_PluginCallbacks[callbackName] = DISPID_UNKNOWN;
+        return;
+    }
+
+    // If the Lua function returned a string, update strText
+    if (!returnString.isNull()) {
+        strText = returnString;
+    }
 }
 
 /**

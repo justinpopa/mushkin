@@ -252,6 +252,18 @@ class Plugin : public QObject {
                              const QString& arg3, const QString& arg4);
 
     /**
+     * Execute plugin callback that can modify a string (filter chain pattern).
+     *
+     * Calls the plugin's Lua function with strText as argument.
+     * If the function returns a string, strText is replaced with the return value.
+     * Used by OnPluginPacketReceived to allow plugins to modify incoming data.
+     *
+     * @param callbackName Function name
+     * @param strText [in/out] String to filter — modified in place
+     */
+    void ExecutePluginScriptRtn(const QString& callbackName, QString& strText);
+
+    /**
      * Save plugin state to .state file
      *
      * Plugin State Saving
