@@ -1232,6 +1232,22 @@ void WorldDocument::logCommand(const QString& text)
  */
 void WorldDocument::Execute(const QString& command, bool allowScriptPrefix)
 {
+    // Recursion depth guard — prevents infinite alias loops from crashing.
+    // Original: methods_commands.cpp:254 — MAX_EXECUTION_DEPTH = 100
+    constexpr int MAX_EXECUTION_DEPTH = 100;
+    if (++m_iExecutionDepth > MAX_EXECUTION_DEPTH) {
+        --m_iExecutionDepth;
+        return; // Original returns eCommandsNestedTooDeeply to Lua caller
+    }
+    // RAII guard to decrement depth on any return path
+    struct DepthGuard {
+        qint32& depth;
+        ~DepthGuard()
+        {
+            --depth;
+        }
+    } depthGuard{m_iExecutionDepth};
+
     QString strFixedCommand = command;
 
     // ========== Auto-Say Mode ==========
