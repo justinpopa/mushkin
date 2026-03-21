@@ -1627,9 +1627,10 @@ class WorldDocument : public QObject, public IWorldContext {
                         const QString& matchedText) override; // Execute trigger action
     void executeTriggerScript(Trigger* trigger,
                               const QString& matchedText); // Execute Lua script callback
-    QString replaceWildcards(const QString& text,
-                             const QVector<QString>& wildcards); // Replace %1, %2, etc.
-    void changeLineColors(Trigger* trigger, Line* line);         // Change matched line colors
+    QString replaceWildcards(const QString& text, const QVector<QString>& wildcards,
+                             const QString& itemName = {},
+                             const QMap<QString, QString>& namedWildcards = {});
+    void changeLineColors(Trigger* trigger, Line* line); // Change matched line colors
 
     // ========== Alias Matching and Execution ==========
     bool evaluateAliases(const QString& command)

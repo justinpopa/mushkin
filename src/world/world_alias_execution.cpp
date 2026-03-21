@@ -52,8 +52,8 @@ void WorldDocument::executeAlias(Alias* alias, const QString& command)
     // Prepare contents (send text)
     QString contents = alias->contents;
 
-    // Replace wildcards (%0, %1, %2, etc.)
-    contents = replaceWildcards(contents, alias->wildcards);
+    // Replace wildcards (%0-%99, %N, %C, %<name>)
+    contents = replaceWildcards(contents, alias->wildcards, alias->label, alias->namedWildcards);
 
     // Expand variables (@variablename → value)
     if (alias->expand_variables) {

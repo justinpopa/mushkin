@@ -41,7 +41,9 @@ extern "C" {
  * @param wildcards Vector of captured wildcard strings
  * @return Text with wildcards replaced
  */
-QString WorldDocument::replaceWildcards(const QString& text, const QVector<QString>& wildcards)
+QString WorldDocument::replaceWildcards(const QString& text, const QVector<QString>& wildcards,
+                                        const QString& itemName,
+                                        const QMap<QString, QString>& namedWildcards)
 {
     QString result = text;
 
@@ -52,6 +54,21 @@ QString WorldDocument::replaceWildcards(const QString& text, const QVector<QStri
             QString placeholder = QString("%%1").arg(i);
             result.replace(placeholder, wildcards[i]);
         }
+    }
+
+    // Replace %<name> with named capture groups (original: FixSendText)
+    for (auto it = namedWildcards.constBegin(); it != namedWildcards.constEnd(); ++it) {
+        result.replace(QStringLiteral("%<") + it.key() + QStringLiteral(">"), it.value());
+    }
+
+    // Replace %N with trigger/alias/timer name (original: FixSendText)
+    result.replace(QStringLiteral("%N"), itemName);
+
+    // Replace %C with clipboard contents (original: FixSendText)
+    if (result.contains(QStringLiteral("%C"))) {
+        QClipboard* clipboard = QGuiApplication::clipboard();
+        QString clipText = clipboard ? clipboard->text() : QString();
+        result.replace(QStringLiteral("%C"), clipText);
     }
 
     return result;
@@ -166,8 +183,9 @@ void WorldDocument::executeTrigger(Trigger* trigger, Line* line, const QString& 
     // Prepare contents (send text)
     QString contents = trigger->contents;
 
-    // Replace wildcards (%0, %1, %2, etc.)
-    contents = replaceWildcards(contents, trigger->wildcards);
+    // Replace wildcards (%0-%99, %N, %C, %<name>)
+    contents =
+        replaceWildcards(contents, trigger->wildcards, trigger->label, trigger->namedWildcards);
 
     // Expand variables (@variablename → value)
     if (trigger->expand_variables) {
