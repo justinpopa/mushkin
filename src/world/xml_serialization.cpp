@@ -383,6 +383,12 @@ bool SaveWorldXML(WorldDocument* doc, const QString& filename)
     doc->saveVariablesToXml(writer);
 
     // ========================================================================
+    // COLOURS (ANSI palette and custom color entries)
+    // ========================================================================
+
+    doc->saveColoursToXml(writer);
+
+    // ========================================================================
     // ACCELERATORS (User-defined keyboard shortcuts)
     // ========================================================================
 
@@ -691,6 +697,12 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
                     // Load variables
                     if (elementName == "variables") {
                         doc->loadVariablesFromXml(reader);
+                        continue;
+                    }
+
+                    // Load colours (ANSI palette and custom color entries)
+                    if (elementName == "colours") {
+                        doc->loadColoursFromXml(reader);
                         continue;
                     }
 

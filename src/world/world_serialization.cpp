@@ -841,6 +841,138 @@ void WorldDocument::loadVariablesFromXml(QXmlStreamReader& xml, Plugin* plugin)
     }
 }
 
+// ========== Colour XML Serialization ==========
+
+/**
+ * saveColoursToXml - Save ANSI and custom palette colors to XML
+ *
+ * Writes <colours> section containing normal/bold ANSI colors (0-7)
+ * and custom palette entries. Matches original MUSHclient format.
+ * Colors are stored as #RRGGBB (RGB order) in the XML, converting
+ * from internal BGR format.
+ *
+ * Based on xml_save_world.cpp:635-684
+ */
+void WorldDocument::saveColoursToXml(QXmlStreamWriter& xml)
+{
+    xml.writeStartElement("colours");
+
+    // ANSI section
+    xml.writeStartElement("ansi");
+
+    // Normal colors (0-7)
+    xml.writeStartElement("normal");
+    for (int i = 0; i < 8; i++) {
+        xml.writeStartElement("colour");
+        xml.writeAttribute("seq", QString::number(i + 1)); // 1-indexed
+        xml.writeAttribute("rgb", colorToName(m_colors.normal_colour[i]));
+        xml.writeEndElement(); // colour
+    }
+    xml.writeEndElement(); // normal
+
+    // Bold colors (0-7)
+    xml.writeStartElement("bold");
+    for (int i = 0; i < 8; i++) {
+        xml.writeStartElement("colour");
+        xml.writeAttribute("seq", QString::number(i + 1)); // 1-indexed
+        xml.writeAttribute("rgb", colorToName(m_colors.bold_colour[i]));
+        xml.writeEndElement(); // colour
+    }
+    xml.writeEndElement(); // bold
+
+    xml.writeEndElement(); // ansi
+
+    // Custom palette section
+    xml.writeStartElement("custom");
+    for (int i = 0; i < MAX_CUSTOM; i++) {
+        xml.writeStartElement("colour");
+        xml.writeAttribute("seq", QString::number(i + 1)); // 1-indexed
+        xml.writeAttribute("name", m_colors.custom_colour_name[i]);
+        xml.writeAttribute("text", colorToName(m_colors.custom_text[i]));
+        xml.writeAttribute("back", colorToName(m_colors.custom_back[i]));
+        xml.writeEndElement(); // colour
+    }
+    xml.writeEndElement(); // custom
+
+    xml.writeEndElement(); // colours
+}
+
+/**
+ * loadColoursFromXml - Load ANSI and custom palette colors from XML
+ *
+ * Reads <colours> section and populates normal_colour, bold_colour,
+ * custom_text, custom_back, and custom_colour_name arrays.
+ * Parses #RRGGBB hex strings and converts to internal BGR format.
+ *
+ * @param xml XML reader positioned at <colours> start element
+ */
+void WorldDocument::loadColoursFromXml(QXmlStreamReader& xml)
+{
+    // xml is positioned at <colours>
+    while (!xml.atEnd()) {
+        xml.readNext();
+        if (xml.isEndElement() && xml.name() == QLatin1String("colours"))
+            break;
+        if (!xml.isStartElement())
+            continue;
+
+        const QString sectionName = xml.name().toString();
+
+        if (sectionName == "ansi") {
+            while (!xml.atEnd()) {
+                xml.readNext();
+                if (xml.isEndElement() && xml.name() == QLatin1String("ansi"))
+                    break;
+                if (!xml.isStartElement())
+                    continue;
+
+                const QString subsection = xml.name().toString();
+                const bool isNormal = (subsection == "normal");
+                const bool isBold = (subsection == "bold");
+
+                if (isNormal || isBold) {
+                    while (!xml.atEnd()) {
+                        xml.readNext();
+                        if (xml.isEndElement() && xml.name() == subsection)
+                            break;
+                        if (!xml.isStartElement() || xml.name() != QLatin1String("colour"))
+                            continue;
+
+                        const QXmlStreamAttributes attrs = xml.attributes();
+                        const int seq = attrs.value("seq").toInt() - 1; // 0-indexed
+                        const QString rgbStr = attrs.value("rgb").toString();
+
+                        if (seq >= 0 && seq < 8) {
+                            const QRgb bgr = nameToColor(rgbStr);
+                            if (isNormal)
+                                m_colors.normal_colour[seq] = bgr;
+                            else
+                                m_colors.bold_colour[seq] = bgr;
+                        }
+                    }
+                }
+            }
+        } else if (sectionName == "custom") {
+            while (!xml.atEnd()) {
+                xml.readNext();
+                if (xml.isEndElement() && xml.name() == QLatin1String("custom"))
+                    break;
+                if (!xml.isStartElement() || xml.name() != QLatin1String("colour"))
+                    continue;
+
+                const QXmlStreamAttributes attrs = xml.attributes();
+                const int seq = attrs.value("seq").toInt() - 1; // 0-indexed
+
+                if (seq >= 0 && seq < MAX_CUSTOM) {
+                    m_colors.custom_colour_name[seq] = attrs.value("name").toString();
+                    m_colors.custom_text[seq] = nameToColor(attrs.value("text").toString());
+                    m_colors.custom_back[seq] = nameToColor(attrs.value("back").toString());
+                }
+            }
+        }
+    }
+}
+
 /**
  * Save_One_Variable_XML - Save single variable for Plugin Wizard
  *

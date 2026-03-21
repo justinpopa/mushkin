@@ -1689,6 +1689,10 @@ class WorldDocument : public QObject, public IWorldContext {
         class QXmlStreamReader& xml,
         class Plugin* plugin = nullptr); // Load variables from XML (plugin context)
 
+    // ========== Colour XML Serialization ==========
+    void saveColoursToXml(class QXmlStreamWriter& xml);   // Save ANSI and custom palette colors
+    void loadColoursFromXml(class QXmlStreamReader& xml); // Load ANSI and custom palette colors
+
     // ========== Accelerator XML Serialization ==========
     void saveAcceleratorsToXml(class QXmlStreamWriter& xml);   // Save user accelerators to XML
     void loadAcceleratorsFromXml(class QXmlStreamReader& xml); // Load user accelerators from XML
