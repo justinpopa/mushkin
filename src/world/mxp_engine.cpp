@@ -192,36 +192,262 @@ void MXPEngine::InitializeMXPEntities()
         {"amp", '&'},
         {"quot", '"'},
         {"apos", '\''},
-        {"nbsp", 0xA0}, // Non-breaking space
 
-        // Common symbols
-        {"copy", 0xA9},    // ©
-        {"reg", 0xAE},     // ®
-        {"trade", 0x2122}, // ™
-        {"euro", 0x20AC},  // €
-        {"pound", 0xA3},   // £
-        {"yen", 0xA5},     // ¥
-        {"cent", 0xA2},    // ¢
-
-        // Math symbols
-        {"times", 0xD7},  // ×
-        {"divide", 0xF7}, // ÷
-        {"plusmn", 0xB1}, // ±
+        // ISO-8859-1 Latin characters (160–255)
+        {"nbsp", 0xA0},   // Non-breaking space
+        {"iexcl", 0xA1},  // ¡
+        {"cent", 0xA2},   // ¢
+        {"pound", 0xA3},  // £
+        {"curren", 0xA4}, // ¤
+        {"yen", 0xA5},    // ¥
+        {"brvbar", 0xA6}, // ¦
+        {"sect", 0xA7},   // §
+        {"uml", 0xA8},    // ¨
+        {"copy", 0xA9},   // ©
+        {"ordf", 0xAA},   // ª
+        {"laquo", 0xAB},  // «
+        {"not", 0xAC},    // ¬
+        {"shy", 0xAD},    // Soft hyphen
+        {"reg", 0xAE},    // ®
+        {"macr", 0xAF},   // ¯
         {"deg", 0xB0},    // °
-        {"frac12", 0xBD}, // ½
+        {"plusmn", 0xB1}, // ±
+        {"sup2", 0xB2},   // ²
+        {"sup3", 0xB3},   // ³
+        {"acute", 0xB4},  // ´
+        {"micro", 0xB5},  // µ
+        {"para", 0xB6},   // ¶
+        {"middot", 0xB7}, // ·
+        {"cedil", 0xB8},  // ¸
+        {"sup1", 0xB9},   // ¹
+        {"ordm", 0xBA},   // º
+        {"raquo", 0xBB},  // »
         {"frac14", 0xBC}, // ¼
+        {"frac12", 0xBD}, // ½
         {"frac34", 0xBE}, // ¾
+        {"iquest", 0xBF}, // ¿
+        {"Agrave", 0xC0}, // À
+        {"Aacute", 0xC1}, // Á
+        {"Acirc", 0xC2},  // Â
+        {"Atilde", 0xC3}, // Ã
+        {"Auml", 0xC4},   // Ä
+        {"Aring", 0xC5},  // Å
+        {"AElig", 0xC6},  // Æ
+        {"Ccedil", 0xC7}, // Ç
+        {"Egrave", 0xC8}, // È
+        {"Eacute", 0xC9}, // É
+        {"Ecirc", 0xCA},  // Ê
+        {"Euml", 0xCB},   // Ë
+        {"Igrave", 0xCC}, // Ì
+        {"Iacute", 0xCD}, // Í
+        {"Icirc", 0xCE},  // Î
+        {"Iuml", 0xCF},   // Ï
+        {"ETH", 0xD0},    // Ð
+        {"Ntilde", 0xD1}, // Ñ
+        {"Ograve", 0xD2}, // Ò
+        {"Oacute", 0xD3}, // Ó
+        {"Ocirc", 0xD4},  // Ô
+        {"Otilde", 0xD5}, // Õ
+        {"Ouml", 0xD6},   // Ö
+        {"times", 0xD7},  // ×
+        {"Oslash", 0xD8}, // Ø
+        {"Ugrave", 0xD9}, // Ù
+        {"Uacute", 0xDA}, // Ú
+        {"Ucirc", 0xDB},  // Û
+        {"Uuml", 0xDC},   // Ü
+        {"Yacute", 0xDD}, // Ý
+        {"THORN", 0xDE},  // Þ
+        {"szlig", 0xDF},  // ß
+        {"agrave", 0xE0}, // à
+        {"aacute", 0xE1}, // á
+        {"acirc", 0xE2},  // â
+        {"atilde", 0xE3}, // ã
+        {"auml", 0xE4},   // ä
+        {"aring", 0xE5},  // å
+        {"aelig", 0xE6},  // æ
+        {"ccedil", 0xE7}, // ç
+        {"egrave", 0xE8}, // è
+        {"eacute", 0xE9}, // é
+        {"ecirc", 0xEA},  // ê
+        {"euml", 0xEB},   // ë
+        {"igrave", 0xEC}, // ì
+        {"iacute", 0xED}, // í
+        {"icirc", 0xEE},  // î
+        {"iuml", 0xEF},   // ï
+        {"eth", 0xF0},    // ð
+        {"ntilde", 0xF1}, // ñ
+        {"ograve", 0xF2}, // ò
+        {"oacute", 0xF3}, // ó
+        {"ocirc", 0xF4},  // ô
+        {"otilde", 0xF5}, // õ
+        {"ouml", 0xF6},   // ö
+        {"divide", 0xF7}, // ÷
+        {"oslash", 0xF8}, // ø
+        {"ugrave", 0xF9}, // ù
+        {"uacute", 0xFA}, // ú
+        {"ucirc", 0xFB},  // û
+        {"uuml", 0xFC},   // ü
+        {"yacute", 0xFD}, // ý
+        {"thorn", 0xFE},  // þ
+        {"yuml", 0xFF},   // ÿ
+
+        // HTML 4 special characters
+        {"OElig", 0x0152},  // Œ
+        {"oelig", 0x0153},  // œ
+        {"Scaron", 0x0160}, // Š
+        {"scaron", 0x0161}, // š
+        {"Yuml", 0x0178},   // Ÿ
+        {"fnof", 0x0192},   // ƒ
+        {"circ", 0x02C6},   // ˆ
+        {"tilde", 0x02DC},  // ˜
+
+        // Greek letters
+        {"Alpha", 0x0391},    // Α
+        {"Beta", 0x0392},     // Β
+        {"Gamma", 0x0393},    // Γ
+        {"Delta", 0x0394},    // Δ
+        {"Epsilon", 0x0395},  // Ε
+        {"Zeta", 0x0396},     // Ζ
+        {"Eta", 0x0397},      // Η
+        {"Theta", 0x0398},    // Θ
+        {"Iota", 0x0399},     // Ι
+        {"Kappa", 0x039A},    // Κ
+        {"Lambda", 0x039B},   // Λ
+        {"Mu", 0x039C},       // Μ
+        {"Nu", 0x039D},       // Ν
+        {"Xi", 0x039E},       // Ξ
+        {"Omicron", 0x039F},  // Ο
+        {"Pi", 0x03A0},       // Π
+        {"Rho", 0x03A1},      // Ρ
+        {"Sigma", 0x03A3},    // Σ
+        {"Tau", 0x03A4},      // Τ
+        {"Upsilon", 0x03A5},  // Υ
+        {"Phi", 0x03A6},      // Φ
+        {"Chi", 0x03A7},      // Χ
+        {"Psi", 0x03A8},      // Ψ
+        {"Omega", 0x03A9},    // Ω
+        {"alpha", 0x03B1},    // α
+        {"beta", 0x03B2},     // β
+        {"gamma", 0x03B3},    // γ
+        {"delta", 0x03B4},    // δ
+        {"epsilon", 0x03B5},  // ε
+        {"zeta", 0x03B6},     // ζ
+        {"eta", 0x03B7},      // η
+        {"theta", 0x03B8},    // θ
+        {"iota", 0x03B9},     // ι
+        {"kappa", 0x03BA},    // κ
+        {"lambda", 0x03BB},   // λ
+        {"mu", 0x03BC},       // μ
+        {"nu", 0x03BD},       // ν
+        {"xi", 0x03BE},       // ξ
+        {"omicron", 0x03BF},  // ο
+        {"pi", 0x03C0},       // π
+        {"rho", 0x03C1},      // ρ
+        {"sigmaf", 0x03C2},   // ς
+        {"sigma", 0x03C3},    // σ
+        {"tau", 0x03C4},      // τ
+        {"upsilon", 0x03C5},  // υ
+        {"phi", 0x03C6},      // φ
+        {"chi", 0x03C7},      // χ
+        {"psi", 0x03C8},      // ψ
+        {"omega", 0x03C9},    // ω
+        {"thetasym", 0x03D1}, // ϑ
+        {"upsih", 0x03D2},    // ϒ
+        {"piv", 0x03D6},      // ϖ
+
+        // General punctuation and typographic characters
+        {"ensp", 0x2002},   // En space
+        {"emsp", 0x2003},   // Em space
+        {"thinsp", 0x2009}, // Thin space
+        {"zwnj", 0x200C},   // Zero-width non-joiner
+        {"zwj", 0x200D},    // Zero-width joiner
+        {"lrm", 0x200E},    // Left-to-right mark
+        {"rlm", 0x200F},    // Right-to-left mark
+        {"ndash", 0x2013},  // –
+        {"mdash", 0x2014},  // —
+        {"lsquo", 0x2018},  // '
+        {"rsquo", 0x2019},  // '
+        {"sbquo", 0x201A},  // ‚
+        {"ldquo", 0x201C},  // "
+        {"rdquo", 0x201D},  // "
+        {"bdquo", 0x201E},  // „
+        {"dagger", 0x2020}, // †
+        {"Dagger", 0x2021}, // ‡
+        {"bull", 0x2022},   // •
+        {"hellip", 0x2026}, // …
+        {"permil", 0x2030}, // ‰
+        {"prime", 0x2032},  // ′
+        {"Prime", 0x2033},  // ″
+        {"lsaquo", 0x2039}, // ‹
+        {"rsaquo", 0x203A}, // ›
+        {"oline", 0x203E},  // ‾
+        {"frasl", 0x2044},  // ⁄
+        {"euro", 0x20AC},   // €
+        {"trade", 0x2122},  // ™
 
         // Arrows
         {"larr", 0x2190}, // ←
         {"uarr", 0x2191}, // ↑
         {"rarr", 0x2192}, // →
         {"darr", 0x2193}, // ↓
+        {"harr", 0x2194}, // ↔
+        {"lArr", 0x21D0}, // ⇐
+        {"uArr", 0x21D1}, // ⇑
+        {"rArr", 0x21D2}, // ⇒
+        {"dArr", 0x21D3}, // ⇓
+        {"hArr", 0x21D4}, // ⇔
 
-        // Misc
-        {"hearts", 0x2665}, // ♥
-        {"clubs", 0x2663},  // ♣
+        // Mathematical operators
+        {"forall", 0x2200}, // ∀
+        {"part", 0x2202},   // ∂
+        {"exist", 0x2203},  // ∃
+        {"empty", 0x2205},  // ∅
+        {"nabla", 0x2207},  // ∇
+        {"isin", 0x2208},   // ∈
+        {"notin", 0x2209},  // ∉
+        {"ni", 0x220B},     // ∋
+        {"prod", 0x220F},   // ∏
+        {"sum", 0x2211},    // ∑
+        {"minus", 0x2212},  // −
+        {"lowast", 0x2217}, // ∗
+        {"radic", 0x221A},  // √
+        {"prop", 0x221D},   // ∝
+        {"infin", 0x221E},  // ∞
+        {"ang", 0x2220},    // ∠
+        {"and", 0x2227},    // ∧
+        {"or", 0x2228},     // ∨
+        {"cap", 0x2229},    // ∩
+        {"cup", 0x222A},    // ∪
+        {"int", 0x222B},    // ∫
+        {"there4", 0x2234}, // ∴
+        {"sim", 0x223C},    // ∼
+        {"cong", 0x2245},   // ≅
+        {"asymp", 0x2248},  // ≈
+        {"ne", 0x2260},     // ≠
+        {"equiv", 0x2261},  // ≡
+        {"le", 0x2264},     // ≤
+        {"ge", 0x2265},     // ≥
+        {"sub", 0x2282},    // ⊂
+        {"sup", 0x2283},    // ⊃
+        {"nsub", 0x2284},   // ⊄
+        {"sube", 0x2286},   // ⊆
+        {"supe", 0x2287},   // ⊇
+        {"oplus", 0x2295},  // ⊕
+        {"otimes", 0x2297}, // ⊗
+        {"perp", 0x22A5},   // ⊥
+        {"sdot", 0x22C5},   // ⋅
+        {"lceil", 0x2308},  // ⌈
+        {"rceil", 0x2309},  // ⌉
+        {"lfloor", 0x230A}, // ⌊
+        {"rfloor", 0x230B}, // ⌋
+        {"lang", 0x2329},   // 〈
+        {"rang", 0x232A},   // 〉
+        {"loz", 0x25CA},    // ◊
+
+        // Suit symbols
         {"spades", 0x2660}, // ♠
+        {"clubs", 0x2663},  // ♣
+        {"hearts", 0x2665}, // ♥
         {"diams", 0x2666},  // ♦
 
         {nullptr, 0} // Sentinel
