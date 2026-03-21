@@ -1520,7 +1520,7 @@ void MainWindow::closeEvent(QCloseEvent* event)
         !m_mdiArea->subWindowList().isEmpty()) {
         auto reply =
             QMessageBox::information(this, "Mushkin", "This will end your Mushkin session.",
-                                     QMessageBox::Ok | QMessageBox::Cancel, QMessageBox::Cancel);
+                                     QMessageBox::Ok | QMessageBox::Cancel, QMessageBox::Ok);
         if (reply != QMessageBox::Ok) {
             event->ignore();
             return;
@@ -2194,7 +2194,7 @@ void MainWindow::closeWorld()
                 auto reply = QMessageBox::information(
                     this, "Mushkin",
                     QString("This will end your %1 session.").arg(doc->worldName()),
-                    QMessageBox::Ok | QMessageBox::Cancel, QMessageBox::Cancel);
+                    QMessageBox::Ok | QMessageBox::Cancel, QMessageBox::Ok);
                 if (reply != QMessageBox::Ok) {
                     return;
                 }
@@ -2376,7 +2376,7 @@ void MainWindow::toggleLogSession()
         if (GlobalOptions::instance().confirmLogFileClose()) {
             auto reply = QMessageBox::question(
                 this, "Confirm Close Log", QString("Close log file %1?").arg(doc->m_logfile_name),
-                QMessageBox::Ok | QMessageBox::Cancel, QMessageBox::Cancel);
+                QMessageBox::Ok | QMessageBox::Cancel, QMessageBox::Ok);
             if (reply != QMessageBox::Ok) {
                 return;
             }
