@@ -657,7 +657,11 @@ int L_ReloadPlugin(lua_State* L)
 
     auto [pluginID] = luaArgs<QString>(L);
 
+    // Original: tries ID first, falls back to name lookup
     Plugin* plugin = pDoc->FindPluginByID(pluginID);
+    if (!plugin) {
+        plugin = pDoc->FindPluginByName(pluginID);
+    }
 
     if (!plugin) {
         return luaReturnError(L, eNoSuchPlugin);
@@ -671,8 +675,8 @@ int L_ReloadPlugin(lua_State* L)
     // Save plugin filepath before unloading
     QString filepath = plugin->m_strSource;
 
-    // Unload plugin
-    if (!pDoc->UnloadPlugin(pluginID)) {
+    // Unload plugin (use actual ID, not input which might be a name)
+    if (!pDoc->UnloadPlugin(plugin->m_strID)) {
         return luaReturnError(L, eProblemsLoadingPlugin);
     }
 
@@ -719,7 +723,11 @@ int L_UnloadPlugin(lua_State* L)
 
     auto [pluginID] = luaArgs<QString>(L);
 
+    // Original: tries ID first, falls back to name lookup
     Plugin* plugin = pDoc->FindPluginByID(pluginID);
+    if (!plugin) {
+        plugin = pDoc->FindPluginByName(pluginID);
+    }
 
     if (!plugin) {
         return luaReturnError(L, eNoSuchPlugin);
@@ -730,8 +738,8 @@ int L_UnloadPlugin(lua_State* L)
         return luaReturnError(L, eBadParameter);
     }
 
-    // Unload plugin
-    if (pDoc->UnloadPlugin(pluginID)) {
+    // Unload plugin (use the actual plugin ID, not the input which might be a name)
+    if (pDoc->UnloadPlugin(plugin->m_strID)) {
         lua_pushnumber(L, eOK);
     } else {
         lua_pushnumber(L, eProblemsLoadingPlugin);
