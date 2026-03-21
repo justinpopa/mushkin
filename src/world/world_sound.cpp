@@ -9,6 +9,7 @@
  * See sound_manager.cpp for implementation details and documentation.
  */
 
+#include "../automation/plugin.h" // ON_PLUGIN_PLAY_SOUND
 #include "sound_manager.h"
 #include "world_document.h"
 
@@ -25,6 +26,17 @@ qint32 WorldDocument::StopSound(qint16 buffer)
 
 bool WorldDocument::PlaySoundFile(const QString& filename)
 {
+    // Let plugins intercept/suppress sound playback.
+    // Original: doc.cpp:7115-7130 — SendToFirstPluginCallbacks with recursion guard.
+    if (!m_bInPlaySoundFilePlugin) {
+        m_bInPlaySoundFilePlugin = true;
+        bool handled = SendToFirstPluginCallbacks(ON_PLUGIN_PLAY_SOUND, filename);
+        m_bInPlaySoundFilePlugin = false;
+        if (handled) {
+            return true; // Plugin handled the sound
+        }
+    }
+
     return m_soundManager->playSoundFile(filename);
 }
 

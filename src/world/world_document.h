@@ -1107,6 +1107,7 @@ class WorldDocument : public QObject, public IWorldContext {
     bool m_bPluginProcessingCommand;
     bool m_bPluginProcessingSend;
     bool m_bPluginProcessingSent;
+    bool m_bInPlaySoundFilePlugin = false; // Recursion guard for OnPluginPlaySound
     QString m_strLastCommandSent;
     qint32 m_iLastCommandCount;
     qint32 m_iExecutionDepth;
