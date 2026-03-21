@@ -9,6 +9,7 @@
 #include "../text/action.h"
 #include "../text/line.h"
 #include "../text/style.h"
+#include "../utils/name_generator.h"
 #include "accelerator_manager.h"
 #include "logging.h"
 #include "miniwindow.h" // MiniWindow (complete type for unique_ptr destructor)
@@ -218,7 +219,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_iFlags2 = 0;
 
     // ========== Initialize world ID ==========
-    m_strWorldID = QString(); // Will be generated on save
+    m_strWorldID = generateUniqueID(); // Generate immediately (original: doc_construct.cpp:47)
 
     // ========== Initialize more options (version 15+) ==========
     m_bAlwaysRecordCommandHistory = false;

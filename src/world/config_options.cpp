@@ -208,7 +208,7 @@ const tConfigurationNumericOption OptionsTable[] = {
     {"log_in_colour", false, O(m_logging.log_in_colour), 0, 0, 0},
     {"log_lines", 0, O(m_logging.log_lines), 0, 500000, 0},
     {"log_notes", false, O(m_logging.log_notes), 0, 0, 0},
-    {"log_output", false, O(m_logging.log_output), 0, 0, 0},
+    {"log_output", true, O(m_logging.log_output), 0, 0, 0}, // original default: true
     {"log_raw", false, O(m_logging.log_raw), 0, 0, 0},
     {"log_script_errors", false, O(m_logging.log_script_errors), 0, 0, 0},
     {"lower_case_tab_completion", false, O(m_command_window.lower_case_tab_completion), 0, 0, 0},
