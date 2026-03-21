@@ -163,6 +163,9 @@ void ConnectionManager::onConnect(int errorCode)
             m_doc.SendMsg(text, false, false, false); // don't display (may contain password)
         }
 
+        // Reset all timers on connect (original: doc.cpp:6799)
+        m_doc.resetAllTimers();
+
         // Start remote access server if configured.
         const bool hasAuth =
             !m_doc.m_remote.password.isEmpty() || !m_doc.m_remote.authorized_keys_file.isEmpty();
@@ -219,11 +222,19 @@ void ConnectionManager::onConnectionDisconnect()
         m_doc.m_pRemoteServer->stop();
     }
 
+    // Turn off MXP on disconnect (original: worldsock.cpp OnClose → MXP_Off(true))
+    m_doc.MXP_Off(true);
+
     // Lua callback: OnWorldDisconnect.
     onWorldDisconnect();
 
     // Notify plugins.
     m_doc.SendToAllPluginCallbacks(ON_PLUGIN_DISCONNECT);
+
+    // Close auto-log on disconnect (original: worldsock.cpp OnClose)
+    if (m_doc.IsLogOpen()) {
+        m_doc.CloseLog();
+    }
 
     // Update connection state.
     m_iConnectPhase = CONNECT_NOT_CONNECTED;
