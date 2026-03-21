@@ -533,6 +533,10 @@ void TelnetParser::Phase_DO(unsigned char c)
             }
             break;
 
+        case TELOPT_MUD_SPECIFIC: // Aardwolf option 102
+            Send_IAC_WILL(c);
+            break;
+
         default:
             if (Handle_Telnet_Request(c, "DO")) {
                 Send_IAC_WILL(c);
