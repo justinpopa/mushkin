@@ -320,10 +320,12 @@ bool SaveWorldXML(WorldDocument* doc, const QString& filename)
         }
 
         // Handle password encoding (base64)
+        // Original: xml_save_world.cpp:279-284 — writes {name}_base64="y" sentinel
         if (opt.iFlags & OPT_PASSWORD) {
             if (!value.isEmpty()) {
                 QByteArray encoded = value.toUtf8().toBase64();
                 value = QString::fromLatin1(encoded);
+                writer.writeAttribute(QString("%1_base64").arg(opt.pName), "y");
             }
         }
 
@@ -585,9 +587,13 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
 
                 QString value = attrs.value(opt.pName).toString();
 
-                // Handle password decoding (base64)
+                // Handle password decoding — only if _base64 sentinel is present.
+                // Original: xml_load_world.cpp:1068-1080
                 if (opt.iFlags & OPT_PASSWORD) {
-                    if (!value.isEmpty()) {
+                    QString sentinelKey = QString("%1_base64").arg(opt.pName);
+                    bool isEncoded = (attrs.value(sentinelKey).toString().toLower() == "y");
+                    if (isEncoded && !value.isEmpty()) {
+                        value = value.trimmed();
                         QByteArray decoded = QByteArray::fromBase64(value.toLatin1());
                         value = QString::fromUtf8(decoded);
                     }
@@ -716,9 +722,11 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
                                 AlphaOptionsTable[elemIt->second];
                             QString value = reader.readElementText();
 
-                            // Handle password decoding
+                            // Handle password decoding — element-form passwords
+                            // are rare but possible; always base64 if password flag set
                             if (opt.iFlags & OPT_PASSWORD) {
                                 if (!value.isEmpty()) {
+                                    value = value.trimmed();
                                     QByteArray decoded = QByteArray::fromBase64(value.toLatin1());
                                     value = QString::fromUtf8(decoded);
                                 }
