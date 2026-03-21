@@ -1250,30 +1250,10 @@ void WorldDocument::Execute(const QString& command, bool allowScriptPrefix)
 
     QString strFixedCommand = command;
 
-    // ========== Auto-Say Mode ==========
-    // Handle auto-say mode and override prefix
-    // Based on sendvw.cpp
-    // When auto-say is enabled, commands are prepended with "say " unless overridden
-
-    bool bAutoSay = m_auto_say.enabled;
-
-    // Check for override prefix to disable auto-say for this command
-    if (bAutoSay && !m_auto_say.override_prefix.isEmpty() &&
-        strFixedCommand.startsWith(m_auto_say.override_prefix)) {
-        bAutoSay = false;
-        strFixedCommand = strFixedCommand.mid(m_auto_say.override_prefix.length()); // Strip prefix
-    }
-
-    // Exclude auto-say string itself (prevent "say say hello")
-    if (bAutoSay && !m_auto_say.say_string.isEmpty() &&
-        strFixedCommand.startsWith(m_auto_say.say_string)) {
-        bAutoSay = false;
-    }
-
-    // If auto-say is still enabled, prepend the auto-say string
-    if (bAutoSay && !m_auto_say.say_string.isEmpty()) {
-        strFixedCommand = m_auto_say.say_string + strFixedCommand;
-    }
+    // NOTE: Auto-say is NOT applied here. The original MUSHclient explicitly
+    // removed auto-say from Execute() — it only applies in the UI layer
+    // (CSendView::SendCommand / WorldWidget::sendCommand). Lua scripts
+    // calling Execute() should NOT get auto-say prefix prepended.
 
     // ========== Script Prefix ==========
     // Check for script prefix to execute Lua code directly
