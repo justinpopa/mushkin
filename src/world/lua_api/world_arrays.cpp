@@ -574,8 +574,35 @@ static int L_ArrayImport(lua_State* L)
     WorldDocument* pDoc = doc(L);
 
     QString arrayName = luaCheckQString(L, 1);
+
+    // Original supports two forms:
+    // 1. ArrayImport(name, table) — import from Lua table
+    // 2. ArrayImport(name, string [, delimiter]) — import from delimited string
+    if (lua_istable(L, 2)) {
+        ArraysMap& arrays = pDoc->getArrayMap();
+        if (!arrays.contains(arrayName)) {
+            lua_pushnumber(L, eArrayDoesNotExist);
+            return 1;
+        }
+        QMap<QString, QString>& arr = arrays[arrayName];
+        lua_pushnil(L);
+        while (lua_next(L, 2) != 0) {
+            QString key = lua_isstring(L, -2) ? QString::fromUtf8(lua_tostring(L, -2))
+                                              : QString::number(lua_tointeger(L, -2));
+            QString value = lua_isstring(L, -1) ? QString::fromUtf8(lua_tostring(L, -1))
+                                                : QString::number(lua_tonumber(L, -1));
+            arr[key] = value;
+            lua_pop(L, 1); // pop value, keep key for next iteration
+        }
+        lua_pushnumber(L, eOK);
+        return 1;
+    }
+
     QString valuesStr = luaCheckQString(L, 2);
-    QString delimiter = luaCheckQString(L, 3);
+    // Delimiter is optional, defaults to "," (original: my_optstr(L, 3, ","))
+    QString delimiter = (lua_gettop(L) >= 3 && !lua_isnil(L, 3))
+                            ? QString::fromUtf8(luaL_checkstring(L, 3))
+                            : QStringLiteral(",");
 
     // Validate delimiter
     if (delimiter.length() != 1 || delimiter == "\\") {
