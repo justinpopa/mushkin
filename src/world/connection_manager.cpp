@@ -105,6 +105,16 @@ void ConnectionManager::onConnect(int errorCode)
         m_doc.m_UTF8Sequence.fill(0);
         m_doc.m_iUTF8BytesLeft = 0;
 
+        // Reset session counters (original: doc.cpp ConnectionEstablished)
+        m_nTotalLinesSent = 0;
+        m_nTotalLinesReceived = 0;
+        m_nBytesIn = 0;
+        m_nBytesOut = 0;
+        m_iInputPacketCount = 0;
+        m_iOutputPacketCount = 0;
+        m_doc.m_automationRegistry->m_iTriggersMatchedThisSessionCount = 0;
+        m_doc.m_automationRegistry->m_iAliasesMatchedThisSessionCount = 0;
+
         // Create initial line if needed.
         if (!m_doc.m_currentLine) {
             m_doc.m_currentLine = std::make_unique<Line>(1, m_doc.m_display.wrap_column,

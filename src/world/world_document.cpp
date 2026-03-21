@@ -760,7 +760,9 @@ void WorldDocument::ReceiveMsg()
     std::array<char, 8192> buffer{};
     auto result = m_connectionManager->m_pSocket->receive(buffer);
     if (!result) {
-        qCDebug(lcWorld) << "ReceiveMsg: Socket read error:" << result.error();
+        // Original: calls OnClose(GetLastError()) on socket error, triggering disconnect
+        qCWarning(lcWorld) << "ReceiveMsg: Socket read error:" << result.error();
+        OnConnectionDisconnect();
         return;
     }
     qint64 nRead = *result;
