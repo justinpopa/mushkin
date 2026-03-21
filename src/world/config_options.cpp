@@ -65,8 +65,7 @@ inline constexpr int DEFAULT_CHARSET = 1;
 // Line width
 inline constexpr int MAX_LINE_WIDTH = 32000;
 
-// Connect methods (already defined in world_document.h)
-inline constexpr int eConnectTypeMax = 4;
+// Connect method enum constants (eNoAutoConnect, eConnectMUSH, etc.) defined in world_document.h
 
 // SendTo enum now in automation/sendto.h
 
@@ -331,7 +330,8 @@ const tConfigurationAlphaOption AlphaOptionsTable[] = {
     {"filter_triggers", "", A(m_scripting.triggers_filter), OPT_MULTLINE},
     {"filter_variables", "", A(m_scripting.variables_filter), OPT_MULTLINE},
     {"id", "", A(m_strWorldID), OPT_WORLD_ID},
-    {"input_font_name", "FixedSys", A(m_input.font_name), OPT_UPDATE_VIEWS | OPT_UPDATE_INPUT_FONT},
+    {"input_font_name", "Courier New", A(m_input.font_name),
+     OPT_UPDATE_VIEWS | OPT_UPDATE_INPUT_FONT},
     {"log_file_postamble", "", A(m_logging.file_postamble), OPT_MULTLINE},
     {"log_file_preamble", "", A(m_logging.file_preamble), OPT_MULTLINE},
     {"log_line_postamble_input", "", A(m_logging.line_postamble_input), OPT_KEEP_SPACES},
@@ -358,7 +358,7 @@ const tConfigurationAlphaOption AlphaOptionsTable[] = {
     {"on_world_get_focus", "", A(m_scripting.on_world_get_focus)},
     {"on_world_lose_focus", "", A(m_scripting.on_world_lose_focus)},
     {"on_world_open", "", A(m_scripting.on_world_open)},
-    {"output_font_name", "FixedSys", A(m_output.font_name), OPT_UPDATE_OUTPUT_FONT},
+    {"output_font_name", "Courier New", A(m_output.font_name), OPT_UPDATE_OUTPUT_FONT},
     {"password", "", A(m_password), OPT_PASSWORD | OPT_PLUGIN_CANNOT_RW},
     {"proxy_password", "", A(m_proxy.password), OPT_PASSWORD | OPT_PLUGIN_CANNOT_RW},
     {"proxy_server", "", A(m_proxy.server), OPT_PLUGIN_CANNOT_WRITE},

@@ -528,7 +528,7 @@ void WorldPropertiesDialog::loadSettings()
     m_portSpin->setValue(m_doc->m_port);
     m_nameEdit->setText(m_doc->m_mush_name);
     m_passwordEdit->setText(m_doc->m_password);
-    m_autoConnectCheck->setChecked(m_doc->m_connect_now);
+    m_autoConnectCheck->setChecked(m_doc->m_connect_now != eNoAutoConnect);
 
     // Output tab
     // Reconstruct QFont from WorldDocument font properties
@@ -649,7 +649,7 @@ void WorldPropertiesDialog::saveSettings()
     m_doc->m_port = m_portSpin->value();
     m_doc->m_mush_name = m_nameEdit->text();
     m_doc->m_password = m_passwordEdit->text();
-    m_doc->m_connect_now = m_autoConnectCheck->isChecked();
+    m_doc->m_connect_now = m_autoConnectCheck->isChecked() ? eConnectMUSH : eNoAutoConnect;
 
     // Output tab
     m_doc->m_output.font_name = m_outputFont.family();

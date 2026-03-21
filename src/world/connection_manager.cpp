@@ -123,6 +123,37 @@ void ConnectionManager::onConnect(int errorCode)
         // Notify plugins.
         m_doc.SendToAllPluginCallbacks(ON_PLUGIN_CONNECT);
 
+        // Auto-login: send connect credentials based on connect_method.
+        // Matches original MUSHclient doc.cpp:6753-6795 (ConnectionEstablished).
+        switch (m_doc.m_connect_now) {
+            case eConnectMUSH:
+                // Send: connect name password
+                if (!m_doc.m_password.isEmpty()) {
+                    QString cmd =
+                        QStringLiteral("connect %1 %2").arg(m_doc.m_name, m_doc.m_password);
+                    m_doc.SendMsg(cmd, false, false, false); // don't echo password
+                }
+                break;
+            case eConnectDiku:
+                // Send: name\npassword
+                m_doc.SendMsg(m_doc.m_name, m_doc.m_display_my_input, false, false);
+                if (!m_doc.m_password.isEmpty()) {
+                    m_doc.SendMsg(m_doc.m_password, false, false, false);
+                }
+                break;
+            default:
+                break;
+        }
+
+        // Send connect_text (with %name% and %password% substitution).
+        // Original: doc.cpp:6789-6795
+        if (!m_doc.m_connect_text.isEmpty()) {
+            QString text = m_doc.m_connect_text;
+            text.replace(QStringLiteral("%name%"), m_doc.m_name);
+            text.replace(QStringLiteral("%password%"), m_doc.m_password);
+            m_doc.SendMsg(text, false, false, false); // don't display (may contain password)
+        }
+
         // Start remote access server if configured.
         const bool hasAuth =
             !m_doc.m_remote.password.isEmpty() || !m_doc.m_remote.authorized_keys_file.isEmpty();
@@ -147,10 +178,9 @@ void ConnectionManager::onConnect(int errorCode)
         }
 
         // Auto-log if world has an auto-log filename configured
-        // Matches original MUSHclient: doc.cpp ConnectionEstablished()
+        // Original: doc.cpp:6668 — hardcodes append=true (always append for auto-log)
         if (!m_doc.m_logging.auto_log_file_name.isEmpty() && !m_doc.IsLogOpen()) {
-            bool append = GlobalOptions::instance().appendToLogFiles();
-            if (m_doc.OpenLog(QString(), append) != 0) {
+            if (m_doc.OpenLog(QString(), true) != 0) {
                 qCWarning(lcWorld) << "Auto-log: could not open log file for" << m_doc.worldName();
             }
         }

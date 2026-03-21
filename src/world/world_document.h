@@ -138,8 +138,15 @@ inline constexpr quint16 FLAGS2_Custom16isDefaultColour = 0x0008;
 inline constexpr quint16 FLAGS2_LogInColour = 0x0010;
 inline constexpr quint16 FLAGS2_LogRaw = 0x0020;
 
-// Auto-connect values
-enum class AutoConnect : int { eNoAutoConnect, eConnectMUSH, eConnectAndGoIntoGame };
+// Auto-connect values (matches original doc.h:276-283)
+enum {
+    eNoAutoConnect,
+    eConnectMUSH, // send: connect name password
+    eConnectDiku, // send: name\npassword
+    eConnectMXP,  // MXP connect
+
+    eConnectTypeMax // must be last
+};
 
 // MXP usage values
 enum class MXPMode : quint16 { eMXP_Off, eMXP_Query, eMXP_On };
@@ -374,7 +381,7 @@ class WorldDocument : public QObject, public IWorldContext {
     QString m_name;      // player name
     QString m_password;  // player password
     quint16 m_port;      // port number (1-65535)
-    bool m_connect_now;  // auto-connect flag (see enum above)
+    int m_connect_now; // auto-connect method (eNoAutoConnect/eConnectMUSH/eConnectDiku/eConnectMXP)
 
     // ========== Proxy Configuration ==========
     struct ProxyConfig {

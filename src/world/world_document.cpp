@@ -5,6 +5,7 @@
 #include "../automation/trigger.h"
 #include "../automation/variable.h"
 #include "../network/remote_access_server.h"
+#include "../storage/global_options.h"
 #include "../text/action.h"
 #include "../text/line.h"
 #include "../text/style.h"
@@ -97,7 +98,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_name = QString();
     m_password = QString();
     m_port = 4000; // Default MUD port
-    m_connect_now = false;
+    m_connect_now = eNoAutoConnect;
 
     // ========== Initialize display settings ==========
     // m_display uses default member initializers (DisplayConfig)
@@ -536,6 +537,9 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     // Audio system is lazy-loaded on first use (in m_soundManager->playSound())
     // This avoids creating audio objects in tests and headless environments.
     // m_soundManager itself is already created above.
+
+    // Apply global font defaults (mirrors MUSHclient doc_construct.cpp:696-703)
+    applyGlobalFontDefaults();
 }
 
 WorldDocument::~WorldDocument()
@@ -622,6 +626,26 @@ WorldDocument::~WorldDocument()
     // Clear all miniwindows (unique_ptr handles deletion automatically)
     m_MiniWindowMap.clear();
     m_MiniWindowsOrder.clear();
+}
+
+void WorldDocument::applyGlobalFontDefaults()
+{
+    const auto& opts = GlobalOptions::instance();
+
+    const QString outputFont = opts.defaultOutputFont();
+    if (!outputFont.isEmpty()) {
+        m_output.font_name = outputFont;
+        m_output.font_height = opts.defaultOutputFontHeight();
+        m_bUseDefaultOutputFont = 1;
+    }
+
+    const QString inputFont = opts.defaultInputFont();
+    if (!inputFont.isEmpty()) {
+        m_input.font_name = inputFont;
+        m_input.font_height = opts.defaultInputFontHeight();
+        m_input.font_weight = opts.defaultInputFontWeight();
+        m_bUseDefaultInputFont = true;
+    }
 }
 
 void WorldDocument::initializeColors()
