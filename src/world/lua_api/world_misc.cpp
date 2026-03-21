@@ -2469,8 +2469,8 @@ int L_Save(lua_State* L)
                                          sparams, invocation_count);
     }
 
-    // Notify plugins via ON_PLUGIN_WORLD_SAVE callback
-    pDoc->SendToAllPluginCallbacks(ON_PLUGIN_WORLD_SAVE, "");
+    // ON_PLUGIN_WORLD_SAVE is fired inside SaveWorldXML — don't fire here too
+    // (was causing double-fire: once here, once in xml_serialization.cpp:228)
 
     // Save to file
     bool success = XmlSerialization::SaveWorldXML(pDoc, filename);
