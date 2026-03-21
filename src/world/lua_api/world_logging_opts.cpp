@@ -165,6 +165,7 @@ int L_SpeedWalkDelay(lua_State* L)
     if (lua_gettop(L) >= 1) {
         int delay = luaL_checkinteger(L, 1);
         pDoc->m_speedwalk.delay = delay;
+        pDoc->m_connectionManager->setSpeedWalkDelay(delay);
         return 0;
     }
     lua_pushinteger(L, pDoc->m_speedwalk.delay);
@@ -327,8 +328,7 @@ int L_SetSpeedWalkDelay(lua_State* L)
     WorldDocument* pDoc = doc(L);
     int delay = luaL_checkinteger(L, 1);
     pDoc->m_speedwalk.delay = delay;
-    // Not applicable: Windows MFC timer list window refresh. Timer changes take effect on next
-    // check.
+    pDoc->m_connectionManager->setSpeedWalkDelay(delay);
     return 0;
 }
 

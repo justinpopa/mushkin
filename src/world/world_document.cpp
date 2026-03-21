@@ -917,6 +917,12 @@ void WorldDocument::SendMsg(const QString& text, bool bEcho, bool bQueue, bool b
 
             // Queue it
             commandQueue.append(prefix + line);
+
+            // Start the drain timer if not already running
+            if (!m_connectionManager->m_pQueueTimer->isActive()) {
+                m_connectionManager->m_pQueueTimer->setInterval(m_speedwalk.delay);
+                m_connectionManager->m_pQueueTimer->start();
+            }
         } else {
             // Send immediately
             DoSendMsg(line, bEcho, bLog);

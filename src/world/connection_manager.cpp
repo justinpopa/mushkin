@@ -22,8 +22,11 @@
 
 // ========== Construction / destruction ==========
 
-ConnectionManager::ConnectionManager(WorldDocument& doc) : m_doc(doc)
+ConnectionManager::ConnectionManager(WorldDocument& doc) : QObject(nullptr), m_doc(doc)
 {
+    m_pQueueTimer = new QTimer(this);
+    m_pQueueTimer->setSingleShot(false);
+    connect(m_pQueueTimer, &QTimer::timeout, this, &ConnectionManager::drainCommandQueue);
 }
 
 ConnectionManager::~ConnectionManager() = default;
@@ -302,7 +305,71 @@ qint32 ConnectionManager::discardQueue()
 {
     qint32 count = m_CommandQueue.size();
     m_CommandQueue.clear();
+    m_pQueueTimer->stop();
     return count;
+}
+
+/**
+ * drainCommandQueue — timer slot: drain one QUEUE command (or all IMMEDIATE commands) per tick.
+ *
+ * Encoding (set by WorldDocument::SendMsg):
+ *   Q = QUEUE with echo+log    q = QUEUE without echo, with log
+ *   I = IMMEDIATE with echo+log  i = IMMEDIATE without echo, with log
+ *   Uppercase = log=true; lowercase = log=false
+ *
+ * Original MUSHclient behaviour: each tick flushes all leading IMMEDIATE entries, then sends
+ * one QUEUE entry and stops. If the queue empties, the timer is stopped.
+ */
+void ConnectionManager::drainCommandQueue()
+{
+    while (!m_CommandQueue.isEmpty()) {
+        const QString encoded = m_CommandQueue.takeFirst();
+        if (encoded.isEmpty()) {
+            continue;
+        }
+
+        const QChar prefix = encoded.at(0);
+        const QString text = encoded.mid(1);
+
+        // Decode echo/log from prefix character
+        const bool isImmediate = (prefix == u'I' || prefix == u'i');
+        const bool echo = (prefix == u'Q' || prefix == u'I');
+        const bool log = prefix.isUpper(); // uppercase = log=true, lowercase = log=false
+
+        m_doc.DoSendMsg(text, echo, log);
+
+        if (!isImmediate) {
+            // QUEUE entry: send one per tick, then stop
+            break;
+        }
+        // IMMEDIATE entry: continue loop — flush all consecutive immediates
+    }
+
+    if (m_CommandQueue.isEmpty()) {
+        m_pQueueTimer->stop();
+    }
+}
+
+/**
+ * setSpeedWalkDelay — update the queue drain timer interval.
+ *
+ * If delayMs <= 0: flush all remaining queue entries immediately, then stop the timer.
+ * Otherwise: update the timer interval and start it if there are queued commands.
+ */
+void ConnectionManager::setSpeedWalkDelay(int delayMs)
+{
+    if (delayMs <= 0) {
+        // Flush all remaining commands immediately
+        m_pQueueTimer->stop();
+        while (!m_CommandQueue.isEmpty()) {
+            drainCommandQueue();
+        }
+    } else {
+        m_pQueueTimer->setInterval(delayMs);
+        if (!m_CommandQueue.isEmpty() && !m_pQueueTimer->isActive()) {
+            m_pQueueTimer->start();
+        }
+    }
 }
 
 // ========== Private — Lua callbacks ==========

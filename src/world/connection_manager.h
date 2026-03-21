@@ -2,8 +2,10 @@
 
 #include "world_error.h"
 #include <QDateTime>
+#include <QObject>
 #include <QString>
 #include <QStringList>
+#include <QTimer>
 #include <cstdint>
 #include <expected>
 
@@ -29,10 +31,11 @@ inline constexpr qint32 CONNECT_DISCONNECTING = 9;
  * All moved fields are public (direct-access companion-object pattern).
  * The WorldSocket pointer is non-owning; Qt parent-child keeps it alive.
  */
-class ConnectionManager {
+class ConnectionManager : public QObject {
+    Q_OBJECT
   public:
     explicit ConnectionManager(WorldDocument& doc);
-    ~ConnectionManager();
+    ~ConnectionManager() override;
 
     ConnectionManager(const ConnectionManager&) = delete;
     ConnectionManager& operator=(const ConnectionManager&) = delete;
@@ -55,6 +58,7 @@ class ConnectionManager {
     [[nodiscard]] QStringList getCommandQueue() const;
     [[nodiscard]] std::expected<void, WorldError> queue(const QString& message, bool echo);
     qint32 discardQueue();
+    void setSpeedWalkDelay(int delayMs);
 
     // ========== Public state (companion-object pattern: callers access directly) ==========
 
@@ -86,6 +90,13 @@ class ConnectionManager {
 
     // Command queue (speedwalk / delayed send)
     QStringList m_CommandQueue;
+
+    // Queue drain timer — fires every m_speedwalk.delay ms, drains one QUEUE command per tick.
+    // Qt parent-child: parented to `this` (the QObject), deleted automatically.
+    QTimer* m_pQueueTimer = nullptr;
+
+  private slots:
+    void drainCommandQueue();
 
   private:
     WorldDocument& m_doc;
