@@ -102,11 +102,11 @@ void MXPEngine::InitializeMXPElements()
 
         // Links and actions (hyperlink is secure, send requires open mode)
         {"a", TAG_MXP, MXP_ACTION_HYPERLINK, "href"},
-        {"send", TAG_OPEN | TAG_MXP, MXP_ACTION_SEND, "href,hint,prompt"},
+        {"send", TAG_MXP, MXP_ACTION_SEND, "href,hint,prompt"}, // secure (no TAG_OPEN)
 
         // Media (open mode required for security)
-        {"sound", TAG_OPEN | TAG_COMMAND | TAG_MXP, MXP_ACTION_SOUND, "fname,v,l,p,t,u"},
-        {"music", TAG_OPEN | TAG_COMMAND | TAG_MXP, MXP_ACTION_SOUND, "fname,v,l,p,t,u,c"},
+        {"sound", TAG_COMMAND | TAG_MXP, MXP_ACTION_SOUND, "fname,v,l,p,t,u"},   // secure
+        {"music", TAG_COMMAND | TAG_MXP, MXP_ACTION_SOUND, "fname,v,l,p,t,u,c"}, // secure
         {"image", TAG_OPEN | TAG_COMMAND | TAG_MXP, MXP_ACTION_IMAGE,
          "fname,url,t,h,w,hspace,vspace,align"},
 
@@ -982,10 +982,9 @@ void MXPEngine::MXP_StartTag(const QString& tagString)
     // Check if current mode is secure
     bool bSecure = (m_iMXP_mode == eMXP_secure || m_iMXP_mode == eMXP_perm_secure);
 
-    // Restore mode (cancel secure-once)
-    if (m_iMXP_mode == eMXP_perm_secure) {
-        m_iMXP_previousMode = eMXP_secure;
-        m_iMXP_mode = eMXP_secure;
+    // Restore mode (cancel secure-once) — original: MXP_Restore_Mode in mxpMode.cpp
+    if (m_iMXP_mode == eMXP_secure_once) {
+        m_iMXP_mode = m_iMXP_previousMode;
     }
 
     // Count tags
@@ -1136,10 +1135,9 @@ void MXPEngine::MXP_EndTag(const QString& tagString)
     // Check if current mode is secure
     bool bSecure = (m_iMXP_mode == eMXP_secure || m_iMXP_mode == eMXP_perm_secure);
 
-    // Restore mode (cancel secure-once)
-    if (m_iMXP_mode == eMXP_perm_secure) {
-        m_iMXP_previousMode = eMXP_secure;
-        m_iMXP_mode = eMXP_secure;
+    // Restore mode (cancel secure-once) — original: MXP_Restore_Mode in mxpMode.cpp
+    if (m_iMXP_mode == eMXP_secure_once) {
+        m_iMXP_mode = m_iMXP_previousMode;
     }
 
     QString strName = tagString.trimmed().toLower(); // Case-insensitive

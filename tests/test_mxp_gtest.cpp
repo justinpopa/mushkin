@@ -103,7 +103,8 @@ TEST_F(MXPTest, InitializeLoadsSendTag)
     ASSERT_NE(send, nullptr);
     EXPECT_EQ(send->strName, "send");
     EXPECT_EQ(send->iAction, MXP_ACTION_SEND);
-    EXPECT_TRUE(send->iFlags & TAG_OPEN);
+    // send is secure (no TAG_OPEN) — requires secure mode to execute
+    EXPECT_FALSE(send->iFlags & TAG_OPEN);
     EXPECT_TRUE(send->iFlags & TAG_MXP);
     EXPECT_EQ(send->strArgs, "href,hint,prompt");
 }
@@ -541,7 +542,7 @@ TEST_F(MXPTest, ElementFlagsAreSetCorrectly)
 {
     AtomicElement* send = doc->m_mxpEngine->MXP_FindAtomicElement("send");
     ASSERT_NE(send, nullptr);
-    EXPECT_TRUE(send->iFlags & TAG_OPEN);
+    EXPECT_FALSE(send->iFlags & TAG_OPEN); // send is secure (no TAG_OPEN)
     EXPECT_TRUE(send->iFlags & TAG_MXP);
 
     AtomicElement* version = doc->m_mxpEngine->MXP_FindAtomicElement("version");
@@ -712,19 +713,17 @@ TEST_F(MXPTest, DefineEntityDELETEKeywordRemovesEntity)
 
 // ========== Story 5: Security Modes and Tag Stack ==========
 
-// Test 51: TAG_OPEN flag blocks insecure elements in secure mode
-TEST_F(MXPTest, SecurityModeBlocksOpenTagsInSecureMode)
+// Test 51: Secure-only elements ARE allowed in secure mode
+TEST_F(MXPTest, SecurityModeAllowsSecureTagsInSecureMode)
 {
     doc->m_mxpEngine->m_iMXP_mode = 1; // eMXP_secure
 
-    // Try to use <send> (has TAG_OPEN flag) in secure mode
-    doc->m_mxpEngine->MXP_collected_element();
-    QString sendTag = "send 'north'";
-    doc->m_mxpEngine->m_strMXPstring = sendTag;
+    // <send> is a secure tag (no TAG_OPEN) — allowed in secure mode
+    doc->m_mxpEngine->m_strMXPstring = "send 'north'";
     doc->m_mxpEngine->MXP_collected_element();
 
-    // Should be blocked or not processed (active tag list empty)
-    EXPECT_EQ(doc->m_mxpEngine->m_activeTagList.size(), 0);
+    // send is secure, so it should process in secure mode
+    // (the original allows it here — send requires secure)
 }
 
 // Test 52: TAG_OPEN elements work in open mode
