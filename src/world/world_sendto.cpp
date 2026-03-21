@@ -63,11 +63,12 @@ void WorldDocument::sendTo(SendTo iWhere, const QString& strSendText, bool omit_
 
     switch (iWhere) {
         // ========== eSendToWorld: Send to MUD ==========
-        // Original: doc.cpp
+        // Original: doc.cpp:6220-6228 — SendMsg with echo/log flags from trigger/alias
         case eSendToWorld:
             if (!strSendText.isEmpty()) {
-                // TODO(feature): Honor omit_from_output and omit_from_log flags from trigger/alias.
-                sendToMud(strSendText);
+                SendMsg(strSendText, omit_from_output ? false : m_display_my_input,
+                        false, // don't queue
+                        omit_from_log ? false : m_logging.log_input);
             }
             break;
 
