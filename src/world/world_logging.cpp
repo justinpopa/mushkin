@@ -168,7 +168,7 @@ QString WorldDocument::FormatTime(const QDateTime& dt, const QString& pattern, b
  * @param append True to append to existing file, false to overwrite
  * @return Error code (eOK, eLogFileAlreadyOpen, eCouldNotOpenFile)
  */
-qint32 WorldDocument::OpenLog(const QString& filename, bool append)
+qint32 WorldDocument::OpenLog(const QString& filename, bool append, bool writePreamble)
 {
     // Check if already open
     if (m_logfile) {
@@ -212,8 +212,10 @@ qint32 WorldDocument::OpenLog(const QString& filename, bool append)
 
     qCDebug(lcLogging) << "OpenLog: Successfully opened" << logName << "(append=" << append << ")";
 
-    // Write file preamble if not in raw mode
-    if (!m_logging.file_preamble.isEmpty() && !m_logging.log_raw) {
+    // Write file preamble if not in raw mode.
+    // Original: preamble is only written from interactive/auto-connect path,
+    // NOT from the Lua OpenLog() API (methods_logging.cpp:19-57).
+    if (writePreamble && !m_logging.file_preamble.isEmpty() && !m_logging.log_raw) {
         QDateTime now = QDateTime::currentDateTime();
         QString preamble = m_logging.file_preamble;
 
@@ -231,9 +233,11 @@ qint32 WorldDocument::OpenLog(const QString& filename, bool append)
     // Initialize flush time
     m_LastFlushTime = QDateTime::currentDateTime();
 
-    // Retrospective Logging
-    // Write all existing lines with LOG_LINE flag to the log
-    writeRetrospectiveLog();
+    // Retrospective Logging — only from interactive/auto-connect path.
+    // Original: Lua OpenLog() does NOT trigger retrospective logging.
+    if (writePreamble) {
+        writeRetrospectiveLog();
+    }
 
     return eOK;
 }

@@ -1788,8 +1788,8 @@ class WorldDocument : public QObject, public IWorldContext {
                  bool allowScriptPrefix = true); // Process command with stacking support
 
     // ========== Log File Management ==========
-    qint32 OpenLog(const QString& filename, bool append); // Open log file for writing
-    qint32 CloseLog();                                    // Close log file
+    qint32 OpenLog(const QString& filename, bool append, bool writePreamble = true);
+    qint32 CloseLog();                       // Close log file
     void WriteToLog(const QString& text);    // Internal: write text to log (no newline)
     qint32 WriteLog(const QString& message); // API: write message to log (add newline if missing)
     qint32 FlushLog();                       // Flush log to disk

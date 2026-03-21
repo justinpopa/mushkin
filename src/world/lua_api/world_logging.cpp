@@ -45,7 +45,9 @@ int L_OpenLog(lua_State* L)
         append = lua_toboolean(L, 2);
     }
 
-    qint32 result = pDoc->OpenLog(filename, append);
+    // Original: Lua OpenLog does NOT write preamble or trigger retrospective logging.
+    // Those are only done from the interactive (menu) and auto-connect paths.
+    qint32 result = pDoc->OpenLog(filename, append, false);
 
     lua_pushnumber(L, result);
     return 1;
