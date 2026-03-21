@@ -890,11 +890,12 @@ void WorldDocument::SendMsg(const QString& text, bool bEcho, bool bQueue, bool b
     // First replace \r\n with \n, then split on \n
     QString normalized = strText;
     normalized.replace("\r\n", "\n");
-    QStringList lines = normalized.split("\n", Qt::SkipEmptyParts);
+    // Keep empty parts — original sends blank lines as ENDLINE (pressing Enter)
+    QStringList lines = normalized.split("\n", Qt::KeepEmptyParts);
 
-    // If no lines after splitting, treat as single empty line
+    // Guarantee at least one entry (original: StringToList always has at least one)
     if (lines.isEmpty()) {
-        lines.append(strText);
+        lines.append(QString());
     }
 
     auto& commandQueue = m_connectionManager->m_CommandQueue;
