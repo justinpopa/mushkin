@@ -426,30 +426,14 @@ void PluginDialog::onShowInfo()
         return;
     }
 
-    // Show description for all selected plugins
+    // Show description in a notepad pane (original uses AppendToNotepad, not a popup)
     for (const QModelIndex& index : selected) {
         QTableWidgetItem* nameItem = m_pluginTable->item(index.row(), COL_NAME);
         if (nameItem) {
             Plugin* plugin = static_cast<Plugin*>(nameItem->data(Qt::UserRole).value<void*>());
             if (plugin && !plugin->m_strDescription.isEmpty()) {
-                // Create a simple dialog to show the description
-                QDialog* descDialog = new QDialog(this);
-                descDialog->setWindowTitle(tr("%1 - Description").arg(plugin->m_strName));
-                descDialog->setAttribute(Qt::WA_DeleteOnClose);
-
-                QVBoxLayout* layout = new QVBoxLayout(descDialog);
-
-                QTextEdit* textEdit = new QTextEdit(descDialog);
-                textEdit->setPlainText(plugin->m_strDescription);
-                textEdit->setReadOnly(true);
-                layout->addWidget(textEdit);
-
-                QPushButton* closeBtn = new QPushButton(tr("Close"), descDialog);
-                connect(closeBtn, &QPushButton::clicked, descDialog, &QDialog::accept);
-                layout->addWidget(closeBtn);
-
-                descDialog->resize(600, 400);
-                descDialog->show();
+                QString title = plugin->m_strName + " Info";
+                m_doc->SendToNotepad(title, plugin->m_strDescription);
             }
         }
     }
