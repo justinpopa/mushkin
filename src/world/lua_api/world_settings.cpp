@@ -25,6 +25,7 @@
 #include <QGuiApplication>
 #include <QHostAddress>
 #include <QHostInfo>
+#include <QImageReader>
 #include <QLocale>
 #include <QRegularExpression>
 #include <QSysInfo>
@@ -2030,8 +2031,42 @@ int L_SetBackgroundImage(lua_State* L)
         return luaReturn(L, eBadParameter);
     }
 
+    QString fileName = luaOptQString(L, 1).trimmed();
+
+    // No file name means clear the image
+    if (fileName.isEmpty()) {
+        pDoc->m_strBackgroundImageName.clear();
+        pDoc->m_iBackgroundMode = mode;
+        if (pDoc->m_pActiveOutputView) {
+            pDoc->m_pActiveOutputView->reloadBackgroundImage();
+        }
+        return luaReturn(L, eOK);
+    }
+
+    // Must be long enough to have x.bmp or x.png
+    if (fileName.length() < 5) {
+        return luaReturn(L, eBadParameter);
+    }
+
+    // Must have .bmp or .png extension (case-insensitive)
+    QString ext = fileName.right(4).toLower();
+    if (ext != ".bmp" && ext != ".png") {
+        return luaReturn(L, eBadParameter);
+    }
+
+    // File must exist
+    if (!QFileInfo::exists(fileName)) {
+        return luaReturn(L, eFileNotFound);
+    }
+
+    // Try to open the image to confirm it can be read
+    QImageReader reader(fileName);
+    if (!reader.canRead()) {
+        return luaReturn(L, eCouldNotOpenFile);
+    }
+
     // Store the image path and mode
-    pDoc->m_strBackgroundImageName = luaOptQString(L, 1);
+    pDoc->m_strBackgroundImageName = fileName;
     pDoc->m_iBackgroundMode = mode;
 
     // Tell OutputView to reload the image via interface method
