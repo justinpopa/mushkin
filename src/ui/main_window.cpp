@@ -1527,6 +1527,27 @@ void MainWindow::closeEvent(QCloseEvent* event)
         }
     }
 
+    // Per-world close confirmation for connected worlds
+    // Original: SaveAllModified calls SaveModified per document, showing per-world dialog
+    if (GlobalOptions::instance().confirmBeforeClosingWorld()) {
+        for (QMdiSubWindow* sub : m_mdiArea->subWindowList()) {
+            auto* widget = qobject_cast<WorldWidget*>(sub->widget());
+            if (!widget)
+                continue;
+            WorldDocument* doc = widget->document();
+            if (doc && doc->isConnectedToMud()) {
+                auto reply = QMessageBox::information(
+                    this, "Mushkin",
+                    QString("This will end your %1 session.").arg(doc->worldName()),
+                    QMessageBox::Ok | QMessageBox::Cancel, QMessageBox::Ok);
+                if (reply != QMessageBox::Ok) {
+                    event->ignore();
+                    return;
+                }
+            }
+        }
+    }
+
     // Check if any worlds have unsaved changes
     QList<QMdiSubWindow*> windows = m_mdiArea->subWindowList();
     QStringList unsavedWorlds;
