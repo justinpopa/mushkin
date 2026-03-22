@@ -1381,11 +1381,20 @@ QVariant MiniWindow::ImageInfo(const QString& imageId, qint32 infoType)
         return QVariant();
     QImage* img = it->second.get();
 
+    // Original miniwindow.cpp:1500-1508 — Windows BITMAP struct fields
     switch (infoType) {
         case 1:
-            return img->width();
+            return 0; // bmType — always 0 for standard bitmaps
         case 2:
-            return img->height();
+            return img->width(); // bmWidth
+        case 3:
+            return img->height(); // bmHeight
+        case 4:
+            return img->bytesPerLine(); // bmWidthBytes
+        case 5:
+            return 1; // bmPlanes — modern displays use 1 plane
+        case 6:
+            return img->depth(); // bmBitsPixel
         default:
             return QVariant();
     }
