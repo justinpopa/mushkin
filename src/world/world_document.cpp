@@ -454,7 +454,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     // ========== Background Image ==========
     m_strBackgroundImageName = QString();
     m_iBackgroundMode = 0;
-    m_iBackgroundColour = qRgb(0, 0, 0);
+    m_iBackgroundColour = 0xFFFFFFFF; // NO_COLOUR — use default background (original: stdafx.h:252)
 
     // ========== Foreground Image ==========
     m_strForegroundImageName = QString();

@@ -1318,8 +1318,8 @@ int L_GetInfo(lua_State* L)
             lua_pushinteger(L, pDoc->m_iBackgroundMode);
             break;
 
-        case 271: // Background colour
-            lua_pushinteger(L, pDoc->m_iBackgroundColour);
+        case 271: // Background colour (original returns signed COLORREF; NO_COLOUR=0xFFFFFFFF → -1)
+            lua_pushinteger(L, static_cast<qint32>(pDoc->m_iBackgroundColour));
             break;
 
         case 272: // Text rectangle - left
