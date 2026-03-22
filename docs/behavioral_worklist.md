@@ -409,7 +409,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 ## v2 Audit: Command Processing (2026-03-22)
 
 ### HIGH
-- [ ] H69: commands -- L_Send() bypasses entire send pipeline (no echo, no logging, no spam, no plugin callbacks). Calls sendToMud() directly. Mushkin: src/world/lua_api/world_network.cpp:44
+- [x] H69: commands -- L_Send() now routes through SendMsg() for full pipeline (echo/log/spam/callbacks). Mushkin: src/world/lua_api/world_network.cpp:44
 - [ ] H70: commands -- L_LogSend() also bypasses send pipeline. Mushkin: src/world/lua_api/world_logging_opts.cpp:273
 - [ ] H71: commands -- Queue prefix encoding conflates echo and log flags; toLower() destroys echo flag. Mushkin: src/world/world_document.cpp:962-977
 - [ ] H72: commands -- Execute() does not save/restore m_CurrentPlugin; causes plugin context corruption during nested calls. Mushkin: src/world/world_document.cpp:1331

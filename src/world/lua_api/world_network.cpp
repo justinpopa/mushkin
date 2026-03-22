@@ -40,8 +40,9 @@ int L_Send(lua_State* L)
         return luaReturnError(L, eItemInUse);
     }
 
-    // Send the message
-    pDoc->sendToMud(text);
+    // Send through full pipeline (echo/log/spam/plugin callbacks)
+    // Original: methods_sending.cpp:32 calls SendMsg(Message, m_display_my_input, false, false)
+    pDoc->SendMsg(text, pDoc->m_display_my_input, false, false);
 
     return luaReturnOK(L);
 }
