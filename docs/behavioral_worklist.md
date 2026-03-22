@@ -511,3 +511,14 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 
 ### LOW
 - [ ] L90: notepad -- GetNotepadList(true) does not enumerate other worlds' notepads (deferred, single-world). Mushkin: src/world/world_notepad.cpp:277-289
+
+## v2 Audit: Arrays (2026-03-22)
+
+### MEDIUM
+- [ ] M144: arrays -- ArrayExport delimiter is required; original defaults to ",". Mushkin: src/world/lua_api/world_arrays.cpp:459
+- [ ] M145: arrays -- ArrayExportKeys delimiter is required; original defaults to ",". Mushkin: src/world/lua_api/world_arrays.cpp:517
+- [ ] M146: arrays -- ArrayImport from Lua table silently converts integer keys to strings; original raises error. Mushkin: src/world/lua_api/world_arrays.cpp:592-593
+
+### LOW
+- [ ] L91: arrays -- ArrayExport/ArrayExportKeys check delimiter validity before empty check (different error for empty+bad delimiter). Mushkin: src/world/lua_api/world_arrays.cpp:470-481
+- [ ] L92: arrays -- ArrayImport from table always returns eOK; original returns eImportedWithDuplicates. Mushkin: src/world/lua_api/world_arrays.cpp:599
