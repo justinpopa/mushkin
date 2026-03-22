@@ -825,7 +825,9 @@ void WorldDocument::loadVariablesFromXml(QXmlStreamReader& xml, Plugin* plugin)
             QString name = xml.attributes().value("name").toString();
             QString contents = xml.readElementText();
 
-            QString varName = name.toLower(); // Ensure lowercase
+            // Original preserves variable name case (CheckObjectName validates but doesn't
+            // lowercase)
+            QString varName = name;
 
             // Skip duplicates - don't overwrite existing variables
             if (plugin) {

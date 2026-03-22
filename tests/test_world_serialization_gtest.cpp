@@ -155,7 +155,7 @@ TEST_F(WorldSerializationTest, VariableRoundtripViaFile)
 }
 
 // Test 4: Variable name is lowercased on load
-TEST_F(WorldSerializationTest, VariableNameLowercasedOnLoad)
+TEST_F(WorldSerializationTest, VariableNamePreservedOnLoad)
 {
     doc1 = std::make_unique<WorldDocument>();
     doc1->m_mush_name = "Variable Case Test";
@@ -176,9 +176,10 @@ TEST_F(WorldSerializationTest, VariableNameLowercasedOnLoad)
     int imported = XmlSerialization::ImportXML(doc2.get(), mixedCaseXml, XML_VARIABLES);
     EXPECT_GE(imported, 0) << "ImportXML failed on mixed-case variable";
 
-    auto it = doc2->m_VariableMap.find("myvar");
+    // Original preserves variable name case (CheckObjectName validates but doesn't lowercase)
+    auto it = doc2->m_VariableMap.find("MyVar");
     EXPECT_NE(it, doc2->m_VariableMap.end())
-        << "Variable key should be lowercased to 'myvar' after import";
+        << "Variable key should preserve original case 'MyVar' after import";
 }
 
 // Test 5: Duplicate variable names on import keep only the first
