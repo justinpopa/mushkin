@@ -23,6 +23,7 @@ enum {
     eImageNotInstalled = 30068,
     eInvalidNumberOfPoints = 30069,
     eInvalidPoint = 30070,
+    ePenStyleNotValid = 30066,
     eHotspotNotInstalled = 30072,
     eNoSuchWindow = 30073,
 };
@@ -1592,14 +1593,31 @@ qint32 MiniWindow::ImageOp(qint16 action, qint32 left, qint32 top, qint32 right,
 
     QImage* brushImg = it->second.get();
 
+    // Validate pen style (original: miniwindow.cpp:353-398, 1909-1910)
+    {
+        int linePat = penStyle & 0x0F; // PS_STYLE_MASK
+        if (linePat >= 1 && linePat <= 4 && penWidth > 1) {
+            return ePenStyleNotValid; // dash/dot styles require width <= 1
+        }
+        if (linePat > 6) {
+            return ePenStyleNotValid; // unknown style
+        }
+        int endCap = (penStyle >> 8) & 0x0F; // PS_ENDCAP_MASK
+        if (endCap > 2) {
+            return ePenStyleNotValid;
+        }
+        int join = (penStyle >> 12) & 0x0F; // PS_JOIN_MASK
+        if (join > 2) {
+            return ePenStyleNotValid;
+        }
+    }
+
     // Create painter
     QPainter painter(image.get());
     painter.setRenderHint(QPainter::Antialiasing, false);
 
-    // Setup pen (convert BGR to Qt color)
-    QPen pen(bgrToColor(penColor));
-    pen.setWidth(penWidth);
-    pen.setStyle(static_cast<Qt::PenStyle>(penStyle));
+    // Setup pen using shared Windows GDI pen converter
+    QPen pen = createWindowsPen(bgrToColor(penColor), penWidth, penStyle);
     painter.setPen(pen);
 
     // Setup brush with image pattern
@@ -1607,16 +1625,15 @@ qint32 MiniWindow::ImageOp(qint16 action, qint32 left, qint32 top, qint32 right,
     brush.setStyle(Qt::TexturePattern);
     painter.setBrush(brush);
 
-    // Normalize coordinates
-    if (left > right)
-        std::swap(left, right);
-    if (top > bottom)
-        std::swap(top, bottom);
+    // Handle right/bottom <= 0 as offset from window edge (same as RectOp)
+    qint32 fixedRight = (right <= 0) ? width + right : right;
+    qint32 fixedBottom = (bottom <= 0) ? height + bottom : bottom;
 
-    QRect rect(left, top, right - left, bottom - top);
+    int w = fixedRight - left;
+    int h = fixedBottom - top;
+    QRect rect(left, top, w > 0 ? w : 0, h > 0 ? h : 0);
 
-    // Perform operation based on action
-    // Match original MUSHclient action codes: 1=ellipse, 2=rectangle, 3=round rect
+    // Original action codes: 1=ellipse, 2=rectangle, 3=round rect
     switch (action) {
         case 1: // Ellipse (filled with pattern brush)
             painter.drawEllipse(rect);
