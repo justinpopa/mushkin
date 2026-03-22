@@ -480,7 +480,8 @@ QString removeBacktracks(const QString& speedWalkString, const QString& filler)
             result += prev + " ";
     }
 
-    return result.trimmed();
+    // Original preserves trailing space — don't trim
+    return result;
 }
 
 } // namespace speedwalk
