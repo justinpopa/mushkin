@@ -636,8 +636,23 @@ int L_DatabaseError(lua_State* L)
         return 1;
     }
 
-    const char* errMsg = sqlite3_errmsg(it->second->db);
-    lua_pushstring(L, errMsg ? errMsg : "");
+    // Original (methods_database.cpp:248-289) uses sqlite3_errcode and a switch
+    // to provide human-readable messages for SQLITE_ROW, SQLITE_DONE, and
+    // DATABASE_ERROR_* codes before falling back to sqlite3_errmsg.
+    int errCode = sqlite3_errcode(it->second->db);
+    switch (errCode) {
+        case SQLITE_ROW:
+            lua_pushstring(L, "row ready");
+            break;
+        case SQLITE_DONE:
+            lua_pushstring(L, "finished");
+            break;
+        default: {
+            const char* errMsg = sqlite3_errmsg(it->second->db);
+            lua_pushstring(L, errMsg ? errMsg : "");
+            break;
+        }
+    }
     return 1;
 }
 
