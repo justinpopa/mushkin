@@ -386,3 +386,22 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [ ] L69: xml -- XML encoding is UTF-8 instead of iso-8859-1. Mushkin: xml_serialization.cpp:253
 - [ ] L70: xml -- Base64 clipboard XML detection missing. Mushkin: (absent)
 - [ ] L71: xml -- IsArchiveXML uses case-insensitive contains() instead of case-sensitive prefix match. Mushkin: xml_serialization.cpp:154-159
+
+## v2 Audit: Logging (2026-03-22)
+
+### HIGH
+- [ ] H66: logging -- eSendToLogFile (send-to 6) missing newline and raw-mode guard. Mushkin: src/world/world_sendto.cpp:140-144
+- [ ] H67: logging -- Retrospective logging filter too strict; only checks LOG_LINE, misses NOTE_OR_COMMAND flagged lines. Mushkin: src/world/world_logging.cpp:743
+- [ ] H68: logging -- Trigger omit_from_log ignores multi-line check; original only omits for single-line triggers. Mushkin: src/world/world_trigger_execution.cpp:214
+
+### MEDIUM
+- [ ] M111: logging -- FormatTime percent-in-custom-values bug: % in world/player names doubled in log output. Mushkin: src/world/world_logging.cpp:77-138
+- [ ] M112: logging -- HTML world name header not HTML-escaped (TODO in code). Mushkin: src/world/world_logging.cpp:244
+- [ ] M113: logging -- LogLineInHTMLcolour processes single Line only, not multi-line paragraphs. Mushkin: src/world/world_logging.cpp:504-602
+- [ ] M114: logging -- Retrospective HTML colour logging uses different tag structure than original. Mushkin: src/world/world_logging.cpp:785-787
+
+### LOW
+- [ ] L72: logging -- CSS spacing in HTML colour span tags differs (no spaces after colons). Mushkin: src/world/world_logging.cpp:561
+- [ ] L73: logging -- WriteLog newline: Mushkin correctly detects trailing newline; original always appends for 2+ char messages. Mushkin: src/world/world_logging.cpp:392
+- [ ] L74: logging -- flushLogIfNeeded flushes every call instead of every 120 seconds. Mushkin: src/world/world_document.cpp:2966-2973
+- [ ] L75: logging -- LogSend bypasses alias processing (calls sendToMud directly). Mushkin: src/world/lua_api/world_logging_opts.cpp:273
