@@ -7,6 +7,7 @@
  * Based on lua_scripting.cpp and Utilities.cpp from original MUSHclient.
  */
 
+#include "../automation/plugin.h"
 #include "../world/world_document.h"
 #include "script_engine.h"
 #include <QDebug>
@@ -293,10 +294,14 @@ bool ScriptEngine::executeLua(qint32& dispid, const QString& szProcedure, Action
 
     invocation_count++; // Count successful calls
 
-    // Update timing statistics
+    // Update timing statistics (world + current plugin)
     if (m_doc) {
         qint64 elapsed = timer.nsecsElapsed();
         m_doc->m_iScriptTimeTaken += elapsed;
+        // Original also tracks per-plugin timing for GetPluginInfo("scripttime")
+        if (m_doc->m_CurrentPlugin) {
+            m_doc->m_CurrentPlugin->m_iScriptTimeTaken += elapsed;
+        }
     }
 
     // Get return value (if wanted)
