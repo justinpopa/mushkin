@@ -1580,11 +1580,15 @@ int L_SetOption(lua_State* L)
 
     const tConfigurationNumericOption& opt = OptionsTable[optionIndex];
 
-    // Reject out-of-range values (original returns eOptionOutOfRange, not clamp)
-    if (opt.iMinimum != 0 || opt.iMaximum != 0) {
-        if (value < opt.iMinimum || value > opt.iMaximum) {
-            return luaReturnError(L, eOptionOutOfRange);
-        }
+    // Reject out-of-range values (original: scriptingoptions.cpp:421-426)
+    // When both min and max are 0, it's a boolean — effective range is [0, 1]
+    double effectiveMin = opt.iMinimum;
+    double effectiveMax = opt.iMaximum;
+    if (effectiveMin == 0 && effectiveMax == 0) {
+        effectiveMax = 1; // Boolean: treat as [0, 1]
+    }
+    if (value < effectiveMin || value > effectiveMax) {
+        return luaReturnError(L, eOptionOutOfRange);
     }
 
     opt.setter(*pDoc, value);
