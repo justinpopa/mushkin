@@ -44,6 +44,11 @@ extern "C" {
  */
 void WorldDocument::executeAlias(Alias* alias, const QString& command)
 {
+    // Propagate omit_from_command_history flag (original: evaluate.cpp:899)
+    if (alias->omit_from_command_history) {
+        m_bOmitFromCommandHistory = true;
+    }
+
     // Echo the alias/command?
     if (alias->echo_alias) {
         // Insert display-line boundary if current line is MUD output (original:

@@ -1407,6 +1407,8 @@ void WorldDocument::Execute(const QString& command, bool allowScriptPrefix, bool
         }
 
         // ========== Alias Evaluation ==========
+        // Reset omit flag before alias evaluation (original: sendvw.cpp:602)
+        m_bOmitFromCommandHistory = false;
         bool aliasHandled = false;
 
         if (m_enable_aliases && !bypassAliases) {
@@ -1427,14 +1429,13 @@ void WorldDocument::Execute(const QString& command, bool allowScriptPrefix, bool
             }
 
             SendMsg(processedCommand, bEcho, bQueue, bLog);
-
-            // Add to command history (only from UI path, not Lua Execute())
-            if (addHistory) {
-                addToCommandHistory(processedCommand);
-            }
         }
-        // Note: If alias handled, the alias execution already added to history (if
-        // !omit_from_command_history)
+
+        // Add original command to history AFTER alias cycle (original: sendvw.cpp:713-714)
+        // Alias omit_from_command_history flag sets m_bOmitFromCommandHistory during execution
+        if (addHistory && !m_bOmitFromCommandHistory) {
+            addToCommandHistory(processedCommand);
+        }
     }
 }
 
