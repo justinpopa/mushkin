@@ -364,7 +364,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 ### HIGH
 - [x] H60: xml -- Missing "enabled" attribute now preserves constructor default (TRUE) for triggers/aliases/timers. Mushkin: xml_serialization.cpp:234,509
 - [x] H61: xml -- keep_evaluating default changed from TRUE to FALSE for triggers and aliases. Triggers continue evaluating instead of stopping. Mushkin: trigger.cpp:44, xml_serialization.cpp:246
-- [ ] H62: xml -- Variable duplicate handling: original OVERWRITES, Mushkin SKIPS. State restore fails to update existing variables. Mushkin: xml_serialization.cpp:870-880
+- [x] H62: xml -- Variable duplicate handling changed from SKIP to OVERWRITE matching original. State restore fails to update existing variables. Mushkin: xml_serialization.cpp:870-880
 - [ ] H63: xml -- Non-plugin include files not loaded. Original has two-pass include system; Mushkin only processes plugin includes. Mushkin: xml_serialization.cpp:645-674
 - [ ] H64: xml -- XML structure: triggers/aliases/timers nested inside <world> instead of as siblings of <world>. Original MUSHclient cannot read Mushkin-saved files. Mushkin: xml_serialization.cpp:373-428
 - [ ] H65: xml -- Trigger/alias internal names not lowercased. Case-insensitive lookup by name (GetTriggerInfo, DeleteTrigger) may fail. Mushkin: xml_serialization.cpp:232-233,504-506

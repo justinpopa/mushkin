@@ -183,10 +183,11 @@ TEST_F(WorldSerializationTest, VariableNamePreservedOnLoad)
 }
 
 // Test 5: Duplicate variable names on import keep only the first
-TEST_F(WorldSerializationTest, VariableDuplicateSkippedOnImport)
+TEST_F(WorldSerializationTest, VariableDuplicateOverwrittenOnImport)
 {
-    // Build XML manually with two variables sharing the same (lowercased) name
-    // but different contents. The second should be skipped.
+    // Build XML manually with two variables sharing the same name
+    // but different contents. The second should OVERWRITE the first
+    // (original: xml_load_world.cpp:1995-2006 deletes old, inserts new).
     QString xmlStr = R"(<?xml version="1.0" encoding="UTF-8"?>
 <muclient>
 <variables>
@@ -201,8 +202,8 @@ TEST_F(WorldSerializationTest, VariableDuplicateSkippedOnImport)
 
     auto it = doc1->m_VariableMap.find("dupvar");
     ASSERT_NE(it, doc1->m_VariableMap.end()) << "Variable 'dupvar' not found";
-    EXPECT_EQ(it->second->contents, "first_value")
-        << "Duplicate variable should keep first value, not second";
+    EXPECT_EQ(it->second->contents, "second_value")
+        << "Duplicate variable should overwrite with second value";
 }
 
 // =============================================================================

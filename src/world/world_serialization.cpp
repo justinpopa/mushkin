@@ -870,19 +870,8 @@ void WorldDocument::loadVariablesFromXml(QXmlStreamReader& xml, Plugin* plugin)
             // lowercase)
             QString varName = name;
 
-            // Skip duplicates - don't overwrite existing variables
-            if (plugin) {
-                if (plugin->m_VariableMap.find(varName) != plugin->m_VariableMap.end()) {
-                    qCDebug(lcWorld) << "Skipping duplicate variable:" << varName;
-                    continue;
-                }
-            } else {
-                if (m_VariableMap.find(varName) != m_VariableMap.end()) {
-                    qCDebug(lcWorld) << "Skipping duplicate variable:" << varName;
-                    continue;
-                }
-            }
-
+            // Overwrite existing variables (original: xml_load_world.cpp:1995-2006 deletes old,
+            // inserts new). Previous code skipped duplicates which broke state restore.
             auto var = std::make_unique<Variable>();
             var->label = varName;
             var->contents = contents;
