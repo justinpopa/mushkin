@@ -703,6 +703,15 @@ void WorldDocument::loadTimersFromXml(QXmlStreamReader& xml, Plugin* plugin)
                 timer->every_second = attrs.hasAttribute("every_second")
                                           ? attrs.value("every_second").toDouble()
                                           : second;
+
+                // Reject zero-interval timers (original: xml_load_world.cpp:1717-1718)
+                if (timer->every_hour == 0 && timer->every_minute == 0 &&
+                    timer->every_second <= 0.0) {
+                    qWarning() << "Timer" << timer->label
+                               << "has zero interval — skipping (would fire continuously)";
+                    xml.skipCurrentElement();
+                    continue;
+                }
             }
 
             // Offset fields
