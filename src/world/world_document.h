@@ -663,11 +663,11 @@ class WorldDocument : public QObject, public IWorldContext {
 
     // ========== Auto-say Settings ==========
     struct AutoSayConfig {
-        QString say_string = "say ";          // string prepended to commands
-        QString override_prefix = "-";        // prefix to bypass auto-say
-        bool enabled = false;                 // auto-say mode enabled?
-        bool exclude_macros = false;          // skip macro/accelerator keys?
-        bool exclude_non_alpha = false;       // skip commands not starting with a letter?
+        QString say_string;             // string prepended to commands (original default: empty)
+        QString override_prefix = "-";  // prefix to bypass auto-say
+        bool enabled = false;           // auto-say mode enabled?
+        bool exclude_macros = false;    // skip macro/accelerator keys?
+        bool exclude_non_alpha = false; // skip commands not starting with a letter?
         bool confirm_before_replacing = true; // confirm before replacing typed text?
         bool re_evaluate = false;             // re-evaluate after alias expansion?
     } m_auto_say;
