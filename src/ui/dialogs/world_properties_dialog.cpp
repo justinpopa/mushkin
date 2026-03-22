@@ -244,7 +244,34 @@ void WorldPropertiesDialog::setupInputTab()
     m_historySizeSpin->setSuffix(" commands");
     layout->addRow("Command history size:", m_historySizeSpin);
 
-    // Add some spacing
+    // Command stacking
+    layout->addRow("", new QLabel("Command Stacking:"));
+    m_enableCommandStackCheck = new QCheckBox("Enable command stacking");
+    layout->addRow("", m_enableCommandStackCheck);
+    m_commandStackCharEdit = new QLineEdit();
+    m_commandStackCharEdit->setMaxLength(1);
+    m_commandStackCharEdit->setFixedWidth(40);
+    layout->addRow("Stack character:", m_commandStackCharEdit);
+
+    // Speed walk
+    layout->addRow("", new QLabel("Speed Walking:"));
+    m_enableSpeedwalkCheck = new QCheckBox("Enable speed walking");
+    layout->addRow("", m_enableSpeedwalkCheck);
+    m_speedwalkPrefixEdit = new QLineEdit();
+    m_speedwalkPrefixEdit->setFixedWidth(40);
+    layout->addRow("Prefix:", m_speedwalkPrefixEdit);
+    m_speedwalkDelaySpin = new QSpinBox();
+    m_speedwalkDelaySpin->setRange(0, 30000);
+    m_speedwalkDelaySpin->setSuffix(" ms");
+    layout->addRow("Delay:", m_speedwalkDelaySpin);
+
+    // Spam prevention
+    layout->addRow("", new QLabel("Options:"));
+    m_escapeDeletesInputCheck = new QCheckBox("Escape key clears input");
+    layout->addRow("", m_escapeDeletesInputCheck);
+    m_noEchoOffCheck = new QCheckBox("Ignore server echo-off (show passwords)");
+    layout->addRow("", m_noEchoOffCheck);
+
     layout->addRow("", new QWidget()); // Spacer
 
     m_tabWidget->addTab(tab, "Input");
@@ -608,6 +635,19 @@ void WorldPropertiesDialog::loadSettings()
     // Command history size
     m_historySizeSpin->setValue(m_doc->m_maxCommandHistory);
 
+    // Command stacking
+    m_enableCommandStackCheck->setChecked(m_doc->m_input.enable_command_stack);
+    m_commandStackCharEdit->setText(m_doc->m_input.command_stack_character);
+
+    // Speed walk
+    m_enableSpeedwalkCheck->setChecked(m_doc->m_speedwalk.enabled);
+    m_speedwalkPrefixEdit->setText(m_doc->m_speedwalk.prefix);
+    m_speedwalkDelaySpin->setValue(m_doc->m_speedwalk.delay);
+
+    // Options
+    m_escapeDeletesInputCheck->setChecked(m_doc->m_input.escape_deletes_input);
+    m_noEchoOffCheck->setChecked(m_doc->m_input.no_echo_off);
+
     // Logging tab
     m_enableLogCheck->setChecked(m_doc->m_logging.log_output);
     m_logFileEdit->setText(m_doc->m_logging.auto_log_file_name);
@@ -713,6 +753,19 @@ void WorldPropertiesDialog::saveSettings()
 
     // Command history size
     m_doc->m_maxCommandHistory = m_historySizeSpin->value();
+
+    // Command stacking
+    m_doc->m_input.enable_command_stack = m_enableCommandStackCheck->isChecked();
+    m_doc->m_input.command_stack_character = m_commandStackCharEdit->text();
+
+    // Speed walk
+    m_doc->m_speedwalk.enabled = m_enableSpeedwalkCheck->isChecked();
+    m_doc->m_speedwalk.prefix = m_speedwalkPrefixEdit->text();
+    m_doc->m_speedwalk.delay = m_speedwalkDelaySpin->value();
+
+    // Options
+    m_doc->m_input.escape_deletes_input = m_escapeDeletesInputCheck->isChecked();
+    m_doc->m_input.no_echo_off = m_noEchoOffCheck->isChecked();
 
     // Logging tab
     m_doc->m_logging.log_output = m_enableLogCheck->isChecked();

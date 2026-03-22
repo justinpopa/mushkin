@@ -127,6 +127,13 @@ class WorldPropertiesDialog : public QDialog {
     QCheckBox* m_echoInputCheck;
     QComboBox* m_echoColorCombo;
     QSpinBox* m_historySizeSpin; // Command history size (20-5000)
+    QCheckBox* m_enableCommandStackCheck;
+    QLineEdit* m_commandStackCharEdit;
+    QCheckBox* m_enableSpeedwalkCheck;
+    QLineEdit* m_speedwalkPrefixEdit;
+    QSpinBox* m_speedwalkDelaySpin;
+    QCheckBox* m_escapeDeletesInputCheck;
+    QCheckBox* m_noEchoOffCheck;
 
     // Logging tab widgets
     QCheckBox* m_enableLogCheck;
