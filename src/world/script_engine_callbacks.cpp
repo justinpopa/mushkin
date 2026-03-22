@@ -183,13 +183,13 @@ static void luaError(lua_State* L, const QString& event, const QString& procedur
     qWarning() << "  Context:" << context;
     qWarning() << "  Message:" << errorMsg;
 
-    // Display in output window - orange error text on black background
+    // Display in output window — orangered error text on black (SCRIPTERRORFORECOLOUR)
     if (doc) {
-        doc->colourNote(BGR(255, 140, 0), BGR(0, 0, 0), QString("=== %1 ===").arg(event));
+        doc->colourNote(BGR(255, 69, 0), BGR(0, 0, 0), QString("=== %1 ===").arg(event));
         if (!context.isEmpty()) {
-            doc->colourNote(BGR(255, 140, 0), BGR(0, 0, 0), context);
+            doc->colourNote(BGR(255, 69, 0), BGR(0, 0, 0), context);
         }
-        doc->colourNote(BGR(255, 140, 0), BGR(0, 0, 0), errorMsg);
+        doc->colourNote(BGR(255, 69, 0), BGR(0, 0, 0), errorMsg);
     }
 }
 
