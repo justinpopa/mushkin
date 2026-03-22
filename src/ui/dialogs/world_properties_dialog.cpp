@@ -195,6 +195,51 @@ void WorldPropertiesDialog::setupOutputTab()
 
     layout->addLayout(colorGrid);
 
+    // Display options section
+    layout->addSpacing(20);
+    layout->addWidget(new QLabel("Display Options:"));
+
+    QFormLayout* displayForm = new QFormLayout();
+
+    m_wrapCheck = new QCheckBox("Enable word wrap");
+    displayForm->addRow(m_wrapCheck);
+
+    m_wrapColumnSpin = new QSpinBox();
+    m_wrapColumnSpin->setRange(20, 500);
+    m_wrapColumnSpin->setSuffix(" chars");
+    displayForm->addRow("Wrap column:", m_wrapColumnSpin);
+
+    m_maxLinesSpin = new QSpinBox();
+    m_maxLinesSpin->setRange(200, 500000);
+    displayForm->addRow("Max output lines:", m_maxLinesSpin);
+
+    m_utf8Check = new QCheckBox("UTF-8 (Unicode) output");
+    displayForm->addRow(m_utf8Check);
+
+    m_nawsCheck = new QCheckBox("NAWS (send window size to server)");
+    displayForm->addRow(m_nawsCheck);
+
+    m_terminalTypeEdit = new QLineEdit();
+    displayForm->addRow("Terminal type:", m_terminalTypeEdit);
+
+    m_indentParasCheck = new QCheckBox("Indent paragraphs on word-wrap");
+    displayForm->addRow(m_indentParasCheck);
+
+    m_showBoldCheck = new QCheckBox("Show bold");
+    displayForm->addRow(m_showBoldCheck);
+
+    m_showItalicCheck = new QCheckBox("Show italic");
+    displayForm->addRow(m_showItalicCheck);
+
+    m_showUnderlineCheck = new QCheckBox("Show underline");
+    displayForm->addRow(m_showUnderlineCheck);
+
+    m_lineSpacingSpin = new QSpinBox();
+    m_lineSpacingSpin->setRange(0, 100);
+    displayForm->addRow("Line spacing:", m_lineSpacingSpin);
+
+    layout->addLayout(displayForm);
+
     // Activity notification section
     layout->addSpacing(20);
     layout->addWidget(new QLabel("Activity:"));
@@ -612,6 +657,19 @@ void WorldPropertiesDialog::loadSettings()
         updateColorButton(i);
     }
 
+    // Display options
+    m_wrapCheck->setChecked(m_doc->m_display.wrap);
+    m_wrapColumnSpin->setValue(m_doc->m_display.wrap_column);
+    m_maxLinesSpin->setValue(m_doc->m_display.max_lines);
+    m_utf8Check->setChecked(m_doc->m_display.utf8);
+    m_nawsCheck->setChecked(m_doc->m_bNAWS);
+    m_terminalTypeEdit->setText(m_doc->m_strTerminalIdentification);
+    m_indentParasCheck->setChecked(m_doc->m_display.indent_paras);
+    m_showBoldCheck->setChecked(m_doc->m_display.show_bold);
+    m_showItalicCheck->setChecked(m_doc->m_display.show_italic);
+    m_showUnderlineCheck->setChecked(m_doc->m_display.show_underline);
+    m_lineSpacingSpin->setValue(m_doc->m_display.line_spacing);
+
     // Activity settings
     m_flashIconCheck->setChecked(m_doc->m_display.flash_icon);
 
@@ -737,6 +795,19 @@ void WorldPropertiesDialog::saveSettings()
         m_doc->m_colors.bold_colour[i] =
             static_cast<QRgb>((qRed(rgb)) | (qGreen(rgb) << 8) | (qBlue(rgb) << 16));
     }
+
+    // Display options
+    m_doc->m_display.wrap = m_wrapCheck->isChecked();
+    m_doc->m_display.wrap_column = static_cast<quint16>(m_wrapColumnSpin->value());
+    m_doc->m_display.max_lines = m_maxLinesSpin->value();
+    m_doc->m_display.utf8 = m_utf8Check->isChecked();
+    m_doc->m_bNAWS = m_nawsCheck->isChecked();
+    m_doc->m_strTerminalIdentification = m_terminalTypeEdit->text();
+    m_doc->m_display.indent_paras = m_indentParasCheck->isChecked();
+    m_doc->m_display.show_bold = m_showBoldCheck->isChecked();
+    m_doc->m_display.show_italic = m_showItalicCheck->isChecked();
+    m_doc->m_display.show_underline = m_showUnderlineCheck->isChecked();
+    m_doc->m_display.line_spacing = static_cast<quint16>(m_lineSpacingSpin->value());
 
     // Activity settings
     m_doc->m_display.flash_icon = m_flashIconCheck->isChecked();

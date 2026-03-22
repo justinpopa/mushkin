@@ -115,6 +115,19 @@ class WorldPropertiesDialog : public QDialog {
     QFont m_outputFont;
     std::array<QPushButton*, 16> m_colorButtons{}; // 8 normal + 8 bright ANSI colors
     std::array<QRgb, 16> m_ansiColors{};
+    // Display options
+    QCheckBox* m_wrapCheck;
+    QSpinBox* m_wrapColumnSpin;
+    QSpinBox* m_maxLinesSpin;
+    QCheckBox* m_utf8Check;
+    QCheckBox* m_nawsCheck;
+    QLineEdit* m_terminalTypeEdit;
+    QCheckBox* m_indentParasCheck;
+    QCheckBox* m_showBoldCheck;
+    QCheckBox* m_showItalicCheck;
+    QCheckBox* m_showUnderlineCheck;
+    QSpinBox* m_lineSpacingSpin;
+    // Activity
     QCheckBox* m_flashIconCheck;
 
     // Helper for Output tab
