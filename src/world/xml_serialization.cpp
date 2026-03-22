@@ -40,7 +40,8 @@ namespace {
  * 4. Relative to working directory's worlds/plugins/
  * 5. Relative to world file directory (fallback)
  */
-QString resolvePluginPath(const QString& pluginPath, const QString& worldFilePath)
+QString resolvePluginPath(const QString& pluginPath, const QString& worldFilePath,
+                          const QString& pluginSourceDir = {})
 {
     // Convert Windows backslashes to forward slashes for cross-platform compatibility
     QString path = pluginPath;
@@ -69,6 +70,12 @@ QString resolvePluginPath(const QString& pluginPath, const QString& worldFilePat
     path.replace("$PLUGINSDEFAULTDIR", QDir(pluginsDir).absolutePath());
     path.replace("$WORLDDIR", worldDir);
     path.replace("$PROGRAMDIR", AppPaths::getAppDirectory());
+
+    // $PLUGINDIR — directory of the currently-loading plugin's source file
+    // Original: xml_load_world.cpp:833-835
+    if (!pluginSourceDir.isEmpty()) {
+        path.replace("$PLUGINDIR", pluginSourceDir);
+    }
 
     // If absolute after placeholder replacement, use directly
     if (QDir::isAbsolutePath(path)) {
@@ -640,7 +647,14 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
                         if (attrs.value("plugin").toString().toLower() == "y") {
                             QString pluginPath = attrs.value("name").toString();
                             if (!pluginPath.isEmpty()) {
-                                QString fullPath = resolvePluginPath(pluginPath, filename);
+                                // Pass current plugin's source dir for $PLUGINDIR
+                                QString pluginDir;
+                                if (doc->m_CurrentPlugin) {
+                                    QFileInfo pi(doc->m_CurrentPlugin->m_strSource);
+                                    pluginDir = pi.absolutePath();
+                                }
+                                QString fullPath =
+                                    resolvePluginPath(pluginPath, filename, pluginDir);
 
                                 QString errorMsg;
                                 Plugin* plugin = doc->LoadPlugin(fullPath, errorMsg);
@@ -772,7 +786,12 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
                 if (includeAttrs.value("plugin").toString().toLower() == "y") {
                     QString pluginPath = includeAttrs.value("name").toString();
                     if (!pluginPath.isEmpty()) {
-                        QString fullPath = resolvePluginPath(pluginPath, filename);
+                        QString pluginDir2;
+                        if (doc->m_CurrentPlugin) {
+                            QFileInfo pi2(doc->m_CurrentPlugin->m_strSource);
+                            pluginDir2 = pi2.absolutePath();
+                        }
+                        QString fullPath = resolvePluginPath(pluginPath, filename, pluginDir2);
 
                         QString errorMsg;
                         Plugin* plugin = doc->LoadPlugin(fullPath, errorMsg);
