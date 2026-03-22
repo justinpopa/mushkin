@@ -9,6 +9,19 @@
 #include "lua_common.h"
 #include <QMdiSubWindow>
 
+// Concatenate all Lua string args from position `start` onward (original: concatArgs)
+static QString concatLuaArgs(lua_State* L, int start)
+{
+    QString result;
+    int top = lua_gettop(L);
+    for (int i = start; i <= top; i++) {
+        if (lua_isstring(L, i)) {
+            result += QString::fromUtf8(lua_tostring(L, i));
+        }
+    }
+    return result;
+}
+
 extern "C" {
 #include <lauxlib.h>
 #include <lua.h>
@@ -27,7 +40,8 @@ extern "C" {
 int L_SendToNotepad(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    auto [title, contents] = luaArgs<QString, QString>(L);
+    QString title = luaCheckQString(L, 1);
+    QString contents = concatLuaArgs(L, 2); // original: concatArgs(L, "", 2)
     return luaReturn(L, pDoc->SendToNotepad(title, contents).has_value());
 }
 
@@ -43,7 +57,8 @@ int L_SendToNotepad(lua_State* L)
 int L_AppendToNotepad(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    auto [title, contents] = luaArgs<QString, QString>(L);
+    QString title = luaCheckQString(L, 1);
+    QString contents = concatLuaArgs(L, 2); // original: concatArgs(L, "", 2)
     return luaReturn(L, pDoc->AppendToNotepad(title, contents).has_value());
 }
 
@@ -59,7 +74,8 @@ int L_AppendToNotepad(lua_State* L)
 int L_ReplaceNotepad(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    auto [title, contents] = luaArgs<QString, QString>(L);
+    QString title = luaCheckQString(L, 1);
+    QString contents = concatLuaArgs(L, 2); // original: concatArgs(L, "", 2)
     return luaReturn(L, pDoc->ReplaceNotepad(title, contents).has_value());
 }
 
