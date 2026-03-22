@@ -622,10 +622,11 @@ void MXPEngine::MXP_mode_change(int mode)
         qCDebug(lcWorld) << "MXP mode change from" << oldMode << "to" << newMode;
     }
 
-    // TODO(mxp): Close open tags when transitioning from OPEN to SECURE/LOCKED mode.
-    // if (MXP_Open() && mode != eMXP_open && mode != eMXP_perm_open) {
-    //     MXP_CloseOpenTags();
-    // }
+    // Close open tags when transitioning from OPEN to non-OPEN mode
+    // Original: mxpMode.cpp:78-81
+    if (MXP_Open() && mode != eMXP_open && mode != eMXP_perm_open) {
+        MXP_CloseOpenTags();
+    }
 
     // Set default mode based on new mode
     switch (mode) {
