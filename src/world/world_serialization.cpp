@@ -229,7 +229,9 @@ void WorldDocument::loadTriggersFromXml(QXmlStreamReader& xml, Plugin* plugin)
                 trigger->internal_name =
                     QString("trigger_%1_%2").arg(triggerCount).arg(qHash(pattern));
             } else {
-                trigger->internal_name = trigger->label;
+                // Original lowercases internal names for case-insensitive lookup
+                // (xml_load_world.cpp:1314). Auto-generated names (*trigger...) stay as-is.
+                trigger->internal_name = trigger->label.toLower();
             }
             // Only override enabled if attribute exists; constructor defaults to true
             if (attrs.hasAttribute("enabled")) {
@@ -502,7 +504,9 @@ void WorldDocument::loadAliasesFromXml(QXmlStreamReader& xml, Plugin* plugin)
                 }
                 alias->internal_name = QString("alias_%1_%2").arg(aliasCount).arg(qHash(match));
             } else {
-                alias->internal_name = alias->label;
+                // Original lowercases internal names for case-insensitive lookup
+                // (xml_load_world.cpp:1545)
+                alias->internal_name = alias->label.toLower();
             }
 
             aliasCount++;
@@ -692,7 +696,9 @@ void WorldDocument::loadTimersFromXml(QXmlStreamReader& xml, Plugin* plugin)
                 // Use timestamp-based unique name for unlabelled timers
                 internalName = QString("*timer%1").arg(timerCount, 10, 10, QChar('0'));
             } else {
-                internalName = timer->label;
+                // Original lowercases internal names for case-insensitive lookup
+                // (xml_load_world.cpp:1785)
+                internalName = timer->label.toLower();
             }
 
             // Only override enabled if attribute exists; constructor defaults to true

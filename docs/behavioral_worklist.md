@@ -367,7 +367,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] H62: xml -- Variable duplicate handling changed from SKIP to OVERWRITE matching original. State restore fails to update existing variables. Mushkin: xml_serialization.cpp:870-880
 - [~] H63: xml -- Non-plugin include files not loaded. DEFERRED: requires recursive XML loading with mask flags, deduplication, and two-pass system. Needs dedicated implementation plan.
 - [x] H64: xml -- XML structure fixed: triggers/aliases/timers/variables/colours now siblings of <world>. Original MUSHclient cannot read Mushkin-saved files. Mushkin: xml_serialization.cpp:373-428
-- [ ] H65: xml -- Trigger/alias internal names not lowercased. Case-insensitive lookup by name (GetTriggerInfo, DeleteTrigger) may fail. Mushkin: xml_serialization.cpp:232-233,504-506
+- [x] H65: xml -- Trigger/alias/timer internal names now lowercased for case-insensitive lookup. Case-insensitive lookup by name (GetTriggerInfo, DeleteTrigger) may fail. Mushkin: xml_serialization.cpp:232-233,504-506
 
 ### MEDIUM
 - [ ] M102: xml -- Named color parsing not supported (e.g., "red", "darkgreen"). Only #RRGGBB hex works. Mushkin: xml_serialization.cpp:63-79
