@@ -314,69 +314,78 @@ qint32 MiniWindow::RectOp(qint16 action, qint32 left, qint32 top, qint32 right, 
             painter.fillRect(rect, bgrToColor(penColor));
             break;
 
-        case 5: { // 3D rectangle (DrawEdge style)
-            // penColor is actually the edge type flags, not a color
-            // Lower byte = inner edge: 0=none, 1=raised, 2=sunken
-            // Upper byte = outer edge: 0=none, 1=raised, 2=sunken
-            int innerEdge = penColor & 0xFF;
-            int outerEdge = (penColor >> 8) & 0xFF;
+        case 5: { // DrawEdge (original: miniwindow.cpp:301-321)
+            // penColor = nEdge (Win32 EDGE_* constant): must be 5, 6, 9, or 10
+            // brushColor = ugrfFlags (Win32 BF_* flags): lower byte <= 0x1F
+            constexpr int EDGE_RAISED = 5;  // BDR_RAISEDOUTER(1) | BDR_RAISEDINNER(4)
+            constexpr int EDGE_ETCHED = 6;  // BDR_SUNKENOUTER(2) | BDR_RAISEDINNER(4)
+            constexpr int EDGE_BUMP = 9;    // BDR_RAISEDOUTER(1) | BDR_SUNKENINNER(8)
+            constexpr int EDGE_SUNKEN = 10; // BDR_SUNKENOUTER(2) | BDR_SUNKENINNER(8)
 
-            // Fill the rectangle first with brushColor
-            painter.setPen(Qt::NoPen);
-            painter.fillRect(rect, bgrToColor(brushColor));
-
-            // Define colors for 3D effect (Windows standard 3D colors)
-            QColor highlight(255, 255, 255);   // White - top/left outer highlight
-            QColor lightShadow(192, 192, 192); // Light gray - top/left inner
-            QColor darkShadow(64, 64, 64);     // Dark gray - bottom/right outer shadow
-            QColor shadow(128, 128, 128);      // Medium gray - bottom/right inner
-
-            // Draw outer edge
-            if (outerEdge == 1) { // Raised outer
-                // Top and left = highlight
-                painter.setPen(highlight);
-                painter.drawLine(rect.left(), rect.top(), rect.right(), rect.top());
-                painter.drawLine(rect.left(), rect.top(), rect.left(), rect.bottom());
-                // Bottom and right = dark shadow
-                painter.setPen(darkShadow);
-                painter.drawLine(rect.left(), rect.bottom(), rect.right(), rect.bottom());
-                painter.drawLine(rect.right(), rect.top(), rect.right(), rect.bottom());
-            } else if (outerEdge == 2) { // Sunken outer
-                // Top and left = dark shadow
-                painter.setPen(darkShadow);
-                painter.drawLine(rect.left(), rect.top(), rect.right(), rect.top());
-                painter.drawLine(rect.left(), rect.top(), rect.left(), rect.bottom());
-                // Bottom and right = highlight
-                painter.setPen(highlight);
-                painter.drawLine(rect.left(), rect.bottom(), rect.right(), rect.bottom());
-                painter.drawLine(rect.right(), rect.top(), rect.right(), rect.bottom());
+            if (penColor != EDGE_RAISED && penColor != EDGE_ETCHED && penColor != EDGE_BUMP &&
+                penColor != EDGE_SUNKEN) {
+                return eBadParameter;
             }
+            if ((brushColor & 0xFF) > 0x1F) {
+                return eBadParameter;
+            }
+
+            // BF_* border flags
+            constexpr int BF_LEFT = 0x0001;
+            constexpr int BF_TOP = 0x0002;
+            constexpr int BF_RIGHT = 0x0004;
+            constexpr int BF_BOTTOM = 0x0008;
+            constexpr int BF_MIDDLE = 0x0800;
+            int flags = static_cast<int>(brushColor);
+
+            // Decompose nEdge into outer/inner edge type
+            // BDR_RAISEDOUTER=1, BDR_SUNKENOUTER=2, BDR_RAISEDINNER=4, BDR_SUNKENINNER=8
+            bool outerRaised = (penColor & 0x01) != 0;
+            bool innerRaised = (penColor & 0x04) != 0;
+
+            // Windows 3D colors
+            QColor highlight(255, 255, 255);
+            QColor lightShadow(192, 192, 192);
+            QColor darkShadow(64, 64, 64);
+            QColor shadow(128, 128, 128);
+
+            // Determine outer edge colors (top-left / bottom-right)
+            QColor outerTL = outerRaised ? highlight : darkShadow;
+            QColor outerBR = outerRaised ? darkShadow : highlight;
+            // Determine inner edge colors
+            QColor innerTL = innerRaised ? lightShadow : shadow;
+            QColor innerBR = innerRaised ? shadow : lightShadow;
+
+            // Fill middle if BF_MIDDLE set
+            if (flags & BF_MIDDLE) {
+                painter.setPen(Qt::NoPen);
+                painter.fillRect(rect, lightShadow);
+            }
+
+            // Draw outer edge (respecting BF_* side flags)
+            painter.setPen(outerTL);
+            if (flags & BF_TOP)
+                painter.drawLine(rect.left(), rect.top(), rect.right(), rect.top());
+            if (flags & BF_LEFT)
+                painter.drawLine(rect.left(), rect.top(), rect.left(), rect.bottom());
+            painter.setPen(outerBR);
+            if (flags & BF_BOTTOM)
+                painter.drawLine(rect.left(), rect.bottom(), rect.right(), rect.bottom());
+            if (flags & BF_RIGHT)
+                painter.drawLine(rect.right(), rect.top(), rect.right(), rect.bottom());
 
             // Draw inner edge (1 pixel inset)
-            QRect innerRect = rect.adjusted(1, 1, -1, -1);
-            if (innerEdge == 1) { // Raised inner
-                painter.setPen(lightShadow);
-                painter.drawLine(innerRect.left(), innerRect.top(), innerRect.right(),
-                                 innerRect.top());
-                painter.drawLine(innerRect.left(), innerRect.top(), innerRect.left(),
-                                 innerRect.bottom());
-                painter.setPen(shadow);
-                painter.drawLine(innerRect.left(), innerRect.bottom(), innerRect.right(),
-                                 innerRect.bottom());
-                painter.drawLine(innerRect.right(), innerRect.top(), innerRect.right(),
-                                 innerRect.bottom());
-            } else if (innerEdge == 2) { // Sunken inner
-                painter.setPen(shadow);
-                painter.drawLine(innerRect.left(), innerRect.top(), innerRect.right(),
-                                 innerRect.top());
-                painter.drawLine(innerRect.left(), innerRect.top(), innerRect.left(),
-                                 innerRect.bottom());
-                painter.setPen(lightShadow);
-                painter.drawLine(innerRect.left(), innerRect.bottom(), innerRect.right(),
-                                 innerRect.bottom());
-                painter.drawLine(innerRect.right(), innerRect.top(), innerRect.right(),
-                                 innerRect.bottom());
-            }
+            QRect inner = rect.adjusted(1, 1, -1, -1);
+            painter.setPen(innerTL);
+            if (flags & BF_TOP)
+                painter.drawLine(inner.left(), inner.top(), inner.right(), inner.top());
+            if (flags & BF_LEFT)
+                painter.drawLine(inner.left(), inner.top(), inner.left(), inner.bottom());
+            painter.setPen(innerBR);
+            if (flags & BF_BOTTOM)
+                painter.drawLine(inner.left(), inner.bottom(), inner.right(), inner.bottom());
+            if (flags & BF_RIGHT)
+                painter.drawLine(inner.right(), inner.top(), inner.right(), inner.bottom());
             break;
         }
 
