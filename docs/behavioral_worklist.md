@@ -358,3 +358,31 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 (error_codes MISSING items are all chat-related codes — chat system not implemented, deferred)
 (error_codes EXTRA items are intentional Mushkin additions)
 (lua_environment jit_version difference is expected — different LuaJIT builds)
+
+## v2 Audit: XML Serialization (2026-03-22)
+
+### HIGH
+- [ ] H60: xml -- Missing "enabled" attribute defaults to FALSE for triggers/aliases; original defaults TRUE. Mushkin: xml_serialization.cpp:234,509
+- [ ] H61: xml -- keep_evaluating default inverted: Mushkin defaults TRUE, original FALSE. Triggers continue evaluating instead of stopping. Mushkin: trigger.cpp:44, xml_serialization.cpp:246
+- [ ] H62: xml -- Variable duplicate handling: original OVERWRITES, Mushkin SKIPS. State restore fails to update existing variables. Mushkin: xml_serialization.cpp:870-880
+- [ ] H63: xml -- Non-plugin include files not loaded. Original has two-pass include system; Mushkin only processes plugin includes. Mushkin: xml_serialization.cpp:645-674
+- [ ] H64: xml -- XML structure: triggers/aliases/timers nested inside <world> instead of as siblings of <world>. Original MUSHclient cannot read Mushkin-saved files. Mushkin: xml_serialization.cpp:373-428
+- [ ] H65: xml -- Trigger/alias internal names not lowercased. Case-insensitive lookup by name (GetTriggerInfo, DeleteTrigger) may fail. Mushkin: xml_serialization.cpp:232-233,504-506
+
+### MEDIUM
+- [ ] M102: xml -- Named color parsing not supported (e.g., "red", "darkgreen"). Only #RRGGBB hex works. Mushkin: xml_serialization.cpp:63-79
+- [ ] M103: xml -- Pre-v3.35 backward compat attributes (speed_walk, set_variable, queue) not handled. Mushkin: xml_serialization.cpp (absent)
+- [ ] M104: xml -- Version attribute is "mushkin_version" not "muclient_version". Breaks version tracking/GetInfo. Mushkin: xml_serialization.cpp:266
+- [ ] M105: xml -- Trigger/alias/timer validation missing on load (empty match, label names, regex). Mushkin: xml_serialization.cpp:196-420
+- [ ] M106: xml -- IsArchiveXML missing 9 signature patterns (<macros>, <variables>, etc.). Mushkin: xml_serialization.cpp:151-152
+- [ ] M107: xml -- date_saved never written to world file. Mushkin: xml_serialization.cpp:261-267
+- [ ] M108: xml -- m_bLoaded never set to true after loading. Mushkin: world_document.cpp:286
+- [ ] M109: xml -- PluginListChanged called per-plugin instead of batch after all plugins loaded. Mushkin: world_document_plugins.cpp:568
+- [ ] M110: xml -- Load order depends on file element order rather than explicit sequence. Mushkin: xml_serialization.cpp
+
+### LOW
+- [ ] L67: xml -- Timer seconds saved with 4 decimal places instead of 2. Mushkin: xml_serialization.cpp:625
+- [ ] L68: xml -- Boolean/number attributes always written vs only-when-non-default. Mushkin: xml_serialization.cpp:97-181
+- [ ] L69: xml -- XML encoding is UTF-8 instead of iso-8859-1. Mushkin: xml_serialization.cpp:253
+- [ ] L70: xml -- Base64 clipboard XML detection missing. Mushkin: (absent)
+- [ ] L71: xml -- IsArchiveXML uses case-insensitive contains() instead of case-sensitive prefix match. Mushkin: xml_serialization.cpp:154-159
