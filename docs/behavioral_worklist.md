@@ -390,7 +390,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 ## v2 Audit: Logging (2026-03-22)
 
 ### HIGH
-- [ ] H66: logging -- eSendToLogFile (send-to 6) missing newline and raw-mode guard. Mushkin: src/world/world_sendto.cpp:140-144
+- [x] H66: logging -- eSendToLogFile now adds newline and checks !log_raw. Mushkin: src/world/world_sendto.cpp:140-144
 - [ ] H67: logging -- Retrospective logging filter too strict; only checks LOG_LINE, misses NOTE_OR_COMMAND flagged lines. Mushkin: src/world/world_logging.cpp:743
 - [ ] H68: logging -- Trigger omit_from_log ignores multi-line check; original only omits for single-line triggers. Mushkin: src/world/world_trigger_execution.cpp:214
 

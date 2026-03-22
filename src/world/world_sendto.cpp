@@ -138,9 +138,12 @@ void WorldDocument::sendTo(SendTo iWhere, const QString& strSendText, bool omit_
         // ========== eSendToLogFile: Write to log file ==========
         // Original: doc.cpp
         case eSendToLogFile:
-            // Write text to log file (if logging is enabled)
-            // WriteToLog checks m_logfile internally and handles all formatting
-            WriteToLog(strSendText);
+            // Write text + newline to log file, but not in raw log mode
+            // (original: doc.cpp:6300-6307)
+            if (m_logfile && !m_logging.log_raw) {
+                WriteToLog(strSendText);
+                WriteToLog(QStringLiteral("\n"));
+            }
             break;
 
         // ========== eSendToVariable: Set a variable ==========
