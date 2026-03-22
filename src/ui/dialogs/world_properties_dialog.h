@@ -139,6 +139,13 @@ class WorldPropertiesDialog : public QDialog {
     QLineEdit* m_scriptFileEdit;
     QPushButton* m_scriptFileBrowse;
     QComboBox* m_scriptLanguageCombo;
+    QLineEdit* m_onWorldOpenEdit;
+    QLineEdit* m_onWorldCloseEdit;
+    QLineEdit* m_onWorldConnectEdit;
+    QLineEdit* m_onWorldDisconnectEdit;
+    QLineEdit* m_onWorldGetFocusEdit;
+    QLineEdit* m_onWorldLoseFocusEdit;
+    QLineEdit* m_onWorldSaveEdit;
 
     // Paste to World tab widgets
     QLineEdit* m_pastePreambleEdit;

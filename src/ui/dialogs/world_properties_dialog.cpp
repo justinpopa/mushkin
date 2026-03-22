@@ -308,7 +308,36 @@ void WorldPropertiesDialog::setupScriptingTab()
     m_scriptLanguageCombo->addItems({"Lua", "YueScript", "MoonScript", "Teal", "Fennel"});
     layout->addRow("Language:", m_scriptLanguageCombo);
 
-    // Add some spacing
+    // Event handler entry points
+    layout->addRow("", new QLabel("Event Handlers:"));
+    m_onWorldOpenEdit = new QLineEdit();
+    m_onWorldOpenEdit->setPlaceholderText("e.g., OnWorldOpen");
+    layout->addRow("On world open:", m_onWorldOpenEdit);
+
+    m_onWorldCloseEdit = new QLineEdit();
+    m_onWorldCloseEdit->setPlaceholderText("e.g., OnWorldClose");
+    layout->addRow("On world close:", m_onWorldCloseEdit);
+
+    m_onWorldConnectEdit = new QLineEdit();
+    m_onWorldConnectEdit->setPlaceholderText("e.g., OnWorldConnect");
+    layout->addRow("On connect:", m_onWorldConnectEdit);
+
+    m_onWorldDisconnectEdit = new QLineEdit();
+    m_onWorldDisconnectEdit->setPlaceholderText("e.g., OnWorldDisconnect");
+    layout->addRow("On disconnect:", m_onWorldDisconnectEdit);
+
+    m_onWorldGetFocusEdit = new QLineEdit();
+    m_onWorldGetFocusEdit->setPlaceholderText("e.g., OnWorldGetFocus");
+    layout->addRow("On get focus:", m_onWorldGetFocusEdit);
+
+    m_onWorldLoseFocusEdit = new QLineEdit();
+    m_onWorldLoseFocusEdit->setPlaceholderText("e.g., OnWorldLoseFocus");
+    layout->addRow("On lose focus:", m_onWorldLoseFocusEdit);
+
+    m_onWorldSaveEdit = new QLineEdit();
+    m_onWorldSaveEdit->setPlaceholderText("e.g., OnWorldSave");
+    layout->addRow("On save:", m_onWorldSaveEdit);
+
     layout->addRow("", new QWidget()); // Spacer
 
     m_tabWidget->addTab(tab, "Scripting");
@@ -593,7 +622,13 @@ void WorldPropertiesDialog::loadSettings()
     // Scripting tab
     m_enableScriptCheck->setChecked(m_doc->m_scripting.enabled);
     m_scriptFileEdit->setText(m_doc->m_scripting.filename);
-    // Not applicable: Script language is always Lua — no multi-language support needed.
+    m_onWorldOpenEdit->setText(m_doc->m_scripting.on_world_open);
+    m_onWorldCloseEdit->setText(m_doc->m_scripting.on_world_close);
+    m_onWorldConnectEdit->setText(m_doc->m_scripting.on_world_connect);
+    m_onWorldDisconnectEdit->setText(m_doc->m_scripting.on_world_disconnect);
+    m_onWorldGetFocusEdit->setText(m_doc->m_scripting.on_world_get_focus);
+    m_onWorldLoseFocusEdit->setText(m_doc->m_scripting.on_world_lose_focus);
+    m_onWorldSaveEdit->setText(m_doc->m_scripting.on_world_save);
 
     // Paste to World tab
     m_pastePreambleEdit->setText(m_doc->m_paste.paste_preamble);
@@ -689,6 +724,13 @@ void WorldPropertiesDialog::saveSettings()
     // Scripting tab
     m_doc->m_scripting.enabled = m_enableScriptCheck->isChecked();
     m_doc->m_scripting.filename = m_scriptFileEdit->text();
+    m_doc->m_scripting.on_world_open = m_onWorldOpenEdit->text();
+    m_doc->m_scripting.on_world_close = m_onWorldCloseEdit->text();
+    m_doc->m_scripting.on_world_connect = m_onWorldConnectEdit->text();
+    m_doc->m_scripting.on_world_disconnect = m_onWorldDisconnectEdit->text();
+    m_doc->m_scripting.on_world_get_focus = m_onWorldGetFocusEdit->text();
+    m_doc->m_scripting.on_world_lose_focus = m_onWorldLoseFocusEdit->text();
+    m_doc->m_scripting.on_world_save = m_onWorldSaveEdit->text();
     // Not applicable: Script language is always Lua — no multi-language support needed.
 
     // Paste to World tab
