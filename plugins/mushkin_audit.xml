@@ -4,7 +4,7 @@
 <plugin
    name="Mushkin_Audit"
    author="Mushkin Project"
-   id="mu5hk1na0d10010001a0d101"
+   id="a0d1700100e5e5e500a0d101"
    language="Lua"
    purpose="Behavioral baseline capture for Mushkin vs MUSHclient comparison"
    save_state="n"
