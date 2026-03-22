@@ -231,7 +231,10 @@ void WorldDocument::loadTriggersFromXml(QXmlStreamReader& xml, Plugin* plugin)
             } else {
                 trigger->internal_name = trigger->label;
             }
-            trigger->enabled = attrs.value("enabled").toString() == "y";
+            // Only override enabled if attribute exists; constructor defaults to true
+            if (attrs.hasAttribute("enabled")) {
+                trigger->enabled = attrs.value("enabled").toString() == "y";
+            }
             trigger->trigger = attrs.value("match").toString();
             trigger->send_to = static_cast<SendTo>(attrs.value("send_to").toInt());
             trigger->sequence = attrs.value("sequence").toInt();
@@ -506,7 +509,10 @@ void WorldDocument::loadAliasesFromXml(QXmlStreamReader& xml, Plugin* plugin)
             }
 
             aliasCount++;
-            alias->enabled = attrs.value("enabled").toString() == "y";
+            // Only override enabled if attribute exists; constructor defaults to true
+            if (attrs.hasAttribute("enabled")) {
+                alias->enabled = attrs.value("enabled").toString() == "y";
+            }
             alias->name = attrs.value("match").toString();
             alias->send_to = static_cast<SendTo>(attrs.value("send_to").toInt());
             alias->sequence = attrs.value("sequence").toInt();
@@ -695,7 +701,10 @@ void WorldDocument::loadTimersFromXml(QXmlStreamReader& xml, Plugin* plugin)
                 internalName = timer->label;
             }
 
-            timer->enabled = attrs.value("enabled").toString() == "y";
+            // Only override enabled if attribute exists; constructor defaults to true
+            if (attrs.hasAttribute("enabled")) {
+                timer->enabled = attrs.value("enabled").toString() == "y";
+            }
             timer->send_to = static_cast<SendTo>(attrs.value("send_to").toInt());
             timer->procedure = attrs.value("script").toString();
             timer->group = attrs.value("group").toString();

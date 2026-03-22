@@ -362,7 +362,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 ## v2 Audit: XML Serialization (2026-03-22)
 
 ### HIGH
-- [ ] H60: xml -- Missing "enabled" attribute defaults to FALSE for triggers/aliases; original defaults TRUE. Mushkin: xml_serialization.cpp:234,509
+- [x] H60: xml -- Missing "enabled" attribute now preserves constructor default (TRUE) for triggers/aliases/timers. Mushkin: xml_serialization.cpp:234,509
 - [ ] H61: xml -- keep_evaluating default inverted: Mushkin defaults TRUE, original FALSE. Triggers continue evaluating instead of stopping. Mushkin: trigger.cpp:44, xml_serialization.cpp:246
 - [ ] H62: xml -- Variable duplicate handling: original OVERWRITES, Mushkin SKIPS. State restore fails to update existing variables. Mushkin: xml_serialization.cpp:870-880
 - [ ] H63: xml -- Non-plugin include files not loaded. Original has two-pass include system; Mushkin only processes plugin includes. Mushkin: xml_serialization.cpp:645-674
