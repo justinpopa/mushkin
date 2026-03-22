@@ -425,9 +425,9 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_bPluginProcessesSetEntity = false;
     m_bPluginProcessesError = false;
 
-    m_bRecallCommands = false;
-    m_bRecallOutput = false;
-    m_bRecallNotes = false;
+    m_bRecallCommands = true; // original: doc_construct.cpp:345
+    m_bRecallOutput = true;   // original: doc_construct.cpp:346
+    m_bRecallNotes = true;    // original: doc_construct.cpp:347
 
     // ========== Document ID ==========
     m_iUniqueDocumentNumber = 0;
