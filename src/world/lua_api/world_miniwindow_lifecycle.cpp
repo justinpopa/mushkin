@@ -454,8 +454,8 @@ int L_WindowInfo(lua_State* L)
             lua_pushnumber(L, win->lastMousePosition.y());
             break;
 
-        case 16: // Last mouse update count - TODO: implement update tracking
-            lua_pushnil(L);
+        case 16: // Last mouse update count (original: m_last_mouse_update)
+            lua_pushnumber(L, win->mouseUpdateCount);
             break;
 
         case 17: // Client mouse X position (output-window-relative)

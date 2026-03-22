@@ -119,7 +119,9 @@ class MiniWindow : public QObject {
 
     QPoint lastMousePosition; // Last mouse position in miniwindow coordinates (WindowInfo 14/15)
     QPoint
-        clientMousePosition;  // Last mouse position in output window coordinates (WindowInfo 17/18)
+        clientMousePosition; // Last mouse position in output window coordinates (WindowInfo 17/18)
+    qint32 mouseUpdateCount =
+        0; // Incremented each mouse update (WindowInfo 16, original: m_last_mouse_update)
     QString mouseOverHotspot; // Hotspot ID currently under mouse (empty if none)
     QString mouseDownHotspot; // Hotspot ID where mouse was pressed (empty if none)
 
@@ -667,6 +669,7 @@ class MiniWindow : public QObject {
     void setLastMousePosition(const QPoint& pos)
     {
         lastMousePosition = pos;
+        mouseUpdateCount++; // original: m_last_mouse_update
     }
 
     QPoint getClientMousePosition() const
