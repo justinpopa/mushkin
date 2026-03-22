@@ -3,6 +3,7 @@
  * Functions
  */
 
+#include "../../automation/sendto.h"
 #include "../accelerator_manager.h"
 #include "../lua_dialog_callbacks.h"
 #include "../view_interfaces.h"
@@ -53,6 +54,11 @@ int L_AcceleratorTo(lua_State* L)
     QString script = luaCheckQString(L, 2);
     int send_to = luaL_checkinteger(L, 3);
 
+    // Validate send_to range (original: 0 <= send_to < eSendToLast)
+    if (send_to < 0 || send_to >= eSendToLast) {
+        return luaReturnError(L, eOptionOutOfRange);
+    }
+
     // Get current plugin ID if running from a plugin
     QString pluginId;
     if (pDoc->m_CurrentPlugin) {
@@ -70,7 +76,7 @@ int L_AcceleratorTo(lua_State* L)
  * world.Accelerator(key_string, send_string)
  *
  * Registers a keyboard accelerator that executes a command.
- * Convenience wrapper for AcceleratorTo with sendto.execute (12).
+ * Convenience wrapper for AcceleratorTo with sendto.execute (10).
  * The command is executed as if typed by the user.
  *
  * @param key_string (string) Key combination (e.g., "Ctrl+A", "F1", "PageUp")
