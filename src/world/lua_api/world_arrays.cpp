@@ -458,16 +458,17 @@ static int L_ArrayExport(lua_State* L)
     QString arrayName = luaCheckQString(L, 1);
     QString delimiter = luaCheckQString(L, 2);
 
-    // Validate delimiter
-    if (delimiter.length() != 1 || delimiter == "\\") {
-        lua_pushnumber(L, eBadDelimiter);
-        return 1;
-    }
-
+    // Original checks array first, then delimiter (methods_arrays.cpp:394-416)
     const ArraysMap& arrays = pDoc->getArrayMap();
 
     if (!arrays.contains(arrayName)) {
         lua_pushnumber(L, eArrayDoesNotExist);
+        return 1;
+    }
+
+    // Validate delimiter
+    if (delimiter.length() != 1 || delimiter == "\\") {
+        lua_pushnumber(L, eBadDelimiter);
         return 1;
     }
 
@@ -515,16 +516,17 @@ static int L_ArrayExportKeys(lua_State* L)
     QString arrayName = luaCheckQString(L, 1);
     QString delimiter = luaCheckQString(L, 2);
 
-    // Validate delimiter
-    if (delimiter.length() != 1 || delimiter == "\\") {
-        lua_pushnumber(L, eBadDelimiter);
-        return 1;
-    }
-
+    // Original checks array first, then delimiter
     const ArraysMap& arrays = pDoc->getArrayMap();
 
     if (!arrays.contains(arrayName)) {
         lua_pushnumber(L, eArrayDoesNotExist);
+        return 1;
+    }
+
+    // Validate delimiter
+    if (delimiter.length() != 1 || delimiter == "\\") {
+        lua_pushnumber(L, eBadDelimiter);
         return 1;
     }
 
