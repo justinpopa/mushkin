@@ -626,8 +626,13 @@ int L_DatabaseError(lua_State* L)
     QString qName = luaCheckQString(L, 1);
 
     auto it = pDoc->m_DatabaseMap.find(qName);
-    if (it == pDoc->m_DatabaseMap.end() || it->second->db == nullptr) {
-        lua_pushstring(L, "");
+    if (it == pDoc->m_DatabaseMap.end()) {
+        // Original returns translated string for "database id not found"
+        lua_pushstring(L, "database id not found");
+        return 1;
+    }
+    if (it->second->db == nullptr) {
+        lua_pushstring(L, "database not open");
         return 1;
     }
 
