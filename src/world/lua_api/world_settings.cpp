@@ -1469,9 +1469,9 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 297: // High-resolution timer frequency
-            // Original: App.m_iCounterFrequency (QueryPerformanceFrequency).
-            // Qt uses millisecond timers, so frequency is 1000.0.
-            lua_pushnumber(L, 1000.0);
+            // Original: App.m_iCounterFrequency (QueryPerformanceFrequency, ~10MHz).
+            // QElapsedTimer counts in nanoseconds, so frequency is 1e9.
+            lua_pushnumber(L, 1e9);
             break;
 
         case 298: // SQLite3 version number
