@@ -444,3 +444,34 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [ ] L81: speedwalks -- GetSpeedWalkDelay returns lua_Integer instead of short. Mushkin: src/world/lua_api/world_logging_opts.cpp:297-301
 - [ ] L82: speedwalks -- Speed walk prefix empty guard prevents all commands being parsed as speedwalks. Mushkin: src/world/world_document.cpp:1379-1380
 - [ ] L83: speedwalks -- RemoveBacktracks cannot cancel custom parenthesized directions. Mushkin: src/world/speedwalk_engine.cpp:409-439
+
+## v2 Audit: Miniwindows (2026-03-22)
+
+### HIGH
+- [ ] H74: miniwindows -- WindowInfo case 6 returns !show instead of temporarilyHide (inverted semantics). Mushkin: world_miniwindow_lifecycle.cpp:418
+- [ ] H75: miniwindows -- WindowResize does not preserve existing content (creates fresh image). Mushkin: miniwindow.cpp:168-192
+- [ ] H76: miniwindows -- WindowText return value not clipped to rectangle width. Mushkin: miniwindow.cpp:1103
+- [ ] H77: miniwindows -- WindowFont does not support deletion when name="" and size=0. Mushkin: miniwindow.cpp:1043-1058
+- [ ] H78: miniwindows -- CircleOp chord/pie (actions 4,5) use angle-based params instead of GDI point-based params. Mushkin: miniwindow.cpp:517-525
+- [ ] H79: miniwindows -- CircleOp accepts action 6 (arc) which is not valid in original. Mushkin: miniwindow.cpp:608-611
+- [ ] H80: miniwindows -- BlendImage source-rect clamping order wrong for out-of-bounds rects. Mushkin: miniwindow.cpp:1377-1396
+
+### MEDIUM
+- [ ] M125: miniwindows -- WindowInfo cases 12/13 (rect.right/bottom) off by one due to Qt inclusive QRect. Mushkin: world_miniwindow_lifecycle.cpp:442-447
+- [ ] M126: miniwindows -- RectOp action 2 (fill) uses brushColor/penColor fallback instead of always Colour1. Mushkin: miniwindow.cpp:291-296
+- [ ] M127: miniwindows -- RectOp action 3 (InvertRect) XORs with penColor instead of white. Mushkin: miniwindow.cpp:299-302
+- [ ] M128: miniwindows -- Pen style validation missing. Mushkin: miniwindow.cpp:629-646
+- [ ] M129: miniwindows -- WindowFont weight returns Qt QFont::Weight scale instead of Windows FW_ values. Mushkin: miniwindow.cpp:1157
+- [ ] M130: miniwindows -- Gradient bounds check rejects valid coordinates that original would clip. Mushkin: miniwindow.cpp:973-974
+- [ ] M131: miniwindows -- Filter MonoNoise (op 2) applies independent noise per channel instead of same noise. Mushkin: miniwindow.cpp:2631-2647
+- [ ] M132: miniwindows -- Filter blur (ops 3,25,26) ignores Options parameter for h/v direction. Mushkin: miniwindow.cpp:2649-2680
+- [ ] M133: miniwindows -- Filter sharpen/edge/emboss use single-pass instead of separable convolution. Mushkin: miniwindow.cpp:2682-2772
+- [ ] M134: miniwindows -- DeleteAllHotspots/DeleteHotspot don't clear callbackPlugin. Mushkin: world_miniwindow_images.cpp:906-948
+- [ ] M135: miniwindows -- WindowInfo case 21 returns current time instead of installation time. Mushkin: world_miniwindow_lifecycle.cpp:488-493
+
+### LOW
+- [ ] L84: miniwindows -- SetPixel returns eBadParameter for out-of-bounds instead of silently succeeding. Mushkin: miniwindow.cpp:790-792
+- [ ] L85: miniwindows -- GetPixel returns 0 for out-of-bounds instead of -1 (CLR_INVALID). Mushkin: miniwindow.cpp:813-814
+- [ ] L86: miniwindows -- WindowFont size=0 creates 1px font instead of defaulting to 10pt. Mushkin: miniwindow.cpp:1047
+- [ ] L87: miniwindows -- LoadImage accepts all Qt formats instead of only .bmp/.png. Mushkin: miniwindow.cpp:1217-1234
+- [ ] L88: miniwindows -- Arc atan2 conversion may draw wrong arc segment for some point configs. Mushkin: miniwindow.cpp:662-704
