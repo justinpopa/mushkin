@@ -1048,8 +1048,13 @@ int L_DatabaseList(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    lua_newtable(L);
+    // Original returns nil (VT_EMPTY via SAFEARRAY) when no databases are open
+    if (pDoc->m_DatabaseMap.empty()) {
+        lua_pushnil(L);
+        return 1;
+    }
 
+    lua_newtable(L);
     int index = 1;
     for (const auto& pair : pDoc->m_DatabaseMap) {
         luaPushQString(L, pair.first);
