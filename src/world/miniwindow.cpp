@@ -1,6 +1,7 @@
 #include "miniwindow.h"
 #include "../utils/font_utils.h"
 #include "../world/world_document.h"
+#include "blend_modes.h"
 #include "color_utils.h"
 #include <QColor>
 #include <QDebug>
@@ -1315,23 +1316,25 @@ qint32 MiniWindow::DrawImage(const QString& imageId, qint32 left, qint32 top, qi
 }
 
 /**
- * @brief BlendImage - Draw image with opacity and blend modes
+ * @brief BlendImage - Draw image with opacity and one of 65 blend modes
  *
  * Image Operations
- * Draws an image with alpha blending and various composition modes
- * for advanced visual effects.
+ * Ported from MUSHclient CMiniWindow::BlendImage.
+ * Modes 1-35:  per-channel mathematical blend functions (see blend_modes.h)
+ * Modes 36-59: channel-routing / channel-selection operations
+ * Modes 60-64: HSL (hue/saturation/luminance) component swaps
  *
- * @param imageId Image identifier
- * @param left Destination left coordinate
- * @param top Destination top coordinate
- * @param right Destination right coordinate
- * @param bottom Destination bottom coordinate
- * @param mode Blend mode (1=normal, 2=multiply, 3=screen, 4=overlay)
- * @param opacity Opacity (0.0 = transparent, 1.0 = opaque)
- * @param srcLeft Source left (0 = use full image)
- * @param srcTop Source top
- * @param srcRight Source right
- * @param srcBottom Source bottom
+ * @param imageId  Image identifier (blend/upper layer)
+ * @param left     Destination left
+ * @param top      Destination top
+ * @param right    Destination right  (<=0 → width+right)
+ * @param bottom   Destination bottom (<=0 → height+bottom)
+ * @param mode     Blend mode 1–64
+ * @param opacity  Opacity [0.0, 1.0]
+ * @param srcLeft  Source image left   (all zero → use full image)
+ * @param srcTop   Source image top
+ * @param srcRight Source image right  (<=0 → srcImg.width()+srcRight)
+ * @param srcBottom Source image bottom (<=0 → srcImg.height()+srcBottom)
  * @return eOK on success, error code on failure
  */
 qint32 MiniWindow::BlendImage(const QString& imageId, qint32 left, qint32 top, qint32 right,
@@ -1341,50 +1344,436 @@ qint32 MiniWindow::BlendImage(const QString& imageId, qint32 left, qint32 top, q
     if (!image)
         return eBadParameter;
 
-    // Get raw pointer from unique_ptr in map
+    if (mode < 1 || mode > 64)
+        return eUnknownOption;
+
     auto it = images.find(imageId);
     if (it == images.end() || !it->second)
         return eImageNotInstalled;
-    QImage* img = it->second.get();
 
-    // Handle special meaning for right/bottom
-    qint32 fixedRight = (right <= 0) ? width + right : right;
-    qint32 fixedBottom = (bottom <= 0) ? height + bottom : bottom;
+    // Clamp opacity
+    if (opacity < 0.0)
+        opacity = 0.0;
+    if (opacity > 1.0)
+        opacity = 1.0;
 
-    QPainter painter(image.get());
-    painter.setRenderHint(QPainter::SmoothPixmapTransform);
-    painter.setOpacity(opacity);
+    // ── Resolve destination rect ──────────────────────────────────────────
+    qint32 destLeft = left;
+    qint32 destTop = top;
+    qint32 destRight = (right <= 0) ? width + right : right;
+    qint32 destBottom = (bottom <= 0) ? height + bottom : bottom;
 
-    // Map blend mode to Qt composition mode
-    QPainter::CompositionMode compMode;
-    switch (mode) {
-        case 1: // Normal (SourceOver)
-            compMode = QPainter::CompositionMode_SourceOver;
-            break;
-        case 2: // Multiply
-            compMode = QPainter::CompositionMode_Multiply;
-            break;
-        case 3: // Screen
-            compMode = QPainter::CompositionMode_Screen;
-            break;
-        case 4: // Overlay
-            compMode = QPainter::CompositionMode_Overlay;
-            break;
-        default:
-            compMode = QPainter::CompositionMode_SourceOver;
-            break;
+    // Clamp to miniwindow bounds
+    destLeft = std::max(destLeft, 0);
+    destTop = std::max(destTop, 0);
+    destRight = std::min(destRight, width);
+    destBottom = std::min(destBottom, height);
+
+    // ── Resolve source rect ───────────────────────────────────────────────
+    // Work on an ARGB32 copy of the source so we can use QRgb scanlines.
+    QImage srcImg = it->second->convertToFormat(QImage::Format_ARGB32);
+
+    // Clamp src bounds to actual image dimensions first
+    if (srcLeft < 0)
+        srcLeft = 0;
+    if (srcTop < 0)
+        srcTop = 0;
+    if (srcRight > srcImg.width())
+        srcRight = srcImg.width();
+    if (srcBottom > srcImg.height())
+        srcBottom = srcImg.height();
+
+    // Apply FixRight/FixBottom: <=0 means offset from the right/bottom edge
+    if (srcRight <= 0)
+        srcRight = srcImg.width() + srcRight;
+    if (srcBottom <= 0)
+        srcBottom = srcImg.height() + srcBottom;
+
+    // If all four source args were zero, use the full source image
+    if (srcLeft == 0 && srcTop == 0 && srcRight == 0 && srcBottom == 0) {
+        srcRight = srcImg.width();
+        srcBottom = srcImg.height();
     }
-    painter.setCompositionMode(compMode);
 
-    QRect destRect(left, top, fixedRight - left, fixedBottom - top);
-    QRect srcRect(srcLeft, srcTop, srcRight - srcLeft, srcBottom - srcTop);
+    // Effective pixel region is the minimum of dest and src sizes
+    qint32 blendW = std::min(destRight - destLeft, srcRight - srcLeft);
+    qint32 blendH = std::min(destBottom - destTop, srcBottom - srcTop);
 
-    // If source rect is empty, use full image
-    if (srcRect.isEmpty() || srcRect.width() == 0 || srcRect.height() == 0) {
-        srcRect = QRect(0, 0, img->width(), img->height());
+    if (blendW <= 0 || blendH <= 0)
+        return eOK;
+
+    // Ensure destination is ARGB32 for direct pixel access
+    if (image->format() != QImage::Format_ARGB32 &&
+        image->format() != QImage::Format_ARGB32_Premultiplied) {
+        *image = image->convertToFormat(QImage::Format_ARGB32);
     }
 
-    painter.drawImage(destRect, *img, srcRect);
+    // ── Precompute cosine table (mode 3 / Interpolate) ────────────────────
+    static uint8_t cos_table[256];
+    static bool cos_table_ready = false;
+    if (!cos_table_ready) {
+        constexpr double pi_div255 = 3.1415926535898 / 255.0;
+        for (int i = 0; i < 256; ++i) {
+            double a = 64.0 - std::cos(static_cast<double>(i) * pi_div255) * 64.0;
+            cos_table[i] = static_cast<uint8_t>(a + 0.5);
+        }
+        cos_table_ready = true;
+    }
+
+    // ── Per-pixel blend ───────────────────────────────────────────────────
+    for (int row = 0; row < blendH; ++row) {
+        const int srcY = srcTop + row;
+        const int destY = destTop + row;
+
+        const auto* srcLine = reinterpret_cast<const QRgb*>(srcImg.constScanLine(srcY));
+        auto* dstLine = reinterpret_cast<QRgb*>(image->scanLine(destY));
+
+        for (int col = 0; col < blendW; ++col) {
+            const int srcX = srcLeft + col;
+            const int destX = destLeft + col;
+
+            const QRgb pixA = srcLine[srcX];  // A = blend layer
+            const QRgb pixB = dstLine[destX]; // B = base layer
+
+            const auto rA = static_cast<uint8_t>(qRed(pixA));
+            const auto gA = static_cast<uint8_t>(qGreen(pixA));
+            const auto bA = static_cast<uint8_t>(qBlue(pixA));
+
+            const auto rB = static_cast<uint8_t>(qRed(pixB));
+            const auto gB = static_cast<uint8_t>(qGreen(pixB));
+            const auto bB = static_cast<uint8_t>(qBlue(pixB));
+
+            uint8_t rOut{}, gOut{}, bOut{};
+
+            // Helper lambdas that apply opacity after blending
+            auto ch = [&](uint8_t blended, uint8_t base) -> uint8_t {
+                return (opacity >= 1.0) ? blended : Simple_Opacity(base, blended, opacity);
+            };
+            // Colour_Op equivalent: compute final (fR,fG,fB) then apply opacity
+            auto colourOp = [&](uint8_t fR, uint8_t fG, uint8_t fB) {
+                rOut = (opacity >= 1.0) ? fR : Simple_Opacity(rB, fR, opacity);
+                gOut = (opacity >= 1.0) ? fG : Simple_Opacity(gB, fG, opacity);
+                bOut = (opacity >= 1.0) ? fB : Simple_Opacity(bB, fB, opacity);
+            };
+
+            switch (mode) {
+                // ── Modes 1–35: per-channel mathematical blends ──────────
+                case 1:
+                    rOut = ch(Blend_Normal(rA, rB), rB);
+                    gOut = ch(Blend_Normal(gA, gB), gB);
+                    bOut = ch(Blend_Normal(bA, bB), bB);
+                    break;
+                case 2:
+                    rOut = ch(Blend_Average(rA, rB), rB);
+                    gOut = ch(Blend_Average(gA, gB), gB);
+                    bOut = ch(Blend_Average(bA, bB), bB);
+                    break;
+                case 3: // Interpolate — cosine table
+                    rOut = ch(Blend_Interpolate(cos_table[rA], cos_table[rB]), rB);
+                    gOut = ch(Blend_Interpolate(cos_table[gA], cos_table[gB]), gB);
+                    bOut = ch(Blend_Interpolate(cos_table[bA], cos_table[bB]), bB);
+                    break;
+                case 4: { // Dissolve — random per-pixel selection
+                    double rnd = QRandomGenerator::global()->generateDouble();
+                    bool useA = (rnd < opacity);
+                    rOut = useA ? rA : rB;
+                    gOut = useA ? gA : gB;
+                    bOut = useA ? bA : bB;
+                    break;
+                }
+                case 5:
+                    rOut = ch(Blend_Darken(rA, rB), rB);
+                    gOut = ch(Blend_Darken(gA, gB), gB);
+                    bOut = ch(Blend_Darken(bA, bB), bB);
+                    break;
+                case 6:
+                    rOut = ch(Blend_Multiply(rA, rB), rB);
+                    gOut = ch(Blend_Multiply(gA, gB), gB);
+                    bOut = ch(Blend_Multiply(bA, bB), bB);
+                    break;
+                case 7:
+                    rOut = ch(Blend_ColorBurn(rA, rB), rB);
+                    gOut = ch(Blend_ColorBurn(gA, gB), gB);
+                    bOut = ch(Blend_ColorBurn(bA, bB), bB);
+                    break;
+                case 8:
+                    rOut = ch(Blend_LinearBurn(rA, rB), rB);
+                    gOut = ch(Blend_LinearBurn(gA, gB), gB);
+                    bOut = ch(Blend_LinearBurn(bA, bB), bB);
+                    break;
+                case 9:
+                    rOut = ch(Blend_InverseColorBurn(rA, rB), rB);
+                    gOut = ch(Blend_InverseColorBurn(gA, gB), gB);
+                    bOut = ch(Blend_InverseColorBurn(bA, bB), bB);
+                    break;
+                case 10:
+                    rOut = ch(Blend_Subtract(rA, rB), rB);
+                    gOut = ch(Blend_Subtract(gA, gB), gB);
+                    bOut = ch(Blend_Subtract(bA, bB), bB);
+                    break;
+                case 11:
+                    rOut = ch(Blend_Lighten(rA, rB), rB);
+                    gOut = ch(Blend_Lighten(gA, gB), gB);
+                    bOut = ch(Blend_Lighten(bA, bB), bB);
+                    break;
+                case 12:
+                    rOut = ch(Blend_Screen(rA, rB), rB);
+                    gOut = ch(Blend_Screen(gA, gB), gB);
+                    bOut = ch(Blend_Screen(bA, bB), bB);
+                    break;
+                case 13:
+                    rOut = ch(Blend_ColorDodge(rA, rB), rB);
+                    gOut = ch(Blend_ColorDodge(gA, gB), gB);
+                    bOut = ch(Blend_ColorDodge(bA, bB), bB);
+                    break;
+                case 14:
+                    rOut = ch(Blend_LinearDodge(rA, rB), rB);
+                    gOut = ch(Blend_LinearDodge(gA, gB), gB);
+                    bOut = ch(Blend_LinearDodge(bA, bB), bB);
+                    break;
+                case 15:
+                    rOut = ch(Blend_InverseColorDodge(rA, rB), rB);
+                    gOut = ch(Blend_InverseColorDodge(gA, gB), gB);
+                    bOut = ch(Blend_InverseColorDodge(bA, bB), bB);
+                    break;
+                case 16:
+                    rOut = ch(Blend_Add(rA, rB), rB);
+                    gOut = ch(Blend_Add(gA, gB), gB);
+                    bOut = ch(Blend_Add(bA, bB), bB);
+                    break;
+                case 17:
+                    rOut = ch(Blend_Overlay(rA, rB), rB);
+                    gOut = ch(Blend_Overlay(gA, gB), gB);
+                    bOut = ch(Blend_Overlay(bA, bB), bB);
+                    break;
+                case 18:
+                    rOut = ch(Blend_SoftLight(rA, rB), rB);
+                    gOut = ch(Blend_SoftLight(gA, gB), gB);
+                    bOut = ch(Blend_SoftLight(bA, bB), bB);
+                    break;
+                case 19:
+                    rOut = ch(Blend_HardLight(rA, rB), rB);
+                    gOut = ch(Blend_HardLight(gA, gB), gB);
+                    bOut = ch(Blend_HardLight(bA, bB), bB);
+                    break;
+                case 20:
+                    rOut = ch(Blend_VividLight(rA, rB), rB);
+                    gOut = ch(Blend_VividLight(gA, gB), gB);
+                    bOut = ch(Blend_VividLight(bA, bB), bB);
+                    break;
+                case 21:
+                    rOut = ch(Blend_LinearLight(rA, rB), rB);
+                    gOut = ch(Blend_LinearLight(gA, gB), gB);
+                    bOut = ch(Blend_LinearLight(bA, bB), bB);
+                    break;
+                case 22:
+                    rOut = ch(Blend_PinLight(rA, rB), rB);
+                    gOut = ch(Blend_PinLight(gA, gB), gB);
+                    bOut = ch(Blend_PinLight(bA, bB), bB);
+                    break;
+                case 23:
+                    rOut = ch(Blend_HardMix(rA, rB), rB);
+                    gOut = ch(Blend_HardMix(gA, gB), gB);
+                    bOut = ch(Blend_HardMix(bA, bB), bB);
+                    break;
+                case 24:
+                    rOut = ch(Blend_Difference(rA, rB), rB);
+                    gOut = ch(Blend_Difference(gA, gB), gB);
+                    bOut = ch(Blend_Difference(bA, bB), bB);
+                    break;
+                case 25:
+                    rOut = ch(Blend_Exclusion(rA, rB), rB);
+                    gOut = ch(Blend_Exclusion(gA, gB), gB);
+                    bOut = ch(Blend_Exclusion(bA, bB), bB);
+                    break;
+                case 26:
+                    rOut = ch(Blend_Reflect(rA, rB), rB);
+                    gOut = ch(Blend_Reflect(gA, gB), gB);
+                    bOut = ch(Blend_Reflect(bA, bB), bB);
+                    break;
+                case 27:
+                    rOut = ch(Blend_Glow(rA, rB), rB);
+                    gOut = ch(Blend_Glow(gA, gB), gB);
+                    bOut = ch(Blend_Glow(bA, bB), bB);
+                    break;
+                case 28:
+                    rOut = ch(Blend_Freeze(rA, rB), rB);
+                    gOut = ch(Blend_Freeze(gA, gB), gB);
+                    bOut = ch(Blend_Freeze(bA, bB), bB);
+                    break;
+                case 29:
+                    rOut = ch(Blend_Heat(rA, rB), rB);
+                    gOut = ch(Blend_Heat(gA, gB), gB);
+                    bOut = ch(Blend_Heat(bA, bB), bB);
+                    break;
+                case 30:
+                    rOut = ch(Blend_Negation(rA, rB), rB);
+                    gOut = ch(Blend_Negation(gA, gB), gB);
+                    bOut = ch(Blend_Negation(bA, bB), bB);
+                    break;
+                case 31:
+                    rOut = ch(Blend_Phoenix(rA, rB), rB);
+                    gOut = ch(Blend_Phoenix(gA, gB), gB);
+                    bOut = ch(Blend_Phoenix(bA, bB), bB);
+                    break;
+                case 32:
+                    rOut = ch(Blend_Stamp(rA, rB), rB);
+                    gOut = ch(Blend_Stamp(gA, gB), gB);
+                    bOut = ch(Blend_Stamp(bA, bB), bB);
+                    break;
+                case 33:
+                    rOut = ch(Blend_Xor(rA, rB), rB);
+                    gOut = ch(Blend_Xor(gA, gB), gB);
+                    bOut = ch(Blend_Xor(bA, bB), bB);
+                    break;
+                case 34:
+                    rOut = ch(Blend_And(rA, rB), rB);
+                    gOut = ch(Blend_And(gA, gB), gB);
+                    bOut = ch(Blend_And(bA, bB), bB);
+                    break;
+                case 35:
+                    rOut = ch(Blend_Or(rA, rB), rB);
+                    gOut = ch(Blend_Or(gA, gB), gB);
+                    bOut = ch(Blend_Or(bA, bB), bB);
+                    break;
+
+                // ── Modes 36–59: channel-routing operations ──────────────
+                // Take one channel from A (blend), retain others from B (base)
+                case 36:
+                    colourOp(rA, gB, bB);
+                    break; // red from A
+                case 37:
+                    colourOp(rB, gA, bB);
+                    break; // green from A
+                case 38:
+                    colourOp(rB, gB, bA);
+                    break; // blue from A
+                // Take two channels from A, retain one from B
+                case 39:
+                    colourOp(rA, gA, bB);
+                    break; // yellow (R+G from A)
+                case 40:
+                    colourOp(rB, gA, bA);
+                    break; // cyan   (G+B from A)
+                case 41:
+                    colourOp(rA, gB, bA);
+                    break; // magenta (R+B from A)
+                // Limit green
+                case 42:
+                    colourOp(rA, (gA > rA) ? rA : gA, bA);
+                    break; // green limited by red
+                case 43:
+                    colourOp(rA, (gA > bA) ? bA : gA, bA);
+                    break; // green limited by blue
+                case 44:
+                    colourOp(rA, (gA > ((rA + bA) / 2)) ? ((rA + bA) / 2) : gA, bA);
+                    break;
+                // Limit blue
+                case 45:
+                    colourOp(rA, gA, (bA > rA) ? rA : bA);
+                    break; // blue limited by red
+                case 46:
+                    colourOp(rA, gA, (bA > gA) ? gA : bA);
+                    break; // blue limited by green
+                case 47:
+                    colourOp(rA, gA, (bA > ((rA + gA) / 2)) ? ((rA + gA) / 2) : bA);
+                    break;
+                // Limit red
+                case 48:
+                    colourOp((rA > gA) ? gA : rA, gA, bA);
+                    break; // red limited by green
+                case 49:
+                    colourOp((rA > bA) ? bA : rA, gA, bA);
+                    break; // red limited by blue
+                case 50:
+                    colourOp((rA > ((gA + bA) / 2)) ? ((gA + bA) / 2) : rA, gA, bA);
+                    break;
+                // Single channel selection
+                case 51:
+                    colourOp(rA, 0, 0);
+                    break; // red only   → looks red
+                case 52:
+                    colourOp(0, gA, 0);
+                    break; // green only → looks green
+                case 53:
+                    colourOp(0, 0, bA);
+                    break; // blue only  → looks blue
+                // Discard one channel
+                case 54:
+                    colourOp(0, gA, bA);
+                    break; // discard red   → looks cyan
+                case 55:
+                    colourOp(rA, 0, bA);
+                    break; // discard green → looks magenta
+                case 56:
+                    colourOp(rA, gA, 0);
+                    break; // discard blue  → looks yellow
+                // One channel expanded to all
+                case 57:
+                    colourOp(rA, rA, rA);
+                    break; // all red   → grey
+                case 58:
+                    colourOp(gA, gA, gA);
+                    break; // all green → grey
+                case 59:
+                    colourOp(bA, bA, bA);
+                    break; // all blue  → grey
+
+                // ── Modes 60–64: HSL component swaps ─────────────────────
+                case 60: { // Hue from A, saturation+lightness from B
+                    QColor cA(rA, gA, bA);
+                    QColor cB(rB, gB, bB);
+                    cB.setHsl(cA.hslHue() < 0 ? 0 : cA.hslHue(), cB.hslSaturation(),
+                              cB.lightness());
+                    colourOp(static_cast<uint8_t>(cB.red()), static_cast<uint8_t>(cB.green()),
+                             static_cast<uint8_t>(cB.blue()));
+                    break;
+                }
+                case 61: { // Saturation from A, hue+lightness from B
+                    QColor cA(rA, gA, bA);
+                    QColor cB(rB, gB, bB);
+                    cB.setHsl(cB.hslHue() < 0 ? 0 : cB.hslHue(), cA.hslSaturation(),
+                              cB.lightness());
+                    colourOp(static_cast<uint8_t>(cB.red()), static_cast<uint8_t>(cB.green()),
+                             static_cast<uint8_t>(cB.blue()));
+                    break;
+                }
+                case 62: { // Hue+Saturation from A, lightness from B
+                    QColor cA(rA, gA, bA);
+                    QColor cB(rB, gB, bB);
+                    cB.setHsl(cA.hslHue() < 0 ? 0 : cA.hslHue(), cA.hslSaturation(),
+                              cB.lightness());
+                    colourOp(static_cast<uint8_t>(cB.red()), static_cast<uint8_t>(cB.green()),
+                             static_cast<uint8_t>(cB.blue()));
+                    break;
+                }
+                case 63: { // Luminance (lightness) from A, hue+saturation from B
+                    QColor cA(rA, gA, bA);
+                    QColor cB(rB, gB, bB);
+                    cB.setHsl(cB.hslHue() < 0 ? 0 : cB.hslHue(), cB.hslSaturation(),
+                              cA.lightness());
+                    colourOp(static_cast<uint8_t>(cB.red()), static_cast<uint8_t>(cB.green()),
+                             static_cast<uint8_t>(cB.blue()));
+                    break;
+                }
+                case 64: { // Visualise HSL: hue→R, saturation→G, lightness→B
+                    QColor cA(rA, gA, bA);
+                    // Hue is in [0,360) (or -1 for achromatic); scale to [0,255]
+                    int hue = cA.hslHue();
+                    auto hueOut = static_cast<uint8_t>((hue < 0 ? 0 : hue) * 255 / 359);
+                    auto satOut = static_cast<uint8_t>(cA.hslSaturation()); // already [0,255]
+                    auto lightOut = static_cast<uint8_t>(cA.lightness());   // already [0,255]
+                    colourOp(hueOut, satOut, lightOut);
+                    break;
+                }
+
+                default:
+                    return eUnknownOption;
+            }
+
+            dstLine[destX] = qRgb(rOut, gOut, bOut);
+        }
+    }
 
     dirty = true;
     emit needsRedraw();
