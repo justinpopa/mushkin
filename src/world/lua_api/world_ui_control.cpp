@@ -155,12 +155,18 @@ int L_AcceleratorList(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
+    // Original only returns script/plugin-registered accelerators (m_AcceleratorToCommandMap),
+    // not user-defined ones from macros/keypad. Filter to Script and Plugin sources.
     QVector<AcceleratorEntry> accelerators = pDoc->m_acceleratorManager->acceleratorList();
 
     lua_newtable(L);
     int index = 1;
 
     for (const AcceleratorEntry& entry : accelerators) {
+        // Skip user-defined (macros/keypad) — original doesn't include them
+        if (entry.source == AcceleratorSource::User) {
+            continue;
+        }
         QString str = entry.keyString + " = " + entry.action;
 
         // Add sendto suffix if not eSendToExecute (10)
