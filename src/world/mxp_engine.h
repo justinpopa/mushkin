@@ -95,10 +95,10 @@ class MXPEngine {
     // ========== Argument Parsing ==========
     void ParseMXPTag(const QString& tagString, QString& tagName,
                      MXPArgumentList& args); // Parse tag string into name + args
-    QString GetMXPArgument(MXPArgumentList& args,
-                           const QString& name); // Get arg value by name (marks as used)
-    QString MXP_GetArgument(const QString& name,
-                            MXPArgumentList& args); // Convenience wrapper (swapped params)
+    QString GetMXPArgument(MXPArgumentList& args, const QString& name,
+                           int position = 0); // Get arg by name or position (marks as used)
+    QString MXP_GetArgument(const QString& name, MXPArgumentList& args,
+                            int position = 0); // Convenience wrapper (swapped params)
     bool MXP_HasArgument(const QString& name,
                          MXPArgumentList& args); // Check if argument exists (marks as used)
 

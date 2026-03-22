@@ -1005,14 +1005,31 @@ void MXPEngine::ParseMXPTag(const QString& tagString, QString& tagName, MXPArgum
  * @param name Argument name (case-insensitive)
  * @return Argument value, or empty string if not found
  */
-QString MXPEngine::GetMXPArgument(MXPArgumentList& args, const QString& name)
+QString MXPEngine::GetMXPArgument(MXPArgumentList& args, const QString& name, int position)
 {
+    MXPArgument* positionalMatch = nullptr;
+
     for (const auto& arg : args) {
-        if (arg->strName.compare(name, Qt::CaseInsensitive) == 0) {
+        if (arg->bKeyword) {
+            continue; // keywords are not arguments (original: mxputils.cpp:210-211)
+        }
+        // Name match takes priority
+        if (!name.isEmpty() && arg->strName.compare(name, Qt::CaseInsensitive) == 0) {
             arg->bUsed = true;
             return arg->strValue;
         }
+        // Remember positional match as fallback (original: mxputils.cpp:221-222)
+        if (position > 0 && arg->iPosition == position) {
+            positionalMatch = arg.get();
+        }
     }
+
+    // Fall back to positional match if no name match found
+    if (positionalMatch) {
+        positionalMatch->bUsed = true;
+        return positionalMatch->strValue;
+    }
+
     return QString();
 }
 
@@ -1021,9 +1038,9 @@ QString MXPEngine::GetMXPArgument(MXPArgumentList& args, const QString& name)
  *
  * Swaps the parameter order to make it more natural to call: MXP_GetArgument("href", args)
  */
-QString MXPEngine::MXP_GetArgument(const QString& name, MXPArgumentList& args)
+QString MXPEngine::MXP_GetArgument(const QString& name, MXPArgumentList& args, int position)
 {
-    return GetMXPArgument(args, name);
+    return GetMXPArgument(args, name, position);
 }
 
 /**
