@@ -352,7 +352,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 
 ### MEDIUM (2)
 - [~] M100: getinfo -- GetInfo(53) "Ready" was runtime state from a plugin, not a code bug. Default is correctly empty.. Mushkin: src/world/lua_api/world_settings.cpp
-- [ ] M101: lua_environment -- package.loaders count is 5 (expected 4). The backslash normalizer adds an extra searcher. Verify this doesn't break plugins that check loader count.
+- [~] M101: lua_environment -- package.loaders count 5 is by design (backslash normalizer searcher). No plugins check loader count.. The backslash normalizer adds an extra searcher. Verify this doesn't break plugins that check loader count.
 
 ### LOW (0)
 (error_codes MISSING items are all chat-related codes — chat system not implemented, deferred)
