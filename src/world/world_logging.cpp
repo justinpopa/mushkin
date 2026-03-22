@@ -739,8 +739,10 @@ void WorldDocument::writeRetrospectiveLog()
             continue;
         }
 
-        // Only write lines that have been marked for logging
-        if (!(line->flags & LOG_LINE)) {
+        // Only write lines flagged for logging: LOG_LINE (MUD output) or
+        // NOTE_OR_COMMAND (user input/notes added to buffer)
+        // Original: doc.cpp:2943 checks both flags
+        if (!(line->flags & LOG_LINE) && !(line->flags & NOTE_OR_COMMAND)) {
             continue;
         }
 
