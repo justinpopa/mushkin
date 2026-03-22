@@ -2139,11 +2139,35 @@ void WorldDocument::StartNewLine(bool bNewLine, unsigned char iFlags)
     QRgb initialFore = m_iForeColour;
     QRgb initialBack = m_iBackColour;
 
-    // Special handling for user input and comments (like original)
-    if (iFlags & USER_INPUT) {
-        // TODO(feature): Apply m_output.echo_colour setting to echoed command text.
+    // Apply echo/note colors to new line's initial style (original: doc.cpp:1673-1710)
+    if ((iFlags & USER_INPUT) && m_output.echo_colour != 65535) {
+        // User input with custom echo color: COLOUR_CUSTOM index
+        initialFlags = COLOUR_CUSTOM;
+        initialFore = m_output.echo_colour;
+        initialBack = BLACK;
     } else if (iFlags & COMMENT) {
-        // TODO(feature): Apply m_colors.note_text_colour setting to Note() output text.
+        if (m_bNotesInRGB) {
+            // Note in RGB mode: direct RGB colors
+            initialFlags = COLOUR_RGB | m_iNoteStyle;
+            initialFore = m_iNoteColourFore;
+            initialBack = m_iNoteColourBack;
+        } else if (m_colors.note_text_colour == 65535) {
+            // SAMECOLOUR: use custom_text[15] or default ANSI white/black
+            if (m_bCustom16isDefaultColour) {
+                initialFlags = COLOUR_CUSTOM | m_iNoteStyle;
+                initialFore = 15; // custom text index 15
+                initialBack = 0;  // custom back index 0
+            } else {
+                initialFlags = COLOUR_ANSI | m_iNoteStyle;
+                initialFore = ANSI_WHITE;
+                initialBack = ANSI_BLACK;
+            }
+        } else {
+            // Custom note text colour: COLOUR_CUSTOM index
+            initialFlags = COLOUR_CUSTOM | m_iNoteStyle;
+            initialFore = m_colors.note_text_colour;
+            initialBack = BLACK;
+        }
     }
 
     // Create new Line object
