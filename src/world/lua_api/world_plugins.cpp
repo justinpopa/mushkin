@@ -563,7 +563,8 @@ int L_GetPluginInfo(lua_State* L)
             break;
 
         case 24: // Script time taken (in seconds)
-            lua_pushnumber(L, plugin->m_iScriptTimeTaken / 1000.0);
+            // m_iScriptTimeTaken is in nanoseconds (from QElapsedTimer::nsecsElapsed)
+            lua_pushnumber(L, plugin->m_iScriptTimeTaken / 1e9);
             break;
 
         case 25: // Sequence

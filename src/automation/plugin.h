@@ -90,7 +90,7 @@ class Plugin : public QObject {
     bool m_bSaveState;         // Save variables to .state file?
     qint16 m_iSequence;        // Evaluation order (negative = before world, positive = after)
     qint32 m_iLoadOrder;       // Order plugins were loaded (for dependencies)
-    qint64 m_iScriptTimeTaken; // Time spent executing plugin scripts (µs)
+    qint64 m_iScriptTimeTaken; // Time spent executing plugin scripts (nanoseconds)
 
     // ========== Plugin Collections (Isolated from world) ==========
 
