@@ -209,9 +209,9 @@ void WorldDocument::executeTrigger(Trigger* trigger, Line* line, const QString& 
         m_bLineOmittedFromOutput = true;
     }
 
-    // Omit from log
-    // Mark line to not be logged if trigger has omit_from_log set
-    if (trigger->omit_from_log) {
+    // Omit from log — only for single-line triggers
+    // (original: ProcessPreviousLine.cpp:1320-1321 checks !bMultiLine)
+    if (trigger->omit_from_log && !trigger->multi_line) {
         m_bOmitCurrentLineFromLog = true;
         qCDebug(lcWorld) << "Trigger omit from log: set m_bOmitCurrentLineFromLog flag";
     }
