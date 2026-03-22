@@ -363,10 +363,26 @@ void WorldDocument::loadTriggersFromXml(QXmlStreamReader& xml, Plugin* plugin)
 
                 QString triggerName = trigger->internal_name;
 
-                // Skip duplicates - don't overwrite existing triggers
+                // Skip name-based duplicates
                 if (plugin->m_TriggerMap.find(triggerName) != plugin->m_TriggerMap.end()) {
                     qCDebug(lcWorld) << "Skipping duplicate trigger:" << triggerName;
                     continue;
+                }
+                // Skip structural duplicates for unnamed triggers (original:
+                // xml_load_world.cpp:1372-1389)
+                if (trigger->label.isEmpty()) {
+                    bool isDuplicate = false;
+                    for (const auto& [name, existing] : plugin->m_TriggerMap) {
+                        if (*existing == *trigger) {
+                            isDuplicate = true;
+                            break;
+                        }
+                    }
+                    if (isDuplicate) {
+                        qCDebug(lcWorld)
+                            << "Skipping duplicate unnamed trigger:" << trigger->trigger;
+                        continue;
+                    }
                 }
 
                 trigger->owningPlugin = plugin;
@@ -377,7 +393,23 @@ void WorldDocument::loadTriggersFromXml(QXmlStreamReader& xml, Plugin* plugin)
                 qCDebug(lcWorld) << "Added trigger to plugin:" << rawPtr->internal_name
                                  << "sequence:" << rawPtr->sequence;
             } else {
-                // Add to world's collections (existing behavior)
+                // Duplicate detection for unnamed triggers (original: xml_load_world.cpp:1372-1389)
+                // Check if an unnamed trigger with identical content already exists
+                if (trigger->label.isEmpty()) {
+                    bool isDuplicate = false;
+                    for (const auto& [name, existing] : m_automationRegistry->m_TriggerMap) {
+                        if (*existing == *trigger) {
+                            isDuplicate = true;
+                            break;
+                        }
+                    }
+                    if (isDuplicate) {
+                        qCDebug(lcWorld)
+                            << "Skipping duplicate unnamed trigger:" << trigger->trigger;
+                        continue;
+                    }
+                }
+                // Add to world's collections
                 QString triggerName = trigger->internal_name;
                 (void)addTrigger(triggerName,
                                  std::move(trigger)); // intentional: deserialization load
