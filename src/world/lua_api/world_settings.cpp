@@ -1580,12 +1580,11 @@ int L_SetOption(lua_State* L)
 
     const tConfigurationNumericOption& opt = OptionsTable[optionIndex];
 
-    // Clamp value to min/max if specified
+    // Reject out-of-range values (original returns eOptionOutOfRange, not clamp)
     if (opt.iMinimum != 0 || opt.iMaximum != 0) {
-        if (value < opt.iMinimum)
-            value = opt.iMinimum;
-        if (value > opt.iMaximum)
-            value = opt.iMaximum;
+        if (value < opt.iMinimum || value > opt.iMaximum) {
+            return luaReturnError(L, eOptionOutOfRange);
+        }
     }
 
     opt.setter(*pDoc, value);
