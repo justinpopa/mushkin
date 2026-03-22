@@ -824,6 +824,13 @@ int L_WindowAddHotspot(lua_State* L)
         return luaReturnError(L, eNoSuchWindow);
     }
 
+    // Plugin enforcement: can't switch callback plugins (original: miniwindow.cpp:1731-1732)
+    QString pluginId = pDoc->m_CurrentPlugin ? pDoc->m_CurrentPlugin->m_strID : QString();
+    if (!win->callbackPlugin.isEmpty() && win->callbackPlugin != pluginId) {
+        return luaReturnError(L, eHotspotPluginChanged);
+    }
+    win->callbackPlugin = pluginId;
+
     // Create or replace hotspot
     auto hotspot = std::make_unique<Hotspot>();
 
@@ -1029,6 +1036,12 @@ int L_WindowDragHandler(lua_State* L)
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         return luaReturnError(L, eNoSuchWindow);
+    }
+
+    // Plugin enforcement (original: miniwindow.cpp:3780-3781)
+    QString dragPluginId = pDoc->m_CurrentPlugin ? pDoc->m_CurrentPlugin->m_strID : QString();
+    if (!win->callbackPlugin.isEmpty() && win->callbackPlugin != dragPluginId) {
+        return luaReturnError(L, eHotspotPluginChanged);
     }
 
     // Get raw pointer from unique_ptr in map
@@ -1456,6 +1469,12 @@ int L_WindowScrollwheelHandler(lua_State* L)
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         return luaReturnError(L, eNoSuchWindow);
+    }
+
+    // Plugin enforcement (original: miniwindow.cpp:4091-4092)
+    QString swPluginId = pDoc->m_CurrentPlugin ? pDoc->m_CurrentPlugin->m_strID : QString();
+    if (!win->callbackPlugin.isEmpty() && win->callbackPlugin != swPluginId) {
+        return luaReturnError(L, eHotspotPluginChanged);
     }
 
     // Get raw pointer from unique_ptr in map
