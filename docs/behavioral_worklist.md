@@ -667,3 +667,26 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [ ] L110: scripting -- Error display color is darkorange instead of orangered. Mushkin: script_engine.cpp:1176
 - [ ] L111: scripting -- executeLua uses qCDebug instead of m_doc->Trace() for trace output. Mushkin: script_engine_callbacks.cpp:241
 - [ ] L112: scripting -- error_code table has extra constants not in original (30055, 30075-30077). Mushkin: script_engine.cpp:922,942-944
+
+## v2 Audit: World File Edge Cases (2026-03-22)
+
+### HIGH
+- [ ] H119: world-edge -- OnWorldOpen script callback is never invoked. Mushkin: src/ui/views/world_widget.cpp:304-346
+- [ ] H120: world-edge -- Global plugins never loaded at world open time. Mushkin: no equivalent code
+- [ ] H121: world-edge -- Non-plugin include files silently ignored. Mushkin: src/world/xml_serialization.cpp:645-673
+- [ ] H122: world-edge -- Plugin SaveState() not called when world file is saved (only at destructor). Mushkin: src/world/xml_serialization.cpp:233-235
+
+### MEDIUM
+- [ ] M190: world-edge -- PluginListChanged called per-plugin instead of once after all loaded. Mushkin: src/world/world_document_plugins.cpp:568
+- [ ] M191: world-edge -- No welcome message displayed on world open. Mushkin: src/ui/views/world_widget.cpp:342
+- [ ] M192: world-edge -- m_bStartPaused never applied to output view. Mushkin: src/world/world_document.cpp:168
+- [ ] M193: world-edge -- Duplicate world ID not detected when opening same file twice. Mushkin: no equivalent
+- [ ] M194: world-edge -- m_bSaveWorldAutomatically not honored on close. Mushkin: src/ui/main_window.cpp:2227-2252
+- [ ] M195: world-edge -- Variables-only-changed save prompt missing on close. Mushkin: src/ui/main_window.cpp:2227-2252
+- [ ] M196: world-edge -- Password prompt dialog not triggered on connect. Mushkin: src/world/connection_manager.cpp:146-165
+
+### LOW
+- [ ] L113: world-edge -- No unused attribute/element warnings during XML load. Mushkin: src/world/xml_serialization.cpp
+- [ ] L114: world-edge -- Tab-to-space conversion not performed during XML parsing. Mushkin: handled by QXmlStreamReader
+- [ ] L115: world-edge -- m_bLoaded flag never set to true after loading. Mushkin: src/world/world_document.cpp:286
+- [ ] L116: world-edge -- XML file size limit (100MB) not enforced. Mushkin: src/world/xml_serialization.cpp:477-488
