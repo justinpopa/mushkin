@@ -558,3 +558,20 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [ ] L95: options -- Default font names "Courier New" instead of "FixedSys". Mushkin: config_options.cpp:333,361
 - [ ] L96: options -- GetInfo(55) returns SetTitle value instead of document title. Mushkin: world_settings.cpp:612
 - [ ] L97: options -- Extra numeric/alpha options in Mushkin (proxy, remote, log_lines). Mushkin: config_options.cpp
+
+## v2 Audit: Accelerators (2026-03-22)
+
+### HIGH
+- [ ] H97: accelerators -- Dispatch uses sendTo==12 (eSendToScript) instead of sendTo==10 (eSendToExecute). Mushkin: src/ui/views/world_widget.cpp:162
+- [ ] H98: accelerators -- Dispatch does not suppress auto-say during execution. Mushkin: src/ui/views/world_widget.cpp:158-170
+- [ ] H99: accelerators -- Dispatch does not set m_iCurrentActionSource to eUserAccelerator. Mushkin: src/world/world_document.h:168-178
+- [ ] H100: accelerators -- Dispatch does not set/restore plugin context for plugin-registered accelerators. Mushkin: src/ui/views/world_widget.cpp:158-170
+
+### MEDIUM
+- [ ] M156: accelerators -- AcceleratorList key name format differs (Qt vs MUSHclient names). Mushkin: src/world/accelerator_manager.cpp:268-272
+- [ ] M157: accelerators -- No maximum accelerator count limit (original caps at 1000). Mushkin: src/world/accelerator_manager.cpp:274-317
+- [ ] M158: accelerators -- Dispatch passes omit_from_output=false and omit_from_log=false (should be true). Mushkin: src/ui/views/world_widget.cpp:167
+- [ ] M159: accelerators -- Dispatch omits "Accelerator: <key>" description string. Mushkin: src/ui/views/world_widget.cpp:167
+
+### LOW
+- [ ] L98: accelerators -- Extra key name aliases accepted (e.g., "Escape" in addition to "Esc"). Mushkin: src/world/accelerator_manager.cpp:62-63
