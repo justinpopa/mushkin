@@ -2206,6 +2206,9 @@ void WorldDocument::StartNewLine(bool bNewLine, unsigned char iFlags)
                 m_recentLines.pop_front();
             }
 
+            // Reset omit flag before trigger evaluation (original: ProcessPreviousLine.cpp:322)
+            m_bLineOmittedFromOutput = false;
+
             evaluateTriggers(m_currentLine.get());
             // Replay any notes/tells that plugins queued during trigger callbacks.
             OutputOutstandingLines();
@@ -2238,8 +2241,15 @@ void WorldDocument::StartNewLine(bool bNewLine, unsigned char iFlags)
             }
         }
 
-        // Add completed line to buffer (ownership transferred via move)
-        AddLineToBuffer(std::move(m_currentLine));
+        // If trigger set omit_from_output, discard the line (original:
+        // ProcessPreviousLine.cpp:605-697) Note: original deletes from line list; we skip adding
+        // entirely
+        if (m_bLineOmittedFromOutput) {
+            m_currentLine.reset(); // discard line, don't add to buffer
+        } else {
+            // Add completed line to buffer (ownership transferred via move)
+            AddLineToBuffer(std::move(m_currentLine));
+        }
     }
 
     // Create new line

@@ -203,11 +203,10 @@ void WorldDocument::executeTrigger(Trigger* trigger, Line* line, const QString& 
     // Change line colors
     changeLineColors(trigger, line);
 
-    // Omit from output
-    if (trigger->omit_from_output) {
-        // TODO(feature): Set omit flag on Line object for omit-from-output triggers.
-        // line->flags |= OMITTED;
-        qCDebug(lcWorld) << "Trigger omit from output (not yet implemented)";
+    // Omit from output (original: ProcessPreviousLine.cpp:1323-1324)
+    // Sets flag checked by StartNewLine to skip adding line to output buffer
+    if (trigger->omit_from_output && !trigger->multi_line) {
+        m_bLineOmittedFromOutput = true;
     }
 
     // Omit from log
