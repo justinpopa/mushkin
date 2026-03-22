@@ -1897,17 +1897,42 @@ void WorldDocument::handleLineWrap()
 
     qint32 lineLen = m_currentLine->len();
 
-    // Determine break point
+    // Determine break point by scanning line for split candidates
+    // (original: doc.cpp:1520-1546 — scans for Big5, GB2312, and spaces)
+    // Scan only up to wrap_column since Mushkin adds text in bulk (original adds per-char)
     int breakPoint = -1;
+    int wrapCol = static_cast<int>(m_display.wrap_column);
 
-    // If word-wrap is enabled and we have a valid space position
-    if (m_display.wrap && m_lastSpace >= 0) {
-        // Check that the text after the space isn't too long
-        // (if remaining text is >= wrap column, we'd have to break again immediately)
-        qint32 remainingLen = lineLen - m_lastSpace;
-        if (remainingLen < static_cast<qint32>(m_display.wrap_column)) {
-            breakPoint = m_lastSpace;
+    if (lineLen >= wrapCol && lineLen >= 2) {
+        auto text = m_currentLine->text();
+        int scanLimit = qMin(static_cast<int>(text.size()) - 1, wrapCol);
+        for (int i = 0; i < scanLimit; i++) {
+            auto c1 = static_cast<unsigned char>(text[i]);
+            auto c2 = static_cast<unsigned char>(text[i + 1]);
+            // Big5 double-byte detection (not for UTF-8)
+            if (c1 >= 0x81 && c1 <= 0xFE &&
+                ((c2 >= 0x40 && c2 <= 0x7E) || (c2 >= 0xA1 && c2 <= 0xFE)) && !m_display.utf8) {
+                breakPoint = i++;
+            }
+            // GB2312 double-byte detection (not for UTF-8)
+            else if (c1 >= 0xA1 && c1 <= 0xF7 && c2 >= 0xA1 && c2 <= 0xFE && !m_display.utf8) {
+                breakPoint = i++;
+            }
+            // Space break point (only with word-wrap enabled)
+            else if (c1 == ' ' && m_display.wrap) {
+                breakPoint = i;
+            }
         }
+        // Allow space at the wrap column boundary (original: doc.cpp:1543-1544)
+        if (wrapCol > 0 && wrapCol <= lineLen &&
+            static_cast<unsigned char>(text[wrapCol - 1]) == ' ' && m_display.wrap) {
+            breakPoint = wrapCol - 1;
+        }
+    }
+
+    // If no break found, or remaining text too long, will hard-break below
+    if (breakPoint >= 0 && (lineLen - breakPoint) >= wrapCol) {
+        breakPoint = -1;
     }
 
     if (breakPoint >= 0) {
