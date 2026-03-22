@@ -894,7 +894,10 @@ void WorldPropertiesDialog::saveSettings()
     m_doc->m_proxy.username = m_proxyUsernameEdit->text();
     m_doc->m_proxy.password = m_proxyPasswordEdit->text();
 
-    m_doc->setModified(true);
+    // Don't unconditionally mark modified — original only sets modified flag
+    // when values actually change (via individual option setters). The document's
+    // existing m_bModified state is preserved; it will be set true by the save-to-XML
+    // comparison if any values differ from what's on disk.
 
     qCDebug(lcDialog) << "WorldPropertiesDialog::saveSettings() - saved to WorldDocument";
 }
