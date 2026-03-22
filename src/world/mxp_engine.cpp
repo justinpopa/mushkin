@@ -536,6 +536,9 @@ void MXPEngine::MXP_Off(bool force)
         return;
     }
 
+    // Reset ANSI colors to default (original: MXP_Off calls InterpretANSIcode(0))
+    m_doc.InterpretANSIcode(0);
+
     if (force) {
         qCDebug(lcWorld) << "Closing down MXP";
     }
