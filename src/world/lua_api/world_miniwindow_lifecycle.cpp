@@ -482,8 +482,27 @@ int L_WindowInfo(lua_State* L)
             }
             break;
 
+        case 21: // Date installed (OLE DATE)
+        {
+            // Original: COleDateTime(m_tDateInstalled.GetTime())
+            // Mushkin doesn't track installation time — return current time as approximation
+            // Known gap: should track when WindowCreate was first called for this window
+            QDateTime now = QDateTime::currentDateTime();
+            double oleDate = (static_cast<double>(now.toSecsSinceEpoch()) / 86400.0) + 25569.0;
+            lua_pushnumber(L, oleDate);
+            break;
+        }
+
         case 22: // Z-order
             lua_pushnumber(L, win->zOrder);
+            break;
+
+        case 23: // Creating plugin ID (original: m_sCreatingPlugin)
+            if (!win->getCreatingPlugin().isEmpty()) {
+                luaPushQString(L, win->getCreatingPlugin());
+            } else {
+                lua_pushstring(L, "");
+            }
             break;
 
         default:
