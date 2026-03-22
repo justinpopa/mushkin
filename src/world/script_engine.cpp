@@ -258,9 +258,13 @@ void ScriptEngine::openLua()
     // Bundled modules (inside app bundle) take priority over user files
     // to avoid conflicts with incompatible versions (e.g., lua-openssl vs LuaSec).
     QString exeDir2 = AppPaths::getExecutableDirectory();
+    QString appDir = AppPaths::getAppDirectory();
     QStringList luaPaths = {
         exeDir2 + "/../Resources/lua/?.lua",
         exeDir2 + "/../Resources/lua/?/init.lua",
+        appDir + "/?.lua",
+        appDir + "/lua/?.lua",
+        appDir + "/lua/?/init.lua",
         "./?.lua",
         "./lua/?.lua",
         "./lua/?/init.lua",
