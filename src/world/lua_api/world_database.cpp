@@ -726,7 +726,9 @@ static void pushDatabaseColumnValue(lua_State* L, sqlite3_stmt* pStmt, int colum
     int type = sqlite3_column_type(pStmt, column);
     switch (type) {
         case SQLITE_INTEGER:
-            lua_pushnumber(L, static_cast<lua_Number>(sqlite3_column_int64(pStmt, column)));
+            // Original uses lua_pushinteger (via SetUpVariantLong) with sqlite3_column_int
+            // (32-bit). We use int64 for better precision but push as integer to match Lua type.
+            lua_pushinteger(L, static_cast<lua_Integer>(sqlite3_column_int64(pStmt, column)));
             break;
         case SQLITE_FLOAT:
             lua_pushnumber(L, sqlite3_column_double(pStmt, column));
