@@ -1131,6 +1131,14 @@ void TelnetParser::Handle_TELOPT_MSP()
             loops = param.mid(2).toInt();
         } else if (param.startsWith("U=", Qt::CaseInsensitive)) {
             url = param.mid(2);
+        } else if (param.startsWith("T=", Qt::CaseInsensitive)) {
+            // T= sound type/category (MSP spec). Parsed but not used —
+            // Mushkin doesn't categorize sounds. Logged for debugging.
+            qCDebug(lcWorld) << "MSP T=" << param.mid(2);
+        } else if (param.startsWith("P=", Qt::CaseInsensitive)) {
+            // P= priority (MSP spec). Parsed but not used —
+            // Mushkin doesn't implement sound priority. Logged for debugging.
+            qCDebug(lcWorld) << "MSP P=" << param.mid(2);
         }
     }
 
