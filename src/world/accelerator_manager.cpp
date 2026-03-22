@@ -523,7 +523,9 @@ void AcceleratorManager::activateShortcut(AcceleratorEntry& entry)
     }
 
     entry.shortcut = new QShortcut(entry.keySeq, m_parentWidget);
-    entry.shortcut->setContext(Qt::WidgetWithChildrenShortcut);
+    // Original uses Win32 accelerator table (window-scope). Qt::WindowShortcut
+    // fires when the parent window is active, matching the global scope.
+    entry.shortcut->setContext(Qt::WindowShortcut);
 
     // Store the key string in the shortcut for retrieval in slot
     entry.shortcut->setProperty("keyString", entry.keyString.toUpper().simplified());
