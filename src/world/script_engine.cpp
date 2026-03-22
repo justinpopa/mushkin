@@ -1,5 +1,6 @@
 #include "script_engine.h"
 #include "../automation/plugin.h"
+#include "../storage/global_options.h"
 #include "../utils/app_paths.h"
 #include "../world/world_document.h"
 #include <QCoreApplication>
@@ -958,7 +959,24 @@ return re
         lua_pop(L, 1);
     }
 
-    // 11. Clear stack to ensure clean state
+    // 11. Execute global sandbox/init script (original: lua_scripting.cpp:222-226)
+    // This runs the user's Lua initialization script from global preferences
+    // (accessible via "Edit > Global Preferences > Lua" in the original)
+    {
+        GlobalOptions& opts = GlobalOptions::instance();
+        QString luaScript = opts.luaScript();
+        if (!luaScript.isEmpty()) {
+            m_doc->m_iCurrentActionSource = ActionSource::eLuaSandbox;
+            QByteArray scriptUtf8 = luaScript.toUtf8();
+            if (luaL_dostring(L, scriptUtf8.constData()) != 0) {
+                qWarning() << "Sandbox script error:" << lua_tostring(L, -1);
+                lua_pop(L, 1);
+            }
+            m_doc->m_iCurrentActionSource = ActionSource::eUnknownActionSource;
+        }
+    }
+
+    // 12. Clear stack to ensure clean state
     lua_settop(L, 0);
 }
 
