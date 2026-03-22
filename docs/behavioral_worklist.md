@@ -493,3 +493,21 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 
 ### LOW
 - [ ] L89: sound -- PlaySound filename path length limit (127 chars) not enforced. Mushkin: src/world/sound_manager.cpp:298-301
+
+## v2 Audit: Notepad (2026-03-22)
+
+### HIGH
+- [ ] H85: notepad -- CloseNotepad returns error codes (0=success) instead of boolean (0=failure). Inverted convention. Mushkin: src/world/world_notepad.cpp:216-248
+- [ ] H86: notepad -- NotepadColour returns error codes instead of boolean. Mushkin: src/world/world_notepad.cpp:322-341
+- [ ] H87: notepad -- NotepadFont returns error codes instead of boolean. Mushkin: src/world/world_notepad.cpp:301-312
+- [ ] H88: notepad -- NotepadReadOnly returns error codes instead of boolean. Mushkin: src/world/world_notepad.cpp:350-360
+- [ ] H89: notepad -- NotepadSaveMethod returns error codes instead of boolean. Mushkin: src/world/world_notepad.cpp:369-385
+- [ ] H90: notepad -- SaveNotepad returns error codes instead of boolean. Mushkin: src/world/world_notepad.cpp:258-269
+
+### MEDIUM
+- [ ] M141: notepad -- ReplaceNotepad returns boolean; original returns nil. Mushkin: src/world/lua_api/world_notepads.cpp:74-80
+- [ ] M142: notepad -- NotepadColour rejects empty color strings; original treats as no-op. Mushkin: src/world/world_notepad.cpp:335-336
+- [ ] M143: notepad -- New notepads ignore global notepad color preferences. Mushkin: src/world/notepad_widget.cpp:30-35
+
+### LOW
+- [ ] L90: notepad -- GetNotepadList(true) does not enumerate other worlds' notepads (deferred, single-world). Mushkin: src/world/world_notepad.cpp:277-289
