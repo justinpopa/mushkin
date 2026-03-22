@@ -1,0 +1,311 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE muclient>
+<muclient>
+<plugin
+   name="Mushkin_Audit"
+   author="Mushkin Project"
+   id="mu5hk1na0d10010001a0d101"
+   language="Lua"
+   purpose="Behavioral baseline capture for Mushkin vs MUSHclient comparison"
+   save_state="n"
+   date_written="2026-03-22"
+   requires="4.00"
+   version="1.0"
+   sequence="9999"
+>
+<description trim="y">
+Mushkin Audit -- Behavioral baseline capture plugin.
+Type 'audit' to run all tests and capture API behavior to JSON.
+</description>
+</plugin>
+
+<aliases>
+  <alias
+    enabled="y"
+    match="^audit$"
+    name="audit_run"
+    send_to="12"
+    sequence="100"
+    script="run_audit"
+    regexp="y"
+    ignore_case="y"
+    omit_from_output="y"
+    omit_from_log="y"
+  >
+  </alias>
+</aliases>
+
+<script>
+<![CDATA[
+
+-- ============================================================
+-- JSON Encoder
+-- Self-contained, no external dependencies.
+-- Works in Lua 5.1 (MUSHclient) and LuaJIT/5.1-compat (Mushkin).
+-- Keys are sorted at ALL nesting levels for stable diffs.
+-- ============================================================
+
+local function is_array(t)
+  -- A table is an array if all keys are consecutive integers starting at 1.
+  local count = 0
+  for _ in pairs(t) do
+    count = count + 1
+  end
+  if count == 0 then
+    -- Empty table: treat as array (produces [])
+    return true
+  end
+  for i = 1, count do
+    if t[i] == nil then
+      return false
+    end
+  end
+  return true
+end
+
+local function json_encode_inner(value, indent)
+  local vtype = type(value)
+
+  if value == nil then
+    return "null"
+  elseif vtype == "boolean" then
+    return value and "true" or "false"
+  elseif vtype == "number" then
+    if value ~= value then
+      -- NaN
+      return '"NaN"'
+    elseif value == math.huge then
+      return '"Infinity"'
+    elseif value == -math.huge then
+      return '"-Infinity"'
+    else
+      -- Use integer representation when value is a whole number
+      if value == math.floor(value) and math.abs(value) < 1e15 then
+        return string.format("%d", value)
+      else
+        return string.format("%.17g", value)
+      end
+    end
+  elseif vtype == "string" then
+    -- Escape special characters
+    local s = value
+    s = s:gsub('\\', '\\\\')
+    s = s:gsub('"',  '\\"')
+    s = s:gsub('\n', '\\n')
+    s = s:gsub('\r', '\\r')
+    s = s:gsub('\t', '\\t')
+    -- Escape remaining control characters (U+0000–U+001F)
+    s = s:gsub('[\0-\31]', function(c)
+      return string.format('\\u%04x', c:byte())
+    end)
+    return '"' .. s .. '"'
+  elseif vtype == "table" then
+    local inner_indent = indent .. "  "
+
+    if is_array(value) then
+      -- Array encoding
+      if #value == 0 then
+        return "[]"
+      end
+      local parts = {}
+      for i = 1, #value do
+        parts[i] = inner_indent .. json_encode_inner(value[i], inner_indent)
+      end
+      return "[\n" .. table.concat(parts, ",\n") .. "\n" .. indent .. "]"
+    else
+      -- Object encoding — collect and sort keys
+      local keys = {}
+      for k in pairs(value) do
+        keys[#keys + 1] = k
+      end
+      -- Sort: numbers first (numerically), then strings (lexicographically)
+      table.sort(keys, function(a, b)
+        local ta, tb = type(a), type(b)
+        if ta == tb then
+          return a < b
+        end
+        -- numbers before strings
+        return ta == "number"
+      end)
+
+      if #keys == 0 then
+        return "{}"
+      end
+
+      local parts = {}
+      for _, k in ipairs(keys) do
+        -- Use direct lookup — NOT `val[k] or val[tonumber(k)]`
+        -- which would incorrectly skip false values.
+        local v = value[k]
+        local key_str = json_encode_inner(tostring(k), inner_indent)
+        parts[#parts + 1] = inner_indent .. key_str .. ": " .. json_encode_inner(v, inner_indent)
+      end
+      return "{\n" .. table.concat(parts, ",\n") .. "\n" .. indent .. "}"
+    end
+  else
+    -- Functions, userdata, threads: represent as a quoted type string
+    return '"<' .. vtype .. '>"'
+  end
+end
+
+function json_encode(value)
+  return json_encode_inner(value, "")
+end
+
+
+-- ============================================================
+-- Test Suite
+-- ============================================================
+
+local pass_count = 0
+local fail_count = 0
+
+local function check(label, got, expected)
+  if got == expected then
+    pass_count = pass_count + 1
+    ColourNote("lime", "black", "  PASS  " .. label)
+  else
+    fail_count = fail_count + 1
+    ColourNote("red", "black", "  FAIL  " .. label)
+    ColourNote("red", "black", "    got:      " .. tostring(got))
+    ColourNote("red", "black", "    expected: " .. tostring(expected))
+  end
+end
+
+function test_json()
+  pass_count = 0
+  fail_count = 0
+
+  ColourNote("white", "black", "--- json_encode test suite ---")
+
+  -- Empty table (array)
+  check("empty table",
+    json_encode({}),
+    "[]")
+
+  -- Simple array
+  check("simple array",
+    json_encode({1, 2, 3}),
+    "[\n  1,\n  2,\n  3\n]")
+
+  -- Boolean true
+  check("boolean true",
+    json_encode(true),
+    "true")
+
+  -- Boolean false
+  check("boolean false",
+    json_encode(false),
+    "false")
+
+  -- nil
+  check("nil",
+    json_encode(nil),
+    "null")
+
+  -- Integer number
+  check("integer",
+    json_encode(42),
+    "42")
+
+  -- Float number
+  check("float",
+    json_encode(3.14),
+    string.format("%.17g", 3.14))
+
+  -- NaN
+  check("NaN",
+    json_encode(0/0),
+    '"NaN"')
+
+  -- Positive infinity
+  check("Infinity",
+    json_encode(math.huge),
+    '"Infinity"')
+
+  -- Negative infinity
+  check("-Infinity",
+    json_encode(-math.huge),
+    '"-Infinity"')
+
+  -- Empty string
+  check("empty string",
+    json_encode(""),
+    '""')
+
+  -- String with special chars
+  check("string special chars",
+    json_encode('say "hello"\nworld\t!'),
+    '"say \\"hello\\"\\nworld\\t!"')
+
+  -- String with backslash
+  check("string backslash",
+    json_encode("a\\b"),
+    '"a\\\\b"')
+
+  -- Unicode passthrough (Lua 5.1 strings are byte strings)
+  -- Use decimal escapes (\195\169 = UTF-8 for é) since \xNN is Lua 5.2+
+  local utf8_e_acute = "\195\169"
+  check("unicode passthrough",
+    json_encode(utf8_e_acute),
+    '"' .. utf8_e_acute .. '"')
+
+  -- Simple object with sorted keys
+  check("simple object sorted keys",
+    json_encode({b = 2, a = 1}),
+    '{\n  "a": 1,\n  "b": 2\n}')
+
+  -- Object with false value (must not be skipped)
+  check("object false value",
+    json_encode({flag = false}),
+    '{\n  "flag": false\n}')
+
+  -- Object with nil value (nil keys are invisible in Lua tables, so this
+  -- tests that a key whose value is false isn't confused with nil)
+  local t = {present = false, missing = nil}
+  check("false vs nil in object",
+    json_encode(t),
+    '{\n  "present": false\n}')
+
+  -- Nested tables
+  check("nested object",
+    json_encode({outer = {inner = 1}}),
+    '{\n  "outer": {\n    "inner": 1\n  }\n}')
+
+  -- Mixed nesting: array of objects
+  check("array of objects",
+    json_encode({{a=1},{a=2}}),
+    '[\n  {\n    "a": 1\n  },\n  {\n    "a": 2\n  }\n]')
+
+  -- Mixed integer/string keys — integer keys sort before string keys
+  local mixed = {}
+  mixed[1]   = "one"
+  mixed["x"] = "ex"
+  check("mixed keys order",
+    json_encode(mixed),
+    '{\n  "1": "one",\n  "x": "ex"\n}')
+
+  -- Summary
+  local total = pass_count + fail_count
+  ColourNote("white", "black", string.format(
+    "--- %d/%d passed, %d failed ---", pass_count, total, fail_count))
+end
+
+
+-- ============================================================
+-- Entry Point
+-- ============================================================
+
+function run_audit()
+  ColourNote("white", "black", "Mushkin Audit plugin starting...")
+  test_json()
+  ColourNote("white", "black", "Audit plugin ready. Type 'audit' to run.")
+end
+
+-- Print a startup notice when the plugin loads
+ColourNote("white", "black", "Mushkin_Audit loaded. Type 'audit' to run.")
+
+]]>
+</script>
+
+</muclient>

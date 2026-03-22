@@ -1,0 +1,2134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE muclient>
+<muclient>
+<plugin
+   name="Acid_Test"
+   author="Mushkin Project"
+   id="ac1d0e5a00010001ac1d0001"
+   language="Lua"
+   purpose="Lua API compatibility test suite"
+   save_state="y"
+   date_written="2026-03-01"
+   requires="4.00"
+   version="1.0"
+   sequence="5000"
+>
+<description trim="y">
+Acid Test -- Lua API Compatibility Suite for MUSHclient/Mushkin.
+Type 'acid' to run all tests, 'acid list' to see categories,
+or 'acid &lt;category&gt;' to run a single category.
+</description>
+</plugin>
+
+<aliases>
+  <alias
+    enabled="y"
+    match="^acid$"
+    name="acid_run_all"
+    send_to="12"
+    sequence="100"
+    script="run_all"
+    regexp="y"
+    ignore_case="y"
+    omit_from_output="y"
+    omit_from_log="y"
+  >
+  </alias>
+  <alias
+    enabled="y"
+    match="^acid (\w+)$"
+    name="acid_run_cat"
+    send_to="12"
+    sequence="101"
+    script="run_category"
+    regexp="y"
+    ignore_case="y"
+    omit_from_output="y"
+    omit_from_log="y"
+  >
+  </alias>
+</aliases>
+
+<script>
+<![CDATA[
+
+-- ============================================================
+-- Acid Test Framework
+-- ============================================================
+
+T = { pass = 0, fail = 0, skip = 0, errors = {} }
+
+function T.ok(condition, name)
+  if condition then
+    T.pass = T.pass + 1
+    ColourNote("lime", "black", "  PASS  ")
+    ColourNote("white", "black", "  " .. name)
+  else
+    T.fail = T.fail + 1
+    ColourNote("red", "black", "  FAIL  ")
+    ColourNote("white", "black", "  " .. name)
+    table.insert(T.errors, name)
+  end
+end
+
+function T.eq(got, expected, name)
+  if got == expected then
+    T.pass = T.pass + 1
+    ColourNote("lime", "black", "  PASS  ")
+    ColourNote("white", "black", "  " .. name)
+  else
+    T.fail = T.fail + 1
+    ColourNote("red", "black", "  FAIL  ")
+    ColourNote("white", "black", "  " .. name)
+    ColourNote("red", "black", "         got: " .. tostring(got) .. "  expected: " .. tostring(expected))
+    table.insert(T.errors, name .. " (got=" .. tostring(got) .. " expected=" .. tostring(expected) .. ")")
+  end
+end
+
+function T.neq(got, unwanted, name)
+  if got ~= unwanted then
+    T.pass = T.pass + 1
+    ColourNote("lime", "black", "  PASS  ")
+    ColourNote("white", "black", "  " .. name)
+  else
+    T.fail = T.fail + 1
+    ColourNote("red", "black", "  FAIL  ")
+    ColourNote("white", "black", "  " .. name)
+    ColourNote("red", "black", "         got unwanted value: " .. tostring(got))
+    table.insert(T.errors, name .. " (got unwanted=" .. tostring(got) .. ")")
+  end
+end
+
+function T.match(str, pattern, name)
+  if type(str) == "string" and str:find(pattern) then
+    T.pass = T.pass + 1
+    ColourNote("lime", "black", "  PASS  ")
+    ColourNote("white", "black", "  " .. name)
+  else
+    T.fail = T.fail + 1
+    ColourNote("red", "black", "  FAIL  ")
+    ColourNote("white", "black", "  " .. name)
+    ColourNote("red", "black", "         string: " .. tostring(str) .. "  pattern: " .. tostring(pattern))
+    table.insert(T.errors, name .. " (no match)")
+  end
+end
+
+function T.skip(name, reason)
+  T.skip_count = (T.skip_count or 0) + 1
+  ColourNote("yellow", "black", "  SKIP  ")
+  ColourNote("white", "black", "  " .. name .. " (" .. reason .. ")")
+end
+
+function T.section(name)
+  Note("")
+  ColourNote("cyan", "black", "=== " .. name .. " ===")
+end
+
+function T.fail_error(name, err)
+  T.fail = T.fail + 1
+  ColourNote("red", "black", "  FAIL  ")
+  ColourNote("white", "black", "  " .. name .. " [ERROR: " .. tostring(err) .. "]")
+  table.insert(T.errors, name .. " [ERROR: " .. tostring(err) .. "]")
+end
+
+function T.reset()
+  T.pass = 0
+  T.fail = 0
+  T.skip_count = 0
+  T.errors = {}
+end
+
+function T.summary()
+  Note("")
+  ColourNote("cyan", "black", string.rep("=", 50))
+  local total = T.pass + T.fail + (T.skip_count or 0)
+  ColourTell("white", "black", "  Total: " .. total .. "  ")
+  ColourTell("lime", "black", "Passed: " .. T.pass .. "  ")
+  ColourTell("red", "black", "Failed: " .. T.fail .. "  ")
+  ColourNote("yellow", "black", "Skipped: " .. (T.skip_count or 0))
+  if T.fail > 0 then
+    ColourNote("red", "black", "\nFailures:")
+    for i = 1, #T.errors do
+      ColourNote("red", "black", "  " .. i .. ". " .. T.errors[i])
+    end
+  end
+  ColourNote("cyan", "black", string.rep("=", 50))
+end
+
+-- Platform detection: Mushkin registers NoteColourFore as a Lua function, MUSHclient does not
+local is_mushkin = (NoteColourFore ~= nil)
+
+
+-- ============================================================
+-- Category 1: Variables
+-- ============================================================
+
+function test_vars()
+  T.section("Variables")
+
+  local ok, err
+
+  -- Set and get a string variable
+  ok, err = pcall(function()
+    SetVariable("acid_str", "hello")
+    T.eq(GetVariable("acid_str"), "hello", "SetVariable/GetVariable string round-trip")
+  end)
+  if not ok then T.fail_error("SetVariable/GetVariable string round-trip", err) end
+
+  -- Set and get a numeric string variable
+  ok, err = pcall(function()
+    SetVariable("acid_num", "42")
+    T.eq(GetVariable("acid_num"), "42", "SetVariable/GetVariable numeric string")
+  end)
+  if not ok then T.fail_error("SetVariable/GetVariable numeric string", err) end
+
+  -- Get nonexistent variable returns nil
+  ok, err = pcall(function()
+    T.ok(GetVariable("acid_nonexistent_zzz") == nil, "GetVariable nonexistent returns nil")
+  end)
+  if not ok then T.fail_error("GetVariable nonexistent returns nil", err) end
+
+  -- Delete existing variable returns eOK (0)
+  ok, err = pcall(function()
+    SetVariable("acid_del", "to_delete")
+    T.eq(DeleteVariable("acid_del"), 0, "DeleteVariable existing returns eOK (0)")
+  end)
+  if not ok then T.fail_error("DeleteVariable existing returns eOK (0)", err) end
+
+  -- Delete nonexistent variable returns error
+  ok, err = pcall(function()
+    local rc = DeleteVariable("acid_nonexistent_zzz")
+    T.neq(rc, 0, "DeleteVariable nonexistent returns non-zero")
+  end)
+  if not ok then T.fail_error("DeleteVariable nonexistent returns non-zero", err) end
+
+  -- GetVariableList returns a table
+  ok, err = pcall(function()
+    local list = GetVariableList()
+    T.ok(type(list) == "table", "GetVariableList returns table")
+  end)
+  if not ok then T.fail_error("GetVariableList returns table", err) end
+
+  -- Overwrite existing variable
+  ok, err = pcall(function()
+    SetVariable("acid_over", "first")
+    SetVariable("acid_over", "second")
+    T.eq(GetVariable("acid_over"), "second", "SetVariable overwrites existing value")
+  end)
+  if not ok then T.fail_error("SetVariable overwrites existing value", err) end
+
+  -- Empty string variable
+  ok, err = pcall(function()
+    SetVariable("acid_empty", "")
+    T.eq(GetVariable("acid_empty"), "", "SetVariable/GetVariable empty string")
+  end)
+  if not ok then T.fail_error("SetVariable/GetVariable empty string", err) end
+
+  -- Variable with special characters
+  ok, err = pcall(function()
+    SetVariable("acid_special", "hello!@#$%^&*()")
+    T.eq(GetVariable("acid_special"), "hello!@#$%^&*()",
+         "SetVariable/GetVariable special chars in value")
+  end)
+  if not ok then T.fail_error("SetVariable/GetVariable special chars in value", err) end
+
+  -- Set then delete then get returns nil
+  ok, err = pcall(function()
+    SetVariable("acid_lifecycle", "alive")
+    DeleteVariable("acid_lifecycle")
+    T.ok(GetVariable("acid_lifecycle") == nil, "GetVariable after delete returns nil")
+  end)
+  if not ok then T.fail_error("GetVariable after delete returns nil", err) end
+
+  -- Multiple variables; list contains all
+  ok, err = pcall(function()
+    SetVariable("acid_multi_a", "1")
+    SetVariable("acid_multi_b", "2")
+    SetVariable("acid_multi_c", "3")
+    local list = GetVariableList()
+    local found_a, found_b, found_c = false, false, false
+    -- Handle both array-style and key-value-style tables
+    if type(list) == "table" then
+      for k, v in pairs(list) do
+        local name = (type(k) == "number") and v or k
+        if name == "acid_multi_a" then found_a = true end
+        if name == "acid_multi_b" then found_b = true end
+        if name == "acid_multi_c" then found_c = true end
+      end
+    end
+    T.ok(found_a and found_b and found_c, "GetVariableList contains all created variables")
+  end)
+  if not ok then T.fail_error("GetVariableList contains all created variables", err) end
+
+  -- Variable names are case-sensitive
+  ok, err = pcall(function()
+    SetVariable("acid_case_lo", "lower")
+    SetVariable("acid_CASE_UP", "upper")
+    T.eq(GetVariable("acid_case_lo"), "lower", "Variable names case-sensitive: lowercase key")
+    T.eq(GetVariable("acid_CASE_UP"), "upper", "Variable names case-sensitive: uppercase key")
+    T.ok(GetVariable("acid_case_lo") ~= GetVariable("acid_CASE_UP"),
+         "Variable names case-sensitive: keys are distinct")
+  end)
+  if not ok then T.fail_error("Variable names case-sensitive", err) end
+
+  -- Cleanup
+  DeleteVariable("acid_str")
+  DeleteVariable("acid_num")
+  DeleteVariable("acid_over")
+  DeleteVariable("acid_empty")
+  DeleteVariable("acid_special")
+  DeleteVariable("acid_multi_a")
+  DeleteVariable("acid_multi_b")
+  DeleteVariable("acid_multi_c")
+  DeleteVariable("acid_case_lo")
+  DeleteVariable("acid_CASE_UP")
+end
+
+
+-- ============================================================
+-- Category 2: Utilities
+-- ============================================================
+
+function test_utils()
+  T.section("Utilities")
+
+  local ok, err
+
+  -- Trim: leading and trailing spaces
+  ok, err = pcall(function()
+    T.eq(Trim("  hi  "), "hi", "Trim leading/trailing spaces")
+  end)
+  if not ok then T.fail_error("Trim leading/trailing spaces", err) end
+
+  -- Trim: tabs
+  ok, err = pcall(function()
+    T.eq(Trim("\t hello \t"), "hello", "Trim leading/trailing tabs")
+  end)
+  if not ok then T.fail_error("Trim leading/trailing tabs", err) end
+
+  -- Trim: empty string
+  ok, err = pcall(function()
+    T.eq(Trim(""), "", "Trim empty string returns empty")
+  end)
+  if not ok then T.fail_error("Trim empty string returns empty", err) end
+
+  -- Replace: all occurrences (MUSHclient replaces all)
+  ok, err = pcall(function()
+    T.eq(Replace("hello hello", "hello", "hi"), "hi hi", "Replace all occurrences")
+  end)
+  if not ok then T.fail_error("Replace all occurrences", err) end
+
+  -- Replace: with empty string (deletion)
+  ok, err = pcall(function()
+    T.eq(Replace("hello world", "world", ""), "hello ", "Replace with empty string")
+  end)
+  if not ok then T.fail_error("Replace with empty string", err) end
+
+  -- Replace: no match returns original
+  ok, err = pcall(function()
+    T.eq(Replace("hello", "xyz", "abc"), "hello", "Replace no match returns original")
+  end)
+  if not ok then T.fail_error("Replace no match returns original", err) end
+
+  -- Hash: returns a non-empty hex string
+  ok, err = pcall(function()
+    local h = Hash("hello")
+    T.ok(type(h) == "string", "Hash returns string")
+    T.ok(#h > 0, "Hash returns non-empty string")
+    T.ok(#h == 32 or #h == 40 or #h == 64, "Hash length is 32 (MD5), 40 (SHA-1), or 64 (SHA-256)")
+    T.match(h, "^%x+$", "Hash output is hex string")
+  end)
+  if not ok then T.fail_error("Hash returns hex string", err) end
+
+  -- Hash: correct value per client
+  ok, err = pcall(function()
+    local h = Hash("hello")
+    if is_mushkin then
+      T.eq(h, "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+           "Hash('hello') == SHA-256 on Mushkin")
+    else
+      -- MUSHclient uses SHA-1
+      T.eq(h, "ac62a630ca850b4ea07eda664eaecf9480843152",
+           "Hash('hello') == SHA-1 on MUSHclient")
+    end
+  end)
+  if not ok then T.fail_error("Hash('hello') value", err) end
+
+  -- Base64 round-trip
+  ok, err = pcall(function()
+    local original = "Hello, World!"
+    local encoded = Base64Encode(original)
+    local decoded = Base64Decode(encoded)
+    T.eq(decoded, original, "Base64 round-trip")
+  end)
+  if not ok then T.fail_error("Base64 round-trip", err) end
+
+  -- Base64: empty string
+  ok, err = pcall(function()
+    T.eq(Base64Encode(""), "", "Base64Encode empty string returns empty")
+  end)
+  if not ok then T.fail_error("Base64Encode empty string returns empty", err) end
+
+  -- Version returns a non-empty string
+  ok, err = pcall(function()
+    local v = Version()
+    T.ok(type(v) == "string", "Version returns string")
+    T.ok(#v > 0, "Version returns non-empty string")
+  end)
+  if not ok then T.fail_error("Version returns non-empty string", err) end
+
+  -- Version contains at least one digit
+  ok, err = pcall(function()
+    T.match(Version(), "%d", "Version string contains a digit")
+  end)
+  if not ok then T.fail_error("Version string contains a digit", err) end
+
+  -- Version format: numeric like "4.94" or "0.1.0"
+  ok, err = pcall(function()
+    T.match(Version(), "^%d+%.%d+", "Version() matches numeric format (x.y)")
+  end)
+  if not ok then T.fail_error("Version() matches numeric format", err) end
+
+  -- GetUniqueNumber is strictly increasing
+  ok, err = pcall(function()
+    local n1 = GetUniqueNumber()
+    local n2 = GetUniqueNumber()
+    T.ok(type(n1) == "number", "GetUniqueNumber returns number")
+    T.ok(n2 > n1, "GetUniqueNumber is strictly increasing")
+  end)
+  if not ok then T.fail_error("GetUniqueNumber is strictly increasing", err) end
+
+  -- GetUniqueID returns 24-char hex string
+  ok, err = pcall(function()
+    local id = GetUniqueID()
+    T.ok(type(id) == "string", "GetUniqueID returns string")
+    T.eq(#id, 24, "GetUniqueID returns 24-char string")
+    T.match(id, "^%x+$", "GetUniqueID is hex string")
+  end)
+  if not ok then T.fail_error("GetUniqueID returns 24-char hex string", err) end
+
+  -- CreateGUID returns 36-char UUID-format string
+  ok, err = pcall(function()
+    local guid = CreateGUID()
+    T.ok(type(guid) == "string", "CreateGUID returns string")
+    T.eq(#guid, 36, "CreateGUID returns 36-char string")
+    T.match(guid,
+      "^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$",
+      "CreateGUID matches 8-4-4-4-12 UUID format")
+  end)
+  if not ok then T.fail_error("CreateGUID matches UUID format", err) end
+
+  -- MakeRegularExpression escapes special chars
+  ok, err = pcall(function()
+    local result = MakeRegularExpression("[HP: 100]")
+    T.match(result, "^%^", "MakeRegularExpression adds ^ anchor")
+    T.match(result, "%$$", "MakeRegularExpression adds $ anchor")
+  end)
+  if not ok then T.fail_error("MakeRegularExpression escapes special chars", err) end
+
+  -- EditDistance
+  ok, err = pcall(function()
+    T.eq(EditDistance("kitten", "sitting"), 3, "EditDistance('kitten','sitting') == 3")
+  end)
+  if not ok then T.fail_error("EditDistance('kitten','sitting') == 3", err) end
+
+  ok, err = pcall(function()
+    T.eq(EditDistance("abc", "abc"), 0, "EditDistance identical strings == 0")
+  end)
+  if not ok then T.fail_error("EditDistance identical strings == 0", err) end
+
+  -- GenerateName (may return empty if names file not loaded)
+  ok, err = pcall(function()
+    local name = GenerateName()
+    if type(name) == "string" and #name > 0 then
+      T.ok(true, "GenerateName returns non-empty string")
+    else
+      T.skip("GenerateName returns non-empty string", "names file may not be loaded")
+    end
+  end)
+  if not ok then T.fail_error("GenerateName returns non-empty string", err) end
+
+  -- StripANSI
+  ok, err = pcall(function()
+    local stripped = StripANSI("\27[31mHello\27[0m")
+    T.eq(stripped, "Hello", "StripANSI removes ANSI codes")
+  end)
+  if not ok then T.fail_error("StripANSI removes ANSI codes", err) end
+
+  ok, err = pcall(function()
+    T.eq(StripANSI("plain text"), "plain text", "StripANSI no codes returns original")
+  end)
+  if not ok then T.fail_error("StripANSI no codes returns original", err) end
+
+  -- FixupHTML
+  ok, err = pcall(function()
+    T.eq(FixupHTML("<b>bold</b>"), "&lt;b&gt;bold&lt;/b&gt;",
+         "FixupHTML escapes angle brackets")
+  end)
+  if not ok then T.fail_error("FixupHTML escapes angle brackets", err) end
+
+  ok, err = pcall(function()
+    T.eq(FixupHTML("A & B"), "A &amp; B", "FixupHTML escapes ampersand")
+  end)
+  if not ok then T.fail_error("FixupHTML escapes ampersand", err) end
+
+  -- FixupEscapeSequences
+  ok, err = pcall(function()
+    local result = FixupEscapeSequences("Hello\\nWorld")
+    T.ok(result:find("\n", 1, true) ~= nil,
+         "FixupEscapeSequences converts \\n to newline")
+  end)
+  if not ok then T.fail_error("FixupEscapeSequences converts \\n", err) end
+
+  -- ErrorDesc
+  ok, err = pcall(function()
+    local desc = ErrorDesc(0)
+    T.ok(type(desc) == "string", "ErrorDesc(0) returns string")
+  end)
+  if not ok then T.fail_error("ErrorDesc(0) returns string", err) end
+
+  ok, err = pcall(function()
+    local desc = ErrorDesc(30005)
+    T.ok(type(desc) == "string" and #desc > 0,
+         "ErrorDesc(30005) returns non-empty string")
+  end)
+  if not ok then T.fail_error("ErrorDesc(30005) returns non-empty string", err) end
+
+  -- Speedwalk
+  ok, err = pcall(function()
+    local result = EvaluateSpeedwalk("2n")
+    T.ok(type(result) == "string", "EvaluateSpeedwalk returns string")
+  end)
+  if not ok then T.fail_error("EvaluateSpeedwalk simple directions", err) end
+
+  ok, err = pcall(function()
+    local result = ReverseSpeedwalk("2n")
+    T.ok(type(result) == "string", "ReverseSpeedwalk returns string")
+    T.match(result, "s", "ReverseSpeedwalk '2n' result contains 's'")
+  end)
+  if not ok then T.fail_error("ReverseSpeedwalk reverses directions", err) end
+
+  ok, err = pcall(function()
+    local result = RemoveBacktracks("ns")
+    T.ok(type(result) == "string", "RemoveBacktracks returns string")
+  end)
+  if not ok then T.fail_error("RemoveBacktracks simplifies paths", err) end
+
+  -- Metaphone
+  ok, err = pcall(function()
+    local result = Metaphone("hello", 6)
+    T.ok(type(result) == "string", "Metaphone returns string")
+  end)
+  if not ok then T.fail_error("Metaphone returns string", err) end
+end
+
+
+-- ============================================================
+-- Category 3: Colors
+-- ============================================================
+
+function test_colors()
+  T.section("Colors")
+
+  local ok, err
+
+  -- ColourNameToRGB for known colors (BGR format)
+  ok, err = pcall(function()
+    T.eq(ColourNameToRGB("red"), 0x0000FF, "ColourNameToRGB('red') == 0x0000FF (BGR)")
+  end)
+  if not ok then T.fail_error("ColourNameToRGB('red')", err) end
+
+  ok, err = pcall(function()
+    T.eq(ColourNameToRGB("blue"), 0xFF0000, "ColourNameToRGB('blue') == 0xFF0000 (BGR)")
+  end)
+  if not ok then T.fail_error("ColourNameToRGB('blue')", err) end
+
+  ok, err = pcall(function()
+    T.eq(ColourNameToRGB("white"), 0xFFFFFF, "ColourNameToRGB('white') == 0xFFFFFF")
+  end)
+  if not ok then T.fail_error("ColourNameToRGB('white')", err) end
+
+  ok, err = pcall(function()
+    T.eq(ColourNameToRGB("black"), 0, "ColourNameToRGB('black') == 0")
+  end)
+  if not ok then T.fail_error("ColourNameToRGB('black')", err) end
+
+  -- RGBColourToName
+  ok, err = pcall(function()
+    T.eq(RGBColourToName(0x0000FF), "red", "RGBColourToName(0x0000FF) == 'red'")
+  end)
+  if not ok then T.fail_error("RGBColourToName(0x0000FF) == 'red'", err) end
+
+  ok, err = pcall(function()
+    T.eq(RGBColourToName(0), "black", "RGBColourToName(0) == 'black'")
+  end)
+  if not ok then T.fail_error("RGBColourToName(0) == 'black'", err) end
+
+  -- ColourNameToRGB with invalid name returns number
+  ok, err = pcall(function()
+    local c = ColourNameToRGB("notacolor_xyzzy")
+    T.ok(type(c) == "number", "ColourNameToRGB invalid name returns number")
+  end)
+  if not ok then T.fail_error("ColourNameToRGB invalid name returns number", err) end
+
+  -- GetNormalColour(1..8) returns numbers
+  ok, err = pcall(function()
+    for i = 1, 8 do
+      local c = GetNormalColour(i)
+      T.ok(type(c) == "number", "GetNormalColour(" .. i .. ") returns number")
+    end
+  end)
+  if not ok then T.fail_error("GetNormalColour(1-8) returns numbers", err) end
+
+  -- GetBoldColour(1..8) returns numbers
+  ok, err = pcall(function()
+    for i = 1, 8 do
+      local c = GetBoldColour(i)
+      T.ok(type(c) == "number", "GetBoldColour(" .. i .. ") returns number")
+    end
+  end)
+  if not ok then T.fail_error("GetBoldColour(1-8) returns numbers", err) end
+
+  -- Round-trip
+  ok, err = pcall(function()
+    local name = RGBColourToName(ColourNameToRGB("red"))
+    T.eq(name, "red", "Round-trip RGBColourToName(ColourNameToRGB('red')) == 'red'")
+  end)
+  if not ok then T.fail_error("Round-trip ColourNameToRGB/RGBColourToName", err) end
+
+  -- AdjustColour
+  ok, err = pcall(function()
+    local red = ColourNameToRGB("red")
+    T.eq(AdjustColour(red, 0), red, "AdjustColour method 0 returns same color")
+  end)
+  if not ok then T.fail_error("AdjustColour method 0 (no change)", err) end
+
+  ok, err = pcall(function()
+    T.eq(AdjustColour(0, 1), 0xFFFFFF, "AdjustColour invert(black) == white")
+  end)
+  if not ok then T.fail_error("AdjustColour invert(black) == white", err) end
+
+  ok, err = pcall(function()
+    local white = ColourNameToRGB("white")
+    local darker = AdjustColour(white, 3)
+    T.ok(type(darker) == "number", "AdjustColour darker returns number")
+    T.neq(darker, white, "AdjustColour darker changes the color")
+  end)
+  if not ok then T.fail_error("AdjustColour darker changes color", err) end
+
+  -- NoteColourFore/Back (may be named GetNoteColourFore on some builds)
+  ok, err = pcall(function()
+    local fn = NoteColourFore or GetNoteColourFore
+    if fn then
+      T.ok(type(fn()) == "number", "NoteColourFore returns number")
+    else
+      T.skip("NoteColourFore returns number", "function not available")
+    end
+  end)
+  if not ok then T.fail_error("NoteColourFore returns number", err) end
+
+  ok, err = pcall(function()
+    local fn = NoteColourBack or GetNoteColourBack
+    if fn then
+      T.ok(type(fn()) == "number", "NoteColourBack returns number")
+    else
+      T.skip("NoteColourBack returns number", "function not available")
+    end
+  end)
+  if not ok then T.fail_error("NoteColourBack returns number", err) end
+end
+
+
+-- ============================================================
+-- Category 4: Arrays
+-- ============================================================
+
+function test_arrays()
+  T.section("Arrays")
+
+  local ok, err
+  local ARRAY  = "acid_test_array"
+  local ARRAY2 = "acid_test_array2"
+
+  ArrayDelete(ARRAY)
+  ArrayDelete(ARRAY2)
+
+  ok, err = pcall(function()
+    T.eq(ArrayCreate(ARRAY), 0, "ArrayCreate returns eOK (0)")
+  end)
+  if not ok then T.fail_error("ArrayCreate returns eOK (0)", err) end
+
+  ok, err = pcall(function()
+    local rc = ArrayCreate(ARRAY)
+    T.neq(rc, 0, "ArrayCreate duplicate returns error")
+  end)
+  if not ok then T.fail_error("ArrayCreate duplicate returns error", err) end
+
+  ok, err = pcall(function()
+    T.ok(ArrayExists(ARRAY), "ArrayExists returns truthy for existing array")
+    T.ok(not ArrayExists("acid_no_such_array_zzz"),
+         "ArrayExists returns falsy for nonexistent array")
+  end)
+  if not ok then T.fail_error("ArrayExists true/false", err) end
+
+  ok, err = pcall(function()
+    T.eq(ArraySet(ARRAY, "mykey", "myvalue"), 0, "ArraySet new key returns eOK (0)")
+    T.eq(ArrayGet(ARRAY, "mykey"), "myvalue", "ArrayGet returns set value")
+  end)
+  if not ok then T.fail_error("ArraySet/ArrayGet round-trip", err) end
+
+  ok, err = pcall(function()
+    T.ok(ArrayGet(ARRAY, "no_such_key_zzz") == nil, "ArrayGet nonexistent key returns nil")
+  end)
+  if not ok then T.fail_error("ArrayGet nonexistent key returns nil", err) end
+
+  ok, err = pcall(function()
+    T.ok(ArrayKeyExists(ARRAY, "mykey"), "ArrayKeyExists truthy for existing key")
+    T.ok(not ArrayKeyExists(ARRAY, "no_such_key_zzz"),
+         "ArrayKeyExists falsy for missing key")
+  end)
+  if not ok then T.fail_error("ArrayKeyExists true/false", err) end
+
+  ok, err = pcall(function()
+    ArraySet(ARRAY, "del_key", "del_val")
+    T.eq(ArrayDeleteKey(ARRAY, "del_key"), 0, "ArrayDeleteKey returns eOK (0)")
+    T.ok(ArrayGet(ARRAY, "del_key") == nil, "ArrayGet after ArrayDeleteKey returns nil")
+  end)
+  if not ok then T.fail_error("ArrayDeleteKey removes key", err) end
+
+  ok, err = pcall(function()
+    ArrayClear(ARRAY)
+    ArraySet(ARRAY, "k1", "v1")
+    ArraySet(ARRAY, "k2", "v2")
+    ArraySet(ARRAY, "k3", "v3")
+    T.eq(ArraySize(ARRAY), 3, "ArraySize == 3 after adding 3 elements")
+  end)
+  if not ok then T.fail_error("ArraySize after adding elements", err) end
+
+  ok, err = pcall(function()
+    T.eq(ArrayClear(ARRAY), 0, "ArrayClear returns eOK (0)")
+    T.eq(ArraySize(ARRAY), 0, "ArraySize == 0 after ArrayClear")
+  end)
+  if not ok then T.fail_error("ArrayClear empties array", err) end
+
+  ok, err = pcall(function()
+    ArraySet(ARRAY, "apple",  "1")
+    ArraySet(ARRAY, "mango",  "2")
+    ArraySet(ARRAY, "cherry", "3")
+    T.eq(ArrayGetFirstKey(ARRAY), "apple", "ArrayGetFirstKey returns first key")
+    T.eq(ArrayGetLastKey(ARRAY),  "mango", "ArrayGetLastKey returns last key")
+  end)
+  if not ok then T.fail_error("ArrayGetFirstKey/ArrayGetLastKey", err) end
+
+  ok, err = pcall(function()
+    local names = ArrayListAll()
+    T.ok(type(names) == "table", "ArrayListAll returns table")
+    local found = false
+    for i = 1, #names do
+      if names[i] == ARRAY then found = true; break end
+    end
+    T.ok(found, "ArrayListAll contains our test array")
+  end)
+  if not ok then T.fail_error("ArrayListAll contains test array", err) end
+
+  ok, err = pcall(function()
+    local keys = ArrayListKeys(ARRAY)
+    T.ok(type(keys) == "table", "ArrayListKeys returns table")
+    T.eq(keys[1], "apple",  "ArrayListKeys[1] == 'apple' (sorted)")
+    T.eq(keys[2], "cherry", "ArrayListKeys[2] == 'cherry' (sorted)")
+    T.eq(keys[3], "mango",  "ArrayListKeys[3] == 'mango' (sorted)")
+  end)
+  if not ok then T.fail_error("ArrayListKeys returns sorted keys", err) end
+
+  ok, err = pcall(function()
+    local vals = ArrayListValues(ARRAY)
+    T.ok(type(vals) == "table", "ArrayListValues returns table")
+    T.eq(vals[1], "1", "ArrayListValues[1] == '1' (apple)")
+    T.eq(vals[2], "3", "ArrayListValues[2] == '3' (cherry)")
+    T.eq(vals[3], "2", "ArrayListValues[3] == '2' (mango)")
+  end)
+  if not ok then T.fail_error("ArrayListValues in key-sorted order", err) end
+
+  ok, err = pcall(function()
+    local exported = ArrayExport(ARRAY, "|")
+    T.ok(type(exported) == "string", "ArrayExport returns string")
+    T.ok(#exported > 0, "ArrayExport is non-empty")
+    ArrayCreate(ARRAY2)
+    ArrayImport(ARRAY2, exported, "|")
+    T.eq(ArrayGet(ARRAY2, "apple"),  "1", "ArrayImport round-trip: apple == '1'")
+    T.eq(ArrayGet(ARRAY2, "cherry"), "3", "ArrayImport round-trip: cherry == '3'")
+    T.eq(ArrayGet(ARRAY2, "mango"),  "2", "ArrayImport round-trip: mango == '2'")
+    ArrayDelete(ARRAY2)
+  end)
+  if not ok then T.fail_error("ArrayExport/ArrayImport round-trip", err) end
+
+  ok, err = pcall(function()
+    local keys_str = ArrayExportKeys(ARRAY, "|")
+    T.ok(type(keys_str) == "string", "ArrayExportKeys returns string")
+    T.match(keys_str, "apple",  "ArrayExportKeys contains 'apple'")
+    T.match(keys_str, "cherry", "ArrayExportKeys contains 'cherry'")
+    T.match(keys_str, "mango",  "ArrayExportKeys contains 'mango'")
+  end)
+  if not ok then T.fail_error("ArrayExportKeys contains all keys", err) end
+
+  ok, err = pcall(function()
+    T.eq(ArrayDelete(ARRAY), 0, "ArrayDelete existing returns eOK (0)")
+    T.ok(not ArrayExists(ARRAY), "ArrayExists returns false after ArrayDelete")
+  end)
+  if not ok then T.fail_error("ArrayDelete removes array", err) end
+
+  ok, err = pcall(function()
+    local rc = ArrayDelete("acid_no_such_array_zzz")
+    T.neq(rc, 0, "ArrayDelete nonexistent returns error")
+  end)
+  if not ok then T.fail_error("ArrayDelete nonexistent returns error", err) end
+
+  -- Cleanup
+  ArrayDelete(ARRAY)
+  ArrayDelete(ARRAY2)
+end
+
+
+-- ============================================================
+-- Category 5: Triggers
+-- ============================================================
+
+function test_triggers()
+  T.section("Triggers")
+
+  local eOK = 0
+  local eTriggerNotFound = 30001
+  local eTriggerAlreadyExists = 30002
+  local FLAG_ENABLED = 1
+  local FLAG_REGEXP  = 32
+  local TRIG1  = "acid_trig_1"
+  local TRIG2  = "acid_trig_2"
+  local TRIG3  = "acid_trig_3"
+  local GROUP  = "acid_test"
+  local ok, err
+
+  local function list_contains(t, v)
+    if type(t) ~= "table" then return false end
+    for i = 1, #t do if t[i] == v then return true end end
+    return false
+  end
+
+  ok, err = pcall(function()
+    local ret = AddTriggerEx(TRIG1, "Hello *", "", FLAG_ENABLED, 0, 0, "", "", 0, 100)
+    T.eq(ret, eOK, "AddTriggerEx simple match returns 0")
+  end)
+  if not ok then T.fail_error("AddTriggerEx simple match returns 0", err) end
+
+  ok, err = pcall(function()
+    T.eq(IsTrigger(TRIG1), eOK, "IsTrigger existing returns 0")
+  end)
+  if not ok then T.fail_error("IsTrigger existing returns 0", err) end
+
+  ok, err = pcall(function()
+    T.neq(IsTrigger("acid_trig_nonexistent_xyz"), eOK,
+         "IsTrigger nonexistent returns error")
+  end)
+  if not ok then T.fail_error("IsTrigger nonexistent returns error", err) end
+
+  ok, err = pcall(function()
+    local list = GetTriggerList()
+    T.ok(list_contains(list, TRIG1), "GetTriggerList contains acid_trig_1")
+  end)
+  if not ok then T.fail_error("GetTriggerList contains acid_trig_1", err) end
+
+  ok, err = pcall(function()
+    T.eq(GetTriggerInfo(TRIG1, 1), "Hello *", "GetTriggerInfo match text (code 1)")
+  end)
+  if not ok then T.fail_error("GetTriggerInfo match text (code 1)", err) end
+
+  ok, err = pcall(function()
+    T.eq(EnableTrigger(TRIG1, false), eOK, "EnableTrigger(false) returns 0")
+    T.eq(GetTriggerInfo(TRIG1, 8), false, "GetTriggerInfo(8) disabled")
+  end)
+  if not ok then T.fail_error("EnableTrigger disable", err) end
+
+  ok, err = pcall(function()
+    T.eq(EnableTrigger(TRIG1, true), eOK, "EnableTrigger(true) returns 0")
+    T.eq(GetTriggerInfo(TRIG1, 8), true, "GetTriggerInfo(8) enabled")
+  end)
+  if not ok then T.fail_error("EnableTrigger enable", err) end
+
+  ok, err = pcall(function()
+    T.eq(SetTriggerOption(TRIG1, "sequence", 42), eOK,
+         "SetTriggerOption sequence returns 0")
+    T.eq(GetTriggerOption(TRIG1, "sequence"), 42,
+         "GetTriggerOption sequence round-trip")
+  end)
+  if not ok then T.fail_error("GetTriggerOption/SetTriggerOption round-trip", err) end
+
+  ok, err = pcall(function()
+    T.neq(AddTriggerEx(TRIG1, "Dup *", "", FLAG_ENABLED, 0, 0, "", "", 0, 100),
+         eOK, "AddTriggerEx duplicate returns error")
+  end)
+  if not ok then T.fail_error("AddTriggerEx duplicate", err) end
+
+  ok, err = pcall(function()
+    T.eq(AddTriggerEx(TRIG2, "^Hello \\w+$", "", FLAG_ENABLED + FLAG_REGEXP, 0, 0, "", "", 0, 100),
+         eOK, "AddTriggerEx with regexp flag returns 0")
+  end)
+  if not ok then T.fail_error("AddTriggerEx with regexp flag", err) end
+
+  ok, err = pcall(function()
+    T.eq(AddTriggerEx(TRIG3, "World *", "", FLAG_ENABLED, 0, 0, "", "", 0, 100), eOK,
+         "AddTriggerEx third trigger returns 0")
+    local list = GetTriggerList()
+    T.ok(list_contains(list, TRIG1), "GetTriggerList contains trig_1 (multi)")
+    T.ok(list_contains(list, TRIG2), "GetTriggerList contains trig_2 (multi)")
+    T.ok(list_contains(list, TRIG3), "GetTriggerList contains trig_3 (multi)")
+  end)
+  if not ok then T.fail_error("Multiple triggers list", err) end
+
+  ok, err = pcall(function()
+    SetTriggerOption(TRIG1, "group", GROUP)
+    SetTriggerOption(TRIG2, "group", GROUP)
+    SetTriggerOption(TRIG3, "group", GROUP)
+    EnableTriggerGroup(GROUP, false)
+    T.eq(GetTriggerInfo(TRIG1, 8), false, "Trigger disabled by EnableTriggerGroup(false)")
+    EnableTriggerGroup(GROUP, true)
+  end)
+  if not ok then T.fail_error("EnableTriggerGroup", err) end
+
+  ok, err = pcall(function()
+    T.eq(DeleteTrigger(TRIG3), eOK, "DeleteTrigger returns 0")
+  end)
+  if not ok then T.fail_error("DeleteTrigger returns 0", err) end
+
+  ok, err = pcall(function()
+    T.neq(DeleteTrigger("acid_trig_nonexistent_xyz"), eOK,
+         "DeleteTrigger nonexistent returns error")
+  end)
+  if not ok then T.fail_error("DeleteTrigger nonexistent", err) end
+
+  -- Cleanup
+  DeleteTriggerGroup(GROUP)
+  DeleteTrigger(TRIG1)
+  DeleteTrigger(TRIG2)
+  DeleteTrigger(TRIG3)
+end
+
+
+-- ============================================================
+-- Category 6: Aliases
+-- ============================================================
+
+function test_aliases()
+  T.section("Aliases")
+
+  local eOK = 0
+  local eAliasNotFound = 30003
+  local eAliasAlreadyExists = 30004
+  local FLAG_ENABLED = 1
+  local FLAG_REGEXP  = 32
+  local ALIAS1 = "acid_alias_1"
+  local ALIAS2 = "acid_alias_2"
+  local ALIAS3 = "acid_alias_3"
+  local GROUP  = "acid_test"
+  local ok, err
+
+  local function list_contains(t, v)
+    if type(t) ~= "table" then return false end
+    for i = 1, #t do if t[i] == v then return true end end
+    return false
+  end
+
+  ok, err = pcall(function()
+    T.eq(AddAlias(ALIAS1, "n", "north", FLAG_ENABLED, ""), eOK, "AddAlias returns 0")
+  end)
+  if not ok then T.fail_error("AddAlias returns 0", err) end
+
+  ok, err = pcall(function()
+    T.eq(IsAlias(ALIAS1), eOK, "IsAlias existing returns 0")
+  end)
+  if not ok then T.fail_error("IsAlias existing returns 0", err) end
+
+  ok, err = pcall(function()
+    T.neq(IsAlias("acid_alias_nonexistent_xyz"), eOK,
+         "IsAlias nonexistent returns error")
+  end)
+  if not ok then T.fail_error("IsAlias nonexistent", err) end
+
+  ok, err = pcall(function()
+    T.ok(list_contains(GetAliasList(), ALIAS1), "GetAliasList contains acid_alias_1")
+  end)
+  if not ok then T.fail_error("GetAliasList contains acid_alias_1", err) end
+
+  ok, err = pcall(function()
+    T.eq(GetAliasInfo(ALIAS1, 1), "n", "GetAliasInfo match text (code 1)")
+  end)
+  if not ok then T.fail_error("GetAliasInfo match text", err) end
+
+  ok, err = pcall(function()
+    T.eq(EnableAlias(ALIAS1, false), eOK, "EnableAlias(false) returns 0")
+  end)
+  if not ok then T.fail_error("EnableAlias disable", err) end
+
+  ok, err = pcall(function()
+    T.eq(EnableAlias(ALIAS1, true), eOK, "EnableAlias(true) returns 0")
+  end)
+  if not ok then T.fail_error("EnableAlias enable", err) end
+
+  ok, err = pcall(function()
+    T.neq(AddAlias(ALIAS1, "n", "north", FLAG_ENABLED, ""),
+         eOK, "AddAlias duplicate returns error")
+  end)
+  if not ok then T.fail_error("AddAlias duplicate", err) end
+
+  ok, err = pcall(function()
+    T.eq(AddAlias(ALIAS2, "^go (\\w+)$", "", FLAG_ENABLED + FLAG_REGEXP, ""),
+         eOK, "AddAlias with regexp returns 0")
+  end)
+  if not ok then T.fail_error("AddAlias with regexp", err) end
+
+  ok, err = pcall(function()
+    T.eq(SetAliasOption(ALIAS1, "sequence", 77), eOK,
+         "SetAliasOption sequence returns 0")
+    T.eq(GetAliasOption(ALIAS1, "sequence"), 77,
+         "GetAliasOption sequence round-trip")
+  end)
+  if not ok then T.fail_error("GetAliasOption/SetAliasOption round-trip", err) end
+
+  ok, err = pcall(function()
+    T.eq(AddAlias(ALIAS3, "s", "south", FLAG_ENABLED, ""), eOK,
+         "AddAlias third alias returns 0")
+    local list = GetAliasList()
+    T.ok(list_contains(list, ALIAS1), "GetAliasList contains alias_1 (multi)")
+    T.ok(list_contains(list, ALIAS2), "GetAliasList contains alias_2 (multi)")
+    T.ok(list_contains(list, ALIAS3), "GetAliasList contains alias_3 (multi)")
+  end)
+  if not ok then T.fail_error("Multiple aliases list", err) end
+
+  ok, err = pcall(function()
+    SetAliasOption(ALIAS1, "group", GROUP)
+    SetAliasOption(ALIAS2, "group", GROUP)
+    SetAliasOption(ALIAS3, "group", GROUP)
+    EnableAliasGroup(GROUP, false)
+    EnableAliasGroup(GROUP, true)
+    T.ok(true, "EnableAliasGroup disable/enable succeeds")
+  end)
+  if not ok then T.fail_error("EnableAliasGroup", err) end
+
+  ok, err = pcall(function()
+    T.eq(DeleteAlias(ALIAS3), eOK, "DeleteAlias returns 0")
+  end)
+  if not ok then T.fail_error("DeleteAlias returns 0", err) end
+
+  ok, err = pcall(function()
+    T.neq(DeleteAlias("acid_alias_nonexistent_xyz"), eOK,
+         "DeleteAlias nonexistent returns error")
+  end)
+  if not ok then T.fail_error("DeleteAlias nonexistent", err) end
+
+  -- Cleanup
+  DeleteAliasGroup(GROUP)
+  DeleteAlias(ALIAS1)
+  DeleteAlias(ALIAS2)
+  DeleteAlias(ALIAS3)
+end
+
+
+-- ============================================================
+-- Category 7: Timers
+-- ============================================================
+
+function test_timers()
+  T.section("Timers")
+
+  local eOK = 0
+  local eTimerNotFound = 30006
+  local eTimerAlreadyExists = 30007
+  local FLAG_ENABLED = 1
+  local TIMER1 = "acid_timer_1"
+  local TIMER2 = "acid_timer_2"
+  local TIMER3 = "acid_timer_3"
+  local GROUP  = "acid_test"
+  local ok, err
+
+  local function list_contains(t, v)
+    if type(t) ~= "table" then return false end
+    for i = 1, #t do if t[i] == v then return true end end
+    return false
+  end
+
+  ok, err = pcall(function()
+    T.eq(AddTimer(TIMER1, 0, 0, 30, "say tick", FLAG_ENABLED, ""), eOK,
+         "AddTimer returns 0")
+  end)
+  if not ok then T.fail_error("AddTimer returns 0", err) end
+
+  ok, err = pcall(function()
+    T.eq(IsTimer(TIMER1), eOK, "IsTimer existing returns 0")
+  end)
+  if not ok then T.fail_error("IsTimer existing returns 0", err) end
+
+  ok, err = pcall(function()
+    T.neq(IsTimer("acid_timer_nonexistent_xyz"), eOK,
+         "IsTimer nonexistent returns error")
+  end)
+  if not ok then T.fail_error("IsTimer nonexistent", err) end
+
+  ok, err = pcall(function()
+    T.ok(list_contains(GetTimerList(), TIMER1), "GetTimerList contains acid_timer_1")
+  end)
+  if not ok then T.fail_error("GetTimerList contains acid_timer_1", err) end
+
+  ok, err = pcall(function()
+    T.eq(EnableTimer(TIMER1, false), eOK, "EnableTimer(false) returns 0")
+  end)
+  if not ok then T.fail_error("EnableTimer disable", err) end
+
+  ok, err = pcall(function()
+    T.eq(EnableTimer(TIMER1, true), eOK, "EnableTimer(true) returns 0")
+  end)
+  if not ok then T.fail_error("EnableTimer enable", err) end
+
+  ok, err = pcall(function()
+    T.neq(AddTimer(TIMER1, 0, 1, 0, "say dup", FLAG_ENABLED, ""),
+         eOK, "AddTimer duplicate returns error")
+  end)
+  if not ok then T.fail_error("AddTimer duplicate", err) end
+
+  ok, err = pcall(function()
+    T.eq(ResetTimer(TIMER1), eOK, "ResetTimer returns 0")
+  end)
+  if not ok then T.fail_error("ResetTimer returns 0", err) end
+
+  ok, err = pcall(function()
+    T.eq(SetTimerOption(TIMER1, "send", "say tock"), eOK,
+         "SetTimerOption send returns 0")
+    T.eq(GetTimerOption(TIMER1, "send"), "say tock",
+         "GetTimerOption send round-trip")
+  end)
+  if not ok then T.fail_error("GetTimerOption/SetTimerOption round-trip", err) end
+
+  ok, err = pcall(function()
+    T.eq(AddTimer(TIMER2, 0, 0, 45, "say timer2", FLAG_ENABLED, ""), eOK,
+         "AddTimer second returns 0")
+    T.eq(AddTimer(TIMER3, 0, 1, 0, "say timer3", FLAG_ENABLED, ""), eOK,
+         "AddTimer third returns 0")
+    local list = GetTimerList()
+    T.ok(list_contains(list, TIMER1), "GetTimerList contains timer_1 (multi)")
+    T.ok(list_contains(list, TIMER2), "GetTimerList contains timer_2 (multi)")
+    T.ok(list_contains(list, TIMER3), "GetTimerList contains timer_3 (multi)")
+  end)
+  if not ok then T.fail_error("Multiple timers list", err) end
+
+  ok, err = pcall(function()
+    SetTimerOption(TIMER1, "group", GROUP)
+    SetTimerOption(TIMER2, "group", GROUP)
+    SetTimerOption(TIMER3, "group", GROUP)
+    EnableTimerGroup(GROUP, false)
+    EnableTimerGroup(GROUP, true)
+    T.ok(true, "EnableTimerGroup disable/enable succeeds")
+  end)
+  if not ok then T.fail_error("EnableTimerGroup", err) end
+
+  ok, err = pcall(function()
+    local ret = DoAfter(99, "say do_after_test")
+    T.ok(ret ~= nil, "DoAfter returns non-nil")
+  end)
+  if not ok then T.fail_error("DoAfter creates one-shot timer", err) end
+
+  ok, err = pcall(function()
+    local ret = DoAfterNote(99, "acid_do_after_note")
+    T.ok(ret ~= nil, "DoAfterNote returns non-nil")
+  end)
+  if not ok then T.fail_error("DoAfterNote creates one-shot timer", err) end
+
+  ok, err = pcall(function()
+    local ret = DoAfterSpecial(99, "say special", 0)
+    T.ok(ret ~= nil, "DoAfterSpecial returns non-nil")
+  end)
+  if not ok then T.fail_error("DoAfterSpecial", err) end
+
+  ok, err = pcall(function()
+    T.eq(DeleteTimer(TIMER3), eOK, "DeleteTimer returns 0")
+  end)
+  if not ok then T.fail_error("DeleteTimer returns 0", err) end
+
+  ok, err = pcall(function()
+    T.neq(DeleteTimer("acid_timer_nonexistent_xyz"), eOK,
+         "DeleteTimer nonexistent returns error")
+  end)
+  if not ok then T.fail_error("DeleteTimer nonexistent", err) end
+
+  -- Cleanup
+  DeleteTimerGroup(GROUP)
+  DeleteTimer(TIMER1)
+  DeleteTimer(TIMER2)
+  DeleteTimer(TIMER3)
+  -- Delete anonymous DoAfter* timers so they don't fire later
+  DeleteTemporaryTimers()
+end
+
+
+-- ============================================================
+-- Category 8: Database
+-- ============================================================
+
+function test_db()
+  T.section("Database")
+
+  local DB = "acid_test_db"
+  local ok, err
+
+  ok, err = pcall(function()
+    T.eq(DatabaseOpen(DB, ":memory:"), 0, "DatabaseOpen :memory: returns 0")
+  end)
+  if not ok then T.fail_error("DatabaseOpen :memory: returns 0", err) end
+
+  ok, err = pcall(function()
+    T.eq(DatabaseExec(DB, "CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT, value INTEGER)"),
+         0, "DatabaseExec CREATE TABLE returns 0")
+  end)
+  if not ok then T.fail_error("DatabaseExec CREATE TABLE returns 0", err) end
+
+  ok, err = pcall(function()
+    T.eq(DatabaseExec(DB, "INSERT INTO test (name, value) VALUES ('alpha', 42)"),
+         0, "DatabaseExec INSERT returns 0")
+  end)
+  if not ok then T.fail_error("DatabaseExec INSERT returns 0", err) end
+
+  ok, err = pcall(function()
+    T.eq(DatabaseChanges(DB), 1, "DatabaseChanges returns 1 after single insert")
+  end)
+  if not ok then T.fail_error("DatabaseChanges returns 1", err) end
+
+  ok, err = pcall(function()
+    local rowid = DatabaseLastInsertRowid(DB)
+    T.ok(type(rowid) == "string" and rowid ~= "", "DatabaseLastInsertRowid returns non-empty string")
+  end)
+  if not ok then T.fail_error("DatabaseLastInsertRowid", err) end
+
+  ok, err = pcall(function()
+    DatabaseExec(DB, "INSERT INTO test (name, value) VALUES ('beta', 99)")
+    DatabaseExec(DB, "INSERT INTO test (name, value) VALUES ('gamma', 7)")
+    local total = DatabaseTotalChanges(DB)
+    T.ok(type(total) == "number" and total >= 3, "DatabaseTotalChanges >= 3")
+  end)
+  if not ok then T.fail_error("DatabaseTotalChanges", err) end
+
+  ok, err = pcall(function()
+    T.eq(DatabasePrepare(DB, "SELECT id, name, value FROM test WHERE name = 'alpha'"),
+         0, "DatabasePrepare SELECT returns 0")
+  end)
+  if not ok then T.fail_error("DatabasePrepare SELECT returns 0", err) end
+
+  ok, err = pcall(function()
+    T.eq(DatabaseColumns(DB), 3, "DatabaseColumns returns 3")
+  end)
+  if not ok then T.fail_error("DatabaseColumns returns 3", err) end
+
+  ok, err = pcall(function()
+    local names = DatabaseColumnNames(DB)
+    T.ok(type(names) == "table", "DatabaseColumnNames returns table")
+    T.eq(names[1], "id",    "DatabaseColumnNames[1] == 'id'")
+    T.eq(names[2], "name",  "DatabaseColumnNames[2] == 'name'")
+    T.eq(names[3], "value", "DatabaseColumnNames[3] == 'value'")
+  end)
+  if not ok then T.fail_error("DatabaseColumnNames", err) end
+
+  ok, err = pcall(function()
+    T.eq(DatabaseColumnName(DB, 2), "name", "DatabaseColumnName(2) == 'name'")
+  end)
+  if not ok then T.fail_error("DatabaseColumnName", err) end
+
+  ok, err = pcall(function()
+    T.eq(DatabaseStep(DB), 100, "DatabaseStep returns 100 (SQLITE_ROW)")
+  end)
+  if not ok then T.fail_error("DatabaseStep returns 100", err) end
+
+  ok, err = pcall(function()
+    T.eq(DatabaseColumnText(DB, 2), "alpha", "DatabaseColumnText returns 'alpha'")
+  end)
+  if not ok then T.fail_error("DatabaseColumnText returns 'alpha'", err) end
+
+  ok, err = pcall(function()
+    T.eq(DatabaseColumnValue(DB, 3), 42, "DatabaseColumnValue returns 42")
+  end)
+  if not ok then T.fail_error("DatabaseColumnValue returns 42", err) end
+
+  ok, err = pcall(function()
+    local vals = DatabaseColumnValues(DB)
+    T.ok(type(vals) == "table", "DatabaseColumnValues returns table")
+    T.eq(vals[2], "alpha", "DatabaseColumnValues[2] == 'alpha'")
+  end)
+  if not ok then T.fail_error("DatabaseColumnValues", err) end
+
+  ok, err = pcall(function()
+    T.eq(DatabaseColumnType(DB, 2), 3, "DatabaseColumnType returns 3 (SQLITE_TEXT)")
+  end)
+  if not ok then T.fail_error("DatabaseColumnType returns 3", err) end
+
+  ok, err = pcall(function()
+    T.eq(DatabaseStep(DB), 101, "DatabaseStep returns 101 (SQLITE_DONE)")
+  end)
+  if not ok then T.fail_error("DatabaseStep returns 101", err) end
+
+  ok, err = pcall(function()
+    T.eq(DatabaseReset(DB), 0, "DatabaseReset returns 0")
+    T.eq(DatabaseStep(DB), 100, "DatabaseStep returns 100 after reset")
+  end)
+  if not ok then T.fail_error("DatabaseReset", err) end
+
+  ok, err = pcall(function()
+    while DatabaseStep(DB) == 100 do end
+    T.eq(DatabaseFinalize(DB), 0, "DatabaseFinalize returns 0")
+  end)
+  if not ok then T.fail_error("DatabaseFinalize returns 0", err) end
+
+  ok, err = pcall(function()
+    local v = DatabaseGetField(DB, "SELECT value FROM test WHERE name = 'beta'")
+    T.eq(v, 99, "DatabaseGetField returns 99 for beta")
+  end)
+  if not ok then T.fail_error("DatabaseGetField returns 99", err) end
+
+  ok, err = pcall(function()
+    local list = DatabaseList()
+    T.ok(type(list) == "table", "DatabaseList returns table")
+    local found = false
+    for i = 1, #list do
+      if list[i] == DB then found = true; break end
+    end
+    T.ok(found, "DatabaseList includes 'acid_test_db'")
+  end)
+  if not ok then T.fail_error("DatabaseList includes acid_test_db", err) end
+
+  ok, err = pcall(function()
+    local rc = DatabaseExec(DB, "THIS IS NOT VALID SQL !!!!")
+    T.ok(rc ~= 0, "DatabaseExec syntax error returns non-zero")
+  end)
+  if not ok then T.fail_error("DatabaseExec syntax error", err) end
+
+  ok, err = pcall(function()
+    local msg = DatabaseError(DB)
+    T.ok(type(msg) == "string" and msg ~= "", "DatabaseError returns non-empty string")
+  end)
+  if not ok then T.fail_error("DatabaseError", err) end
+
+  ok, err = pcall(function()
+    T.eq(DatabaseClose(DB), 0, "DatabaseClose returns 0")
+  end)
+  if not ok then T.fail_error("DatabaseClose returns 0", err) end
+
+  ok, err = pcall(function()
+    local rc = DatabaseClose("nonexistent_acid_db_xyz")
+    T.ok(type(rc) == "number" and rc ~= 0, "DatabaseClose nonexistent returns error")
+  end)
+  if not ok then T.fail_error("DatabaseClose nonexistent returns error", err) end
+end
+
+
+-- ============================================================
+-- Category 9: World Info & Options
+-- ============================================================
+
+function test_world()
+  T.section("World Info & Options")
+
+  local ok, err
+
+  ok, err = pcall(function()
+    T.ok(type(GetInfo(2)) == "string", "GetInfo(2) returns string (world name)")
+  end)
+  if not ok then T.fail_error("GetInfo(2)", err) end
+
+  ok, err = pcall(function()
+    T.ok(type(GetInfo(3)) == "string", "GetInfo(3) returns string (character name)")
+  end)
+  if not ok then T.fail_error("GetInfo(3)", err) end
+
+  ok, err = pcall(function()
+    T.ok(type(GetInfo(1)) == "string", "GetInfo(1) returns string (server address)")
+  end)
+  if not ok then T.fail_error("GetInfo(1)", err) end
+
+  ok, err = pcall(function()
+    T.ok(type(WorldPort()) == "number", "WorldPort() returns number")
+  end)
+  if not ok then T.fail_error("WorldPort()", err) end
+
+  ok, err = pcall(function()
+    T.ok(type(GetInfo(54)) == "string", "GetInfo(54) returns string (world file path)")
+  end)
+  if not ok then T.fail_error("GetInfo(54)", err) end
+
+  ok, err = pcall(function()
+    T.ok(type(GetInfo(66)) == "string", "GetInfo(66) returns string (app directory)")
+  end)
+  if not ok then T.fail_error("GetInfo(66)", err) end
+
+  ok, err = pcall(function()
+    local ver = GetInfo(72)
+    T.ok(type(ver) == "string" and #ver > 0, "GetInfo(72) returns non-empty version string")
+    T.match(ver, "^%d+%.%d+", "GetInfo(72) matches version format (x.y)")
+  end)
+  if not ok then T.fail_error("GetInfo(72)", err) end
+
+  ok, err = pcall(function()
+    T.ok(type(GetWorldID()) == "string", "GetWorldID() returns string")
+  end)
+  if not ok then T.fail_error("GetWorldID()", err) end
+
+  ok, err = pcall(function()
+    T.ok(type(WorldName()) == "string", "WorldName() returns string")
+  end)
+  if not ok then T.fail_error("WorldName()", err) end
+
+  ok, err = pcall(function()
+    T.ok(type(GetOption("wrap_column")) == "number", "GetOption('wrap_column') returns number")
+  end)
+  if not ok then T.fail_error("GetOption('wrap_column')", err) end
+
+  ok, err = pcall(function()
+    local orig = GetOption("wrap_column")
+    local safe_val = (orig == 80) and 100 or 80
+    T.eq(SetOption("wrap_column", safe_val), 0, "SetOption('wrap_column') returns 0")
+    T.eq(GetOption("wrap_column"), safe_val, "GetOption reflects SetOption")
+    SetOption("wrap_column", orig)
+  end)
+  if not ok then T.fail_error("SetOption/GetOption round-trip", err) end
+
+  ok, err = pcall(function()
+    T.ok(type(GetLineCount()) == "number", "GetLineCount() returns number")
+  end)
+  if not ok then T.fail_error("GetLineCount()", err) end
+
+  ok, err = pcall(function()
+    T.ok(type(GetLinesInBufferCount()) == "number", "GetLinesInBufferCount() returns number")
+  end)
+  if not ok then T.fail_error("GetLinesInBufferCount()", err) end
+
+  ok, err = pcall(function()
+    T.ok(type(GetCommand()) == "string", "GetCommand() returns string")
+  end)
+  if not ok then T.fail_error("GetCommand()", err) end
+
+  ok, err = pcall(function()
+    T.ok(type(GetScriptTime()) == "number", "GetScriptTime() returns number")
+  end)
+  if not ok then T.fail_error("GetScriptTime()", err) end
+
+  ok, err = pcall(function()
+    local v = Version()
+    T.ok(type(v) == "string", "Version() returns string")
+    T.match(v, "^%d+%.%d+", "Version() matches numeric format (x.y)")
+  end)
+  if not ok then T.fail_error("Version()", err) end
+end
+
+
+-- ============================================================
+-- Category 10: Plugin API
+-- ============================================================
+
+function test_plugins()
+  T.section("Plugin API")
+
+  local OUR_ID = "ac1d0e5a00010001ac1d0001"
+  local ok, err
+
+  ok, err = pcall(function()
+    local id = GetPluginID()
+    T.ok(type(id) == "string" and id ~= "", "GetPluginID() returns non-empty string")
+    T.eq(id, OUR_ID, "GetPluginID() returns expected ID")
+  end)
+  if not ok then T.fail_error("GetPluginID()", err) end
+
+  ok, err = pcall(function()
+    T.eq(GetPluginInfo(OUR_ID, 1), "Acid_Test", "GetPluginInfo(id, 1) == 'Acid_Test'")
+  end)
+  if not ok then T.fail_error("GetPluginInfo(id, 1)", err) end
+
+  ok, err = pcall(function()
+    T.ok(type(GetPluginInfo(OUR_ID, 3)) == "string", "GetPluginInfo(id, 3) returns string")
+  end)
+  if not ok then T.fail_error("GetPluginInfo(id, 3)", err) end
+
+  ok, err = pcall(function()
+    local list = GetPluginList()
+    T.ok(type(list) == "table", "GetPluginList() returns table")
+    local found = false
+    for i = 1, #list do
+      if list[i] == OUR_ID then found = true; break end
+    end
+    T.ok(found, "GetPluginList() contains our plugin ID")
+  end)
+  if not ok then T.fail_error("GetPluginList()", err) end
+
+  ok, err = pcall(function()
+    local installed = IsPluginInstalled(OUR_ID)
+    T.ok(installed ~= false and installed ~= 0 and installed ~= nil,
+         "IsPluginInstalled(our_id) returns truthy")
+  end)
+  if not ok then T.fail_error("IsPluginInstalled(our_id)", err) end
+
+  ok, err = pcall(function()
+    local installed = IsPluginInstalled("nonexistent_plugin_id_xyz_000000000000")
+    T.ok(installed == false or installed == 0 or installed == nil,
+         "IsPluginInstalled(nonexistent) returns falsy")
+  end)
+  if not ok then T.fail_error("IsPluginInstalled(nonexistent)", err) end
+
+  ok, err = pcall(function()
+    T.eq(PluginSupports(OUR_ID, "OnPluginInstall"), 0,
+         "PluginSupports 'OnPluginInstall' returns 0")
+  end)
+  if not ok then T.fail_error("PluginSupports 'OnPluginInstall'", err) end
+
+  ok, err = pcall(function()
+    local rc = PluginSupports(OUR_ID, "NonexistentCallbackXyz")
+    T.ok(rc ~= 0, "PluginSupports nonexistent callback returns non-zero")
+  end)
+  if not ok then T.fail_error("PluginSupports nonexistent", err) end
+
+  ok, err = pcall(function()
+    T.eq(SaveState(), 0, "SaveState() returns 0")
+  end)
+  if not ok then T.fail_error("SaveState()", err) end
+end
+
+
+-- ============================================================
+-- Category 11: Logging
+-- ============================================================
+
+function test_log()
+  T.section("Logging")
+
+  local tmpfile = os.tmpname() .. "_acid_test.log"
+  local ok, err
+
+  -- Close any existing log first
+  local was_open = IsLogOpen()
+  if was_open and was_open ~= false and was_open ~= 0 then
+    pcall(function() CloseLog() end)
+  end
+
+  ok, err = pcall(function()
+    local open = IsLogOpen()
+    T.ok(open == false or open == 0 or open == nil, "IsLogOpen() is falsy before OpenLog")
+  end)
+  if not ok then T.fail_error("IsLogOpen() before OpenLog", err) end
+
+  ok, err = pcall(function()
+    local rc = OpenLog(tmpfile, false)
+    T.eq(rc, 0, "OpenLog(tmpfile) returns 0")
+  end)
+  if not ok then
+    T.fail_error("OpenLog(tmpfile) returns 0", err)
+    pcall(function() CloseLog() end)
+    pcall(function() os.remove(tmpfile) end)
+    return
+  end
+
+  ok, err = pcall(function()
+    local open = IsLogOpen()
+    T.ok(open == true or open == 1 or (type(open) == "number" and open ~= 0),
+         "IsLogOpen() is truthy after OpenLog")
+  end)
+  if not ok then T.fail_error("IsLogOpen() after OpenLog", err) end
+
+  ok, err = pcall(function()
+    local rc = WriteLog("acid test log entry\n")
+    T.ok(rc == 0 or rc == nil, "WriteLog() succeeds")
+  end)
+  if not ok then T.fail_error("WriteLog()", err) end
+
+  ok, err = pcall(function()
+    local rc = FlushLog()
+    T.ok(rc == 0 or rc == nil, "FlushLog() succeeds")
+  end)
+  if not ok then T.fail_error("FlushLog()", err) end
+
+  ok, err = pcall(function()
+    local rc = CloseLog()
+    T.ok(rc == 0 or rc == nil, "CloseLog() succeeds")
+  end)
+  if not ok then T.fail_error("CloseLog()", err) end
+
+  ok, err = pcall(function()
+    local open = IsLogOpen()
+    T.ok(open == false or open == 0 or open == nil, "IsLogOpen() is falsy after CloseLog")
+  end)
+  if not ok then T.fail_error("IsLogOpen() after CloseLog", err) end
+
+  -- Cleanup
+  pcall(function() os.remove(tmpfile) end)
+end
+
+
+-- ============================================================
+-- Category 12: Output
+-- ============================================================
+
+function test_output()
+  T.section("Output")
+
+  local ok, err
+
+  ok, err = pcall(function() Note("acid_test_output") end)
+  if not ok then T.fail_error("Note doesn't error", err) else T.ok(true, "Note doesn't error") end
+
+  ok, err = pcall(function() Tell("partial_tell") end)
+  if not ok then T.fail_error("Tell doesn't error", err) else T.ok(true, "Tell doesn't error") end
+  pcall(function() Note("") end)
+
+  ok, err = pcall(function() ColourNote("white", "black", "colored text") end)
+  if not ok then T.fail_error("ColourNote doesn't error", err) else T.ok(true, "ColourNote doesn't error") end
+
+  ok, err = pcall(function() ColourTell("red", "blue", "partial_colour") end)
+  if not ok then T.fail_error("ColourTell doesn't error", err) else T.ok(true, "ColourTell doesn't error") end
+  pcall(function() Note("") end)
+
+  ok, err = pcall(function() AnsiNote("\027[31mred\027[0m") end)
+  if not ok then T.fail_error("AnsiNote doesn't error", err) else T.ok(true, "AnsiNote doesn't error") end
+
+  ok, err = pcall(function() NoteHr() end)
+  if not ok then T.fail_error("NoteHr doesn't error", err) else T.ok(true, "NoteHr doesn't error") end
+
+  ok, err = pcall(function() NoteStyle(1) end)
+  if not ok then T.fail_error("NoteStyle(1) doesn't error", err) else T.ok(true, "NoteStyle(1) bold on doesn't error") end
+
+  ok, err = pcall(function() NoteStyle(0) end)
+  if not ok then T.fail_error("NoteStyle(0) doesn't error", err) else T.ok(true, "NoteStyle(0) bold off doesn't error") end
+
+  ok, err = pcall(function()
+    T.ok(type(GetLineCount()) == "number" and GetLineCount() >= 0,
+         "GetLineCount returns number >= 0")
+  end)
+  if not ok then T.fail_error("GetLineCount returns number >= 0", err) end
+
+  ok, err = pcall(function()
+    T.ok(type(GetLinesInBufferCount()) == "number" and GetLinesInBufferCount() >= 0,
+         "GetLinesInBufferCount returns number >= 0")
+  end)
+  if not ok then T.fail_error("GetLinesInBufferCount returns number >= 0", err) end
+
+  ok, err = pcall(function()
+    local count = GetLineCount()
+    local text = GetLineInfo(count, 1)
+    T.ok(text == nil or type(text) == "string", "GetLineInfo(last, 1) returns string or nil")
+  end)
+  if not ok then T.fail_error("GetLineInfo(last, 1)", err) end
+
+  ok, err = pcall(function()
+    local count = GetLineCount()
+    local style_text = GetStyleInfo(count, 1, 1)
+    T.ok(style_text == nil or type(style_text) == "string",
+         "GetStyleInfo(last, 1, 1) returns string or nil")
+  end)
+  if not ok then T.fail_error("GetStyleInfo(last, 1, 1)", err) end
+
+  ok, err = pcall(function()
+    local marker = "acid_marker_" .. tostring(os.time())
+    Note(marker)
+    local count = GetLineCount()
+    -- Try both last line and second-to-last (indexing may differ)
+    local text = GetLineInfo(count, 1)
+    local text2 = count > 1 and GetLineInfo(count - 1, 1) or nil
+    local found = (text and string.find(text, "acid_marker_"))
+                  or (text2 and string.find(text2, "acid_marker_"))
+    T.ok(found, "GetLineInfo after Note contains marker text")
+  end)
+  if not ok then T.fail_error("GetLineInfo after Note contains marker text", err) end
+
+  ok, err = pcall(function()
+    Hyperlink("http://example.com", "click me", "tooltip", "white", "black", false)
+  end)
+  if not ok then T.fail_error("Hyperlink doesn't crash", err) else T.ok(true, "Hyperlink doesn't crash") end
+
+  ok, err = pcall(function()
+    local count = GetLineCount()
+    if count > 0 then
+      Bookmark(count, 1)
+      Bookmark(count, 0)
+    end
+    T.ok(true, "Bookmark set/clear doesn't error")
+  end)
+  if not ok then T.fail_error("Bookmark set/clear doesn't error", err) end
+end
+
+
+-- ============================================================
+-- Category 13: Notepad
+-- ============================================================
+
+function test_notepad()
+  T.section("Notepad")
+
+  local pad = "acid_test_pad"
+  local ok, err
+
+  pcall(function() CloseNotepad(pad) end)
+
+  ok, err = pcall(function()
+    local result = SendToNotepad(pad, "hello")
+    T.ok(result == true or result == 0, "SendToNotepad creates notepad")
+  end)
+  if not ok then T.fail_error("SendToNotepad", err) end
+
+  ok, err = pcall(function()
+    local list = GetNotepadList()
+    T.ok(type(list) == "table", "GetNotepadList returns table")
+    local found = false
+    for i = 1, #list do if list[i] == pad then found = true; break end end
+    T.ok(found, "GetNotepadList includes acid_test_pad")
+  end)
+  if not ok then T.fail_error("GetNotepadList includes pad", err) end
+
+  ok, err = pcall(function()
+    local text = GetNotepadText(pad)
+    T.ok(type(text) == "string" and text:find("hello"), "GetNotepadText contains 'hello'")
+  end)
+  if not ok then T.fail_error("GetNotepadText contains 'hello'", err) end
+
+  ok, err = pcall(function()
+    local len = GetNotepadLength(pad)
+    T.ok(type(len) == "number" and len >= 0, "GetNotepadLength returns number >= 0")
+  end)
+  if not ok then T.fail_error("GetNotepadLength", err) end
+
+  ok, err = pcall(function()
+    local result = AppendToNotepad(pad, " world")
+    T.ok(result == true or result == 0, "AppendToNotepad succeeds")
+    local text = GetNotepadText(pad)
+    T.ok(text:find("hello") and text:find("world"), "GetNotepadText after append contains both")
+  end)
+  if not ok then T.fail_error("AppendToNotepad", err) end
+
+  ok, err = pcall(function()
+    ReplaceNotepad(pad, "replaced")
+    T.ok(true, "ReplaceNotepad doesn't error")
+    local text = GetNotepadText(pad)
+    T.ok(text and text:find("replaced"), "GetNotepadText after replace contains 'replaced'")
+  end)
+  if not ok then T.fail_error("ReplaceNotepad", err) end
+
+  ok, err = pcall(function()
+    NotepadReadOnly(pad, 1)
+    NotepadReadOnly(pad, 0)
+    T.ok(true, "NotepadReadOnly set/clear succeeds")
+  end)
+  if not ok then T.fail_error("NotepadReadOnly", err) end
+
+  ok, err = pcall(function()
+    local result = CloseNotepad(pad)
+    T.ok(result ~= nil and result ~= false, "CloseNotepad succeeds")
+  end)
+  if not ok then T.fail_error("CloseNotepad", err) end
+
+  ok, err = pcall(function()
+    local list = GetNotepadList()
+    if type(list) == "table" then
+      local found = false
+      for i = 1, #list do if list[i] == pad then found = true; break end end
+      T.ok(not found, "GetNotepadList no longer includes acid_test_pad")
+    else
+      T.ok(true, "GetNotepadList returns nil/empty (pad closed)")
+    end
+  end)
+  if not ok then T.fail_error("GetNotepadList after close", err) end
+
+  ok, err = pcall(function()
+    local result = CloseNotepad("acid_nonexistent_pad_xyz")
+    -- Different clients return different values for nonexistent; just verify callable
+    T.ok(true, "CloseNotepad nonexistent is callable")
+  end)
+  if not ok then T.fail_error("CloseNotepad nonexistent", err) end
+end
+
+
+-- ============================================================
+-- Category 14: MiniWindow
+-- ============================================================
+
+function test_miniwin()
+  T.section("MiniWindow")
+
+  local win = "acid_win"
+  local ok, err
+
+  pcall(function() WindowDelete(win) end)
+
+  ok, err = pcall(function()
+    T.eq(WindowCreate(win, 0, 0, 200, 100, 0, 0, 0), 0, "WindowCreate returns 0")
+  end)
+  if not ok then T.fail_error("WindowCreate returns 0", err) end
+
+  ok, err = pcall(function()
+    local list = WindowList()
+    T.ok(type(list) == "table", "WindowList returns table")
+    local found = false
+    for i = 1, #list do if list[i] == win then found = true; break end end
+    T.ok(found, "WindowList includes acid_win")
+  end)
+  if not ok then T.fail_error("WindowList includes acid_win", err) end
+
+  ok, err = pcall(function()
+    T.eq(WindowInfo(win, 3), 200, "WindowInfo(3) returns width 200")
+  end)
+  if not ok then T.fail_error("WindowInfo(3) width", err) end
+
+  ok, err = pcall(function()
+    T.eq(WindowInfo(win, 4), 100, "WindowInfo(4) returns height 100")
+  end)
+  if not ok then T.fail_error("WindowInfo(4) height", err) end
+
+  ok, err = pcall(function()
+    T.eq(WindowFont(win, "f1", "Arial", 12, false, false, false, false), 0,
+         "WindowFont returns 0")
+  end)
+  if not ok then T.fail_error("WindowFont", err) end
+
+  ok, err = pcall(function()
+    local list = WindowFontList(win)
+    T.ok(type(list) == "table", "WindowFontList returns table")
+    local found = false
+    for i = 1, #list do if list[i] == "f1" then found = true; break end end
+    T.ok(found, "WindowFontList includes f1")
+  end)
+  if not ok then T.fail_error("WindowFontList", err) end
+
+  ok, err = pcall(function()
+    local width = WindowText(win, "f1", "Hello", 10, 10, 0, 0, 0xFFFFFF, false)
+    T.ok(type(width) == "number" and width > 0, "WindowText returns width > 0")
+  end)
+  if not ok then T.fail_error("WindowText", err) end
+
+  ok, err = pcall(function()
+    local width = WindowTextWidth(win, "f1", "Hello")
+    T.ok(type(width) == "number" and width > 0, "WindowTextWidth returns width > 0")
+  end)
+  if not ok then T.fail_error("WindowTextWidth", err) end
+
+  ok, err = pcall(function()
+    T.eq(WindowRectOp(win, 2, 0, 0, 200, 100, 0xFF0000, 0), 0, "WindowRectOp fill returns 0")
+  end)
+  if not ok then T.fail_error("WindowRectOp fill", err) end
+
+  ok, err = pcall(function()
+    T.eq(WindowLine(win, 0, 0, 200, 100, 0xFFFFFF, 0, 1), 0, "WindowLine returns 0")
+  end)
+  if not ok then T.fail_error("WindowLine", err) end
+
+  ok, err = pcall(function()
+    T.eq(WindowCircleOp(win, 1, 10, 10, 50, 50, 0xFF0000, 0, 1, 0xFF0000, 0), 0,
+         "WindowCircleOp returns 0")
+  end)
+  if not ok then T.fail_error("WindowCircleOp", err) end
+
+  ok, err = pcall(function()
+    T.eq(WindowSetPixel(win, 5, 5, 0xFF0000), 0, "WindowSetPixel returns 0")
+  end)
+  if not ok then T.fail_error("WindowSetPixel", err) end
+
+  ok, err = pcall(function()
+    T.eq(WindowGetPixel(win, 5, 5), 0xFF0000, "WindowGetPixel returns 0xFF0000")
+  end)
+  if not ok then T.fail_error("WindowGetPixel", err) end
+
+  ok, err = pcall(function()
+    T.eq(WindowResize(win, 300, 150, 0), 0, "WindowResize returns 0")
+  end)
+  if not ok then T.fail_error("WindowResize", err) end
+
+  ok, err = pcall(function()
+    T.eq(WindowInfo(win, 3), 300, "WindowInfo(3) returns 300 after resize")
+  end)
+  if not ok then T.fail_error("WindowInfo(3) after resize", err) end
+
+  ok, err = pcall(function()
+    T.eq(WindowShow(win, true), 0, "WindowShow(true) returns 0")
+  end)
+  if not ok then T.fail_error("WindowShow(true)", err) end
+
+  ok, err = pcall(function()
+    T.eq(WindowShow(win, false), 0, "WindowShow(false) returns 0")
+  end)
+  if not ok then T.fail_error("WindowShow(false)", err) end
+
+  ok, err = pcall(function()
+    T.eq(WindowDelete(win), 0, "WindowDelete returns 0")
+  end)
+  if not ok then T.fail_error("WindowDelete returns 0", err) end
+
+  ok, err = pcall(function()
+    local list = WindowList()
+    local found = false
+    for i = 1, #list do if list[i] == win then found = true; break end end
+    T.ok(not found, "WindowList no longer includes acid_win")
+  end)
+  if not ok then T.fail_error("WindowList after delete", err) end
+
+  ok, err = pcall(function()
+    local result = WindowDelete("acid_nonexistent_win_xyz")
+    T.ok(result ~= 0, "WindowDelete nonexistent returns error")
+  end)
+  if not ok then T.fail_error("WindowDelete nonexistent", err) end
+end
+
+
+-- ============================================================
+-- Category 15: Mapper
+-- ============================================================
+
+function test_mapper()
+  T.section("Mapper")
+
+  local ok, err
+
+  pcall(function() DeleteAllMapItems() end)
+
+  ok, err = pcall(function()
+    EnableMapping(1)
+    T.ok(true, "EnableMapping(1) doesn't error")
+  end)
+  if not ok then T.fail_error("EnableMapping(1)", err) end
+
+  local initial_count = 0
+  ok, err = pcall(function()
+    initial_count = GetMappingCount()
+    T.ok(type(initial_count) == "number" and initial_count >= 0,
+         "GetMappingCount returns number >= 0")
+  end)
+  if not ok then T.fail_error("GetMappingCount initial", err) end
+
+  ok, err = pcall(function()
+    T.eq(AddToMapper("n", "s"), 0, "AddToMapper('n', 's') returns 0")
+  end)
+  if not ok then T.fail_error("AddToMapper('n', 's')", err) end
+
+  ok, err = pcall(function()
+    T.ok(GetMappingCount() > initial_count, "GetMappingCount increments after AddToMapper")
+  end)
+  if not ok then T.fail_error("GetMappingCount increments", err) end
+
+  ok, err = pcall(function()
+    T.eq(AddToMapper("s", "n"), 0, "AddToMapper('s', 'n') returns 0")
+  end)
+  if not ok then T.fail_error("AddToMapper('s', 'n')", err) end
+
+  ok, err = pcall(function()
+    T.ok(type(GetMappingString()) == "string", "GetMappingString returns string")
+  end)
+  if not ok then T.fail_error("GetMappingString", err) end
+
+  ok, err = pcall(function()
+    T.eq(AddMapperComment("test comment"), 0, "AddMapperComment returns 0")
+  end)
+  if not ok then T.fail_error("AddMapperComment", err) end
+
+  ok, err = pcall(function()
+    local count_before = GetMappingCount()
+    T.eq(DeleteLastMapItem(), 0, "DeleteLastMapItem returns 0")
+    T.ok(GetMappingCount() < count_before, "GetMappingCount decrements after DeleteLastMapItem")
+  end)
+  if not ok then T.fail_error("DeleteLastMapItem", err) end
+
+  ok, err = pcall(function()
+    T.ok(type(MapColourList()) == "table", "MapColourList returns table")
+  end)
+  if not ok then T.fail_error("MapColourList", err) end
+
+  ok, err = pcall(function()
+    T.eq(DeleteAllMapItems(), 0, "DeleteAllMapItems returns 0")
+    T.eq(GetMappingCount(), 0, "GetMappingCount returns 0 after DeleteAllMapItems")
+  end)
+  if not ok then T.fail_error("DeleteAllMapItems", err) end
+
+  ok, err = pcall(function()
+    EnableMapping(0)
+    T.ok(true, "EnableMapping(0) doesn't error")
+  end)
+  if not ok then T.fail_error("EnableMapping(0)", err) end
+end
+
+
+-- ============================================================
+-- Category 16: Net
+-- ============================================================
+
+function test_net()
+  T.section("Net")
+
+  local connected = false
+  local ok, err
+
+  ok, err = pcall(function()
+    local result = IsConnected()
+    T.ok(result == 0 or result == 1 or result == true or result == false,
+         "IsConnected returns 0 or 1")
+    connected = (result == 1 or result == true)
+  end)
+  if not ok then T.fail_error("IsConnected", err) end
+
+  ok, err = pcall(function()
+    T.ok(type(GetSentBytes()) == "number" and GetSentBytes() >= 0,
+         "GetSentBytes returns number >= 0")
+  end)
+  if not ok then T.fail_error("GetSentBytes", err) end
+
+  ok, err = pcall(function()
+    T.ok(type(GetReceivedBytes()) == "number" and GetReceivedBytes() >= 0,
+         "GetReceivedBytes returns number >= 0")
+  end)
+  if not ok then T.fail_error("GetReceivedBytes", err) end
+
+  ok, err = pcall(function()
+    T.ok(type(GetConnectDuration()) == "number" and GetConnectDuration() >= 0,
+         "GetConnectDuration returns number >= 0")
+  end)
+  if not ok then T.fail_error("GetConnectDuration", err) end
+
+  ok, err = pcall(function()
+    T.ok(type(WorldAddress()) == "string", "WorldAddress returns string")
+  end)
+  if not ok then T.fail_error("WorldAddress", err) end
+
+  ok, err = pcall(function()
+    T.ok(type(WorldPort()) == "number" and WorldPort() >= 0, "WorldPort returns number >= 0")
+  end)
+  if not ok then T.fail_error("WorldPort", err) end
+
+  if not connected then
+    ok, err = pcall(function()
+      T.ok(GetConnectDuration() == 0, "GetConnectDuration is 0 when not connected")
+    end)
+    if not ok then T.fail_error("GetConnectDuration when not connected", err) end
+  else
+    T.skip("GetConnectDuration is 0 when not connected", "world is connected")
+  end
+end
+
+
+-- ============================================================
+-- Category Dispatch
+-- ============================================================
+
+local categories = {
+  { name = "vars",     func = test_vars },
+  { name = "utils",    func = test_utils },
+  { name = "colors",   func = test_colors },
+  { name = "arrays",   func = test_arrays },
+  { name = "triggers", func = test_triggers },
+  { name = "aliases",  func = test_aliases },
+  { name = "timers",   func = test_timers },
+  { name = "db",       func = test_db },
+  { name = "world",    func = test_world },
+  { name = "plugins",  func = test_plugins },
+  { name = "log",      func = test_log },
+  { name = "output",   func = test_output },
+  { name = "notepad",  func = test_notepad },
+  { name = "miniwin",  func = test_miniwin },
+  { name = "mapper",   func = test_mapper },
+  { name = "net",      func = test_net },
+}
+
+local category_map = {}
+for _, cat in ipairs(categories) do
+  category_map[cat.name] = cat.func
+end
+
+
+-- ============================================================
+-- Alias Handlers
+-- ============================================================
+
+function run_all(name, line, wildcards)
+  T.reset()
+  ColourNote("cyan", "black", string.rep("=", 50))
+  ColourNote("cyan", "black", "  Acid Test -- Lua API Compatibility Suite")
+  ColourNote("cyan", "black", "  Platform: " .. (is_mushkin and "Mushkin" or "MUSHclient"))
+  ColourNote("cyan", "black", string.rep("=", 50))
+  for _, cat in ipairs(categories) do
+    local ok, err = pcall(cat.func)
+    if not ok then
+      T.fail_error("CATEGORY " .. cat.name .. " CRASHED", err)
+    end
+  end
+  T.summary()
+end
+
+function run_list(name, line, wildcards)
+  ColourNote("cyan", "black", "Available acid test categories:")
+  for i, cat in ipairs(categories) do
+    ColourNote("white", "black", "  " .. i .. ". " .. cat.name)
+  end
+  ColourNote("cyan", "black", "Usage: acid <category>  or  acid  (run all)")
+end
+
+function run_category(name, line, wildcards)
+  local cat_name = string.lower(wildcards[1])
+  if cat_name == "list" then
+    run_list()
+    return
+  end
+  local func = category_map[cat_name]
+  if not func then
+    ColourNote("red", "black", "Unknown category: " .. cat_name)
+    run_list()
+    return
+  end
+  T.reset()
+  ColourNote("cyan", "black", string.rep("=", 50))
+  ColourNote("cyan", "black", "  Acid Test -- Category: " .. cat_name)
+  ColourNote("cyan", "black", string.rep("=", 50))
+  local ok, err = pcall(func)
+  if not ok then
+    T.fail_error("CATEGORY " .. cat_name .. " CRASHED", err)
+  end
+  T.summary()
+end
+
+
+-- ============================================================
+-- Plugin Callbacks
+-- ============================================================
+
+function OnPluginInstall()
+  ColourNote("cyan", "black", "Acid Test plugin loaded. Type 'acid' to run tests.")
+end
+
+function OnPluginClose()
+  -- Final cleanup sweep
+  pcall(function()
+    -- Variables
+    for _, v in ipairs({"acid_str", "acid_num", "acid_del", "acid_over", "acid_empty",
+                        "acid_special", "acid_lifecycle", "acid_multi_a", "acid_multi_b",
+                        "acid_multi_c", "acid_case_lo", "acid_CASE_UP"}) do
+      DeleteVariable(v)
+    end
+    -- Arrays
+    for _, a in ipairs({"acid_test_array", "acid_test_array2", "acid_lifecycle_array"}) do
+      ArrayDelete(a)
+    end
+    -- Automation
+    DeleteTriggerGroup("acid_test")
+    DeleteAliasGroup("acid_test")
+    DeleteTimerGroup("acid_test")
+    for _, t in ipairs({"acid_trig_1", "acid_trig_2", "acid_trig_3"}) do DeleteTrigger(t) end
+    for _, a in ipairs({"acid_alias_1", "acid_alias_2", "acid_alias_3"}) do DeleteAlias(a) end
+    for _, t in ipairs({"acid_timer_1", "acid_timer_2", "acid_timer_3"}) do DeleteTimer(t) end
+    -- Notepad
+    CloseNotepad("acid_test_pad")
+    -- Miniwindow
+    WindowDelete("acid_win")
+    -- Database
+    DatabaseClose("acid_test_db")
+    -- Mapper
+    DeleteAllMapItems()
+    EnableMapping(0)
+    -- Log
+    if IsLogOpen() then CloseLog() end
+  end)
+end
+
+]]>
+</script>
+
+</muclient>
