@@ -96,6 +96,15 @@ int L_WindowCreate(lua_State* L)
     winPtr->setFlags(flags);
     winPtr->setBackgroundColor(bgColor);
 
+    // Window is hidden after create (original: miniwindow.cpp:202 — m_bShow = false)
+    winPtr->setShow(false);
+
+    // Clear hotspots unless KEEP_HOTSPOTS flag is set
+    // Original: miniwindow.cpp:205-206
+    if ((flags & MINIWINDOW_KEEP_HOTSPOTS) == 0) {
+        winPtr->hotspots.clear();
+    }
+
     // Create fresh pixmap if dimensions provided (allow 0x0 for initial font setup)
     // Unlike WindowResize, WindowCreate always creates a clean pixmap (no content preservation)
     if (width > 0 && height > 0) {
