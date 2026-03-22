@@ -251,6 +251,7 @@ void WorldDocument::loadTriggersFromXml(QXmlStreamReader& xml, Plugin* plugin)
             trigger->repeat = attrs.value("repeat").toString() == "y";
             trigger->expand_variables = attrs.value("expand_variables").toString() == "y";
             trigger->one_shot = attrs.value("one_shot").toString() == "y";
+            trigger->temporary = attrs.value("temporary").toString() == "y";
             trigger->lowercase_wildcard = attrs.value("lowercase_wildcard").toString() == "y";
 
             // Multi-line matching
@@ -495,6 +496,7 @@ void WorldDocument::loadAliasesFromXml(QXmlStreamReader& xml, Plugin* plugin)
             alias->expand_variables = attrs.value("expand_variables").toString() == "y";
             alias->echo_alias = attrs.value("echo_alias").toString() == "y";
             alias->one_shot = attrs.value("one_shot").toString() == "y";
+            alias->temporary = attrs.value("temporary").toString() == "y";
             alias->menu = attrs.value("menu").toString() == "y";
 
             // Script language (defaults to Lua if not specified)
@@ -721,6 +723,7 @@ void WorldDocument::loadTimersFromXml(QXmlStreamReader& xml, Plugin* plugin)
 
             // Behavior flags
             timer->one_shot = attrs.value("one_shot").toString() == "y";
+            timer->temporary = attrs.value("temporary").toString() == "y";
             // active_closed is alternate name for active_when_closed
             timer->active_when_closed = (attrs.value("active_when_closed").toString() == "y") ||
                                         (attrs.value("active_closed").toString() == "y");
