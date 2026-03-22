@@ -475,3 +475,21 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [ ] L86: miniwindows -- WindowFont size=0 creates 1px font instead of defaulting to 10pt. Mushkin: miniwindow.cpp:1047
 - [ ] L87: miniwindows -- LoadImage accepts all Qt formats instead of only .bmp/.png. Mushkin: miniwindow.cpp:1217-1234
 - [ ] L88: miniwindows -- Arc atan2 conversion may draw wrong arc segment for some point configs. Mushkin: miniwindow.cpp:662-704
+
+## v2 Audit: Sound/MSP (2026-03-22)
+
+### HIGH
+- [ ] H81: sound -- GetSoundStatus missing -3 return for uninitialized sound system. Mushkin: src/world/sound_manager.cpp:414-438
+- [ ] H82: sound -- GetSoundStatus returns 2 for looping sounds; original returns 1 (original bug but scripts depend on it). Mushkin: src/world/sound_manager.cpp:432-437
+- [ ] H83: sound -- PlaySoundMemory ignores buffer, loop, volume, and pan parameters. Mushkin: src/world/lua_api/world_sounds.cpp:140-170
+- [ ] H84: sound -- PlaySoundMemory uses single fixed temp file; race condition on concurrent calls. Mushkin: src/world/lua_api/world_sounds.cpp:158-159
+
+### MEDIUM
+- [ ] M136: sound -- PlaySound filename is required (luaCheckQString); original allows nil for sound adjustment. Mushkin: src/world/lua_api/world_sounds.cpp:47
+- [ ] M137: sound -- play_sounds_in_background option parsed but never applied. Mushkin: src/world/sound_manager.cpp
+- [ ] M138: sound -- MXP sound tag ignores volume, loops, priority, URL parameters. Mushkin: src/world/mxp_engine.cpp:2039-2067
+- [ ] M139: sound -- MSP MUSIC hardcodes buffer 1; MSP STOP stops ALL buffers instead of per-channel. Mushkin: src/world/telnet_parser.cpp:1150-1157
+- [ ] M140: sound -- releaseInactiveSoundBuffers is no-op; sounds stay marked playing forever. Mushkin: src/world/sound_manager.cpp:199-204
+
+### LOW
+- [ ] L89: sound -- PlaySound filename path length limit (127 chars) not enforced. Mushkin: src/world/sound_manager.cpp:298-301
