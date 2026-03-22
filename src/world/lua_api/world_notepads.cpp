@@ -153,7 +153,13 @@ int L_GetNotepadLength(lua_State* L)
 
     NotepadWidget* notepad = pDoc->FindNotepad(luaCheckQString(L, 1));
 
-    qint32 length = notepad ? notepad->GetLength() : 0;
+    // Original CEdit::GetWindowTextLength counts \r\n as 2 chars per newline.
+    // Qt toPlainText counts \n as 1. Add newline count to match.
+    qint32 length = 0;
+    if (notepad) {
+        QString text = notepad->GetText();
+        length = text.length() + text.count('\n'); // +1 per newline for \r
+    }
     lua_pushnumber(L, length);
 
     return 1;
