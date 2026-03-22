@@ -1889,6 +1889,9 @@ void WorldDocument::AddToLine(unsigned char c)
  * 3. Break at the space, carry text after space to new line
  * 4. Otherwise, hard break at the column boundary
  */
+// Forward declaration — defined after adjustStylesForTruncation
+static std::vector<std::unique_ptr<Style>> migrateStylesForWrap(Line* oldLine, int truncateAt);
+
 void WorldDocument::handleLineWrap()
 {
     if (!m_currentLine) {
@@ -1936,13 +1939,10 @@ void WorldDocument::handleLineWrap()
     }
 
     if (breakPoint >= 0) {
-        // Word-wrap: break at the space
-        // Original MUSHclient behavior (doc.cpp:1557-1562):
-        // When m_display.indent_paras is false (normal case), KEEP the space at end of this line
-        // This ensures soft-wrapped lines display correctly when joined
-
-        // Save the text AFTER the space to carry over to the next line
-        int carryOverStart = breakPoint + 1; // Text starts after the space
+        // Word-wrap at break point (original: doc.cpp:1552-1633)
+        // Keep space on this line (indent_paras=false default)
+        int truncateAt = breakPoint + 1;
+        int carryOverStart = truncateAt;
         int carryOverLen = lineLen - carryOverStart;
 
         QByteArray carryOver;
@@ -1950,32 +1950,49 @@ void WorldDocument::handleLineWrap()
             carryOver = QByteArray(m_currentLine->text().data() + carryOverStart, carryOverLen);
         }
 
-        // Truncate current line AFTER the space (include the space in this line)
-        // This matches original MUSHclient when m_display.indent_paras is false
-        int truncateAt = breakPoint + 1; // Keep up to and including the space
+        // Truncate old line text
         m_currentLine->textBuffer.resize(truncateAt);
         m_currentLine->textBuffer.push_back('\0');
 
-        // Adjust styles: need to truncate styles to match new line length
-        adjustStylesForTruncation(truncateAt);
+        // Migrate styles from old line BEFORE StartNewLine (original: doc.cpp:1586-1628)
+        auto migratedStyles = migrateStylesForWrap(m_currentLine.get(), truncateAt);
 
-        // Start new line (soft wrap - bNewLine=false)
+        // Start new line (soft wrap)
         StartNewLine(false, 0);
-
-        // Reset last space tracking for new line
         m_lastSpace = -1;
 
-        // Add carried-over text to new line
         if (carryOverLen > 0) {
-            // Temporarily disable wrap checking to avoid recursion
-            quint16 savedWrapColumn = m_display.wrap_column;
-            m_display.wrap_column = 0;
+            // Remove the new line's empty initial style — replace with migrated styles
+            m_currentLine->styleList.clear();
 
-            AddToLine(carryOver.constData(), carryOverLen);
+            // Copy carried-over text directly into new line buffer
+            m_currentLine->textBuffer.resize(carryOverLen);
+            memcpy(m_currentLine->textBuffer.data(), carryOver.constData(), carryOverLen);
+            m_currentLine->textBuffer.push_back('\0');
 
-            m_display.wrap_column = savedWrapColumn;
+            // Install migrated styles on the new line
+            if (!migratedStyles.empty()) {
+                m_currentLine->styleList = std::move(migratedStyles);
+            } else {
+                // No styles migrated — create a default style covering the text
+                auto defaultStyle = std::make_unique<Style>();
+                defaultStyle->iLength = static_cast<quint16>(carryOverLen);
+                defaultStyle->iFlags = m_iFlags;
+                defaultStyle->iForeColour = m_iForeColour;
+                defaultStyle->iBackColour = m_iBackColour;
+                defaultStyle->pAction = m_currentAction;
+                m_currentLine->styleList.push_back(std::move(defaultStyle));
+            }
 
-            // Re-check for wrap (in case carried text is still too long)
+            // Track spaces in carried-over text
+            for (int i = 0; i < carryOverLen; i++) {
+                if (carryOver[i] == ' ' &&
+                    (m_display.wrap_column == 0 || i < static_cast<int>(m_display.wrap_column))) {
+                    m_lastSpace = i;
+                }
+            }
+
+            // Re-check for wrap (carried text may still exceed column)
             if (m_display.wrap_column > 0 &&
                 m_currentLine->len() >= static_cast<qint32>(m_display.wrap_column)) {
                 handleLineWrap();
@@ -2058,6 +2075,62 @@ void WorldDocument::adjustStylesForTruncation(qint32 newLength)
         }
         pos = styleEnd;
     }
+}
+
+/**
+ * migrateStylesForWrap - Split styles between old and new line at break point
+ *
+ * Original: doc.cpp:1586-1628
+ * Counts styles that extend past the truncation point on the old line,
+ * moves them to the returned vector for the new line, and handles
+ * styles that span the break point by splitting them.
+ *
+ * @param oldLine The line being truncated
+ * @param truncateAt The byte position where the line is being split
+ * @return Vector of styles to prepend to the new line
+ */
+static std::vector<std::unique_ptr<Style>> migrateStylesForWrap(Line* oldLine, int truncateAt)
+{
+    std::vector<std::unique_ptr<Style>> migrated;
+
+    // Count cumulative lengths to find which styles extend past truncateAt
+    int cumLen = 0;
+    int oldCumLen = 0; // cumulative length of styles staying on old line
+    int moveCount = 0;
+
+    for (const auto& s : oldLine->styleList) {
+        cumLen += s->iLength;
+        if (cumLen > truncateAt) {
+            moveCount++;
+        } else {
+            oldCumLen += s->iLength;
+        }
+    }
+
+    // Move styles from tail of old line (going backwards preserves order when prepending)
+    for (int i = 0; i < moveCount && !oldLine->styleList.empty(); i++) {
+        migrated.insert(migrated.begin(), std::move(oldLine->styleList.back()));
+        oldLine->styleList.pop_back();
+    }
+
+    // Handle shared style — if oldCumLen < truncateAt, a style spans the break point
+    if (oldCumLen < truncateAt && !migrated.empty()) {
+        int diff = truncateAt - oldCumLen; // bytes staying on old line from shared style
+
+        // Reduce the migrated style's length (it loses the portion staying on old line)
+        migrated.front()->iLength -= static_cast<quint16>(diff);
+
+        // Create a copy for the old line's tail with the remaining bytes
+        auto tailStyle = std::make_unique<Style>();
+        tailStyle->iLength = static_cast<quint16>(diff);
+        tailStyle->iFlags = migrated.front()->iFlags;
+        tailStyle->iForeColour = migrated.front()->iForeColour;
+        tailStyle->iBackColour = migrated.front()->iBackColour;
+        tailStyle->pAction = migrated.front()->pAction;
+        oldLine->styleList.push_back(std::move(tailStyle));
+    }
+
+    return migrated;
 }
 
 // ========== Lua Function Callbacks ==========
