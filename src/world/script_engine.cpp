@@ -266,6 +266,18 @@ void ScriptEngine::openLua()
         "./lua/?/init.lua",
     };
 
+    // Add world file's directory to search path so plugins can find Lua modules
+    // that live alongside the world file (e.g., Aardwolf's lua/ subfolder).
+    // This matches original MUSHclient which runs from its install directory.
+    if (m_doc && !m_doc->m_strWorldFilePath.isEmpty()) {
+        QFileInfo worldFileInfo(m_doc->m_strWorldFilePath);
+        QString worldDir = worldFileInfo.absolutePath();
+        luaPaths << worldDir + "/?.lua";
+        luaPaths << worldDir + "/?/init.lua";
+        luaPaths << worldDir + "/lua/?.lua";
+        luaPaths << worldDir + "/lua/?/init.lua";
+    }
+
     // For plugins, add the plugin directory paths
     // This allows require() to find Lua files in:
     // 1. Plugin's own directory and subdirectories
