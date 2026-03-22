@@ -615,3 +615,35 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [ ] L103: ui -- Use-default-X checkboxes missing throughout preferences. Mushkin: no equivalent
 - [ ] L104: ui -- Import/Export XML buttons missing from trigger/alias/timer list dialogs. Mushkin: no equivalent
 - [ ] L105: ui -- Filter functionality missing from list dialogs. Mushkin: no equivalent
+
+## v2 Audit: MXP Engine (2026-03-22)
+
+### HIGH
+- [ ] H106: mxp -- Security model inverted: secure tags blocked in secure mode, open tags allowed. Mushkin: mxp_engine.cpp:1279-1284
+- [ ] H107: mxp -- !ELEMENT and !ENTITY definitions have no secure-mode check (security hole). Mushkin: mxp_engine.cpp:1476-1485
+- [ ] H108: mxp -- !ATTLIST not implemented (custom element attribute extension). Mushkin: mxp_engine.cpp:1476-1485
+- [ ] H109: mxp -- MXP_Off calls MXP_CloseOpenTags instead of MXP_CloseAllTags (secure tags leak). Mushkin: mxp_engine.cpp:568-569
+- [ ] H110: mxp -- SEND tag missing xch_cmd/xch_hint Pueblo fallbacks. Mushkin: mxp_engine.cpp:2003-2018
+- [ ] H111: mxp -- Hyperlink <A> tag does not convert xch_cmd to SEND action. Mushkin: mxp_engine.cpp:2021-2036
+- [ ] H112: mxp -- </send> close does not populate &text; replacement (most MUDs use <send>text</send>). Mushkin: mxp_engine.cpp:2428-2443
+- [ ] H113: mxp -- <var> tag close is a no-op stub (MXP variables never set). Mushkin: mxp_engine.cpp:2190-2198
+- [ ] H114: mxp -- No style stack: closing COLOR/FONT/B/I/U tags don't restore previous state. Mushkin: mxp_engine.cpp:2414-2425
+
+### MEDIUM
+- [ ] M174: mxp -- Entity lookup is case-sensitive; original is partially case-insensitive for custom entities. Mushkin: mxp_engine.cpp:1189-1213
+- [ ] M175: mxp -- MXP_On always clears custom elements/entities; original preserves on manual toggle. Mushkin: mxp_engine.cpp:511-538
+- [ ] M176: mxp -- <reset> tag only closes open tags, doesn't reset ANSI/paragraph mode. Mushkin: mxp_engine.cpp:2207-2210
+- [ ] M177: mxp -- <mxp off> keyword not handled (no-op stub). Mushkin: mxp_engine.cpp:2212-2216
+- [ ] M178: mxp -- SUPPORT response does not list sub-attributes. Mushkin: mxp_engine.cpp:2218-2255
+- [ ] M179: mxp -- <li> tag does not render bullet/number prefix. Mushkin: mxp_engine.cpp:2293-2298
+- [ ] M180: mxp -- <image> tag does not render placeholder text/link. Mushkin: mxp_engine.cpp:2069-2084
+- [ ] M181: mxp -- No OnMXP_Error/OnMXP_OpenTag/OnMXP_CloseTag/OnMXP_SetVariable callbacks. Mushkin: TODO stubs
+- [ ] M182: mxp -- COLOR tag does not check m_bIgnoreMXPcolourChanges. Mushkin: mxp_engine.cpp:1923-1948
+- [ ] M183: mxp -- Hyperlinks missing underline and custom link color. Mushkin: mxp_engine.cpp:2003-2036
+- [ ] M184: mxp -- MXP color table has only 15 named colors vs original's 147. Mushkin: mxp_engine.cpp:2545-2598
+
+### LOW
+- [ ] L106: mxp -- Extra elements defined (strikeout, sbr) not in original. Mushkin: mxp_engine.cpp:78,88
+- [ ] L107: mxp -- <p> tag defined as TAG_COMMAND (self-closing) instead of block element. Mushkin: mxp_engine.cpp:85
+- [ ] L108: mxp -- user/password tags have TAG_OPEN flag (conflicts with inverted security). Mushkin: mxp_engine.cpp:134-138
+- [ ] L109: mxp -- <send> element missing xch_cmd/xch_hint in argument spec. Mushkin: mxp_engine.cpp:111
