@@ -345,6 +345,20 @@ void WorldDocument::WriteToLog(const QString& text)
     QTextStream stream(m_logfile.get());
     stream.setEncoding(QStringConverter::Utf8);
     stream << text;
+    stream.flush();
+
+    // Original doc.cpp:3104-3112 — on write error, close log + show message
+    if (stream.status() != QTextStream::Ok || m_logfile->error() != QFileDevice::NoError) {
+        QString msg = QString("An error occurred writing to log file \"%1\"").arg(m_logfile_name);
+        qWarning() << msg;
+        m_logfile->close();
+        m_logfile.reset();
+        // Original shows UMessageBox (modal dialog). We use output note instead
+        // since modal dialogs from the data receive path would block the event loop.
+        if (m_outputFormatter) {
+            m_outputFormatter->colourNote(qRgb(255, 0, 0), qRgb(0, 0, 0), msg);
+        }
+    }
 }
 
 /**
