@@ -21,6 +21,14 @@ qint32 WorldDocument::PlaySound(qint16 buffer, const QString& filename, bool loo
 
 qint32 WorldDocument::StopSound(qint16 buffer)
 {
+    // When stopping all sounds (buffer=0), fire OnPluginPlaySound with empty string
+    // to let plugins know sounds are being cancelled.
+    // Original: CancelSound (doc.cpp:7137-7158)
+    if (buffer == 0 && !m_bInPlaySoundFilePlugin) {
+        m_bInPlaySoundFilePlugin = true;
+        SendToFirstPluginCallbacks(ON_PLUGIN_PLAY_SOUND, QString());
+        m_bInPlaySoundFilePlugin = false;
+    }
     return m_soundManager->stopSound(buffer);
 }
 
