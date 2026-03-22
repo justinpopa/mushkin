@@ -431,12 +431,17 @@ void WorldWidget::sendCommand()
         }
     }
 
-    // 3. Exclude macro commands if configured
+    // 3. Exclude macro commands if configured (original: sendvw.cpp:628-636)
     if (bAutoSay && m_document->m_auto_say.exclude_macros) {
-        // Check if command starts with any configured macro
-        // Note: Macros are stored in m_macros array, checked in original sendvw.cpp
-        // For now, we don't have macro support implemented, so this is a placeholder
-        // TODO(feature): Exclude macro keys from forwarding when macro system is fully implemented.
+        // Check if command starts with text of any REPLACE_COMMAND(0) or SEND_NOW(1) macro
+        for (int i = 0; bAutoSay && i < MACRO_COUNT; i++) {
+            if (m_document->m_macro_type[i] == 0 || m_document->m_macro_type[i] == 1) {
+                if (!m_document->m_macros[i].isEmpty() &&
+                    command.startsWith(m_document->m_macros[i])) {
+                    bAutoSay = false;
+                }
+            }
+        }
     }
 
     // 4. Exclude if command already starts with auto-say string (prevent "say say Hello!")
