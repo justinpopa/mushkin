@@ -269,13 +269,7 @@ void PluginDialog::onRemovePlugin()
         return;
     }
 
-    int result = QMessageBox::question(this, tr("Remove Plugin"),
-                                       tr("Remove %n selected plugin(s)?", "", selected.size()),
-                                       QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
-
-    if (result != QMessageBox::Yes) {
-        return;
-    }
+    // Original does not prompt for confirmation before removing plugins
 
     // Collect plugins to remove (don't modify list while iterating)
     QList<Plugin*> pluginsToRemove;
