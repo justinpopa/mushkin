@@ -743,10 +743,11 @@ static void pushDatabaseColumnValue(lua_State* L, sqlite3_stmt* pStmt, int colum
             break;
         }
         case SQLITE_BLOB: {
-            const void* blob = sqlite3_column_blob(pStmt, column);
-            int bytes = sqlite3_column_bytes(pStmt, column);
-            if (blob && bytes > 0) {
-                lua_pushlstring(L, static_cast<const char*>(blob), bytes);
+            // Original (methods_database.cpp:374-383) uses sqlite3_column_text for both
+            // TEXT and BLOB, returning a text representation rather than raw bytes
+            const unsigned char* blobText = sqlite3_column_text(pStmt, column);
+            if (blobText) {
+                lua_pushstring(L, reinterpret_cast<const char*>(blobText));
             } else {
                 lua_pushnil(L);
             }
