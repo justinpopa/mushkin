@@ -181,6 +181,15 @@ qint32 WorldDocument::OpenLog(const QString& filename, bool append, bool writePr
         return eCouldNotOpenFile;
     }
 
+    // Normalize path separators — world files from Windows use backslashes
+    logName.replace('\\', '/');
+
+    // Create directories if needed (e.g., "logs/Aardwolf log.txt" needs "logs/" to exist)
+    QFileInfo fi(logName);
+    if (!fi.dir().exists()) {
+        fi.dir().mkpath(".");
+    }
+
     // Store resolved filename
     m_logfile_name = logName;
 
