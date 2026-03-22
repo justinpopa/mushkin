@@ -647,3 +647,23 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [ ] L107: mxp -- <p> tag defined as TAG_COMMAND (self-closing) instead of block element. Mushkin: mxp_engine.cpp:85
 - [ ] L108: mxp -- user/password tags have TAG_OPEN flag (conflicts with inverted security). Mushkin: mxp_engine.cpp:134-138
 - [ ] L109: mxp -- <send> element missing xch_cmd/xch_hint in argument spec. Mushkin: mxp_engine.cpp:111
+
+## v2 Audit: Scripting Engine (2026-03-22)
+
+### HIGH
+- [ ] H115: scripting -- Trigger/alias script uses lua_getglobal() instead of GetNestedFunction(); dotted names (e.g., "utils.my_trigger") don't work. Mushkin: world_trigger_execution.cpp:324
+- [ ] H116: scripting -- Trigger script does not set m_iCurrentActionSource (eTriggerFired). Mushkin: world_trigger_execution.cpp
+- [ ] H117: scripting -- Trigger/alias script uses bare lua_pcall() instead of callLuaWithTraceBack(); no stack traces in errors. Mushkin: world_trigger_execution.cpp:420
+- [ ] H118: scripting -- Trigger/alias script errors only go to qWarning(), not displayed in output window. Mushkin: world_trigger_execution.cpp:431-435
+
+### MEDIUM
+- [ ] M185: scripting -- Trigger/alias does not reset m_iNoteStyle to NORMAL before callbacks. Mushkin: world_trigger_execution.cpp
+- [ ] M186: scripting -- Trigger invocation_count incremented even on script error. Mushkin: world_trigger_execution.cpp:441
+- [ ] M187: scripting -- Trigger style runs table (4th callback arg) is always empty. Mushkin: world_trigger_execution.cpp:413-414
+- [ ] M188: scripting -- parseLua() does not track per-plugin script timing. Mushkin: script_engine.cpp:1236-1238
+- [ ] M189: scripting -- ePluginCouldNotSaveState = 30038 instead of 30037 (duplicates ePluginDoesNotSaveState). Mushkin: script_engine.cpp:912
+
+### LOW
+- [ ] L110: scripting -- Error display color is darkorange instead of orangered. Mushkin: script_engine.cpp:1176
+- [ ] L111: scripting -- executeLua uses qCDebug instead of m_doc->Trace() for trace output. Mushkin: script_engine_callbacks.cpp:241
+- [ ] L112: scripting -- error_code table has extra constants not in original (30055, 30075-30077). Mushkin: script_engine.cpp:922,942-944
