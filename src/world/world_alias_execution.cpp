@@ -11,6 +11,7 @@
 #include "../automation/alias.h"
 #include "../automation/plugin.h"
 #include "../automation/sendto.h"
+#include "../text/line.h"
 #include "script_engine.h"
 #include "world_document.h"
 #include <QDebug>
@@ -45,8 +46,17 @@ void WorldDocument::executeAlias(Alias* alias, const QString& command)
 {
     // Echo the alias/command?
     if (alias->echo_alias) {
-        // Display the command in output
-        note(command);
+        // Insert display-line boundary if current line is MUD output (original:
+        // evaluate.cpp:878-879) Prevents style bleeding from previous MUD output into echoed
+        // command
+        if (m_currentLine && (m_currentLine->flags & NOTE_OR_COMMAND) != COMMENT) {
+            StartNewLine(true, COMMENT);
+        }
+        // Echo as USER_INPUT (original: evaluate.cpp:887-889)
+        QByteArray utf8 = command.toUtf8();
+        AddToLine(utf8.constData(), utf8.length());
+        StartNewLine(true,
+                     static_cast<unsigned char>(USER_INPUT | (m_logging.log_input ? LOG_LINE : 0)));
     }
 
     // Prepare contents (send text)
