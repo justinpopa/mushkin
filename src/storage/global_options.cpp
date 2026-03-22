@@ -26,9 +26,11 @@ static auto resolveDirectory(const QString& path) -> QString
 {
     if (path.isEmpty() || QDir::isAbsolutePath(path))
         return path;
-    // Strip leading ./ or .\ like original Utilities.cpp:2503-2505
+    // Normalize Windows backslashes (prefs database may contain paths from Wine/MUSHclient)
     QString cleaned = path;
-    if (cleaned.startsWith(QStringLiteral("./")) || cleaned.startsWith(QStringLiteral(".\\"))) {
+    cleaned.replace('\\', '/');
+    // Strip leading ./ like original Utilities.cpp:2503-2505
+    if (cleaned.startsWith(QStringLiteral("./"))) {
         cleaned = cleaned.mid(2);
     }
     return QDir::cleanPath(startupWorkingDir() + cleaned) + "/";
