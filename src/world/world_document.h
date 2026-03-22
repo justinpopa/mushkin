@@ -434,7 +434,7 @@ class WorldDocument : public QObject, public IWorldContext {
     struct OutputConfig {
         // Font
         QString font_name = "Courier New"; // output font face name
-        qint32 font_height = 12;           // font size in pixels
+        qint32 font_height = 12;           // font size in points
         qint32 font_weight = 400;          // bold/normal (400=normal, 700=bold)
         quint32 font_charset = 0;          // character set
 
@@ -490,7 +490,7 @@ class WorldDocument : public QObject, public IWorldContext {
         QRgb background_colour = 0xFFFFFFu; // input background color (BGR) — white
 
         // Font
-        qint32 font_height = 12;           // font size in pixels
+        qint32 font_height = 12;           // font size in points
         QString font_name = "Courier New"; // input font face name
         quint8 font_italic = 0;            // italic flag (0=normal, 1=italic)
         qint32 font_weight = 400;          // font weight (400=normal, 700=bold)

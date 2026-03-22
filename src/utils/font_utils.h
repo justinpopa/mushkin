@@ -9,31 +9,35 @@
 #include <QScreen>
 
 /**
+ * MUSHclient-compatible DPI constant.
+ *
+ * MUSHclient on Windows renders fonts at 96 DPI:
+ *   lfHeight = -MulDiv(pointSize, 96, 72)
+ *
+ * All world files and plugins assume this DPI. macOS reports 72 DPI via Qt,
+ * which makes fonts 25% smaller. We hard-code 96 DPI so fonts render at the
+ * same pixel size as the original on all platforms.
+ */
+inline constexpr double kMushclientDpi = 96.0;
+
+/**
  * @brief Create a QFont from a world-file point size
  *
- * MUSHclient world files store font sizes as typographic point sizes.
- * The original MUSHclient converts these to GDI pixels at runtime via:
- *   lfHeight = -MulDiv(pointSize, GetDeviceCaps(LOGPIXELSY), 72)
- *
- * Qt's setPointSize() performs the same conversion using the screen's
- * logical DPI, so it should produce correct results on all platforms
- * without manual DPI compensation.
+ * Uses setPixelSize() with the Windows 96 DPI conversion so fonts render
+ * at the same pixel size as the original MUSHclient on all platforms.
  *
  * @param family Font family name
  * @param pointSize Point size (as stored in world files)
- * @return QFont configured with the given point size
+ * @return QFont configured with the equivalent pixel size
  */
 inline QFont createScaledFont(const QString& family, int pointSize)
 {
     QFont font(family);
-    font.setPointSize(pointSize > 0 ? pointSize : 1);
+    int pixelSize = qRound(pointSize * kMushclientDpi / 72.0);
+    font.setPixelSize(pixelSize > 0 ? pixelSize : 1);
 
-    // Diagnostic: log what Qt resolved so we can verify cross-platform behavior
-    if (auto* screen = QGuiApplication::primaryScreen()) {
-        qCDebug(lcFont) << "createScaledFont:" << family << pointSize << "pt"
-                        << "-> screenDPI:" << screen->logicalDotsPerInchY()
-                        << "resolvedPixelSize:" << QFontInfo(font).pixelSize();
-    }
+    qCDebug(lcFont) << "createScaledFont:" << family << pointSize << "pt"
+                    << "-> pixelSize:" << pixelSize;
 
     return font;
 }
@@ -41,19 +45,15 @@ inline QFont createScaledFont(const QString& family, int pointSize)
 /**
  * @brief Get the pixel size for a world-file point size
  *
- * Converts a point size to the pixel value Qt would use on the current
- * screen. Useful for stylesheet font-size values where pixels are needed.
+ * Converts a point size to the pixel value that MUSHclient would use
+ * at 96 DPI. Useful for stylesheet font-size values where pixels are needed.
  *
  * @param pointSize Point size (as stored in world files)
- * @return Resolved pixel size for the current screen DPI
+ * @return Pixel size equivalent at 96 DPI
  */
 inline int scaledFontSize(int pointSize)
 {
-    if (auto* screen = QGuiApplication::primaryScreen()) {
-        return qRound(pointSize * screen->logicalDotsPerInchY() / 72.0);
-    }
-    // Fallback: assume 96 DPI (Windows default)
-    return qRound(pointSize * 96.0 / 72.0);
+    return qRound(pointSize * kMushclientDpi / 72.0);
 }
 
 /**
@@ -64,18 +64,16 @@ inline int scaledFontSize(int pointSize)
  *
  * @param family Font family name
  * @param pointSize Point size as floating point
- * @return QFont configured with the given point size
+ * @return QFont configured with the equivalent pixel size
  */
 inline QFont createScaledFontF(const QString& family, double pointSize)
 {
     QFont font(family);
-    font.setPointSizeF(pointSize > 0.0 ? pointSize : 1.0);
+    int pixelSize = qRound(pointSize * kMushclientDpi / 72.0);
+    font.setPixelSize(pixelSize > 0 ? pixelSize : 1);
 
-    if (auto* screen = QGuiApplication::primaryScreen()) {
-        qCDebug(lcFont) << "createScaledFontF:" << family << pointSize << "pt"
-                        << "-> screenDPI:" << screen->logicalDotsPerInchY()
-                        << "resolvedPixelSize:" << QFontInfo(font).pixelSize();
-    }
+    qCDebug(lcFont) << "createScaledFontF:" << family << pointSize << "pt"
+                    << "-> pixelSize:" << pixelSize;
 
     return font;
 }
