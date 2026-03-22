@@ -1389,6 +1389,12 @@ void WorldDocument::Execute(const QString& command, bool allowScriptPrefix, bool
             bool bQueue = false;
             bool bLog = m_logging.log_input;
 
+            // Check for QUIT macro — suppress auto-reconnect on deliberate quit
+            // Original: evaluate.cpp:143 — m_macros[MAC_QUIT] defaults to "QUIT"
+            if (processedCommand.compare(QStringLiteral("QUIT"), Qt::CaseInsensitive) == 0) {
+                m_bDisconnectOK = true;
+            }
+
             SendMsg(processedCommand, bEcho, bQueue, bLog);
 
             // Add to command history (only from UI path, not Lua Execute())
