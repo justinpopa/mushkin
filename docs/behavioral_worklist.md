@@ -428,3 +428,19 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [ ] L78: commands -- DoSendMsg sends \n instead of \r\n. Mushkin: src/world/world_document.cpp:903,1218
 - [ ] L79: commands -- Command history stores processed command instead of original typed command. Mushkin: src/world/world_document.cpp:1493
 - [ ] L80: commands -- Execute() doesn't check empty lines for reconnect prompt. Mushkin: src/world/world_document.cpp:1438
+
+## v2 Audit: Speedwalks (2026-03-22)
+
+### HIGH
+- [ ] H73: speedwalks -- eSendToSpeedwalk bypasses queue, ignores echo/log flags, silently drops parse errors. Calls sendToMud() directly. Mushkin: src/world/world_sendto.cpp:169-174
+
+### MEDIUM
+- [ ] M121: speedwalks -- SetSpeedWalkDelay does not clamp to 0-30000 range; accepts 0-65535. Mushkin: src/world/connection_manager.cpp:380-394
+- [ ] M122: speedwalks -- ReverseSpeedwalk cannot reverse single-letter or full-name directions inside parentheses (only diagonals). Mushkin: src/world/speedwalk_engine.cpp:309-334
+- [ ] M123: speedwalks -- Speed walk pipeline does not check connection before sending. Mushkin: src/world/world_document.cpp:1394-1395
+- [ ] M124: speedwalks -- Speed walk error shows note() instead of modal dialog. Mushkin: src/world/world_document.cpp:1389-1390
+
+### LOW
+- [ ] L81: speedwalks -- GetSpeedWalkDelay returns lua_Integer instead of short. Mushkin: src/world/lua_api/world_logging_opts.cpp:297-301
+- [ ] L82: speedwalks -- Speed walk prefix empty guard prevents all commands being parsed as speedwalks. Mushkin: src/world/world_document.cpp:1379-1380
+- [ ] L83: speedwalks -- RemoveBacktracks cannot cancel custom parenthesized directions. Mushkin: src/world/speedwalk_engine.cpp:409-439
