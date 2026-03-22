@@ -1559,7 +1559,7 @@ QString WorldDocument::PushCommand()
  * @param whichColour Index of custom color (1-16)
  * @param name Name for the color (1-30 characters)
  * @return eOK (0) on success,
- *         eOptionOutOfRange (30009) if whichColour out of range,
+ *         eOptionOutOfRange (30026) if whichColour out of range,
  *         eNoNameSpecified (30003) if name is empty,
  *         eInvalidObjectLabel (30008) if name too long
  */
@@ -1567,7 +1567,7 @@ qint32 WorldDocument::SetCustomColourName(qint16 whichColour, const QString& nam
 {
     // Validate color index (1-based, matches original which checks against MAX_CUSTOM)
     if (whichColour < 1 || whichColour > MAX_CUSTOM) {
-        return 30009; // eOptionOutOfRange
+        return 30026; // eOptionOutOfRange
     }
 
     // Validate name not empty (original uses strlen > 0)
