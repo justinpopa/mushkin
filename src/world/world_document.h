@@ -1405,6 +1405,8 @@ class WorldDocument : public QObject, public IWorldContext {
     // Support methods
     void SendPacket(std::span<const unsigned char> data); // Send raw bytes
     void OutputBadUTF8characters();                       // Fallback for invalid UTF-8
+    void debugPacketData(const char* caption, const char* data, int size,
+                         qint64 packetNum); // Hex dump for packet debug
 
     // ========== ANSI Parser ==========
     void InterpretANSIcode(int code);    // Process ANSI color/style codes

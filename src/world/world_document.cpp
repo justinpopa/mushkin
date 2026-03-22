@@ -777,6 +777,12 @@ void WorldDocument::ReceiveMsg()
     m_connectionManager->m_nBytesIn += nRead;
     m_connectionManager->m_iInputPacketCount++;
 
+    // Debug packet display (original: doc.cpp:5464-5538, Debug_Packets)
+    if (m_bDebugIncomingPackets) {
+        debugPacketData("Incoming", buffer.data(), static_cast<int>(nRead),
+                        m_connectionManager->m_iInputPacketCount);
+    }
+
     // Let plugins modify the raw packet (filter chain pattern).
     // Original: doc.cpp:1769 — SendToAllPluginCallbacksRtn allows each plugin to
     // modify the packet string. If a plugin empties it, the packet is discarded.
@@ -814,6 +820,54 @@ void WorldDocument::ReceiveMsg()
     // Prompts don't have newlines, so they stay in m_currentLine
     if (m_currentLine && m_currentLine->len() > 0) {
         emit incompleteLine();
+    }
+}
+
+/**
+ * debugPacketData - Format and display packet hex dump
+ *
+ * Original: doc.cpp:5464-5538 (Debug_Packets)
+ * Fires ON_PLUGIN_PACKET_DEBUG for each line of the hex dump.
+ * If no plugin handles it, displays in output window.
+ */
+void WorldDocument::debugPacketData(const char* caption, const char* data, int size,
+                                    qint64 packetNum)
+{
+    constexpr int MAX_DEBUG_CHARS = 16;
+
+    // Header line
+    QString timeStr = QDateTime::currentDateTime().toString("dddd, MMMM d, yyyy, h:mm:ss AP");
+    QString header = QString("\n%1 packet: %2 (%3 bytes) at %4\n\n")
+                         .arg(caption)
+                         .arg(packetNum)
+                         .arg(size)
+                         .arg(timeStr);
+
+    if (!SendToFirstPluginCallbacks(ON_PLUGIN_PACKET_DEBUG, header)) {
+        colourNote(BGR(255, 69, 0), BGR(0, 0, 0), header);
+    }
+
+    // Hex dump lines (16 bytes per line)
+    const auto* p = reinterpret_cast<const unsigned char*>(data);
+    while (size > 0) {
+        QString asciiPart;
+        QString hexPart;
+
+        for (int i = 0; size > 0 && i < MAX_DEBUG_CHARS; size--, i++, p++) {
+            asciiPart += (std::isprint(*p) ? QChar(*p) : QChar('.'));
+            hexPart += QString(" %1").arg(*p, 2, 16, QChar('0'));
+        }
+
+        // Pad ASCII part to MAX_DEBUG_CHARS for alignment
+        while (asciiPart.length() < MAX_DEBUG_CHARS) {
+            asciiPart += ' ';
+        }
+
+        QString line = QString("%1  %2\n").arg(asciiPart, hexPart);
+
+        if (!SendToFirstPluginCallbacks(ON_PLUGIN_PACKET_DEBUG, line)) {
+            colourNote(BGR(255, 69, 0), BGR(0, 0, 0), line);
+        }
     }
 }
 

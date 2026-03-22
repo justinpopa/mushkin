@@ -2728,7 +2728,27 @@ void MainWindow::colourPicker()
 
 void MainWindow::debugPackets()
 {
-    // TODO(feature): Show packet debug window (raw telnet data inspector).
+    // Toggle packet debug mode on the active world (original: Ctrl+Alt+F11)
+    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
+    if (!activeSubWindow)
+        return;
+    WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
+    if (!worldWidget)
+        return;
+    WorldDocument* doc = worldWidget->document();
+    if (!doc)
+        return;
+
+    doc->m_bDebugIncomingPackets = !doc->m_bDebugIncomingPackets;
+    // Orangered on black (SCRIPTERRORFORECOLOUR / SCRIPTERRORBACKCOLOUR)
+    constexpr QRgb orangeRed = 0x000045FF; // BGR(255, 69, 0)
+    constexpr QRgb black = 0x00000000;
+    if (doc->m_bDebugIncomingPackets) {
+        doc->colourNote(orangeRed, black,
+                        "Packet debugging enabled — incoming data will be hex-dumped.");
+    } else {
+        doc->colourNote(orangeRed, black, "Packet debugging disabled.");
+    }
 }
 
 void MainWindow::find()
