@@ -363,6 +363,12 @@ qint32 WorldDocument::NotepadSaveMethod(const QString& title, qint32 method)
         return eNoSuchNotepad;
     }
 
+    // Validate method range (original: methods_notepad.cpp:418-423)
+    // 0=eNotepadSaveDefault, 1=eNotepadSaveAlways, 2=eNotepadSaveNever
+    if (method < 0 || method > 2) {
+        return eBadParameter; // original returns false for bad selector
+    }
+
     notepad->m_iSaveOnChange = method;
     return eOK;
 }
