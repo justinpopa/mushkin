@@ -495,6 +495,14 @@ Plugin* WorldDocument::LoadPlugin(const QString& filepath, QString& errorMsg)
     qCDebug(lcPlugin) << "  Script length:" << pluginPtr->m_strScript.length();
     qCDebug(lcPlugin) << "  Script (first 50 chars):" << pluginPtr->m_strScript.left(50);
 
+    // ================================================================
+    // Load plugin state BEFORE executing script body
+    // ================================================================
+    // Plugins may call GetVariable() at the top level of their script body
+    // (e.g., `width = GetVariable("WINDOW_WIDTH") or default`), so saved
+    // variables must be available before parseScript() runs.
+    (void)pluginPtr->LoadState();
+
     if (!pluginPtr->m_strLanguage.isEmpty() && !pluginPtr->m_strScript.isEmpty()) {
         pluginPtr->m_ScriptEngine =
             std::make_unique<ScriptEngine>(this, pluginPtr->m_strLanguage, pluginPtr);
@@ -525,12 +533,6 @@ Plugin* WorldDocument::LoadPlugin(const QString& filepath, QString& errorMsg)
         // Restore previous plugin context
         m_CurrentPlugin = savedPlugin;
     }
-
-    // ================================================================
-    // Load plugin state
-    // ================================================================
-
-    (void)pluginPtr->LoadState();
 
     // ================================================================
     // SORT PLUGIN LIST BY SEQUENCE
