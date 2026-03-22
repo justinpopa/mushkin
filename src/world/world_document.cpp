@@ -35,6 +35,7 @@
 #include <array>   // for std::array
 #include <cstring> // for memcpy, strlen
 
+#include "../utils/error_codes.h"
 #include "../utils/url_linkifier.h"
 #include "color_utils.h"
 
@@ -1500,7 +1501,7 @@ qint32 WorldDocument::SetCommand(const QString& text)
 
     QString current = m_pActiveInputView->inputText();
     if (!current.isEmpty()) {
-        return 30011; // eCommandNotEmpty
+        return eCommandNotEmpty;
     }
 
     m_pActiveInputView->setInputText(text);
@@ -1605,17 +1606,17 @@ qint32 WorldDocument::SetCustomColourName(qint16 whichColour, const QString& nam
 {
     // Validate color index (1-based, matches original which checks against MAX_CUSTOM)
     if (whichColour < 1 || whichColour > MAX_CUSTOM) {
-        return 30026; // eOptionOutOfRange
+        return eOptionOutOfRange;
     }
 
     // Validate name not empty (original uses strlen > 0)
     if (name.length() <= 0) {
-        return 30003; // eNoNameSpecified
+        return eNoNameSpecified;
     }
 
     // Validate name length (max 30 characters)
     if (name.length() > 30) {
-        return 30008; // eInvalidObjectLabel
+        return eInvalidObjectLabel;
     }
 
     // Check if changed and mark document modified (matches original ordering)

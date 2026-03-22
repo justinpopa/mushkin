@@ -27,14 +27,7 @@
 #include <QFile>
 #include <QTextStream>
 
-// Error codes (defined in lua_methods.cpp)
-enum {
-    eOK = 0,
-    eLogFileAlreadyOpen = 30001,
-    eCouldNotOpenFile = 30002,
-    eLogFileNotOpen = 30003,
-    eLogFileBadWrite = 30004,
-};
+// Error codes from shared header (included via world_document.h -> error_codes.h)
 
 /**
  * FormatTime - Expand time format codes in a string

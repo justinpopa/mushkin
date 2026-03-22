@@ -6,6 +6,7 @@
 
 #include "../automation/plugin.h"
 #include "../automation/script_language.h"
+#include "../utils/error_codes.h"
 #include "logging.h"
 #include "miniwindow.h"
 #include "script_engine.h"
@@ -1108,7 +1109,7 @@ qint32 WorldDocument::WindowFont(const QString& windowName, const QString& fontI
     // Find miniwindow by name
     auto it = m_MiniWindowMap.find(windowName);
     if (it == m_MiniWindowMap.end() || !it->second) {
-        return 30010; // eNoSuchWindow
+        return eNoSuchWindow;
     }
 
     MiniWindow* miniWindow = it->second.get();

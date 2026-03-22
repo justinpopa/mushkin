@@ -20,10 +20,7 @@
 #include "../src/world/notepad_widget.h"
 #include "fixtures/world_fixtures.h"
 
-// Error codes from lua_common.h
-const int eOK = 0;
-const int eNoSuchNotepad = 30075;
-const int eInvalidColourName = 30077;
+#include "../src/utils/error_codes.h"
 
 // Test fixture for Notepad API tests
 class NotepadApiTest : public ConnectedWorldTest {};
@@ -154,7 +151,7 @@ TEST_F(NotepadApiTest, GetNotepadListReturnsAllTitles)
 TEST_F(NotepadApiTest, NotepadFontFailsIfNotExists)
 {
     executeLua("result = world.NotepadFont('NoSuchNotepad', 'Courier', 12, 0, 0)");
-    EXPECT_EQ(getGlobalNumber("result"), eNoSuchNotepad);
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), static_cast<int>(eNoSuchNotepad));
 }
 
 // Test 13: NotepadFont sets font successfully
@@ -162,7 +159,7 @@ TEST_F(NotepadApiTest, NotepadFontSetsFont)
 {
     executeLua("world.SendToNotepad('FontTest', 'content')");
     executeLua("result = world.NotepadFont('FontTest', 'Courier New', 14, 1, 0)");
-    EXPECT_EQ(getGlobalNumber("result"), eOK);
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), static_cast<int>(eOK));
 
     NotepadWidget* notepad = doc->FindNotepad("FontTest");
     ASSERT_NE(notepad, nullptr);
@@ -174,7 +171,7 @@ TEST_F(NotepadApiTest, NotepadFontSetsFont)
 TEST_F(NotepadApiTest, NotepadColourFailsIfNotExists)
 {
     executeLua("result = world.NotepadColour('NoSuchNotepad', 'white', 'black')");
-    EXPECT_EQ(getGlobalNumber("result"), eNoSuchNotepad);
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), static_cast<int>(eNoSuchNotepad));
 }
 
 // Test 15: NotepadColour sets colors successfully
@@ -182,7 +179,7 @@ TEST_F(NotepadApiTest, NotepadColourSetsColors)
 {
     executeLua("world.SendToNotepad('ColorTest', 'content')");
     executeLua("result = world.NotepadColour('ColorTest', '#FFFFFF', '#000000')");
-    EXPECT_EQ(getGlobalNumber("result"), eOK);
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), static_cast<int>(eOK));
 
     NotepadWidget* notepad = doc->FindNotepad("ColorTest");
     ASSERT_NE(notepad, nullptr);
@@ -195,14 +192,14 @@ TEST_F(NotepadApiTest, NotepadColourFailsForInvalidColor)
 {
     executeLua("world.SendToNotepad('InvalidColor', 'content')");
     executeLua("result = world.NotepadColour('InvalidColor', 'notacolor', 'black')");
-    EXPECT_EQ(getGlobalNumber("result"), eInvalidColourName);
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), static_cast<int>(eInvalidColourName));
 }
 
 // Test 17: NotepadReadOnly returns eNoSuchNotepad if not found
 TEST_F(NotepadApiTest, NotepadReadOnlyFailsIfNotExists)
 {
     executeLua("result = world.NotepadReadOnly('NoSuchNotepad', true)");
-    EXPECT_EQ(getGlobalNumber("result"), eNoSuchNotepad);
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), static_cast<int>(eNoSuchNotepad));
 }
 
 // Test 18: NotepadReadOnly sets read-only mode
@@ -210,7 +207,7 @@ TEST_F(NotepadApiTest, NotepadReadOnlySetsMode)
 {
     executeLua("world.SendToNotepad('ReadOnly', 'content')");
     executeLua("result = world.NotepadReadOnly('ReadOnly', true)");
-    EXPECT_EQ(getGlobalNumber("result"), eOK);
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), static_cast<int>(eOK));
 
     NotepadWidget* notepad = doc->FindNotepad("ReadOnly");
     ASSERT_NE(notepad, nullptr);
@@ -221,7 +218,7 @@ TEST_F(NotepadApiTest, NotepadReadOnlySetsMode)
 TEST_F(NotepadApiTest, NotepadSaveMethodFailsIfNotExists)
 {
     executeLua("result = world.NotepadSaveMethod('NoSuchNotepad', 1)");
-    EXPECT_EQ(getGlobalNumber("result"), eNoSuchNotepad);
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), static_cast<int>(eNoSuchNotepad));
 }
 
 // Test 20: NotepadSaveMethod sets save method
@@ -229,7 +226,7 @@ TEST_F(NotepadApiTest, NotepadSaveMethodSetsSaveMethod)
 {
     executeLua("world.SendToNotepad('SaveMethod', 'content')");
     executeLua("result = world.NotepadSaveMethod('SaveMethod', 2)");
-    EXPECT_EQ(getGlobalNumber("result"), eOK);
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), static_cast<int>(eOK));
 
     NotepadWidget* notepad = doc->FindNotepad("SaveMethod");
     ASSERT_NE(notepad, nullptr);
@@ -240,7 +237,7 @@ TEST_F(NotepadApiTest, NotepadSaveMethodSetsSaveMethod)
 TEST_F(NotepadApiTest, CloseNotepadFailsIfNotExists)
 {
     executeLua("result = world.CloseNotepad('NoSuchNotepad', false)");
-    EXPECT_EQ(getGlobalNumber("result"), eNoSuchNotepad);
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), static_cast<int>(eNoSuchNotepad));
 }
 
 // Test 22: CloseNotepad succeeds for existing notepad
@@ -250,7 +247,7 @@ TEST_F(NotepadApiTest, CloseNotepadSucceedsForExisting)
     ASSERT_NE(doc->FindNotepad("ToClose"), nullptr);
 
     executeLua("result = world.CloseNotepad('ToClose', false)");
-    EXPECT_EQ(getGlobalNumber("result"), eOK);
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), static_cast<int>(eOK));
 }
 
 // Test 23: UTF-8 content handling

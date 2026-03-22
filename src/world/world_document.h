@@ -38,6 +38,7 @@
 #include "../automation/sendto.h"          // SendTo enum
 #include "../automation/variable.h"        // ArraysMap type
 #include "../text/style.h" // Style flag bits (HILITE, UNDERLINE, BLINK, INVERSE, STRIKEOUT, COLOUR_*, COLOURTYPE, ACTIONTYPE, STYLE_BITS)
+#include "../utils/error_codes.h"
 
 // Forward declarations
 class WorldSocket;
@@ -1488,11 +1489,11 @@ class WorldDocument : public QObject, public IWorldContext {
         }
         switch (result.error().type) {
             case WorldErrorType::NotConnected:
-                return 30002; // eWorldClosed
+                return eWorldClosed;
             case WorldErrorType::ItemInUse:
-                return 30063; // eItemInUse
+                return eItemInUse;
             default:
-                return 30000; // eUnknownError
+                return eBadParameter;
         }
     }
     qint32 DiscardQueue()

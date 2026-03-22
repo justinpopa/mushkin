@@ -11,22 +11,7 @@
 #include <QRandomGenerator>
 #include <QTransform>
 
-// Error codes (from lua_methods.cpp / lua_common.h)
-enum {
-    eOK = 0,
-    eNoNameSpecified = 30003,
-    eCouldNotOpenFile = 30013,
-    eLogFileBadWrite = 30016,
-    eUnknownOption = 30025,
-    eBadParameter = 30046,
-    eUnableToLoadImage = 30067,
-    eImageNotInstalled = 30068,
-    eInvalidNumberOfPoints = 30069,
-    eInvalidPoint = 30070,
-    ePenStyleNotValid = 30066,
-    eHotspotNotInstalled = 30072,
-    eNoSuchWindow = 30073,
-};
+#include "../utils/error_codes.h"
 
 // Helper to create a pen with Windows GDI-compatible dash patterns
 // Windows GDI cosmetic pens (width 0 or 1) render dash patterns as nearly solid
@@ -1240,7 +1225,7 @@ qint32 MiniWindow::LoadImage(const QString& imageId, const QString& filepath)
     // Load image using Qt (QImage is platform-independent)
     auto img = std::make_unique<QImage>(filepath);
     if (img->isNull()) {
-        return 30051; // eFileNotFound / eCouldNotOpenFile
+        return eFileNotFound;
     }
 
     // Insert new image (replaces old one if it exists; old unique_ptr automatically deletes)
@@ -1277,7 +1262,7 @@ qint32 MiniWindow::DrawImage(const QString& imageId, qint32 left, qint32 top, qi
     // Get raw pointer from unique_ptr in map
     auto it = images.find(imageId);
     if (it == images.end() || !it->second)
-        return 30009; // eImageNotFound
+        return eImageNotInstalled;
     QImage* img = it->second.get();
 
     // Handle special meaning for right/bottom (from miniwindow.cpp)
@@ -1359,7 +1344,7 @@ qint32 MiniWindow::BlendImage(const QString& imageId, qint32 left, qint32 top, q
     // Get raw pointer from unique_ptr in map
     auto it = images.find(imageId);
     if (it == images.end() || !it->second)
-        return 30009; // eImageNotFound
+        return eImageNotInstalled;
     QImage* img = it->second.get();
 
     // Handle special meaning for right/bottom

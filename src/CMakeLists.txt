@@ -97,9 +97,12 @@ if(APPLE)
         MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
         MACOSX_BUNDLE_ICON_FILE "mushkin.icns"
         # Set rpath so bundled Qt frameworks can be found at runtime
-        # This is critical for self-contained app bundles
-        INSTALL_RPATH "@executable_path/../Frameworks"
-        BUILD_WITH_INSTALL_RPATH TRUE
+        # @executable_path/../Frameworks — for self-contained app bundles (release)
+        # @loader_path/../Frameworks — same, via loader path
+        # Qt lib dir — for dev builds where frameworks aren't bundled
+        INSTALL_RPATH "@executable_path/../Frameworks;@loader_path/../Frameworks"
+        BUILD_RPATH "${Qt6_DIR}/../../"
+        BUILD_WITH_INSTALL_RPATH FALSE
     )
 
     # Ad-hoc codesign the app bundle after build (required for macOS to run unsigned apps)

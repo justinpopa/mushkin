@@ -77,7 +77,7 @@ int L_WindowLoadImage(lua_State* L)
     // Load the image as a QImage
     auto image = std::make_unique<QImage>(qFilename);
     if (image->isNull()) {
-        lua_pushnumber(L, 30051); // eFileNotFound
+        lua_pushnumber(L, eFileNotFound);
         return 1;
     }
 

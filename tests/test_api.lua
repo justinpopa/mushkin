@@ -256,7 +256,7 @@ end
 function test_set_command_not_empty()
     -- This assumes InputView has text (set up by C++ test)
     local err = world.SetCommand("other command")
-    check(err == 30011, "SetCommand should return eCommandNotEmpty (30011)")
+    check(err == 30020, "SetCommand should return eCommandNotEmpty (30020)")
 
     return 0
 end

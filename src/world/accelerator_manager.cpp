@@ -5,6 +5,7 @@
  */
 
 #include "accelerator_manager.h"
+#include "../utils/error_codes.h"
 #include "world_document.h"
 #include <QShortcut>
 #include <QWidget>
@@ -276,7 +277,7 @@ int AcceleratorManager::addAccelerator(const QString& keyString, const QString& 
     // Parse the key string
     QKeySequence keySeq;
     if (!parseKeyString(keyString, keySeq)) {
-        return 30001; // eBadParameter - invalid key string
+        return eBadParameter; // invalid key string
     }
 
     // Normalize key string for storage
@@ -377,7 +378,7 @@ int AcceleratorManager::addKeyBinding(const QString& keyString, const QString& a
     // Parse the key string
     QKeySequence keySeq;
     if (!parseKeyString(keyString, keySeq)) {
-        return 30001; // eBadParameter - invalid key string
+        return eBadParameter; // invalid key string
     }
 
     // Normalize key string for storage
