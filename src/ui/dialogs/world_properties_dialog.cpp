@@ -539,29 +539,17 @@ void WorldPropertiesDialog::loadSettings()
     m_outputFontLabel->setText(
         QString("%1, %2pt").arg(m_outputFont.family()).arg(m_outputFont.pointSize()));
 
-    // TODO(feature): Wire ANSI color picker to WorldDocument m_normalColour/m_boldColour arrays.
-    // WorldDocument has m_colors.normal_colour[8] and m_colors.bold_colour[8] — initialize from
-    // them here. For now, initialize with default colors
-    const std::array<QRgb, 16> defaultColors = {
-        qRgb(0, 0, 0),       // Black
-        qRgb(128, 0, 0),     // Red
-        qRgb(0, 128, 0),     // Green
-        qRgb(128, 128, 0),   // Yellow
-        qRgb(0, 0, 128),     // Blue
-        qRgb(128, 0, 128),   // Magenta
-        qRgb(0, 128, 128),   // Cyan
-        qRgb(192, 192, 192), // White
-        qRgb(128, 128, 128), // Bright Black (Gray)
-        qRgb(255, 0, 0),     // Bright Red
-        qRgb(0, 255, 0),     // Bright Green
-        qRgb(255, 255, 0),   // Bright Yellow
-        qRgb(0, 0, 255),     // Bright Blue
-        qRgb(255, 0, 255),   // Bright Magenta
-        qRgb(0, 255, 255),   // Bright Cyan
-        qRgb(255, 255, 255)  // Bright White
-    };
+    // Load ANSI colors from WorldDocument (BGR format → QRgb for display)
+    // normal_colour[0..7] = colors 0-7, bold_colour[0..7] = colors 8-15
+    for (int i = 0; i < 8; i++) {
+        QRgb bgr = m_doc->m_colors.normal_colour[i];
+        m_ansiColors[i] = qRgb(bgr & 0xFF, (bgr >> 8) & 0xFF, (bgr >> 16) & 0xFF);
+    }
+    for (int i = 0; i < 8; i++) {
+        QRgb bgr = m_doc->m_colors.bold_colour[i];
+        m_ansiColors[i + 8] = qRgb(bgr & 0xFF, (bgr >> 8) & 0xFF, (bgr >> 16) & 0xFF);
+    }
     for (int i = 0; i < 16; i++) {
-        m_ansiColors[i] = defaultColors[i];
         updateColorButton(i);
     }
 
@@ -655,9 +643,17 @@ void WorldPropertiesDialog::saveSettings()
     m_doc->m_output.font_name = m_outputFont.family();
     m_doc->m_output.font_height = m_outputFont.pointSize(); // Store as points
     m_doc->m_output.font_weight = m_outputFont.weight();
-    // TODO(feature): Wire ANSI color picker to WorldDocument m_normalColour/m_boldColour arrays.
-    // WorldDocument has m_colors.normal_colour[8] and m_colors.bold_colour[8] — save m_ansiColors[]
-    // to them here.
+    // Save ANSI colors back to WorldDocument (QRgb → BGR format)
+    for (int i = 0; i < 8; i++) {
+        QRgb rgb = m_ansiColors[i];
+        m_doc->m_colors.normal_colour[i] =
+            static_cast<QRgb>((qRed(rgb)) | (qGreen(rgb) << 8) | (qBlue(rgb) << 16));
+    }
+    for (int i = 0; i < 8; i++) {
+        QRgb rgb = m_ansiColors[i + 8];
+        m_doc->m_colors.bold_colour[i] =
+            static_cast<QRgb>((qRed(rgb)) | (qGreen(rgb) << 8) | (qBlue(rgb) << 16));
+    }
 
     // Activity settings
     m_doc->m_display.flash_icon = m_flashIconCheck->isChecked();
