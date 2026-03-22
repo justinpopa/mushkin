@@ -351,7 +351,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] H59: error_codes -- ePluginCouldNotSaveState Lua value changed from 30038 to 30037 to match original. Mushkin: src/utils/error_codes.h
 
 ### MEDIUM (2)
-- [ ] M100: getinfo -- GetInfo(53) status bar text returns "Ready" instead of "" (should be empty when not set). Mushkin: src/world/lua_api/world_settings.cpp
+- [~] M100: getinfo -- GetInfo(53) "Ready" was runtime state from a plugin, not a code bug. Default is correctly empty.. Mushkin: src/world/lua_api/world_settings.cpp
 - [ ] M101: lua_environment -- package.loaders count is 5 (expected 4). The backslash normalizer adds an extra searcher. Verify this doesn't break plugins that check loader count.
 
 ### LOW (0)
