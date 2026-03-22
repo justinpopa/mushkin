@@ -1612,6 +1612,31 @@ int L_SetOption(lua_State* L)
 
     opt.setter(*pDoc, value);
 
+    // Apply side effects based on option flags (original: scriptingoptions.cpp:513-603)
+    int flags = opt.iFlags;
+
+    if (flags & OPT_FIX_OUTPUT_BUFFER) {
+        // Resize output line buffer to new max_output_lines value
+        // FixUpOutputBuffer trims excess lines — handled naturally on next line add
+    }
+
+    if (flags & OPT_FIX_WRAP_COLUMN) {
+        // Notify server of new window width via NAWS
+        pDoc->m_telnetParser->sendWindowSizes(static_cast<int>(value));
+    }
+
+    if (flags & OPT_UPDATE_OUTPUT_FONT) {
+        emit pDoc->outputSettingsChanged();
+    }
+
+    if (flags & OPT_UPDATE_INPUT_FONT) {
+        emit pDoc->inputSettingsChanged();
+    }
+
+    if (flags & OPT_UPDATE_VIEWS) {
+        emit pDoc->linesAdded(); // triggers view repaint
+    }
+
     return luaReturnOK(L);
 }
 
@@ -1914,8 +1939,17 @@ int L_SetAlphaOption(lua_State* L)
 
         opt.setter(*pDoc, strValue);
 
-        // TODO(ui): Trigger UI refresh callbacks (view repaint, font reload) when options
-        // change.
+        // Apply side effects (original: scriptingoptions.cpp:856-868)
+        int alphaFlags = opt.iFlags;
+        if (alphaFlags & OPT_UPDATE_OUTPUT_FONT) {
+            emit pDoc->outputSettingsChanged();
+        }
+        if (alphaFlags & OPT_UPDATE_INPUT_FONT) {
+            emit pDoc->inputSettingsChanged();
+        }
+        if (alphaFlags & OPT_UPDATE_VIEWS) {
+            emit pDoc->linesAdded();
+        }
 
         return luaReturnOK(L);
     }
