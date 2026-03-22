@@ -405,3 +405,26 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [ ] L73: logging -- WriteLog newline: Mushkin correctly detects trailing newline; original always appends for 2+ char messages. Mushkin: src/world/world_logging.cpp:392
 - [ ] L74: logging -- flushLogIfNeeded flushes every call instead of every 120 seconds. Mushkin: src/world/world_document.cpp:2966-2973
 - [ ] L75: logging -- LogSend bypasses alias processing (calls sendToMud directly). Mushkin: src/world/lua_api/world_logging_opts.cpp:273
+
+## v2 Audit: Command Processing (2026-03-22)
+
+### HIGH
+- [ ] H69: commands -- L_Send() bypasses entire send pipeline (no echo, no logging, no spam, no plugin callbacks). Calls sendToMud() directly. Mushkin: src/world/lua_api/world_network.cpp:44
+- [ ] H70: commands -- L_LogSend() also bypasses send pipeline. Mushkin: src/world/lua_api/world_logging_opts.cpp:273
+- [ ] H71: commands -- Queue prefix encoding conflates echo and log flags; toLower() destroys echo flag. Mushkin: src/world/world_document.cpp:962-977
+- [ ] H72: commands -- Execute() does not save/restore m_CurrentPlugin; causes plugin context corruption during nested calls. Mushkin: src/world/world_document.cpp:1331
+
+### MEDIUM
+- [ ] M115: commands -- ON_PLUGIN_SENT fires after echo/log/send instead of before. Mushkin: src/world/world_document.cpp:1232-1235
+- [ ] M116: commands -- SendMsg() missing m_bPluginProcessingSent re-entrancy guard. Mushkin: src/world/world_document.cpp:934
+- [ ] M117: commands -- m_bNoEcho check in DoSendMsg instead of SendMsg; queued commands may encode wrong echo flag. Mushkin: src/world/world_document.cpp:1189
+- [ ] M118: commands -- Backslash escape sequences not applied for typed commands. Mushkin: src/ui/views/world_widget.cpp:508
+- [ ] M119: commands -- m_iExecutionDepth not reset for normal (non-auto-say) commands. Mushkin: src/ui/views/world_widget.cpp:508
+- [ ] M120: commands -- Hardcoded "/" immediate prefix in Execute() not in original; changes Execute() behavior for Lua callers. Mushkin: src/world/world_document.cpp:1458-1463
+
+### LOW
+- [ ] L76: commands -- German umlaut translation not implemented in SendMsg. Mushkin: src/world/world_document.cpp:934
+- [ ] L77: commands -- addToCommandHistory rejects whitespace-only strings; original accepts them. Mushkin: src/world/world_document.cpp:2399
+- [ ] L78: commands -- DoSendMsg sends \n instead of \r\n. Mushkin: src/world/world_document.cpp:903,1218
+- [ ] L79: commands -- Command history stores processed command instead of original typed command. Mushkin: src/world/world_document.cpp:1493
+- [ ] L80: commands -- Execute() doesn't check empty lines for reconnect prompt. Mushkin: src/world/world_document.cpp:1438
