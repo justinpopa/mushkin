@@ -11,6 +11,7 @@
 #include "world_error.h"
 #include <QColor>
 #include <QMdiSubWindow>
+#include <QMessageBox>
 #include <QString>
 #include <expected>
 
@@ -220,7 +221,17 @@ qint32 WorldDocument::CloseNotepad(const QString& title, bool querySave)
         return eNoSuchNotepad;
     }
 
-    // TODO(feature): Prompt to save modified notepad content when querySave=true.
+    // Prompt to save modified content (original: methods_notepad.cpp:250-252)
+    if (querySave && notepad->m_pTextEdit && notepad->m_pTextEdit->document()->isModified()) {
+        QMessageBox::StandardButton reply = QMessageBox::question(
+            notepad, tr("Save Changes"), tr("Save changes to '%1'?").arg(title),
+            QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
+        if (reply == QMessageBox::Cancel) {
+            return eOK; // User cancelled — don't close (original returns false)
+        }
+        // Note: Yes/No both proceed to close. Original's SaveModified handles saving
+        // on Yes, but Mushkin notepads don't have file-backed save, so we just close.
+    }
 
     // Synchronously unregister before deferred deletion so that
     // GetNotepadList (called in the same script) sees the removal immediately.
