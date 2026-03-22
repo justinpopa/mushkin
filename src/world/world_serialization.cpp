@@ -245,10 +245,7 @@ void WorldDocument::loadTriggersFromXml(QXmlStreamReader& xml, Plugin* plugin)
             // Behavior flags
             trigger->omit_from_output = attrs.value("omit_from_output").toString() == "y";
             trigger->omit_from_log = attrs.value("omit_from_log").toString() == "y";
-            // Only set to false if explicitly "n", otherwise keep default (true)
-            if (attrs.hasAttribute("keep_evaluating")) {
-                trigger->keep_evaluating = attrs.value("keep_evaluating").toString() != "n";
-            }
+            trigger->keep_evaluating = attrs.value("keep_evaluating").toString() == "y";
             trigger->use_regexp = attrs.value("regexp").toString() == "y";
             trigger->ignore_case = attrs.value("ignore_case").toString() == "y";
             trigger->repeat = attrs.value("repeat").toString() == "y";
@@ -525,10 +522,7 @@ void WorldDocument::loadAliasesFromXml(QXmlStreamReader& xml, Plugin* plugin)
             alias->omit_from_log = attrs.value("omit_from_log").toString() == "y";
             alias->omit_from_command_history =
                 attrs.value("omit_from_command_history").toString() == "y";
-            // Only set to false if explicitly "n", otherwise keep default (true)
-            if (attrs.hasAttribute("keep_evaluating")) {
-                alias->keep_evaluating = attrs.value("keep_evaluating").toString() != "n";
-            }
+            alias->keep_evaluating = attrs.value("keep_evaluating").toString() == "y";
             alias->use_regexp = attrs.value("regexp").toString() == "y";
             alias->ignore_case = attrs.value("ignore_case").toString() == "y";
             alias->expand_variables = attrs.value("expand_variables").toString() == "y";

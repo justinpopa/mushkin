@@ -41,7 +41,7 @@ void Trigger::initializeDefaults()
     ignore_case = false;
     omit_from_log = false;
     omit_from_output = false;
-    keep_evaluating = true; // MUSHclient default: continue evaluating other triggers after match
+    keep_evaluating = false; // original default: stop after first match (OtherTypes.h:369)
     expand_variables = false;
     enabled = true;
     use_regexp = false;
