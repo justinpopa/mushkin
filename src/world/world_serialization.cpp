@@ -823,7 +823,13 @@ void WorldDocument::loadVariablesFromXml(QXmlStreamReader& xml, Plugin* plugin)
 
         if (xml.isStartElement() && xml.name() == QLatin1String("variable")) {
             QString name = xml.attributes().value("name").toString();
+            bool trim = xml.attributes().value("trim").toString() == "y";
             QString contents = xml.readElementText();
+
+            // Trim whitespace if requested (original: xml_load_world.cpp:1977-1986)
+            if (trim) {
+                contents = contents.trimmed();
+            }
 
             // Original preserves variable name case (CheckObjectName validates but doesn't
             // lowercase)
