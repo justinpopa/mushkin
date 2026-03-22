@@ -1192,32 +1192,63 @@ void WorldDocument::DoSendMsg(const QString& text, bool bEcho, bool bLog)
  */
 void WorldDocument::logCommand(const QString& text)
 {
-    if (!IsLogOpen()) {
+    // Original: doc.cpp:6093-6160 — LogCommand
+    if (!IsLogOpen() || !m_logging.log_input || m_logging.log_raw) {
         return;
     }
 
-    // Write preamble (if any)
-    if (!m_logging.line_preamble_input.isEmpty()) {
-        QString preamble = FormatTime(QDateTime::currentDateTime(), m_logging.line_preamble_input,
-                                      m_logging.log_html);
-        WriteToLog(preamble);
+    // Strip trailing \r\n and normalize \r\n → \n
+    QString message = text;
+    if (message.endsWith("\r\n")) {
+        message.chop(2);
     }
+    message.replace("\r\n", "\n");
 
-    // Write the command text
+    // Preamble with %n expansion and time formatting
+    QString preamble = m_logging.line_preamble_input;
+    preamble.replace("%n", "\n");
+    if (preamble.contains('%')) {
+        preamble = FormatTime(QDateTime::currentDateTime(), preamble, m_logging.log_html);
+    }
+    WriteToLog(preamble);
+
+    // HTML: escape + optional echo color wrapping
     if (m_logging.log_html) {
-        WriteToLog(FixHTMLString(text));
-    } else {
-        WriteToLog(text);
+        message = FixHTMLString(message);
+
+        // Wrap in echo color if logging in colour and echo_colour is set
+        // Original: doc.cpp:6137-6144 — uses m_echo_colour index into m_customtext
+        // SAMECOLOUR = 65535 (no custom colour)
+        if (m_logging.log_in_colour && m_output.echo_colour != 65535) {
+            // echo_colour is an index into m_colors.custom_text (BGR format)
+            if (m_output.echo_colour >= 0 &&
+                m_output.echo_colour < static_cast<int>(m_colors.custom_text.size())) {
+                QRgb bgr = m_colors.custom_text[m_output.echo_colour];
+                int r = bgr & 0xFF;
+                int g = (bgr >> 8) & 0xFF;
+                int b = (bgr >> 16) & 0xFF;
+                WriteToLog(QString("<font color=\"#%1%2%3\">")
+                               .arg(r, 2, 16, QChar('0'))
+                               .arg(g, 2, 16, QChar('0'))
+                               .arg(b, 2, 16, QChar('0')));
+            }
+        }
     }
 
-    // Write postamble (if any)
-    if (!m_logging.line_postamble_input.isEmpty()) {
-        QString postamble = FormatTime(QDateTime::currentDateTime(), m_logging.line_postamble_input,
-                                       m_logging.log_html);
-        WriteToLog(postamble);
+    WriteToLog(message);
+
+    // Close color tag
+    if (m_logging.log_html && m_logging.log_in_colour && m_output.echo_colour != 65535) {
+        WriteToLog("</font>");
     }
 
-    // Always add newline after command
+    // Postamble with %n expansion and time formatting
+    QString postamble = m_logging.line_postamble_input;
+    postamble.replace("%n", "\n");
+    if (postamble.contains('%')) {
+        postamble = FormatTime(QDateTime::currentDateTime(), postamble, m_logging.log_html);
+    }
+    WriteToLog(postamble);
     WriteToLog("\n");
 }
 
