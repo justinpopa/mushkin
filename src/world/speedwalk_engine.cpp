@@ -175,9 +175,9 @@ QString evaluate(const QString& speedWalkString, const QString& filler)
 
         p++; // bypass whatever that character was (or the trailing bracket)
 
-        // Output required number of times
+        // Output required number of times (original uses \r\n — ENDLINE)
         for (int j = 0; j < count; j++)
-            result += str + "\n";
+            result += str + "\r\n";
     }
 
     return result;
@@ -219,7 +219,7 @@ QString reverse(const QString& speedWalkString)
             if (*p == '\r') {
                 // discard carriage returns
             } else if (*p == '\n') {
-                result = "\n" + result;
+                result = "\r\n" + result;
             } else {
                 result = *p + result;
             }
@@ -399,7 +399,8 @@ QString removeBacktracks(const QString& speedWalkString, const QString& filler)
     if (expanded.isEmpty() || expanded.startsWith('*'))
         return expanded;
 
-    // Split into individual directions
+    // Split into individual directions (normalize \r\n to \n first)
+    expanded.replace("\r\n", "\n");
     QStringList directions = expanded.split('\n', Qt::SkipEmptyParts);
 
     // Use a stack approach - push directions, pop when reverse found
