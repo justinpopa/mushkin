@@ -2063,6 +2063,10 @@ void MainWindow::newWorld()
         db.saveWindowGeometry(worldWidget->worldName(), geometry);
     });
 
+    // Apply global font defaults for new worlds only (matches original MUSHclient
+    // doc_construct.cpp:696-703 — NOT applied when loading existing world files).
+    worldWidget->document()->applyGlobalFontDefaults();
+
     // Auto-apply default files on new world creation (matches original MUSHclient
     // doc_construct.cpp:641-684 — only for new worlds, not loaded ones).
     {

@@ -540,8 +540,9 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     // This avoids creating audio objects in tests and headless environments.
     // m_soundManager itself is already created above.
 
-    // Apply global font defaults (mirrors MUSHclient doc_construct.cpp:696-703)
-    applyGlobalFontDefaults();
+    // Note: applyGlobalFontDefaults() is NOT called here.
+    // Original MUSHclient only applies default fonts for new worlds (doc_construct.cpp:696-703),
+    // not when loading existing world files. Caller (MainWindow::newWorld) applies defaults.
 }
 
 WorldDocument::~WorldDocument()
