@@ -344,121 +344,17 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] M98: database — DatabaseError translates SQLITE_ROW/SQLITE_DONE to "row ready"/"finished" matching original. Mushkin: `world_database.cpp`
 ## v2 Runtime Audit Findings (2026-03-22)
 
-### HIGH (43)
-- [ ] H56: getinfo -- MISMATCH getinfo.106`: original=`False` mushkin=`True
-- [ ] H57: getinfo -- MISMATCH getinfo.108`: original=`False` mushkin=`True
-- [ ] H58: getinfo -- MISMATCH getinfo.111`: original=`True` mushkin=`False
-- [ ] H59: getinfo -- MISMATCH getinfo.118`: original=`True` mushkin=`False
-- [ ] H60: getinfo -- MISMATCH getinfo.120`: original=`False` mushkin=`True
-- [ ] H61: getinfo -- MISMATCH getinfo.21`: original=`#` mushkin=`
-- [ ] H62: getinfo -- MISMATCH getinfo.271`: original=`-1` mushkin=`4278190080
-- [ ] H63: getinfo -- MISMATCH getinfo.286`: original=`73` mushkin=`46
-- [ ] H64: getinfo -- MISMATCH getinfo.287`: original=`3` mushkin=`0
-- [ ] H65: getinfo -- MISMATCH getinfo.288`: original=`3875` mushkin=`101
-- [ ] H66: getinfo -- MISMATCH getinfo.295`: original=`1514` mushkin=`0
-- [ ] H67: getinfo -- MISMATCH getinfo.296`: original=`3712` mushkin=`2820
-- [ ] H68: getinfo -- MISMATCH getinfo.297`: original=`10000000` mushkin=`1000000000
-- [ ] H69: getinfo -- MISMATCH getinfo.298`: original=`3039002` mushkin=`3052000
-- [ ] H70: getinfo -- MISMATCH getinfo.299`: original=`1252` mushkin=`65001
-- [ ] H71: getinfo -- MISMATCH getinfo.300`: original=`437` mushkin=`65001
-- [ ] H72: getinfo -- MISMATCH getinfo.301`: original=`1774209598` mushkin=`46103.835497685184
-- [ ] H73: getinfo -- MISMATCH getinfo.302`: original=`1774209595` mushkin=`46103.835497685184
-- [ ] H74: getinfo -- MISMATCH getinfo.304`: original=`1774209747` mushkin=`46103.83568287037
-- [ ] H75: getinfo -- MISMATCH getinfo.305`: original=`1774209594` mushkin=`46103.83568287037
-- [ ] H76: getinfo -- MISMATCH getinfo.306`: original=`1774209595` mushkin=`46103.835497685184
-- [ ] H77: getinfo -- MISMATCH getinfo.310`: original=`69` mushkin=`56
-- [ ] H78: getinfo -- MISMATCH getinfo.37`: original=`` mushkin=`say 
-- [ ] H79: getinfo -- MISMATCH getinfo.53`: original=`` mushkin=`Ready
-- [ ] H80: getinfo -- MISMATCH getinfo.54`: original=`C:\Program Files\MUSHclient\worlds\Aardwolf.mcl` mushkin=`/Users/justinpopa/Desktop/Mushkin/worlds/Aardwolf.mcl
-- [ ] H81: getinfo -- MISMATCH getinfo.60`: original=`.\worlds\plugins\` mushkin=`/Users/justinpopa/Desktop/Mushkin/worlds/plugins/
-- [ ] H82: getinfo -- MISMATCH getinfo.61`: original=`23.111.142.226` mushkin=`
-- [ ] H83: getinfo -- MISMATCH getinfo.62`: original=`0.0.0.0` mushkin=`
-- [ ] H84: getinfo -- MISMATCH getinfo.64`: original=`C:\Program Files\MUSHclient\` mushkin=`/Users/justinpopa/Desktop/Mushkin/
-- [ ] H85: getinfo -- MISMATCH getinfo.72`: original=`5.07-pre` mushkin=`5.06-preview
-- [ ] H86: getinfo -- MISMATCH getinfo.73`: original=`Oct 30 2022 00:33:01` mushkin=`Mar 22 2026 10:35:45
-- [ ] H87: getinfo -- MISMATCH getinfo.74`: original=`C:\Program Files\MUSHclient\sounds\` mushkin=`/Users/justinpopa/Desktop/Mushkin/sounds/
-- [ ] H88: getinfo -- MISMATCH getinfo.76`: original=`C:\Program Files\MUSHclient\\Dina.fon` mushkin=`
-- [ ] H89: getinfo -- MISMATCH getinfo.77`: original=`` mushkin=`macOS Tahoe (26.4)
-- [ ] H90: getinfo -- MISMATCH getinfo.79`: original=`C:\Program Files\MUSHclient\worlds/plugins/images/bg1.png` mushkin=`/Users/justinpopa/Desktop/Mushkin/worlds/plugins/images/bg1.png
-- [ ] H91: getinfo -- MISMATCH getinfo.80`: original=`1.6.37` mushkin=`
-- [ ] H92: getinfo -- MISMATCH getinfo.81`: original=
-- [ ] H93: getinfo -- MISMATCH getinfo.82`: original=`C:\Program Files\MUSHclient\mushclient_prefs.sqlite` mushkin=`/Users/justinpopa/Desktop/Mushkin/mushclient_prefs.sqlite
-- [ ] H94: getinfo -- MISMATCH getinfo.83`: original=`3.39.2` mushkin=`3.52.0
-- [ ] H95: getinfo -- MISMATCH getinfo.84`: original=`C:\Program Files\MUSHclient\` mushkin=`
-- [ ] H96: getinfo -- MISMATCH getinfo.85`: original=`.\worlds\plugins\state\` mushkin=`/Users/justinpopa/Desktop/Mushkin/worlds/plugins/state/
-- [ ] H97: getinfo -- MISMATCH getinfo.87`: original=
-- [ ] H98: getinfo -- MISMATCH getinfo.88`: original=`Aardwolf.mcl` mushkin=`
+### HIGH (4)
+- [ ] H56: getinfo -- GetInfo(21) command_stack_character returns "" instead of "#". Mushkin: src/world/lua_api/world_settings.cpp
+- [ ] H57: getinfo -- GetInfo(271) background_colour returns 4278190080 instead of -1. Mushkin: src/world/lua_api/world_settings.cpp
+- [ ] H58: getinfo -- GetInfo(37) auto_say_string returns "say " instead of "" (wrong default). Mushkin: src/world/world_document.h
+- [ ] H59: error_codes -- ePluginCouldNotSaveState is 30038, should be 30037. Mushkin: src/utils/error_codes.h
 
-### MEDIUM (49)
-- [ ] M100: error_codes -- MISSING error_codes.eCannotCreateChatSocket`: original=`30042
-- [ ] M101: error_codes -- MISSING error_codes.eCannotLookupDomainName`: original=`30043
-- [ ] M102: error_codes -- MISSING error_codes.eChatAlreadyConnected`: original=`30049
-- [ ] M103: error_codes -- MISSING error_codes.eChatAlreadyListening`: original=`30047
-- [ ] M104: error_codes -- MISSING error_codes.eChatIDNotFound`: original=`30048
-- [ ] M105: error_codes -- MISSING error_codes.eChatPersonNotFound`: original=`30045
-- [ ] M106: error_codes -- EXTRA error_codes.eFileNotOpened`: mushkin=`30076
-- [ ] M107: error_codes -- EXTRA error_codes.eInvalidColourName`: mushkin=`30077
-- [ ] M108: error_codes -- MISSING error_codes.eNoChatConnections`: original=`30044
-- [ ] M109: error_codes -- EXTRA error_codes.eNoSuchNotepad`: mushkin=`30075
-- [ ] M110: error_codes -- MISMATCH error_codes.ePluginCouldNotSaveState`: original=`30037` mushkin=`30038
-- [ ] M111: miniwindows -- MISMATCH miniwindows`: original=
-- [ ] M112: options -- MISMATCH options.alpha.auto_say_string`: original=`` mushkin=`say 
-- [ ] M113: options -- EXTRA options.alpha.proxy_username`: mushkin=`
-- [ ] M114: options -- MISMATCH options.alpha.script_editor_argument`: original=`%file` mushkin=`
-- [ ] M115: options -- MISMATCH options.alpha.speed_walk_prefix`: original=`#` mushkin=`
-- [ ] M116: options -- MISMATCH options.numeric.append_to_log_file`: original=`-1` mushkin=`1
-- [ ] M117: options -- MISMATCH options.numeric.confirm_before_replacing_typing`: original=`0` mushkin=`1
-- [ ] M118: options -- MISMATCH options.numeric.detect_pueblo`: original=`1` mushkin=`0
-- [ ] M119: options -- MISMATCH options.numeric.echo_colour`: original=`2` mushkin=`1
-- [ ] M120: options -- MISMATCH options.numeric.echo_hyperlink_in_output_window`: original=`1` mushkin=`0
-- [ ] M121: options -- MISMATCH options.numeric.edit_script_with_notepad`: original=`0` mushkin=`1
-- [ ] M122: options -- MISMATCH options.numeric.hyperlink_adds_to_command_history`: original=`1` mushkin=`0
-- [ ] M123: options -- MISMATCH options.numeric.hyperlink_colour`: original=`16744448` mushkin=`33023
-- [ ] M124: options -- MISMATCH options.numeric.input_font_charset`: original=`1` mushkin=`0
-- [ ] M125: options -- MISMATCH options.numeric.keypad_enable`: original=`1` mushkin=`0
-- [ ] M126: options -- MISMATCH options.numeric.line_information`: original=`0` mushkin=`1
-- [ ] M127: options -- MISMATCH options.numeric.log_lines`: original=`-1` mushkin=`0
-- [ ] M128: options -- MISMATCH options.numeric.mud_can_change_link_colour`: original=`1` mushkin=`0
-- [ ] M129: options -- MISMATCH options.numeric.output_font_charset`: original=`1` mushkin=`0
-- [ ] M130: options -- MISMATCH options.numeric.remote_access_enabled`: original=`-1` mushkin=`0
-- [ ] M131: options -- MISMATCH options.numeric.remote_max_clients`: original=`-1` mushkin=`5
-- [ ] M132: options -- MISMATCH options.numeric.remote_port`: original=`-1` mushkin=`0
-- [ ] M133: options -- MISMATCH options.numeric.remote_scrollback_lines`: original=`-1` mushkin=`100
-- [ ] M134: options -- MISMATCH options.numeric.show_bold`: original=`0` mushkin=`1
-- [ ] M135: options -- MISMATCH options.numeric.show_connect_disconnect`: original=`1` mushkin=`0
-- [ ] M136: options -- MISMATCH options.numeric.show_italic`: original=`0` mushkin=`1
-- [ ] M137: options -- MISMATCH options.numeric.show_underline`: original=`0` mushkin=`1
-- [ ] M138: options -- MISMATCH options.numeric.timestamp_input_text_colour`: original=`128` mushkin=`8388608
-- [ ] M139: options -- MISMATCH options.numeric.timestamp_notes_text_colour`: original=`16711680` mushkin=`255
-- [ ] M140: options -- MISMATCH options.numeric.treeview_aliases`: original=`0` mushkin=`1
-- [ ] M141: options -- MISMATCH options.numeric.treeview_timers`: original=`0` mushkin=`1
-- [ ] M142: options -- MISMATCH options.numeric.treeview_triggers`: original=`0` mushkin=`1
-- [ ] M143: options -- MISMATCH options.numeric.underline_hyperlinks`: original=`1` mushkin=`0
-- [ ] M144: options -- MISMATCH options.numeric.unpause_on_send`: original=`0` mushkin=`1
-- [ ] M145: options -- MISMATCH options.numeric.use_custom_link_colour`: original=`1` mushkin=`0
-- [ ] M146: options -- MISMATCH options.numeric.use_msp`: original=`-1` mushkin=`0
-- [ ] M147: options -- MISMATCH options.numeric.use_mxp`: original=`0` mushkin=`2
-- [ ] M148: options -- MISMATCH options.numeric.write_world_name_to_log`: original=`1` mushkin=`0
+### MEDIUM (2)
+- [ ] M100: getinfo -- GetInfo(53) status bar text returns "Ready" instead of "" (should be empty when not set). Mushkin: src/world/lua_api/world_settings.cpp
+- [ ] M101: lua_environment -- package.loaders count is 5 (expected 4). The backslash normalizer adds an extra searcher. Verify this doesn't break plugins that check loader count.
 
-### LOW (21)
-- [ ] L67: api_availability -- MISMATCH api_availability.BoldColour`: original=`nil` mushkin=`function
-- [ ] L68: api_availability -- MISMATCH api_availability.CustomColourBackground`: original=`nil` mushkin=`function
-- [ ] L69: api_availability -- MISMATCH api_availability.CustomColourText`: original=`nil` mushkin=`function
-- [ ] L70: api_availability -- MISMATCH api_availability.EchoInput`: original=`nil` mushkin=`function
-- [ ] L71: api_availability -- MISMATCH api_availability.GetWorldWindowPositionX`: original=`nil` mushkin=`function
-- [ ] L72: api_availability -- MISMATCH api_availability.InfoColor`: original=`nil` mushkin=`function
-- [ ] L73: api_availability -- MISMATCH api_availability.LogInput`: original=`nil` mushkin=`function
-- [ ] L74: api_availability -- MISMATCH api_availability.LogNotes`: original=`nil` mushkin=`function
-- [ ] L75: api_availability -- MISMATCH api_availability.LogOutput`: original=`nil` mushkin=`function
-- [ ] L76: api_availability -- MISMATCH api_availability.LowercaseWildcard`: original=`nil` mushkin=`function
-- [ ] L77: api_availability -- MISMATCH api_availability.MoveWorldWindowX`: original=`nil` mushkin=`function
-- [ ] L78: api_availability -- MISMATCH api_availability.NormalColour`: original=`nil` mushkin=`function
-- [ ] L79: api_availability -- MISMATCH api_availability.NoteColour`: original=`nil` mushkin=`function
-- [ ] L80: api_availability -- MISMATCH api_availability.NoteColourBack`: original=`nil` mushkin=`function
-- [ ] L81: api_availability -- MISMATCH api_availability.NoteColourFore`: original=`nil` mushkin=`function
-- [ ] L82: api_availability -- MISMATCH api_availability.OmitFromLogFile`: original=`nil` mushkin=`function
-- [ ] L83: api_availability -- MISMATCH api_availability.SpeedWalkDelay`: original=`nil` mushkin=`function
-- [ ] L84: api_availability -- MISMATCH api_availability.Trace`: original=`nil` mushkin=`function
-- [ ] L85: lua_environment -- MISMATCH lua_environment.jit_version`: original=`LuaJIT 2.1.0-beta3` mushkin=`LuaJIT 2.1.1765228720
-- [ ] L86: lua_environment -- MISMATCH lua_environment.package_loaders_count`: original=`4` mushkin=`5
-- [ ] L87: plugins -- MISMATCH plugins`: original=
+### LOW (0)
+(error_codes MISSING items are all chat-related codes — chat system not implemented, deferred)
+(error_codes EXTRA items are intentional Mushkin additions)
+(lua_environment jit_version difference is expected — different LuaJIT builds)

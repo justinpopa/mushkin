@@ -87,6 +87,7 @@ Finding = dict  # {"category": str, "kind": str, "key": str, "original": any, "m
 def compare(orig_flat, mush_flat, allowlist):
     """Compare two flattened dicts and return a list of Finding dicts."""
     skip_set = set(allowlist.get("skip_keys", []))
+    skip_prefixes = allowlist.get("skip_prefixes", [])
     normalize_patterns = allowlist.get("normalize_paths", [])
     tolerance_map = allowlist.get("tolerance", {})
 
@@ -95,6 +96,8 @@ def compare(orig_flat, mush_flat, allowlist):
 
     for key in all_keys:
         if key in skip_set:
+            continue
+        if any(key.startswith(p) for p in skip_prefixes):
             continue
 
         in_orig = key in orig_flat
