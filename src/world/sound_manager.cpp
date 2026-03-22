@@ -273,6 +273,23 @@ qint32 SoundManager::playSound(qint16 buffer, const QString& filename, bool loop
         return eCannotPlaySound;
     }
 
+    // Empty filename with valid buffer = adjust volume/pan/loop of playing sound
+    // Original: methods_sounds.cpp:91-114
+    if (filename.isEmpty()) {
+        if (!sb.isPlaying) {
+            return eCannotPlaySound; // Can't adjust if not playing
+        }
+        // Adjust volume (Qt uses linear 0.0-1.0, convert from dB -100..0)
+        double linearVolume = std::pow(10.0, volume / 20.0); // dB to linear
+        sb.spatialSound->setVolume(static_cast<float>(linearVolume));
+        // Adjust looping
+        sb.spatialSound->setLoops(loop ? QSpatialSound::Infinite : 1);
+        sb.isLooping = loop;
+        // Note: Qt Spatial Audio does not support pan adjustment after creation
+        // (original uses DirectSound SetPan). This is a known platform gap.
+        return eOK;
+    }
+
     // Stop current sound in buffer
     sb.spatialSound->stop();
 
