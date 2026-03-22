@@ -898,6 +898,15 @@ int L_WindowDeleteHotspot(lua_State* L)
     // Delete the hotspot
     win->hotspots.erase(it);
 
+    // Clear mouse tracking if this hotspot was under the mouse or being pressed
+    // Original: miniwindow.cpp:1792-1796
+    if (win->mouseOverHotspot == hotspotIdStr) {
+        win->mouseOverHotspot.clear();
+    }
+    if (win->mouseDownHotspot == hotspotIdStr) {
+        win->mouseDownHotspot.clear();
+    }
+
     return luaReturnOK(L);
 }
 
