@@ -71,10 +71,14 @@ void MXPEngine::InitializeMXPElements()
         {"italic", TAG_MXP, MXP_ACTION_ITALIC, ""},
         {"u", TAG_MXP, MXP_ACTION_UNDERLINE, ""},
         {"underline", TAG_MXP, MXP_ACTION_UNDERLINE, ""},
+        {"em", TAG_MXP, MXP_ACTION_ITALIC, ""},   // em = italic (original: mxpinit.cpp:34)
+        {"strong", TAG_MXP, MXP_ACTION_BOLD, ""}, // strong = bold (original: mxpinit.cpp:41)
+        {"s", TAG_MXP, MXP_ACTION_STRIKE, ""},    // short alias for strike
         {"strike", TAG_MXP, MXP_ACTION_STRIKE, ""},
         {"strikeout", TAG_MXP, MXP_ACTION_STRIKE, ""},
         {"small", TAG_MXP, MXP_ACTION_SMALL, ""},
         {"tt", TAG_MXP, MXP_ACTION_TT, ""},
+        {"h", TAG_MXP, MXP_ACTION_HIGH, ""}, // short alias for high
         {"high", TAG_MXP, MXP_ACTION_HIGH, ""},
 
         // Paragraph and formatting (secure)
@@ -98,16 +102,18 @@ void MXPEngine::InitializeMXPElements()
         {"li", TAG_MXP, MXP_ACTION_LI, ""},
 
         // Color and font (secure)
+        {"c", TAG_MXP, MXP_ACTION_COLOR, "fore,back"}, // short alias for color
         {"color", TAG_MXP, MXP_ACTION_COLOR, "fore,back"},
         {"font", TAG_MXP, MXP_ACTION_FONT, "face,size,color,back"},
 
         // Links and actions (hyperlink is secure, send requires open mode)
-        {"a", TAG_MXP, MXP_ACTION_HYPERLINK, "href"},
+        {"a", TAG_MXP, MXP_ACTION_HYPERLINK, "href,xch_cmd,xch_hint"},
         {"send", TAG_MXP, MXP_ACTION_SEND, "href,hint,prompt"}, // secure (no TAG_OPEN)
 
         // Media (open mode required for security)
         {"sound", TAG_COMMAND | TAG_MXP, MXP_ACTION_SOUND, "fname,v,l,p,t,u"},   // secure
         {"music", TAG_COMMAND | TAG_MXP, MXP_ACTION_SOUND, "fname,v,l,p,t,u,c"}, // secure
+        {"filter", TAG_MXP | TAG_NOT_IMP, MXP_ACTION_FILTER, ""}, // sound/image filter
         {"image", TAG_OPEN | TAG_COMMAND | TAG_MXP, MXP_ACTION_IMAGE,
          "fname,url,t,h,w,hspace,vspace,align"},
 
@@ -118,12 +124,18 @@ void MXPEngine::InitializeMXPElements()
         // Special commands (mostly secure)
         {"version", TAG_MXP | TAG_COMMAND, MXP_ACTION_VERSION, ""},
         {"support", TAG_MXP, MXP_ACTION_SUPPORT, ""},
+        {"option", TAG_MXP | TAG_COMMAND, MXP_ACTION_OPTION, ""},
+        {"recommend_option", TAG_MXP | TAG_COMMAND, MXP_ACTION_RECOMMEND_OPTION, ""},
         {"expire", TAG_MXP, MXP_ACTION_EXPIRE, "name"},
+        {"v", TAG_MXP | TAG_COMMAND, MXP_ACTION_VAR, ""}, // short alias for var
         {"var", TAG_MXP | TAG_COMMAND, MXP_ACTION_VAR, ""},
 
         // User/password (open mode)
         {"user", TAG_OPEN | TAG_COMMAND | TAG_MXP, MXP_ACTION_USER, ""},
+        {"username", TAG_OPEN | TAG_COMMAND | TAG_MXP, MXP_ACTION_USER, ""},
         {"password", TAG_OPEN | TAG_COMMAND | TAG_MXP, MXP_ACTION_PASSWORD, ""},
+        {"pass", TAG_OPEN | TAG_COMMAND | TAG_MXP, MXP_ACTION_PASSWORD, ""},
+        {"relocate", TAG_OPEN | TAG_COMMAND | TAG_MXP | TAG_NOT_IMP, MXP_ACTION_RELOCATE, ""},
 
         // Frame operations (secure - not fully implemented)
         {"frame", TAG_MXP | TAG_NOT_IMP, MXP_ACTION_FRAME,
@@ -146,6 +158,8 @@ void MXPEngine::InitializeMXPElements()
         {"title", TAG_PUEBLO, MXP_ACTION_TITLE, ""},
         {"img", TAG_PUEBLO | TAG_COMMAND, MXP_ACTION_IMG,
          "src,fname,url,t,h,w,hspace,vspace,align"},
+        {"xch_page", TAG_PUEBLO | TAG_COMMAND, MXP_ACTION_XCH_PAGE, ""},
+        {"xch_pane", TAG_PUEBLO | TAG_COMMAND | TAG_NOT_IMP, MXP_ACTION_XCH_PANE, ""},
 
         // Special MXP commands
         {"reset", TAG_MXP | TAG_COMMAND, MXP_ACTION_RESET, ""},
