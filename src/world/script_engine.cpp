@@ -240,6 +240,23 @@ void ScriptEngine::openLua()
     // This opens: base, package, string, table, math, io, os, debug, coroutine
     luaL_openlibs(L);
 
+    // 2b. Save standard package loaders before language modules can modify package.loaders
+    // Language modules (MoonScript, YueScript, Teal, Fennel) insert their own searchers,
+    // pushing the standard searchers to higher indices. The sandbox later strips the table
+    // down to just preload; we restore the standard searchers from the registry afterward.
+    // Standard Lua 5.1 loaders: [1]=preload, [2]=Lua file, [3]=C library, [4]=all-in-one
+    // The all-in-one loader handles submodules (e.g., ssl.core → opens ssl.so, calls
+    // luaopen_ssl_core)
+    lua_getglobal(L, "package");
+    lua_getfield(L, -1, "loaders");
+    lua_rawgeti(L, -1, 2); // standard Lua file searcher
+    lua_setfield(L, LUA_REGISTRYINDEX, "mushclient.lua_searcher");
+    lua_rawgeti(L, -1, 3); // C library searcher
+    lua_setfield(L, LUA_REGISTRYINDEX, "mushclient.c_searcher");
+    lua_rawgeti(L, -1, 4); // all-in-one searcher (for submodules like ssl.core)
+    lua_setfield(L, LUA_REGISTRYINDEX, "mushclient.allinone_searcher");
+    lua_pop(L, 2); // pop loaders + package
+
     // 3. Store world document pointer in registry
     // This allows Lua C functions to retrieve the document pointer
     // Key: DOCUMENT_STATE = "mushclient.document"
@@ -834,15 +851,10 @@ return re
             return orig_loadfile(resolve_path(filename), ...)
         end
 
-        -- Wrap require to normalize backslashes in package.path before searching
-        -- This handles plugins that use Windows-style paths like "..\\subdir\\?.lua"
-        local orig_require = require
-        require = function(modname)
-            -- Normalize backslashes in package.path and package.cpath
-            package.path = (package.path or ""):gsub("\\", "/")
-            package.cpath = (package.cpath or ""):gsub("\\", "/")
-            return orig_require(modname)
-        end
+        -- Normalize backslashes in package.path/cpath once at setup time
+        -- (instead of wrapping require, which interferes with LuaJIT's searcher iteration)
+        package.path = (package.path or ""):gsub("\\", "/")
+        package.cpath = (package.cpath or ""):gsub("\\", "/")
 
         -- Clean up the global we used to pass the path
         _MUSHCLIENT_APP_DIR = nil
@@ -960,10 +972,15 @@ return re
         io.popen = function() error("io.popen not implemented in Mushkin") end
         -- Remove package.loadlib (prevents loading arbitrary native DLLs)
         package.loadlib = nil
-        -- Remove DLL loader and all-in-one loader from package.loaders (indices 3 and 4)
+        -- Remove C library loaders from package.loaders (keep preload + Lua file searcher)
+        -- Language modules (MoonScript, YueScript, etc.) insert their own searchers,
+        -- pushing the standard Lua file searcher to a higher index. We remove all
+        -- non-preload entries here; the standard Lua file searcher is restored from
+        -- the registry in C++ immediately after this sandbox runs.
         if package.loaders then
-            package.loaders[4] = nil
-            package.loaders[3] = nil
+            for i = #package.loaders, 2, -1 do
+                table.remove(package.loaders, i)
+            end
         end
         -- Replace debug.debug with error (prevents interactive debugging)
         if debug then
@@ -973,6 +990,42 @@ return re
     if (luaL_dostring(L, sandbox_code) != 0) {
         qWarning() << "Sandbox setup error:" << lua_tostring(L, -1);
         lua_pop(L, 1);
+    }
+
+    // 10b. Restore standard searchers and add backslash normalizer
+    // After the sandbox stripped package.loaders to just {preload}, rebuild it
+    // WITHOUT nil holes (ipairs stops at first nil):
+    //   [1] preload searcher     (already there)
+    //   [2] Lua file searcher    (saved in registry at step 2b)
+    //   [3] C library searcher   (saved in registry at step 2b, for bundled .so modules)
+    //   [4] all-in-one searcher  (for submodules like ssl.core → ssl.so + luaopen_ssl_core)
+    lua_getglobal(L, "package");
+    lua_getfield(L, -1, "loaders");
+    lua_getfield(L, LUA_REGISTRYINDEX, "mushclient.lua_searcher");
+    lua_rawseti(L, -2, 2); // package.loaders[2] = Lua file searcher
+    lua_getfield(L, LUA_REGISTRYINDEX, "mushclient.c_searcher");
+    lua_rawseti(L, -2, 3); // package.loaders[3] = C library searcher
+    lua_getfield(L, LUA_REGISTRYINDEX, "mushclient.allinone_searcher");
+    lua_rawseti(L, -2, 4); // package.loaders[4] = all-in-one searcher
+    lua_pop(L, 2);         // pop loaders + package
+
+    // Then insert backslash normalizer at [2], shifting others to [3], [4], [5]:
+    //   [1] preload, [2] normalizer, [3] Lua, [4] C library, [5] all-in-one
+    // Plugins append Windows-style paths (e.g., "\\subdir\\?.lua") to package.path at runtime.
+    // This searcher normalizes backslashes before the real Lua file searcher runs.
+    {
+        const char* normalizerCode = R"(
+            local function normalize_paths(modname)
+                package.path = (package.path or ""):gsub("\\", "/")
+                package.cpath = (package.cpath or ""):gsub("\\", "/")
+                return nil -- fall through to next searcher
+            end
+            table.insert(package.loaders, 2, normalize_paths)
+        )";
+        if (luaL_dostring(L, normalizerCode) != 0) {
+            qWarning() << "Path normalizer setup error:" << lua_tostring(L, -1);
+            lua_pop(L, 1);
+        }
     }
 
     // 11. Execute global sandbox/init script (original: lua_scripting.cpp:222-226)
