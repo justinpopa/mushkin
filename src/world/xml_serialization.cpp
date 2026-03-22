@@ -370,8 +370,13 @@ bool SaveWorldXML(WorldDocument* doc, const QString& filename)
         writer.writeEndElement();
     }
 
+    // Close world element BEFORE triggers/aliases/etc.
+    // Original structure: <muclient><world>options</world><triggers/><aliases/>...</muclient>
+    // Triggers, aliases, timers, variables, etc. are siblings of <world>, not children.
+    writer.writeEndElement(); // world
+
     // ========================================================================
-    // TRIGGERS AND ALIASES
+    // TRIGGERS AND ALIASES (siblings of <world>, children of <muclient>)
     // ========================================================================
 
     doc->saveTriggersToXml(writer);
@@ -420,9 +425,6 @@ bool SaveWorldXML(WorldDocument* doc, const QString& filename)
 
         writer.writeEndElement(); // command_history
     }
-
-    // Close world element
-    writer.writeEndElement(); // world
 
     // Close root element
     writer.writeEndElement(); // muclient
@@ -777,6 +779,35 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
 
             if (elementName == "timers") {
                 doc->loadTimersFromXml(reader);
+                continue;
+            }
+
+            if (elementName == "variables") {
+                doc->loadVariablesFromXml(reader);
+                continue;
+            }
+
+            if (elementName == "colours") {
+                doc->loadColoursFromXml(reader);
+                continue;
+            }
+
+            if (elementName == "accelerators") {
+                doc->loadAcceleratorsFromXml(reader);
+                continue;
+            }
+
+            if (elementName == "command_history") {
+                doc->m_commandHistory.clear();
+                while (!reader.atEnd()) {
+                    reader.readNext();
+                    if (reader.isEndElement() && reader.name() == QLatin1String("command_history"))
+                        break;
+                    if (reader.isStartElement() && reader.name() == QLatin1String("command")) {
+                        doc->m_commandHistory.append(reader.readElementText());
+                    }
+                }
+                doc->m_historyPosition = doc->m_commandHistory.count();
                 continue;
             }
 
