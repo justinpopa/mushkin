@@ -28,6 +28,7 @@
  */
 
 #include "sound_manager.h"
+#include "../utils/app_paths.h"
 #include "lua_api/lua_common.h" // For error codes: eOK, eCannotPlaySound
 #include "view_interfaces.h"
 #include "world_context.h"
@@ -569,18 +570,31 @@ QString SoundManager::resolveFilePath(const QString& filename)
     if (QFileInfo(filename).isAbsolute())
         return filename;
 
-    // Try relative to current working directory
-    QString fullPath = QDir::current().filePath(filename);
+    // Original methods_sounds.cpp:162-167:
+    // "without a full pathname, assume in sounds directory under MUSHclient.exe"
+    // On macOS, executable is inside .app bundle — check Resources/ and CWD.
+    // On Windows/Linux, executable directory is the app directory.
+    QString exeDir = AppPaths::getExecutableDirectory();
 
-    if (QFile::exists(fullPath))
-        return fullPath;
+    // Search order:
+    // 1. sounds/ under executable dir (Windows/Linux native layout)
+    // 2. Resources/sounds/ (macOS bundle layout)
+    // 3. sounds/ under CWD (cross-platform fallback)
+    // 4. Directly under executable dir
+    // 5. Directly under CWD
 
-    // Try relative to sounds subdirectory
-    QString soundsDir = QDir::current().filePath("sounds");
-    fullPath = QDir(soundsDir).filePath(filename);
+    QStringList searchPaths = {
+        QDir(exeDir).filePath("sounds/" + filename),
+        QDir(exeDir).filePath("../Resources/sounds/" + filename), // macOS bundle
+        QDir::current().filePath("sounds/" + filename),
+        QDir(exeDir).filePath(filename),
+        QDir::current().filePath(filename),
+    };
 
-    if (QFile::exists(fullPath))
-        return fullPath;
+    for (const QString& path : searchPaths) {
+        if (QFile::exists(path))
+            return path;
+    }
 
     // Return original (will fail later with file not found)
     return filename;
