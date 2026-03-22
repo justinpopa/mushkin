@@ -33,7 +33,10 @@ void AcceleratorManager::initKeyNameMap()
         s_keyNameMap[QString("F%1").arg(i)] = static_cast<Qt::Key>(Qt::Key_F1 + (i - 1));
     }
 
-    // Numpad keys
+    // Numpad digit keys (MUSHclient VK_NUMPAD0-9).  The base Qt::Key is the
+    // same as the regular digit row, but parseKeyString detects "NumpadN" names
+    // and adds Qt::KeypadModifier, making the resulting QKeySequence distinct
+    // from pressing the plain digit keys.
     for (int i = 0; i <= 9; i++) {
         s_keyNameMap[QString("Numpad%1").arg(i)] = static_cast<Qt::Key>(Qt::Key_0 + i);
     }
@@ -218,11 +221,18 @@ bool AcceleratorManager::parseKeyString(const QString& keyString, QKeySequence& 
                 return false; // Already have a key
             }
 
-            // Try case-insensitive lookup (build search key)
-            QString searchKey;
+            // Try case-insensitive lookup
             for (auto it = s_keyNameMap.constBegin(); it != s_keyNameMap.constEnd(); ++it) {
                 if (it.key().compare(trimmed, Qt::CaseInsensitive) == 0) {
                     key = it.value();
+                    // "NumpadN" names (MUSHclient VK_NUMPAD0-9) must carry
+                    // Qt::KeypadModifier so they are distinct from the regular
+                    // digit row (VK_0-9).  The map stores the same Qt::Key_0-9
+                    // base values for both, so we add the modifier here.
+                    if (it.key().startsWith("Numpad", Qt::CaseInsensitive) &&
+                        it.key().length() == 7 && it.key().back().isDigit()) {
+                        modifiers |= Qt::KeypadModifier;
+                    }
                     break;
                 }
             }
