@@ -571,13 +571,8 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
                         value = opt.iMaximum;
                 }
 
-                // Write value to document
-                // For RGB colors, 0 might mean "use default" in old MUSHclient files
-                if ((opt.iFlags & OPT_RGB_COLOUR) && value == 0.0) {
-                    // Keep the default
-                } else {
-                    opt.setter(*doc, value);
-                }
+                // Write value to document (0 is valid for RGB — it's black)
+                opt.setter(*doc, value);
             }
 
             // ================================================================
