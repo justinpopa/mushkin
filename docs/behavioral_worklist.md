@@ -522,3 +522,16 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 ### LOW
 - [ ] L91: arrays -- ArrayExport/ArrayExportKeys check delimiter validity before empty check (different error for empty+bad delimiter). Mushkin: src/world/lua_api/world_arrays.cpp:470-481
 - [ ] L92: arrays -- ArrayImport from table always returns eOK; original returns eImportedWithDuplicates. Mushkin: src/world/lua_api/world_arrays.cpp:599
+
+## v2 Audit: Database (2026-03-22)
+
+### HIGH
+- [ ] H91: database -- DatabaseClose double-frees sqlite3 handles (manual finalize/close then destructor does it again). Mushkin: src/world/lua_api/world_database.cpp:127-136
+
+### MEDIUM
+- [ ] M147: database -- DatabaseGetField does not reset bValidRow/iColumns state on database struct. Mushkin: src/world/lua_api/world_database.cpp:913-957
+- [ ] M148: database -- DatabaseError missing switch cases for DATABASE_ERROR_* negative codes. Mushkin: src/world/lua_api/world_database.cpp:642-656
+
+### LOW
+- [ ] L93: database -- DatabaseColumnValue uses int64 instead of int32 (strictly better but different). Mushkin: src/world/lua_api/world_database.cpp:746
+- [ ] L94: database -- DatabaseOpen does not check for NULL db handle after sqlite3_open_v2. Mushkin: src/world/lua_api/world_database.cpp:83
