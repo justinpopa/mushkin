@@ -2556,7 +2556,7 @@ bool MXPEngine::MXP_Open() const
  */
 bool MXPEngine::MXP_Secure() const
 {
+    // Original: secure, perm_secure, secure_once. Locked mode = NO tags allowed.
     return m_iMXP_mode == eMXP_secure || m_iMXP_mode == eMXP_perm_secure ||
-           m_iMXP_mode == eMXP_locked || m_iMXP_mode == eMXP_perm_locked ||
            m_iMXP_mode == eMXP_secure_once;
 }
