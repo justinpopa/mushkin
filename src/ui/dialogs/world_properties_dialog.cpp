@@ -228,9 +228,12 @@ void WorldPropertiesDialog::setupInputTab()
     m_echoInputCheck = new QCheckBox("Echo my input in output window");
     layout->addRow("", m_echoInputCheck);
 
-    // Echo color
+    // Echo color — index 0 = "Same as output" (SAMECOLOUR=65535), 1-16 = custom color 0-15
     m_echoColorCombo = new QComboBox();
-    m_echoColorCombo->addItems({"Same as output", "Custom color"});
+    m_echoColorCombo->addItem("Same as output");
+    for (int i = 0; i < 16; i++) {
+        m_echoColorCombo->addItem(QString("Custom color %1").arg(i + 1));
+    }
     layout->addRow("Echo color:", m_echoColorCombo);
 
     // Command history size
@@ -565,8 +568,13 @@ void WorldPropertiesDialog::loadSettings()
         QString("%1, %2pt").arg(m_inputFont.family()).arg(m_inputFont.pointSize()));
 
     m_echoInputCheck->setChecked(m_doc->m_display_my_input);
-    // TODO(feature): Wire echo color combo to WorldDocument m_output.echo_colour (quint16, index
-    // into color table).
+    // echo_colour: 65535 = SAMECOLOUR (combo index 0), 0-15 = custom color (combo index 1-16)
+    if (m_doc->m_output.echo_colour == 65535) {
+        m_echoColorCombo->setCurrentIndex(0);
+    } else {
+        m_echoColorCombo->setCurrentIndex(
+            qBound(1, static_cast<int>(m_doc->m_output.echo_colour) + 1, 16));
+    }
 
     // Command history size
     m_historySizeSpin->setValue(m_doc->m_maxCommandHistory);
@@ -664,8 +672,9 @@ void WorldPropertiesDialog::saveSettings()
     m_doc->m_input.font_weight = m_inputFont.weight();
     m_doc->m_input.font_italic = m_inputFont.italic() ? 1 : 0;
     m_doc->m_display_my_input = m_echoInputCheck->isChecked();
-    // TODO(feature): Wire echo color combo to WorldDocument m_output.echo_colour (quint16, index
-    // into color table).
+    // echo_colour: combo index 0 = SAMECOLOUR (65535), 1-16 = custom color 0-15
+    int echoIdx = m_echoColorCombo->currentIndex();
+    m_doc->m_output.echo_colour = (echoIdx == 0) ? 65535 : static_cast<quint16>(echoIdx - 1);
 
     // Command history size
     m_doc->m_maxCommandHistory = m_historySizeSpin->value();
