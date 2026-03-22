@@ -1,0 +1,27 @@
+{
+  "skip_keys": [
+    "metadata.capture_date",
+    "metadata.client_version",
+    "metadata.client_name",
+    "metadata.world_file_hash",
+    "getinfo.1",
+    "getinfo.35", "getinfo.36",
+    "getinfo.56", "getinfo.57", "getinfo.58", "getinfo.59",
+    "getinfo.66", "getinfo.67", "getinfo.68", "getinfo.69", "getinfo.70", "getinfo.71",
+    "getinfo.227", "getinfo.228", "getinfo.229", "getinfo.230",
+    "getinfo.231", "getinfo.232", "getinfo.233", "getinfo.234"
+  ],
+  "normalize_paths": [
+    "getinfo\\..*",
+    "options\\.alpha\\..*",
+    "plugins\\..*\\.variables\\..*"
+  ],
+  "tolerance": {
+    "miniwindows\\..*\\.1": 5,
+    "miniwindows\\..*\\.2": 5,
+    "miniwindows\\..*\\.10": 10,
+    "miniwindows\\..*\\.11": 10,
+    "miniwindows\\..*\\.12": 10,
+    "miniwindows\\..*\\.13": 10
+  }
+}
