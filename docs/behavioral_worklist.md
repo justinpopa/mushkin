@@ -535,3 +535,26 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 ### LOW
 - [ ] L93: database -- DatabaseColumnValue uses int64 instead of int32 (strictly better but different). Mushkin: src/world/lua_api/world_database.cpp:746
 - [ ] L94: database -- DatabaseOpen does not check for NULL db handle after sqlite3_open_v2. Mushkin: src/world/lua_api/world_database.cpp:83
+
+## v2 Audit: GetInfo/GetOption/SetOption (2026-03-22)
+
+### HIGH
+- [ ] H92: options -- GetOption does not check OPT_PLUGIN_CANNOT_READ for restricted options. Mushkin: world_settings.cpp:1653-1683
+- [ ] H93: options -- GetOption falls through to alpha options, returning string instead of -1 for alpha names. Mushkin: world_settings.cpp:1671-1678
+- [ ] H94: options -- SetOption OPT_CUSTOM_COLOUR adjustment missing; echo_colour off by 1. Mushkin: world_settings.cpp:1613
+- [ ] H95: options -- GetInfo dates (301-306) return OLE DATE instead of Unix timestamps. Mushkin: world_settings.cpp:1495-1546
+- [ ] H96: options -- SetOption OPT_FIX_OUTPUT_BUFFER is a no-op; buffer not trimmed. Mushkin: world_settings.cpp:1618-1621
+
+### MEDIUM
+- [ ] M149: options -- SetOption missing OPT_FIX_INPUT_WRAP side effect. Mushkin: world_settings.cpp:1616
+- [ ] M150: options -- SetOption missing OPT_FIX_SPEEDWALK_DELAY side effect. Mushkin: world_settings.cpp:1616
+- [ ] M151: options -- SetOption missing OPT_USE_MXP side effect. Mushkin: world_settings.cpp:1616
+- [ ] M152: options -- SetOption missing OPT_FIX_TOOLTIP side effects. Mushkin: world_settings.cpp:1616
+- [ ] M153: options -- GetInfo(212) returns configured font height instead of rendered pixel height. Mushkin: world_settings.cpp:992
+- [ ] M154: options -- GetInfo(236/237) command selection start/end values differ from original. Mushkin: world_settings.cpp:1116-1128
+- [ ] M155: options -- SetOption does not call SetModifiedFlag when option changes. Mushkin: world_settings.cpp:1613
+
+### LOW
+- [ ] L95: options -- Default font names "Courier New" instead of "FixedSys". Mushkin: config_options.cpp:333,361
+- [ ] L96: options -- GetInfo(55) returns SetTitle value instead of document title. Mushkin: world_settings.cpp:612
+- [ ] L97: options -- Extra numeric/alpha options in Mushkin (proxy, remote, log_lines). Mushkin: config_options.cpp
