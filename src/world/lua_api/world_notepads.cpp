@@ -204,7 +204,7 @@ int L_NotepadFont(lua_State* L)
     WorldDocument* pDoc = doc(L);
     qint32 size = luaL_checknumber(L, 3);
     qint32 style = luaL_checknumber(L, 4);
-    qint32 charset = luaL_checknumber(L, 5);
+    qint32 charset = static_cast<qint32>(luaL_optnumber(L, 5, 0)); // optional, default 0
 
     qint32 result =
         pDoc->NotepadFont(luaCheckQString(L, 1), luaCheckQString(L, 2), size, style, charset);
@@ -247,7 +247,8 @@ int L_NotepadColour(lua_State* L)
 int L_NotepadReadOnly(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    bool readOnly = lua_toboolean(L, 2);
+    // Original: optboolean(L, 2, 1) — default true (make read-only if arg missing)
+    bool readOnly = (lua_gettop(L) >= 2) ? lua_toboolean(L, 2) : true;
 
     qint32 result = pDoc->NotepadReadOnly(luaCheckQString(L, 1), readOnly);
 
