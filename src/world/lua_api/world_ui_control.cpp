@@ -167,7 +167,13 @@ int L_AcceleratorList(lua_State* L)
         if (entry.source == AcceleratorSource::User) {
             continue;
         }
-        QString str = entry.keyString + " = " + entry.action;
+        // Reconstruct key string from key sequence (original: KeyCodeToString)
+        // This produces canonical casing (e.g., "F5" not "f5")
+        QString displayKey = AcceleratorManager::keySequenceToString(entry.keySeq);
+        if (displayKey.isEmpty()) {
+            displayKey = entry.keyString; // fallback to stored
+        }
+        QString str = displayKey + " = " + entry.action;
 
         // Add sendto suffix if not eSendToExecute (10)
         if (entry.sendTo != 10) {
