@@ -77,9 +77,9 @@ int L_CloseLog(lua_State* L)
 /**
  * world.WriteLog(message)
  *
- * Writes a custom message to the currently open log file. The message is
- * written exactly as provided, without any automatic newlines or formatting.
- * Include "\n" in your message if you want a line break.
+ * Writes a custom message to the currently open log file. A newline is
+ * appended automatically if the message does not already end with one
+ * (matching original MUSHclient behavior).
  *
  * @param message (string) Text to write to the log file
  *
