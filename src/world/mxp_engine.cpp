@@ -2510,11 +2510,19 @@ QRgb MXPEngine::MXP_GetColor(const QString& colorSpec)
  */
 void MXPEngine::MXP_CloseOpenTags()
 {
-    qCDebug(lcMXP) << "Closing" << m_activeTagList.size() << "open tags";
+    qCDebug(lcMXP) << "Closing open tags (stopping at secure)";
 
     // Close tags in reverse order (most recent first)
+    // Original mxpClose.cpp:363-387 — stops when it encounters a secure tag
     while (!m_activeTagList.empty()) {
-        // Move last element out and pop; unique_ptr destructor cleans up at end of scope
+        ActiveTag* tag = m_activeTagList.back().get();
+
+        // Don't close securely-opened tags (original: line 373-374)
+        if (tag->bSecure) {
+            return;
+        }
+
+        // Move last element out and pop
         auto owned = std::move(m_activeTagList.back());
         m_activeTagList.pop_back();
 
@@ -2522,7 +2530,6 @@ void MXPEngine::MXP_CloseOpenTags()
         if (!owned->bNoReset) {
             MXP_EndAction(owned->iAction);
         }
-        // owned goes out of scope here — ActiveTag is destroyed automatically
     }
 }
 

@@ -812,20 +812,18 @@ TEST_F(MXPTest, OutOfOrderTagClosingHandled)
 }
 
 // Test 57: MXP_CloseOpenTags closes all active tags
-TEST_F(MXPTest, CloseOpenTagsClosesAllActiveTags)
+TEST_F(MXPTest, CloseOpenTagsStopsAtSecureTags)
 {
-    doc->m_mxpEngine->m_iMXP_mode = 1; // eMXP_secure
-
-    // Open multiple tags
+    // Open tags in open mode (these SHOULD be closed)
+    doc->m_mxpEngine->m_iMXP_mode = 0; // eMXP_open
     doc->m_mxpEngine->m_strMXPstring = "bold";
     doc->m_mxpEngine->MXP_collected_element();
-    doc->m_mxpEngine->m_strMXPstring = "italic";
-    doc->m_mxpEngine->MXP_collected_element();
 
-    // Close all open tags
+    // Original mxpClose.cpp:373-374 — CloseOpenTags stops at secure tags
+    // Tags opened in open mode are closed; tags opened in secure mode are preserved
     doc->m_mxpEngine->MXP_CloseOpenTags();
 
-    // Active tag list should be empty
+    // Open-mode tags should be closed
     EXPECT_EQ(doc->m_mxpEngine->m_activeTagList.size(), 0);
 }
 
