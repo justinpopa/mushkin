@@ -552,5 +552,11 @@ void AcceleratorManager::onShortcutActivated()
     }
 
     const AcceleratorEntry& entry = m_accelerators[keyString];
+
+    // Gate keypad entries on m_keypad_enable (original checks before dispatching numpad)
+    if (keyString.contains("Num+") && m_doc && !m_doc->m_keypad_enable) {
+        return;
+    }
+
     emit acceleratorTriggered(entry.action, entry.sendTo);
 }
