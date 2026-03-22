@@ -994,6 +994,30 @@ qint32 MiniWindow::Gradient(qint32 left, qint32 top, qint32 right, qint32 bottom
     painter.setRenderHint(QPainter::Antialiasing);
 
     // Create gradient based on mode
+    if (mode == 3) {
+        // Texture fill (original: MakeTexture in miniwindow.cpp:2555-2585)
+        // Generates XOR pattern: pixel = (col ^ row) * color_component
+        painter.end(); // Access image pixels directly
+
+        int r = (color1 >> 0) & 0xFF; // BGR format: blue in low byte
+        int g = (color1 >> 8) & 0xFF;
+        int b = (color1 >> 16) & 0xFF;
+
+        for (int col = left; col < fixedRight; col++) {
+            for (int row = top; row < fixedBottom; row++) {
+                int c = (col - left) ^ (row - top);
+                int pr = (c * b) & 0xFF; // BGR→RGB: original's rval is from GetRValue
+                int pg = (c * g) & 0xFF;
+                int pb = (c * r) & 0xFF;
+                image->setPixel(col, row, qRgb(pr, pg, pb));
+            }
+        }
+
+        dirty = true;
+        emit needsRedraw();
+        return eOK;
+    }
+
     QLinearGradient gradient;
 
     switch (mode) {
