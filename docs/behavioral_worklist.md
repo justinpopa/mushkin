@@ -575,3 +575,15 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 
 ### LOW
 - [ ] L98: accelerators -- Extra key name aliases accepted (e.g., "Escape" in addition to "Esc"). Mushkin: src/world/accelerator_manager.cpp:62-63
+
+## v2 Audit: Colors (2026-03-22)
+
+### MEDIUM
+- [ ] M160: colors -- FilterPixel mode 1 (Noise) uses same random value for all channels (identical to MonoNoise). Mushkin: src/world/lua_api/world_misc.cpp:2279-2288
+- [ ] M161: colors -- FilterPixel mode 20 (Perceptual Grayscale) missing /3 divisor; results 3x brighter. Mushkin: src/world/lua_api/world_misc.cpp:2350-2353
+- [ ] M162: colors -- FilterPixel gamma operations (modes 9/12/15/18) missing negative Options clamping. Mushkin: src/world/lua_api/world_misc.cpp:2302-2306
+
+### LOW
+- [ ] L99: colors -- ColourNameToRGB missing "rebeccapurple" (0x663399). Mushkin: src/world/lua_api/world_colors.cpp:34-185
+- [ ] L100: colors -- ColourNameToRGB has extra non-standard names (darkyellow, lightmagenta, lightred). Mushkin: src/world/lua_api/world_colors.cpp:75,110,112
+- [ ] L101: colors -- ColourNameToRGB empty-string returns white instead of undefined. Mushkin: src/world/lua_api/world_colors.cpp:27-29
