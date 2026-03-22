@@ -4,12 +4,31 @@
     "metadata.client_version",
     "metadata.client_name",
     "metadata.world_file_hash",
+    "metadata.plugin_count",
     "getinfo.1",
     "getinfo.35", "getinfo.36",
     "getinfo.56", "getinfo.57", "getinfo.58", "getinfo.59",
     "getinfo.66", "getinfo.67", "getinfo.68", "getinfo.69", "getinfo.70", "getinfo.71",
+
+    "getinfo.201", "getinfo.204", "getinfo.205", "getinfo.206", "getinfo.207",
+    "getinfo.212", "getinfo.213", "getinfo.214", "getinfo.215",
+    "getinfo.216", "getinfo.217", "getinfo.219", "getinfo.221",
+    "getinfo.224",
     "getinfo.227", "getinfo.228", "getinfo.229", "getinfo.230",
-    "getinfo.231", "getinfo.232", "getinfo.233", "getinfo.234"
+    "getinfo.231", "getinfo.232", "getinfo.233", "getinfo.234",
+    "getinfo.236", "getinfo.238", "getinfo.239", "getinfo.240", "getinfo.241",
+    "getinfo.244", "getinfo.245", "getinfo.246", "getinfo.247", "getinfo.248",
+    "getinfo.249", "getinfo.250", "getinfo.251", "getinfo.252", "getinfo.253",
+    "getinfo.254", "getinfo.255", "getinfo.256", "getinfo.257", "getinfo.258",
+    "getinfo.259", "getinfo.260", "getinfo.261", "getinfo.262",
+    "getinfo.263", "getinfo.264", "getinfo.265", "getinfo.266",
+    "getinfo.267", "getinfo.268",
+    "getinfo.280", "getinfo.281", "getinfo.283", "getinfo.284",
+
+    "lua_environment.has_jit",
+    "lua_environment.lua_version",
+    "lua_environment.package_cpath",
+    "lua_environment.package_path"
   ],
   "normalize_paths": [
     "getinfo\\..*",
