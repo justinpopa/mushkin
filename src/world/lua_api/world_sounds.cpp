@@ -93,8 +93,13 @@ int L_Sound(lua_State* L)
     }
 
     auto [filename] = luaArgs<QString>(L);
+
+    // Original methods_sounds.cpp:21-22 — empty filename → eNoNameSpecified
+    if (filename.isEmpty()) {
+        return luaReturn(L, eNoNameSpecified);
+    }
+
     // Call PlaySoundFile (finds first available buffer)
-    // Return error code (eOK or eCannotPlaySound) for API compatibility
     return luaReturn(L, pDoc->PlaySoundFile(filename) ? eOK : eCannotPlaySound);
 }
 
