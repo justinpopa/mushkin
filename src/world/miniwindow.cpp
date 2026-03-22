@@ -389,6 +389,76 @@ qint32 MiniWindow::RectOp(qint16 action, qint32 left, qint32 top, qint32 right, 
             break;
         }
 
+        case 4: { // Draw3dRect (original: miniwindow.cpp:295-299)
+            // penColor = highlight (top/left), brushColor = shadow (bottom/right)
+            QColor hilite = bgrToColor(penColor);
+            QColor shad = bgrToColor(brushColor);
+            painter.setPen(hilite);
+            painter.drawLine(left, top, fixedRight - 1, top);
+            painter.drawLine(left, top, left, fixedBottom - 1);
+            painter.setPen(shad);
+            painter.drawLine(left, fixedBottom - 1, fixedRight - 1, fixedBottom - 1);
+            painter.drawLine(fixedRight - 1, top, fixedRight - 1, fixedBottom - 1);
+            break;
+        }
+
+        case 6:   // Flood fill border (original: miniwindow.cpp:323-331)
+        case 7: { // Flood fill surface (original: miniwindow.cpp:334-342)
+            // penColor = border/surface color, brushColor = fill color
+            painter.end(); // Release painter to access pixels directly
+
+            QRgb fillRgb = bgrToQRgb(brushColor);
+
+            if (left < 0 || left >= image->width() || top < 0 || top >= image->height()) {
+                dirty = true;
+                emit needsRedraw();
+                return eOK;
+            }
+
+            QRgb seedRgb = image->pixel(left, top);
+
+            // Don't fill if seed is already fill color, or seed is border (action 6)
+            if (seedRgb == fillRgb)
+                break;
+            if (action == 6) {
+                QRgb borderRgb = bgrToQRgb(penColor);
+                if (seedRgb == borderRgb)
+                    break;
+            }
+
+            // Determine target: action 7 fills matching seedRgb, action 6 fills until border
+            QRgb borderRgb = bgrToQRgb(penColor);
+            QRgb targetRgb = (action == 7) ? seedRgb : 0; // action 6 doesn't use target
+
+            // Scanline flood fill
+            std::vector<QPoint> stk;
+            stk.push_back(QPoint(left, top));
+
+            while (!stk.empty()) {
+                QPoint pt = stk.back();
+                stk.pop_back();
+                int px = pt.x(), py = pt.y();
+                if (px < 0 || px >= image->width() || py < 0 || py >= image->height())
+                    continue;
+                QRgb cur = image->pixel(px, py);
+                if (cur == fillRgb)
+                    continue;
+                if (action == 7 && cur != targetRgb)
+                    continue;
+                if (action == 6 && cur == borderRgb)
+                    continue;
+                image->setPixel(px, py, fillRgb);
+                stk.push_back(QPoint(px + 1, py));
+                stk.push_back(QPoint(px - 1, py));
+                stk.push_back(QPoint(px, py + 1));
+                stk.push_back(QPoint(px, py - 1));
+            }
+
+            dirty = true;
+            emit needsRedraw();
+            return eOK;
+        }
+
         default:
             return eUnknownOption;
     }
