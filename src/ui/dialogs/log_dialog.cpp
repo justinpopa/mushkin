@@ -6,6 +6,7 @@
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QMessageBox>
 #include <QVBoxLayout>
 
 LogDialog::LogDialog(WorldDocument* doc, QWidget* parent) : QDialog(parent), m_doc(doc)
@@ -118,6 +119,17 @@ void LogDialog::saveSettings()
 
 void LogDialog::onAccepted()
 {
+    // Warn if disabling output logging (original shows confirmation)
+    if (m_doc && m_doc->m_logging.log_output && !m_logOutput->isChecked()) {
+        int result = QMessageBox::warning(
+            this, tr("Logging Warning"),
+            tr("You have unchecked 'Log output'. MUD output will NOT be logged.\n\n"
+               "Are you sure you want to disable output logging?"),
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+        if (result != QMessageBox::Yes) {
+            return; // User cancelled — don't save
+        }
+    }
     saveSettings();
     accept();
 }
