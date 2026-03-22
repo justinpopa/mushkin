@@ -641,6 +641,20 @@ std::expected<void, StorageError> Database::setPreferenceInt(const QString& name
     return setPreference(name, QString::number(value));
 }
 
+void Database::beginTransaction()
+{
+    if (m_db.isOpen()) {
+        m_db.transaction();
+    }
+}
+
+void Database::commitTransaction()
+{
+    if (m_db.isOpen()) {
+        m_db.commit();
+    }
+}
+
 std::expected<void, StorageError> Database::saveWindowGeometry(const QString& worldName,
                                                                const QRect& geometry)
 {

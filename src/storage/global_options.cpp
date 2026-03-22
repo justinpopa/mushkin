@@ -138,6 +138,9 @@ void GlobalOptions::save()
 {
     auto& db = Database::instance();
 
+    // Wrap all writes in a transaction (original: SaveGlobalsToDatabase uses BEGIN/COMMIT)
+    db.beginTransaction();
+
     db.setPreferenceInt("AllTypingToCommandWindow", m_allTypingToCommandWindow ? 1 : 0);
     db.setPreferenceInt("AlwaysOnTop", m_alwaysOnTop ? 1 : 0);
     db.setPreferenceInt("OpenWorldsMaximised", m_openWorldsMaximized ? 1 : 0);
@@ -215,6 +218,8 @@ void GlobalOptions::save()
     db.setPreference("NotepadFont", m_notepadFontName);
     db.setPreference("WorldList", m_worldList.join('*'));
     db.setPreference("PluginList", m_globalPluginList.join('\n'));
+
+    db.commitTransaction();
 }
 
 void GlobalOptions::resetToDefaults()
