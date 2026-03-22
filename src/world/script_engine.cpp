@@ -935,15 +935,23 @@ return re
         lua_pop(L, 1);
     }
 
-    // 10. Sandbox: disable dangerous functions (original: DisableDLLs in lua_scripting.cpp)
-    // Replace os.exit with a no-op to prevent plugins from terminating the application
+    // 10. Sandbox: disable dangerous functions (original: DisableDLLs in lua_methods.cpp:7676-7742)
     const char* sandbox_code = R"(
-        -- Replace os.exit with no-op (original MUSHclient does this)
-        os.exit = function() end
-        -- Replace io.popen with no-op (prevents shell command execution)
-        io.popen = function() return nil, "io.popen is disabled" end
+        -- Replace os.exit with error (original raises luaL_error)
+        os.exit = function() error("os.exit not implemented in Mushkin") end
+        -- Replace io.popen with error (prevents shell command execution)
+        io.popen = function() error("io.popen not implemented in Mushkin") end
         -- Remove package.loadlib (prevents loading arbitrary native DLLs)
         package.loadlib = nil
+        -- Remove DLL loader and all-in-one loader from package.loaders (indices 3 and 4)
+        if package.loaders then
+            package.loaders[4] = nil
+            package.loaders[3] = nil
+        end
+        -- Replace debug.debug with error (prevents interactive debugging)
+        if debug then
+            debug.debug = function() error("debug.debug not implemented in Mushkin") end
+        end
     )";
     if (luaL_dostring(L, sandbox_code) != 0) {
         qWarning() << "Sandbox setup error:" << lua_tostring(L, -1);
