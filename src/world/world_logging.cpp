@@ -230,6 +230,33 @@ qint32 WorldDocument::OpenLog(const QString& filename, bool append, bool writePr
         WriteToLog("\n");
     }
 
+    // Write world name header if configured
+    // Original: doc.cpp:6691-6726 — writes "WorldName - DayOfWeek, Month DD, YYYY, HH:MM AM/PM"
+    // followed by a line of hyphens
+    if (writePreamble && m_logging.write_world_name) {
+        QDateTime now = QDateTime::currentDateTime();
+        QString header = m_mush_name + " - " + now.toString("dddd, MMMM dd, yyyy, h:mm AP");
+
+        if (m_logging.log_html) {
+            WriteToLog("<br>\n");
+            WriteToLog(header); // TODO: HTML-escape header text
+            WriteToLog("<br>\n");
+        } else {
+            WriteToLog("\n");
+            WriteToLog(header);
+            WriteToLog("\n");
+        }
+
+        // Line of hyphens matching header length
+        QString hyphens(header.length(), '-');
+        WriteToLog(hyphens);
+        if (m_logging.log_html) {
+            WriteToLog("<br><br>");
+        } else {
+            WriteToLog("\n\n");
+        }
+    }
+
     // Initialize flush time
     m_LastFlushTime = QDateTime::currentDateTime();
 
