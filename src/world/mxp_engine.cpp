@@ -1917,29 +1917,53 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
 
         // ========== FONT ==========
         case MXP_ACTION_FONT: {
-            // <font face=Arial size=12 color=red>
+            // <font color=Red,Blink back=blue face=Arial size=12>
+            // Original (mxpOpenAtomic.cpp:226-285): parses comma-separated color+style list
             QString face = MXP_GetArgument("face", args);
-            QString size = MXP_GetArgument("size", args);
-            QString color = MXP_GetArgument("color", args);
 
+            // Set RGB color mode
+            m_doc.m_iFlags = (m_doc.m_iFlags & ~COLOURTYPE) | COLOUR_RGB;
+
+            // Color argument: comma-separated list of color name and/or style keywords
+            QString colorArg = MXP_GetArgument("color", args);
+            if (colorArg.isEmpty()) {
+                colorArg = MXP_GetArgument("fgcolor", args); // Pueblo fallback
+            }
+
+            if (!colorArg.isEmpty()) {
+                QStringList items = colorArg.split(',', Qt::SkipEmptyParts);
+                for (const QString& item : items) {
+                    QString trimmed = item.trimmed().toLower();
+                    if (trimmed == "blink" || trimmed == "italic") {
+                        m_doc.m_iFlags |= BLINK;
+                    } else if (trimmed == "underline") {
+                        m_doc.m_iFlags |= UNDERLINE;
+                    } else if (trimmed == "bold") {
+                        m_doc.m_iFlags |= HILITE;
+                    } else if (trimmed == "inverse") {
+                        m_doc.m_iFlags |= INVERSE;
+                    } else if (!m_doc.m_bIgnoreMXPcolourChanges) {
+                        m_doc.m_iForeColour = static_cast<QRgb>(MXP_GetColor(item.trimmed()));
+                    }
+                }
+            }
+
+            // Background color
+            QString backArg = MXP_GetArgument("back", args);
+            if (backArg.isEmpty()) {
+                backArg = MXP_GetArgument("bgcolor", args); // Pueblo fallback
+            }
+            if (!backArg.isEmpty() && !m_doc.m_bIgnoreMXPcolourChanges) {
+                m_doc.m_iBackColour = static_cast<QRgb>(MXP_GetColor(backArg));
+            }
+
+            // face/size: not fully supported (need MXP style stack)
             if (!face.isEmpty()) {
-                // TODO(mxp): Push font face onto MXP style stack (requires style stack
-                // implementation).
-                qCDebug(lcMXP) << "Set font face:" << face;
+                qCDebug(lcMXP) << "Font face:" << face << "(needs style stack)";
             }
 
-            if (!size.isEmpty()) {
-                // TODO(mxp): Push font size onto MXP style stack (requires style stack
-                // implementation).
-                qCDebug(lcMXP) << "Set font size:" << size;
-            }
-
-            if (!color.isEmpty()) {
-                QRgb fgColor = MXP_GetColor(color);
-                // TODO(mxp): Push font color onto MXP style stack (requires style stack
-                // implementation).
-                qCDebug(lcMXP) << "Set font color:" << color;
-            }
+            // consume size argument to avoid unused-argument warnings
+            (void)MXP_GetArgument("size", args);
             break;
         }
 
