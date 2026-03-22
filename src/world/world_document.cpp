@@ -1843,9 +1843,22 @@ void WorldDocument::AddToLine(const char* sText, int iLength)
 
     // Check if line needs to wrap (exceeds wrap column)
     // Only wrap if m_display.wrap_column > 0 (0 means no wrapping)
-    if (m_display.wrap_column > 0 &&
-        m_currentLine->len() >= static_cast<qint32>(m_display.wrap_column)) {
-        handleLineWrap();
+    // Original (doc.cpp:1486-1512): in UTF-8 mode, compare character count, not byte count
+    if (m_display.wrap_column > 0) {
+        qint32 lineWidth = m_currentLine->len();
+        if (m_display.utf8) {
+            // Count UTF-8 characters by skipping continuation bytes (10xxxxxx)
+            lineWidth = 0;
+            auto text = m_currentLine->text();
+            for (qint32 i = 0; i < static_cast<qint32>(text.size()); i++) {
+                if ((static_cast<unsigned char>(text[i]) & 0xC0) != 0x80) {
+                    lineWidth++;
+                }
+            }
+        }
+        if (lineWidth >= static_cast<qint32>(m_display.wrap_column)) {
+            handleLineWrap();
+        }
     }
 }
 
