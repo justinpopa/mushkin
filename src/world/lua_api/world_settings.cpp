@@ -1085,9 +1085,17 @@ int L_GetInfo(lua_State* L)
             }
             break;
 
-        case 232: // High-resolution timer (seconds since epoch)
-            lua_pushnumber(L, QDateTime::currentMSecsSinceEpoch() / 1000.0);
+        case 232: { // High-resolution timer (seconds since app start)
+            // Original uses QueryPerformanceCounter / frequency (boot-relative).
+            // QElapsedTimer gives monotonic nanoseconds since start — same semantics.
+            static QElapsedTimer s_hiResTimer = []() {
+                QElapsedTimer t;
+                t.start();
+                return t;
+            }();
+            lua_pushnumber(L, s_hiResTimer.nsecsElapsed() / 1e9);
             break;
+        }
 
         case 233: // Time taken doing triggers (seconds)
             lua_pushnumber(L, pDoc->m_automationRegistry->m_trigger_time_elapsed);
