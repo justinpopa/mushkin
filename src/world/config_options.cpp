@@ -383,7 +383,7 @@ const tConfigurationAlphaOption AlphaOptionsTable[] = {
     {"speed_walk_filler", "", A(m_speedwalk.filler), OPT_KEEP_SPACES},
     {"speed_walk_prefix", "#", A(m_speedwalk.prefix), OPT_KEEP_SPACES},
     {"tab_completion_defaults", "", A(m_command_window.tab_completion_defaults), OPT_MULTLINE},
-    {"terminal_identification", "mushkin", A(m_strTerminalIdentification)},
+    {"terminal_identification", "mushclient", A(m_strTerminalIdentification)},
     {"timestamp_input", "", A(m_output.preamble_input), OPT_KEEP_SPACES | OPT_UPDATE_VIEWS},
     {"timestamp_notes", "", A(m_output.preamble_notes), OPT_KEEP_SPACES | OPT_UPDATE_VIEWS},
     {"timestamp_output", "", A(m_output.preamble_output), OPT_KEEP_SPACES | OPT_UPDATE_VIEWS},
