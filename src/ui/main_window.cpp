@@ -2080,6 +2080,26 @@ void MainWindow::newWorld()
         for (const auto& [path, flag] : defaultFiles) {
             if (path.isEmpty())
                 continue;
+
+            // Set m_bUseDefault* flag before loading (original: doc_construct.cpp:658-683)
+            switch (flag) {
+                case XML_COLOURS:
+                    // m_bUseDefaultColours not ported — field doesn't exist in Mushkin
+                    break;
+                case XML_TRIGGERS:
+                    doc->m_bUseDefaultTriggers = true;
+                    break;
+                case XML_ALIASES:
+                    doc->m_bUseDefaultAliases = true;
+                    break;
+                case XML_TIMERS:
+                    doc->m_bUseDefaultTimers = true;
+                    break;
+                case XML_MACROS:
+                    doc->m_bUseDefaultMacros = true;
+                    break;
+            }
+
             QFile file(path);
             if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
                 continue;
@@ -2358,6 +2378,24 @@ void MainWindow::reloadDefaults()
     for (const auto& [path, flag] : defaultFiles) {
         if (path.isEmpty())
             continue;
+
+        // Set m_bUseDefault* flag before loading (original: doc_construct.cpp:658-683)
+        switch (flag) {
+            case XML_TRIGGERS:
+                doc->m_bUseDefaultTriggers = true;
+                break;
+            case XML_ALIASES:
+                doc->m_bUseDefaultAliases = true;
+                break;
+            case XML_TIMERS:
+                doc->m_bUseDefaultTimers = true;
+                break;
+            case XML_MACROS:
+                doc->m_bUseDefaultMacros = true;
+                break;
+            default:
+                break;
+        }
 
         QFile file(path);
         if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
