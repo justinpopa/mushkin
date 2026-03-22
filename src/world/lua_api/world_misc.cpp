@@ -387,8 +387,8 @@ int L_EditDistance(lua_State* L)
  *
  * @return (number) Error code:
  *   - eOK (0): Success
- *   - eBadParameter (30): Invalid, empty, or disallowed URL scheme
- *   - eCouldNotOpenFile (30009): System failed to open URL
+ *   - eBadParameter (30046): Invalid, empty, or disallowed URL scheme
+ *   - eCouldNotOpenFile (30013): System failed to open URL
  *
  * @example
  * -- Open a website

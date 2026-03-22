@@ -33,7 +33,7 @@
  *
  * @return (number) Error code:
  *   - eOK (0): Success
- *   - eBadParameter (30): Invalid key string
+ *   - eBadParameter (30046): Invalid key string
  *
  * @example
  * -- Run a Lua function when F5 is pressed
@@ -84,7 +84,7 @@ int L_AcceleratorTo(lua_State* L)
  *
  * @return (number) Error code:
  *   - eOK (0): Success
- *   - eBadParameter (30): Invalid key string
+ *   - eBadParameter (30046): Invalid key string
  *
  * @example
  * -- Quick direction keys
@@ -808,7 +808,7 @@ int L_SetToolBarPosition(lua_State* L)
 
     // Validate which parameter (1-4: main, game, activity, infobar)
     if (which < 1 || which > 4) {
-        lua_pushinteger(L, 30); // eBadParameter
+        lua_pushinteger(L, eBadParameter);
         return 1;
     }
 

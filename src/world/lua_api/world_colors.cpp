@@ -689,7 +689,7 @@ int L_GetCustomColourBackground(lua_State* L)
  *
  * @return (number) Error code:
  *   - eOK (0): Success
- *   - eBadParameter (30001): Index out of range or name too long
+ *   - eBadParameter (30046): Index out of range or name too long
  *
  * @example
  * SetCustomColourName(1, "Combat Alert")

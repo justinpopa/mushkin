@@ -8,14 +8,11 @@
 
 #include "main_window.h"
 
+#include "../utils/error_codes.h"
 #include <QMdiSubWindow>
 #include <functional>
 #include <string_view>
 #include <unordered_map>
-
-// Error codes (must stay in sync with lua_common.h)
-static constexpr int eOK = 0;
-static constexpr int eNoSuchCommand = 30054;
 
 int MainWindow::executeDoCommand(const char* name)
 {

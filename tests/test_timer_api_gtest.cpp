@@ -20,6 +20,7 @@
 
 #include "../src/automation/sendto.h"
 #include "../src/automation/timer.h"
+#include "../src/utils/error_codes.h"
 #include "fixtures/world_fixtures.h"
 #include <QDateTime>
 
@@ -136,7 +137,8 @@ TEST_F(TimerApiTest, IsTimer)
     double result2 = getLuaNumber("result2");
 
     EXPECT_EQ(result1, 0.0) << "IsTimer should return eOK (0) for existing timer";
-    EXPECT_EQ(result2, 30017.0) << "IsTimer should return eTimerNotFound for nonexistent timer";
+    EXPECT_EQ(result2, static_cast<double>(eTimerNotFound))
+        << "IsTimer should return eTimerNotFound for nonexistent timer";
 }
 
 // Test 4: GetTimerInfo
@@ -373,8 +375,8 @@ TEST_F(TimerApiTest, DeleteTimerGroup)
     double result2 = getLuaNumber("result2");
 
     EXPECT_EQ(count, 2.0) << "Should have deleted 2 timers";
-    EXPECT_EQ(result1, 30017.0) << "group_timer1 should not exist";
-    EXPECT_EQ(result2, 30017.0) << "group_timer2 should not exist";
+    EXPECT_EQ(result1, static_cast<double>(eTimerNotFound)) << "group_timer1 should not exist";
+    EXPECT_EQ(result2, static_cast<double>(eTimerNotFound)) << "group_timer2 should not exist";
 }
 
 // Test 13: DeleteTemporaryTimers
@@ -417,7 +419,8 @@ TEST_F(TimerApiTest, DeleteTimer)
 
     EXPECT_EQ(result1, 0.0) << "DeleteTimer should return eOK for test_timer1";
     EXPECT_EQ(result2, 0.0) << "DeleteTimer should return eOK for test_timer2";
-    EXPECT_EQ(result3, 30017.0) << "DeleteTimer should return eTimerNotFound";
+    EXPECT_EQ(result3, static_cast<double>(eTimerNotFound))
+        << "DeleteTimer should return eTimerNotFound";
 
     // Verify timers are deleted
     EXPECT_EQ(doc->getTimer("test_timer1"), nullptr) << "test_timer1 should be deleted";

@@ -12,6 +12,7 @@
  * 7. error_code table exists
  */
 
+#include "../src/utils/error_codes.h"
 #include "fixtures/world_fixtures.h"
 
 class LuaApiTest : public ConnectedWorldTest {};
@@ -205,7 +206,7 @@ TEST_F(LuaApiTest, SendErrorCodes)
     doc->m_connectionManager->m_iConnectPhase = eConnectNotConnected;
     executeLua("result_closed = world.Send('test command')");
     double resultClosed = getGlobalNumber("result_closed");
-    EXPECT_EQ(resultClosed, 30002.0)
+    EXPECT_EQ(resultClosed, static_cast<double>(eWorldClosed))
         << "Send() should return eWorldClosed (30002) when not connected";
 
     // Test Send() when plugin is processing - should return eItemInUse
@@ -213,7 +214,7 @@ TEST_F(LuaApiTest, SendErrorCodes)
     doc->m_bPluginProcessingSent = true;
     executeLua("result_in_use = world.Send('test command')");
     double resultInUse = getGlobalNumber("result_in_use");
-    EXPECT_EQ(resultInUse, 30063.0)
+    EXPECT_EQ(resultInUse, static_cast<double>(eItemInUse))
         << "Send() should return eItemInUse (30063) when plugin is processing";
 }
 
@@ -230,7 +231,7 @@ TEST_F(LuaApiTest, ConnectErrorCodes)
     doc->m_connectionManager->m_iConnectPhase = eConnectConnectedToMud;
     executeLua("result_open = world.Connect()");
     double resultOpen = getGlobalNumber("result_open");
-    EXPECT_EQ(resultOpen, 30001.0)
+    EXPECT_EQ(resultOpen, static_cast<double>(eWorldOpen))
         << "Connect() should return eWorldOpen (30001) when already connected";
 }
 
@@ -247,13 +248,13 @@ TEST_F(LuaApiTest, DisconnectErrorCodes)
     doc->m_connectionManager->m_iConnectPhase = eConnectNotConnected;
     executeLua("result_closed = world.Disconnect()");
     double resultClosed = getGlobalNumber("result_closed");
-    EXPECT_EQ(resultClosed, 30002.0)
+    EXPECT_EQ(resultClosed, static_cast<double>(eWorldClosed))
         << "Disconnect() should return eWorldClosed (30002) when not connected";
 
     // Test Disconnect() when disconnecting - should return eWorldClosed
     doc->m_connectionManager->m_iConnectPhase = eConnectDisconnecting;
     executeLua("result_disconnecting = world.Disconnect()");
     double resultDisconnecting = getGlobalNumber("result_disconnecting");
-    EXPECT_EQ(resultDisconnecting, 30002.0)
+    EXPECT_EQ(resultDisconnecting, static_cast<double>(eWorldClosed))
         << "Disconnect() should return eWorldClosed (30002) when already disconnecting";
 }

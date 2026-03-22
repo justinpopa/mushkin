@@ -51,11 +51,11 @@ extern int callLuaWithTraceBack(lua_State* L, int nArgs, int nResults);
  *
  * @return (number) Error code as first value:
  *   - eOK (0): Success, followed by function return values
- *   - eNoSuchPlugin (30030): Plugin not installed
- *   - ePluginDisabled (30031): Plugin is disabled
- *   - eNoSuchRoutine (30032): Function not found or empty name
- *   - eBadParameter (30001): Cannot pass argument type (tables, functions)
- *   - eErrorCallingPluginRoutine (30033): Runtime error (3rd return has Lua error)
+ *   - eNoSuchPlugin (30034): Plugin not installed
+ *   - ePluginDisabled (30039): Plugin is disabled
+ *   - eNoSuchRoutine (30036): Function not found or empty name
+ *   - eBadParameter (30046): Cannot pass argument type (tables, functions)
+ *   - eErrorCallingPluginRoutine (30040): Runtime error (3rd return has Lua error)
  * @return On error: error message string
  * @return On runtime error: Lua error string as third value
  *
@@ -642,9 +642,9 @@ int L_LoadPlugin(lua_State* L)
  *
  * @return (number) Error code:
  *   - eOK (0): Success
- *   - eNoSuchPlugin (30030): Plugin not found
- *   - eBadParameter (30001): Cannot reload self
- *   - ePluginFileNotFound (30034): Original file not found
+ *   - eNoSuchPlugin (30034): Plugin not found
+ *   - eBadParameter (30046): Cannot reload self
+ *   - ePluginFileNotFound (30030): Original file not found
  *
  * @example
  * -- Reload another plugin during development
@@ -706,8 +706,8 @@ int L_ReloadPlugin(lua_State* L)
  *
  * @return (number) Error code:
  *   - eOK (0): Success
- *   - eNoSuchPlugin (30030): Plugin not found
- *   - eBadParameter (30001): Cannot unload self
+ *   - eNoSuchPlugin (30034): Plugin not found
+ *   - eBadParameter (30046): Cannot unload self
  *
  * @example
  * -- Unload a plugin
@@ -761,7 +761,7 @@ int L_UnloadPlugin(lua_State* L)
  *
  * @return (number) Error code:
  *   - eOK (0): Success
- *   - eNoSuchPlugin (30030): Plugin not found
+ *   - eNoSuchPlugin (30034): Plugin not found
  *
  * @example
  * -- Disable a plugin temporarily
@@ -804,8 +804,8 @@ int L_EnablePlugin(lua_State* L)
  *
  * @return (number) Error code:
  *   - eOK (0): Function exists
- *   - eNoSuchPlugin (30030): Plugin not found
- *   - eNoSuchRoutine (30032): Function not found
+ *   - eNoSuchPlugin (30034): Plugin not found
+ *   - eNoSuchRoutine (30036): Function not found
  *
  * @example
  * if PluginSupports("abc123...", "OnCustomEvent") == 0 then

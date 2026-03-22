@@ -11,19 +11,10 @@
  * - ArrayExport, ArrayExportKeys, ArrayImport
  */
 
+#include "../src/utils/error_codes.h"
 #include "../src/world/script_engine.h"
 #include "../src/world/world_document.h"
 #include "fixtures/world_fixtures.h"
-
-// Error code constants (from lua_common.h)
-#define eOK 0
-#define eArrayAlreadyExists 30055
-#define eArrayDoesNotExist 30056
-#define eArrayNotEvenNumberOfValues 30057
-#define eImportedWithDuplicates 30058
-#define eBadDelimiter 30059
-#define eSetReplacingExistingValue 30060
-#define eKeyDoesNotExist 30061
 
 // Test fixture for Array API tests
 class ArrayAPITest : public ::testing::Test {

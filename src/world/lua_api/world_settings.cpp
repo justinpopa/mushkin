@@ -2260,7 +2260,7 @@ int L_SetCursor(lua_State* L)
  * Based on methods_commands.cpp
  *
  * @param text Text to set in command input
- * @return 0 (eOK) on success, 30011 (eCommandNotEmpty) if input not empty
+ * @return 0 (eOK) on success, eCommandNotEmpty (30020) if input not empty
  */
 int L_SetCommand(lua_State* L)
 {

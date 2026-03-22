@@ -215,7 +215,7 @@ int main(int argc, char* argv[])
     }
 
     result = getGlobalNumber(L, "result");
-    if (result != 30025) { // eUnknownOption
+    if (result != static_cast<double>(eUnknownOption)) { // eUnknownOption
         qDebug() << "✗ FAIL: WindowRectOp should reject invalid action, got" << result;
         return 1;
     }

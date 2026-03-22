@@ -19,7 +19,7 @@
  *
  * @return (number) Error code:
  *   - eOK (0): Success
- *   - eLogFileNotOpen (30020): Failed to open file
+ *   - eLogFileNotOpen (30014): Failed to open file
  *
  * @example
  * -- Start logging to a new file
@@ -85,7 +85,7 @@ int L_CloseLog(lua_State* L)
  *
  * @return (number) Error code:
  *   - eOK (0): Success
- *   - eLogFileNotOpen (30020): No log file is open
+ *   - eLogFileNotOpen (30014): No log file is open
  *
  * @example
  * WriteLog("=== Combat Started ===\n")
@@ -109,7 +109,7 @@ int L_WriteLog(lua_State* L)
  *
  * @return (number) Error code:
  *   - eOK (0): Success
- *   - eLogFileNotOpen (30020): No log file is open
+ *   - eLogFileNotOpen (30014): No log file is open
  *
  * @example
  * -- Ensure critical event is saved

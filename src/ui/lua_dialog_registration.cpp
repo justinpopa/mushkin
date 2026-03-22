@@ -6,6 +6,7 @@
  */
 
 #include "lua_dialog_registration.h"
+#include "../utils/error_codes.h"
 #include "dialogs/lua_choose_box_dialog.h"
 #include "dialogs/lua_choose_list_dialog.h"
 #include "dialogs/lua_choose_list_multi_dialog.h"
@@ -217,7 +218,7 @@ void registerDialogCallbacks()
     // Register DoCommand UI callback
     DoCommandCallbacks::set([](const char* name) -> int {
         MainWindow* mainWindow = getMainWindow();
-        return mainWindow ? mainWindow->executeDoCommand(name) : 30054;
+        return mainWindow ? mainWindow->executeDoCommand(name) : eNoSuchCommand;
     });
 }
 
