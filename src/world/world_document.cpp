@@ -2763,18 +2763,9 @@ void WorldDocument::OutputOutstandingLines()
 
 void WorldDocument::flushLogIfNeeded()
 {
+    // Original (timers.cpp:278-284) does fclose/fopen every 120s to flush.
+    // QFile::flush() achieves the same data-safety goal without releasing the handle.
     if (m_logfile && m_logfile->isOpen()) {
-        QDateTime now = QDateTime::currentDateTime();
-        qint64 elapsed = m_LastFlushTime.secsTo(now);
-        if (elapsed > 120) {
-            m_LastFlushTime = now;
-            QString savedFileName = m_logfile_name;
-            m_logfile->close();
-            QIODevice::OpenMode mode = QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text;
-            if (!m_logfile->open(mode)) {
-                qCDebug(lcLogging)
-                    << "flushLogIfNeeded: Failed to reopen log file" << savedFileName;
-            }
-        }
+        m_logfile->flush();
     }
 }
