@@ -587,3 +587,31 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [ ] L99: colors -- ColourNameToRGB missing "rebeccapurple" (0x663399). Mushkin: src/world/lua_api/world_colors.cpp:34-185
 - [ ] L100: colors -- ColourNameToRGB has extra non-standard names (darkyellow, lightmagenta, lightred). Mushkin: src/world/lua_api/world_colors.cpp:75,110,112
 - [ ] L101: colors -- ColourNameToRGB empty-string returns white instead of undefined. Mushkin: src/world/lua_api/world_colors.cpp:27-29
+
+## v2 Audit: UI Dialogs (2026-03-22)
+
+### HIGH
+- [ ] H101: ui -- Custom Colours page missing (32 custom colour pairs with names). Mushkin: no equivalent
+- [ ] H102: ui -- MXP settings page missing (MXP enable mode, Pueblo, debug, hyperlink settings). Mushkin: no equivalent
+- [ ] H103: ui -- Auto-say settings page missing entirely. Mushkin: no equivalent
+- [ ] H104: ui -- Alias edit dialog missing ignore_case, temporary, one_shot, menu fields. Mushkin: src/ui/dialogs/alias_edit_dialog.h
+- [ ] H105: ui -- Connecting page missing connect_text and connect_method fields. Mushkin: src/ui/dialogs/world_properties_dialog.cpp
+
+### MEDIUM
+- [ ] M163: ui -- Macros page (function key bindings) missing from world properties. Mushkin: no equivalent
+- [ ] M164: ui -- Keypad page (numpad bindings) missing. Mushkin: no equivalent
+- [ ] M165: ui -- Notes page (per-world notes field) missing. Mushkin: no equivalent
+- [ ] M166: ui -- Info/Statistics page missing (buffer/connection/trigger stats). Mushkin: no equivalent
+- [ ] M167: ui -- World properties dialog has NO input validation. Mushkin: src/ui/dialogs/world_properties_dialog.cpp:921-926
+- [ ] M168: ui -- Logging page missing ~12 settings (preamble/postamble, per-line formatting). Mushkin: src/ui/dialogs/world_properties_dialog.cpp:325-355
+- [ ] M169: ui -- Input tab missing ~15 settings (auto-repeat, spell check, spam prevention, etc.). Mushkin: src/ui/dialogs/world_properties_dialog.cpp:254-322
+- [ ] M170: ui -- Output tab missing ~15 settings (beeps, compression, GA conversion, etc.). Mushkin: src/ui/dialogs/world_properties_dialog.cpp:142-252
+- [ ] M171: ui -- Scripting page missing MXP callbacks, script prefix, editor path. Mushkin: src/ui/dialogs/world_properties_dialog.cpp:357-416
+- [ ] M172: ui -- Trigger edit dialog missing ignore_case and sound file fields. Mushkin: src/ui/dialogs/trigger_edit_dialog.h
+- [ ] M173: ui -- Timer edit dialog missing temporary and variable fields. Mushkin: src/ui/dialogs/timer_edit_dialog.h
+
+### LOW
+- [ ] L102: ui -- Printing page missing (Windows-specific, limited cross-platform value). Mushkin: no equivalent
+- [ ] L103: ui -- Use-default-X checkboxes missing throughout preferences. Mushkin: no equivalent
+- [ ] L104: ui -- Import/Export XML buttons missing from trigger/alias/timer list dialogs. Mushkin: no equivalent
+- [ ] L105: ui -- Filter functionality missing from list dialogs. Mushkin: no equivalent
