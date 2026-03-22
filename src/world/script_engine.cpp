@@ -909,7 +909,7 @@ return re
     SET_ERROR_CODE(eNotAPlugin, 30035);
     SET_ERROR_CODE(eNoSuchRoutine, 30036);
     SET_ERROR_CODE(ePluginDoesNotSaveState, 30037);
-    SET_ERROR_CODE(ePluginCouldNotSaveState, 30038);
+    SET_ERROR_CODE(ePluginCouldNotSaveState, 30037); // original lua_methods.cpp:6991 maps both to 30037
     SET_ERROR_CODE(ePluginDisabled, 30039);
     SET_ERROR_CODE(eErrorCallingPluginRoutine, 30040);
     SET_ERROR_CODE(eCommandsNestedTooDeeply, 30041);

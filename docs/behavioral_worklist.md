@@ -348,7 +348,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [~] H56: getinfo -- GetInfo(21) speed_walk_prefix: world file config difference, not code bug. Mushkin: src/world/lua_api/world_settings.cpp
 - [x] H57: getinfo -- GetInfo(271) background_colour returns 4278190080 instead of -1. Mushkin: src/world/lua_api/world_settings.cpp
 - [x] H58: getinfo -- GetInfo(37) auto_say_string default changed from "say " to "" to match original. Mushkin: src/world/world_document.h
-- [ ] H59: error_codes -- ePluginCouldNotSaveState is 30038, should be 30037. Mushkin: src/utils/error_codes.h
+- [x] H59: error_codes -- ePluginCouldNotSaveState Lua value changed from 30038 to 30037 to match original. Mushkin: src/utils/error_codes.h
 
 ### MEDIUM (2)
 - [ ] M100: getinfo -- GetInfo(53) status bar text returns "Ready" instead of "" (should be empty when not set). Mushkin: src/world/lua_api/world_settings.cpp
