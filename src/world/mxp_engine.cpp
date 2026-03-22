@@ -18,6 +18,7 @@
 #include "../utils/logging.h"
 #include "telnet_parser.h"
 #include "world_document.h"
+#include <QCoreApplication>
 #include <QDebug>
 #include <QRegularExpression>
 #include <memory>
@@ -2052,11 +2053,20 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
         }
 
         // ========== SERVER COMMANDS ==========
-        case MXP_ACTION_VERSION:
-            // Send client version to server
-            // Not implemented: MXP VERSION tag — would send client version to server. Rarely used.
-            qCDebug(lcMXP) << "Send version (not implemented)";
+        case MXP_ACTION_VERSION: {
+            // Send client version to server (original: mxpOpenAtomic.cpp:288-304)
+            // Format: ESC[1z<VERSION MXP="0.4" CLIENT=Mushkin VERSION="x.y.z" REGISTERED=YES>\r\n
+            QString versionResponse =
+                QString("\x1B[1z<VERSION MXP=\"0.4\" CLIENT=Mushkin VERSION=\"%1\" "
+                        "REGISTERED=YES>\r\n")
+                    .arg(QCoreApplication::applicationVersion());
+            QByteArray data = versionResponse.toUtf8();
+            m_doc.SendPacket(
+                std::span<const unsigned char>(reinterpret_cast<const unsigned char*>(data.data()),
+                                               static_cast<size_t>(data.size())));
+            qCDebug(lcMXP) << "Sent version response:" << versionResponse.trimmed();
             break;
+        }
 
         case MXP_ACTION_USER:
             // Send username to server
@@ -2175,9 +2185,41 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
         }
 
         case MXP_ACTION_SUPPORT: {
-            // <support> - report what we support
-            // TODO(mxp): Reply with list of supported MXP tags for server capability negotiation.
-            qCDebug(lcMXP) << "Support query (not implemented)";
+            // <support> - report supported tags (original: mxpOpenAtomic.cpp:326-462)
+            QString supports;
+
+            if (args.empty()) {
+                // No args: report all supported elements
+                for (const auto& [name, elem] : m_atomicElementMap) {
+                    if (elem->iFlags & TAG_NOT_IMP) {
+                        supports += QString("-%1 ").arg(name);
+                    } else {
+                        supports += QString("+%1 ").arg(name);
+                    }
+                }
+            } else {
+                // Report on specific requested elements
+                for (const auto& arg : args) {
+                    QString elemName = arg->strName.toLower();
+                    auto it = m_atomicElementMap.find(elemName);
+                    if (it != m_atomicElementMap.end()) {
+                        supports += (it->second->iFlags & TAG_NOT_IMP)
+                                        ? QString("-%1 ").arg(elemName)
+                                        : QString("+%1 ").arg(elemName);
+                    } else {
+                        supports += QString("-%1 ").arg(elemName);
+                    }
+                }
+            }
+
+            {
+                QString response = QString("\x1B[1z<SUPPORTS %1>\r\n").arg(supports.trimmed());
+                QByteArray data = response.toUtf8();
+                m_doc.SendPacket(std::span<const unsigned char>(
+                    reinterpret_cast<const unsigned char*>(data.data()),
+                    static_cast<size_t>(data.size())));
+                qCDebug(lcMXP) << "Sent support response:" << supports.trimmed();
+            }
             break;
         }
 
