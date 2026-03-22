@@ -164,6 +164,13 @@ void RecallSearchDialog::onOkClicked()
         return;
     }
 
+    // At least one line type must be selected
+    if (!m_includeOutputCheck->isChecked() && !m_includeCommandsCheck->isChecked() &&
+        !m_includeNotesCheck->isChecked()) {
+        QMessageBox::information(this, "Recall", "Please select at least one line type to search.");
+        return;
+    }
+
     // Add to history
     if (!m_searchHistory.contains(searchText)) {
         m_searchHistory.prepend(searchText);
