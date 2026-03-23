@@ -674,7 +674,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [ ] H119: world-edge -- OnWorldOpen script callback is never invoked. Mushkin: src/ui/views/world_widget.cpp:304-346
 - [ ] H120: world-edge -- Global plugins never loaded at world open time. Mushkin: no equivalent code
 - [ ] H121: world-edge -- Non-plugin include files silently ignored. Mushkin: src/world/xml_serialization.cpp:645-673
-- [ ] H122: world-edge -- Plugin SaveState() not called when world file is saved (only at destructor). Mushkin: src/world/xml_serialization.cpp:233-235
+- [x] H122: world-edge -- Plugin SaveState() now called for all plugins during world save. Mushkin: src/world/xml_serialization.cpp:233-235
 
 ### MEDIUM
 - [ ] M190: world-edge -- PluginListChanged called per-plugin instead of once after all loaded. Mushkin: src/world/world_document_plugins.cpp:568

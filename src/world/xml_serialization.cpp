@@ -234,6 +234,13 @@ bool SaveWorldXML(WorldDocument* doc, const QString& filename)
     // This allows plugins to save their state before the world file is written
     doc->SendToAllPluginCallbacks(ON_PLUGIN_WORLD_SAVE);
 
+    // Save all plugin state (original: xml_serialize.cpp:33-36)
+    for (const auto& plugin : doc->m_PluginList) {
+        if (plugin) {
+            (void)plugin->SaveState();
+        }
+    }
+
     // Atomic save: write to temp file, then rename
     // This prevents corruption if app crashes mid-save
     QString tempFilename = filename + ".tmp";
