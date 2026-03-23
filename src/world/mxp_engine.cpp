@@ -1846,6 +1846,17 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
     }
 
     int action = elem->iAction;
+
+    // Pueblo compatibility: <A xch_cmd="..."> converts hyperlink to SEND action
+    // (original: mxpOpenAtomic.cpp:97-106)
+    if (action == MXP_ACTION_HYPERLINK) {
+        QString xchCmd = MXP_GetArgument("xch_cmd", args);
+        if (!xchCmd.isEmpty()) {
+            m_bPuebloActive = true;
+            action = MXP_ACTION_SEND;
+        }
+    }
+
     qCDebug(lcMXP) << "Execute action:" << action << "(" << elem->strName << ")";
 
     switch (action) {
