@@ -749,17 +749,20 @@ qint32 MiniWindow::Arc(qint32 left, qint32 top, qint32 right, qint32 bottom, qin
     qreal cx = (left + right) / 2.0;
     qreal cy = (top + bottom) / 2.0;
 
-    // Calculate angles from center to start/end points (in degrees)
-    qreal angle1 = qAtan2(y1 - cy, x1 - cx) * 180.0 / M_PI;
-    qreal angle2 = qAtan2(y2 - cy, x2 - cx) * 180.0 / M_PI;
+    // Convert GDI point-based arc to Qt angle-based arc.
+    // GDI Arc draws counterclockwise (mathematically) from start to end point.
+    // Qt drawArc uses angles in 1/16 degree, counterclockwise from 3 o'clock.
+    // In screen coords (Y-down), atan2 gives clockwise angles from east,
+    // so negate Y to convert to Qt's counterclockwise convention.
+    qreal startAngle = qAtan2(-(y1 - cy), x1 - cx) * 180.0 / M_PI;
+    qreal endAngle = qAtan2(-(y2 - cy), x2 - cx) * 180.0 / M_PI;
 
-    // Calculate span angle (going counter-clockwise from angle1 to angle2)
-    qreal spanAngle = angle2 - angle1;
-    if (spanAngle < 0)
-        spanAngle += 360;
+    // GDI draws counterclockwise from start to end (positive direction in Qt)
+    qreal spanAngle = endAngle - startAngle;
+    if (spanAngle <= 0)
+        spanAngle += 360.0;
 
-    // Qt uses 1/16 degree units and measures angles counter-clockwise from 3 o'clock
-    int startAngle16 = qRound(angle1 * 16);
+    int startAngle16 = qRound(startAngle * 16);
     int spanAngle16 = qRound(spanAngle * 16);
 
     painter.drawArc(rect, startAngle16, spanAngle16);

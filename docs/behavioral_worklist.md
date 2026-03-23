@@ -474,7 +474,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] L85: miniwindows -- GetPixel returns 0 for out-of-bounds instead of -1 (CLR_INVALID). Mushkin: miniwindow.cpp:813-814
 - [x] L86: miniwindows -- WindowFont size=0 creates 1px font instead of defaulting to 10pt. Mushkin: miniwindow.cpp:1047
 - [x] L87: miniwindows -- LoadImage accepts all Qt formats instead of only .bmp/.png. Mushkin: miniwindow.cpp:1217-1234
-- [ ] L88: miniwindows -- Arc atan2 conversion may draw wrong arc segment for some point configs. Mushkin: miniwindow.cpp:662-704
+- [x] L88: miniwindows -- Arc atan2 conversion may draw wrong arc segment for some point configs. Mushkin: miniwindow.cpp:662-704
 
 ## v2 Audit: Sound/MSP (2026-03-22)
 
