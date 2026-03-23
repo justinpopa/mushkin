@@ -80,7 +80,8 @@ int L_DatabaseOpen(lua_State* L)
     // Open the database
     int rc = sqlite3_open_v2(filename, &pDatabase->db, flags, nullptr);
 
-    if (rc == SQLITE_OK) {
+    // Original (methods_database.cpp:98) checks both rc AND db pointer
+    if (rc == SQLITE_OK && pDatabase->db != nullptr) {
         // Success - add to map
         pDoc->m_DatabaseMap[qName] = std::move(pDatabase);
     }

@@ -534,7 +534,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 
 ### LOW
 - [x] L93: database -- DatabaseColumnValue uses int64 instead of int32 (strictly better but different). Mushkin: src/world/lua_api/world_database.cpp:746
-- [ ] L94: database -- DatabaseOpen does not check for NULL db handle after sqlite3_open_v2. Mushkin: src/world/lua_api/world_database.cpp:83
+- [x] L94: database -- DatabaseOpen does not check for NULL db handle after sqlite3_open_v2. Mushkin: src/world/lua_api/world_database.cpp:83
 
 ## v2 Audit: GetInfo/GetOption/SetOption (2026-03-22)
 
