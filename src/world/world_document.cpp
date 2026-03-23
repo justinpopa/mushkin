@@ -1467,18 +1467,6 @@ void WorldDocument::Execute(const QString& command, bool allowScriptPrefix, bool
         QString processedCommand = str;
         bool bypassAliases = false;
 
-        // ========== Immediate Prefix ==========
-        // Check for immediate prefix to bypass alias system
-        // Default prefix is "/" - sends command directly to MUD
-        // This allows users to bypass troublesome aliases temporarily
-
-        QString immediatePrefix = "/"; // Default immediate prefix
-        if (!immediatePrefix.isEmpty() && processedCommand.startsWith(immediatePrefix)) {
-            // Remove prefix and set flag to bypass aliases
-            processedCommand = processedCommand.mid(immediatePrefix.length());
-            bypassAliases = true;
-        }
-
         // ========== Alias Evaluation ==========
         // Reset omit flag before alias evaluation (original: sendvw.cpp:602)
         m_bOmitFromCommandHistory = false;
