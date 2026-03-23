@@ -90,29 +90,43 @@ void WorldDocument::saveTriggersToXml(QXmlStreamWriter& xml)
         xml.writeAttribute("enabled", trigger->enabled ? "y" : "n");
         xml.writeAttribute("match", trigger->trigger);
         xml.writeAttribute("send_to", QString::number(static_cast<quint16>(trigger->send_to)));
-        xml.writeAttribute("sequence", QString::number(trigger->sequence));
+        if (trigger->sequence != 0)
+            xml.writeAttribute("sequence", QString::number(trigger->sequence));
         xml.writeAttribute("script", trigger->procedure);
         xml.writeAttribute("group", trigger->group);
         xml.writeAttribute("variable", trigger->variable);
 
-        // Behavior flags
-        xml.writeAttribute("omit_from_output", trigger->omit_from_output ? "y" : "n");
-        xml.writeAttribute("omit_from_log", trigger->omit_from_log ? "y" : "n");
-        xml.writeAttribute("keep_evaluating", trigger->keep_evaluating ? "y" : "n");
-        xml.writeAttribute("regexp", trigger->use_regexp ? "y" : "n");
-        xml.writeAttribute("ignore_case", trigger->ignore_case ? "y" : "n");
-        xml.writeAttribute("repeat", trigger->repeat ? "y" : "n");
-        xml.writeAttribute("expand_variables", trigger->expand_variables ? "y" : "n");
-        xml.writeAttribute("one_shot", trigger->one_shot ? "y" : "n");
-        xml.writeAttribute("lowercase_wildcard", trigger->lowercase_wildcard ? "y" : "n");
+        // Behavior flags — only written when true (matches original Save_XML_boolean behavior)
+        if (trigger->omit_from_output)
+            xml.writeAttribute("omit_from_output", "y");
+        if (trigger->omit_from_log)
+            xml.writeAttribute("omit_from_log", "y");
+        if (trigger->keep_evaluating)
+            xml.writeAttribute("keep_evaluating", "y");
+        if (trigger->use_regexp)
+            xml.writeAttribute("regexp", "y");
+        if (trigger->ignore_case)
+            xml.writeAttribute("ignore_case", "y");
+        if (trigger->repeat)
+            xml.writeAttribute("repeat", "y");
+        if (trigger->expand_variables)
+            xml.writeAttribute("expand_variables", "y");
+        if (trigger->one_shot)
+            xml.writeAttribute("one_shot", "y");
+        if (trigger->lowercase_wildcard)
+            xml.writeAttribute("lowercase_wildcard", "y");
 
-        // Multi-line matching
-        xml.writeAttribute("multi_line", trigger->multi_line ? "y" : "n");
-        xml.writeAttribute("lines_to_match", QString::number(trigger->lines_to_match));
+        // Multi-line matching — only write when non-default
+        if (trigger->multi_line)
+            xml.writeAttribute("multi_line", "y");
+        if (trigger->lines_to_match != 0)
+            xml.writeAttribute("lines_to_match", QString::number(trigger->lines_to_match));
 
-        // Sound
-        xml.writeAttribute("sound", trigger->sound_to_play);
-        xml.writeAttribute("sound_if_inactive", trigger->sound_if_inactive ? "y" : "n");
+        // Sound — only write when non-empty / true
+        if (!trigger->sound_to_play.isEmpty())
+            xml.writeAttribute("sound", trigger->sound_to_play);
+        if (trigger->sound_if_inactive)
+            xml.writeAttribute("sound_if_inactive", "y");
 
         // Decompose style into individual make_* attributes
         if (trigger->style & HILITE)
@@ -155,8 +169,10 @@ void WorldDocument::saveTriggersToXml(QXmlStreamWriter& xml)
         if (trigger->colour != SAMECOLOUR)
             xml.writeAttribute("custom_colour", QString::number(trigger->colour + 1));
 
-        xml.writeAttribute("colour_change_type",
-                           QString::number(static_cast<quint16>(trigger->colour_change_type)));
+        // colour_change_type — only write when non-zero (matches original Save_XML_number)
+        if (static_cast<quint16>(trigger->colour_change_type) != 0)
+            xml.writeAttribute("colour_change_type",
+                               QString::number(static_cast<quint16>(trigger->colour_change_type)));
 
         // RGB colors as names
         if (trigger->other_foreground != 0)
@@ -169,9 +185,11 @@ void WorldDocument::saveTriggersToXml(QXmlStreamWriter& xml)
             xml.writeAttribute("script_language", scriptLanguageToString(trigger->scriptLanguage));
         }
 
-        // Other options
-        xml.writeAttribute("clipboard_arg", QString::number(trigger->clipboard_arg));
-        xml.writeAttribute("user", QString::number(trigger->user_option));
+        // Other options — only write when non-zero
+        if (trigger->clipboard_arg != 0)
+            xml.writeAttribute("clipboard_arg", QString::number(trigger->clipboard_arg));
+        if (trigger->user_option != 0)
+            xml.writeAttribute("user", QString::number(trigger->user_option));
 
         // Contents as child element with CDATA
         if (!trigger->contents.isEmpty()) {
@@ -439,31 +457,42 @@ void WorldDocument::saveAliasesToXml(QXmlStreamWriter& xml)
         xml.writeAttribute("enabled", alias->enabled ? "y" : "n");
         xml.writeAttribute("match", alias->name);
         xml.writeAttribute("send_to", QString::number(static_cast<quint16>(alias->send_to)));
-        xml.writeAttribute("sequence", QString::number(alias->sequence));
+        if (alias->sequence != 0)
+            xml.writeAttribute("sequence", QString::number(alias->sequence));
         xml.writeAttribute("script", alias->procedure);
         xml.writeAttribute("group", alias->group);
         xml.writeAttribute("variable", alias->variable);
 
-        // Behavior flags
-        xml.writeAttribute("omit_from_output", alias->omit_from_output ? "y" : "n");
-        xml.writeAttribute("omit_from_log", alias->omit_from_log ? "y" : "n");
-        xml.writeAttribute("omit_from_command_history",
-                           alias->omit_from_command_history ? "y" : "n");
-        xml.writeAttribute("keep_evaluating", alias->keep_evaluating ? "y" : "n");
-        xml.writeAttribute("regexp", alias->use_regexp ? "y" : "n");
-        xml.writeAttribute("ignore_case", alias->ignore_case ? "y" : "n");
-        xml.writeAttribute("expand_variables", alias->expand_variables ? "y" : "n");
-        xml.writeAttribute("echo_alias", alias->echo_alias ? "y" : "n");
-        xml.writeAttribute("one_shot", alias->one_shot ? "y" : "n");
-        xml.writeAttribute("menu", alias->menu ? "y" : "n");
+        // Behavior flags — only written when true (matches original Save_XML_boolean behavior)
+        if (alias->omit_from_output)
+            xml.writeAttribute("omit_from_output", "y");
+        if (alias->omit_from_log)
+            xml.writeAttribute("omit_from_log", "y");
+        if (alias->omit_from_command_history)
+            xml.writeAttribute("omit_from_command_history", "y");
+        if (alias->keep_evaluating)
+            xml.writeAttribute("keep_evaluating", "y");
+        if (alias->use_regexp)
+            xml.writeAttribute("regexp", "y");
+        if (alias->ignore_case)
+            xml.writeAttribute("ignore_case", "y");
+        if (alias->expand_variables)
+            xml.writeAttribute("expand_variables", "y");
+        if (alias->echo_alias)
+            xml.writeAttribute("echo_alias", "y");
+        if (alias->one_shot)
+            xml.writeAttribute("one_shot", "y");
+        if (alias->menu)
+            xml.writeAttribute("menu", "y");
 
         // Script language (only write if not Lua - the default)
         if (alias->scriptLanguage != ScriptLanguage::Lua) {
             xml.writeAttribute("script_language", scriptLanguageToString(alias->scriptLanguage));
         }
 
-        // Other options
-        xml.writeAttribute("user", QString::number(alias->user_option));
+        // Other options — only write when non-zero
+        if (alias->user_option != 0)
+            xml.writeAttribute("user", QString::number(alias->user_option));
 
         // Contents as child element with CDATA
         if (!alias->contents.isEmpty()) {
@@ -628,36 +657,50 @@ void WorldDocument::saveTimersToXml(QXmlStreamWriter& xml)
         bool isAtTime = (timer->type == Timer::TimerType::AtTime);
         xml.writeAttribute("at_time", isAtTime ? "y" : "n");
 
-        // Write hour/minute/second from either at_* or every_* fields based on type
+        // Write hour/minute/second from either at_* or every_* fields based on type.
+        // hour and minute use Save_XML_number semantics (skip if zero);
+        // second uses Save_XML_double semantics (always written — "0.00" is non-empty).
         if (isAtTime) {
-            xml.writeAttribute("hour", QString::number(timer->at_hour));
-            xml.writeAttribute("minute", QString::number(timer->at_minute));
+            if (timer->at_hour != 0)
+                xml.writeAttribute("hour", QString::number(timer->at_hour));
+            if (timer->at_minute != 0)
+                xml.writeAttribute("minute", QString::number(timer->at_minute));
             xml.writeAttribute("second", QString::number(timer->at_second, 'f', 2));
         } else {
-            xml.writeAttribute("hour", QString::number(timer->every_hour));
-            xml.writeAttribute("minute", QString::number(timer->every_minute));
+            if (timer->every_hour != 0)
+                xml.writeAttribute("hour", QString::number(timer->every_hour));
+            if (timer->every_minute != 0)
+                xml.writeAttribute("minute", QString::number(timer->every_minute));
             xml.writeAttribute("second", QString::number(timer->every_second, 'f', 2));
         }
 
-        // Offset fields (always written)
-        xml.writeAttribute("offset_hour", QString::number(timer->offset_hour));
-        xml.writeAttribute("offset_minute", QString::number(timer->offset_minute));
+        // Offset fields: hour/minute use Save_XML_number (skip if zero);
+        // second uses Save_XML_double (always written).
+        if (timer->offset_hour != 0)
+            xml.writeAttribute("offset_hour", QString::number(timer->offset_hour));
+        if (timer->offset_minute != 0)
+            xml.writeAttribute("offset_minute", QString::number(timer->offset_minute));
         xml.writeAttribute("offset_second", QString::number(timer->offset_second, 'f', 2));
 
-        // Behavior flags
-        xml.writeAttribute("one_shot", timer->one_shot ? "y" : "n");
+        // Behavior flags — only written when true (matches original Save_XML_boolean behavior)
+        if (timer->one_shot)
+            xml.writeAttribute("one_shot", "y");
         // Use active_closed for original MUSHclient compatibility
-        xml.writeAttribute("active_closed", timer->active_when_closed ? "y" : "n");
-        xml.writeAttribute("omit_from_output", timer->omit_from_output ? "y" : "n");
-        xml.writeAttribute("omit_from_log", timer->omit_from_log ? "y" : "n");
+        if (timer->active_when_closed)
+            xml.writeAttribute("active_closed", "y");
+        if (timer->omit_from_output)
+            xml.writeAttribute("omit_from_output", "y");
+        if (timer->omit_from_log)
+            xml.writeAttribute("omit_from_log", "y");
 
         // Script language (only write if not Lua - the default)
         if (timer->scriptLanguage != ScriptLanguage::Lua) {
             xml.writeAttribute("script_language", scriptLanguageToString(timer->scriptLanguage));
         }
 
-        // Other options
-        xml.writeAttribute("user", QString::number(timer->user_option));
+        // Other options — only write when non-zero
+        if (timer->user_option != 0)
+            xml.writeAttribute("user", QString::number(timer->user_option));
 
         // Contents as child element with CDATA
         if (!timer->contents.isEmpty()) {
