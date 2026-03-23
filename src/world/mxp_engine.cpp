@@ -2019,8 +2019,14 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
         // ========== INTERACTIVE ELEMENTS ==========
         case MXP_ACTION_SEND: {
             // <send href="command" hint="tooltip" prompt>
+            // Pueblo fallback: xch_cmd if href empty, xch_hint if hint empty
+            // (original: mxpOpenAtomic.cpp:193-203)
             QString href = MXP_GetArgument("href", args);
+            if (href.isEmpty())
+                href = MXP_GetArgument("xch_cmd", args);
             QString hint = MXP_GetArgument("hint", args);
+            if (hint.isEmpty())
+                hint = MXP_GetArgument("xch_hint", args);
             bool prompt = MXP_HasArgument("prompt", args);
 
             // Store link info for text that follows

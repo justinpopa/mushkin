@@ -623,7 +623,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] H107: mxp -- !ELEMENT and !ENTITY definitions now require secure mode. Mushkin: mxp_engine.cpp:1476-1485
 - [~] H108: mxp -- !ATTLIST not implemented. DEFERRED: requires porting BuildArgumentList + element attribute list append. Needs dedicated MXP plan.. Mushkin: mxp_engine.cpp:1476-1485
 - [x] H109: mxp -- MXP_Off now closes ALL tags including secure ones via closeAll parameter. Mushkin: mxp_engine.cpp:568-569
-- [ ] H110: mxp -- SEND tag missing xch_cmd/xch_hint Pueblo fallbacks. Mushkin: mxp_engine.cpp:2003-2018
+- [x] H110: mxp -- SEND tag now falls back to xch_cmd/xch_hint for Pueblo compatibility. Mushkin: mxp_engine.cpp:2003-2018
 - [ ] H111: mxp -- Hyperlink <A> tag does not convert xch_cmd to SEND action. Mushkin: mxp_engine.cpp:2021-2036
 - [ ] H112: mxp -- </send> close does not populate &text; replacement (most MUDs use <send>text</send>). Mushkin: mxp_engine.cpp:2428-2443
 - [ ] H113: mxp -- <var> tag close is a no-op stub (MXP variables never set). Mushkin: mxp_engine.cpp:2190-2198
