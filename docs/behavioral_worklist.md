@@ -378,7 +378,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] M107: xml -- date_saved now written to world file (respects omit_date_from_save_files). Mushkin: xml_serialization.cpp:261-267
 - [x] M108: xml -- m_bLoaded now set to true after successful LoadWorldXML. Mushkin: world_document.cpp:286
 - [x] M109: xml -- PluginListChanged now called once after all plugins loaded (batch mode). Mushkin: world_document_plugins.cpp:568
-- [ ] M110: xml -- Load order depends on file element order rather than explicit sequence. Mushkin: xml_serialization.cpp
+- [~] M110: xml -- Load order depends on file element order. DEFERRED: only matters for hand-edited files; well-formed MUSHclient files are always in correct order.. Mushkin: xml_serialization.cpp
 
 ### LOW
 - [ ] L67: xml -- Timer seconds saved with 4 decimal places instead of 2. Mushkin: xml_serialization.cpp:625
