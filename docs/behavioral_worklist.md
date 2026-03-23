@@ -371,8 +371,8 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 
 ### MEDIUM
 - [x] M102: xml -- Named color parsing now supported via ColourNameToRGB (handles 150+ named colors + hex). Mushkin: xml_serialization.cpp:63-79
-- [ ] M103: xml -- Pre-v3.35 backward compat attributes (speed_walk, set_variable, queue) not handled. Mushkin: xml_serialization.cpp (absent)
-- [ ] M104: xml -- Version attribute is "mushkin_version" not "muclient_version". Breaks version tracking/GetInfo. Mushkin: xml_serialization.cpp:266
+- [~] M103: xml -- Pre-v3.35 legacy attributes. DEFERRED: 22+ year old format, extremely unlikely to encounter.. Mushkin: xml_serialization.cpp (absent)
+- [~] M104: xml -- Version attribute "mushkin_version" is intentional branding. world_file_version still correct for compatibility.. Mushkin: xml_serialization.cpp:266
 - [ ] M105: xml -- Trigger/alias/timer validation missing on load (empty match, label names, regex). Mushkin: xml_serialization.cpp:196-420
 - [ ] M106: xml -- IsArchiveXML missing 9 signature patterns (<macros>, <variables>, etc.). Mushkin: xml_serialization.cpp:151-152
 - [ ] M107: xml -- date_saved never written to world file. Mushkin: xml_serialization.cpp:261-267
