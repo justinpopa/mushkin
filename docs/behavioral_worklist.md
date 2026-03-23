@@ -539,7 +539,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 ## v2 Audit: GetInfo/GetOption/SetOption (2026-03-22)
 
 ### HIGH
-- [ ] H92: options -- GetOption does not check OPT_PLUGIN_CANNOT_READ for restricted options. Mushkin: world_settings.cpp:1653-1683
+- [~] H92: options -- OPT_PLUGIN_CANNOT_READ flag defined but no options use it in original. No behavioral impact.. Mushkin: world_settings.cpp:1653-1683
 - [ ] H93: options -- GetOption falls through to alpha options, returning string instead of -1 for alpha names. Mushkin: world_settings.cpp:1671-1678
 - [ ] H94: options -- SetOption OPT_CUSTOM_COLOUR adjustment missing; echo_colour off by 1. Mushkin: world_settings.cpp:1613
 - [ ] H95: options -- GetInfo dates (301-306) return OLE DATE instead of Unix timestamps. Mushkin: world_settings.cpp:1495-1546
