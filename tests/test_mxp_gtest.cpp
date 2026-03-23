@@ -103,10 +103,9 @@ TEST_F(MXPTest, InitializeLoadsSendTag)
     ASSERT_NE(send, nullptr);
     EXPECT_EQ(send->strName, "send");
     EXPECT_EQ(send->iAction, MXP_ACTION_SEND);
-    // send is secure (no TAG_OPEN) — requires secure mode to execute
-    EXPECT_FALSE(send->iFlags & TAG_OPEN);
-    EXPECT_TRUE(send->iFlags & TAG_MXP);
-    EXPECT_EQ(send->strArgs, "href,hint,prompt");
+    // send is secure (flags=0, no TAG_OPEN or TAG_MXP) — original: mxpinit.cpp:66-67
+    EXPECT_EQ(send->iFlags, 0);
+    EXPECT_EQ(send->strArgs, "href,hint,xch_cmd,xch_hint,prompt");
 }
 
 // Test 7: InitializeMXPElements loads color tag
@@ -552,8 +551,7 @@ TEST_F(MXPTest, ElementFlagsAreSetCorrectly)
 {
     AtomicElement* send = doc->m_mxpEngine->MXP_FindAtomicElement("send");
     ASSERT_NE(send, nullptr);
-    EXPECT_FALSE(send->iFlags & TAG_OPEN); // send is secure (no TAG_OPEN)
-    EXPECT_TRUE(send->iFlags & TAG_MXP);
+    EXPECT_EQ(send->iFlags, 0); // send is secure (flags=0, original: mxpinit.cpp:66)
 
     AtomicElement* version = doc->m_mxpEngine->MXP_FindAtomicElement("version");
     ASSERT_NE(version, nullptr);

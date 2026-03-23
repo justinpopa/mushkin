@@ -108,7 +108,8 @@ void MXPEngine::InitializeMXPElements()
 
         // Links and actions (hyperlink is secure, send requires open mode)
         {"a", TAG_MXP, MXP_ACTION_HYPERLINK, "href,xch_cmd,xch_hint"},
-        {"send", TAG_MXP, MXP_ACTION_SEND, "href,hint,prompt"}, // secure (no TAG_OPEN)
+        {"send", 0, MXP_ACTION_SEND,
+         "href,hint,xch_cmd,xch_hint,prompt"}, // secure (original: mxpinit.cpp:66-67)
 
         // Media (open mode required for security)
         {"sound", TAG_COMMAND | TAG_MXP, MXP_ACTION_SOUND, "fname,v,l,p,t,u"},   // secure

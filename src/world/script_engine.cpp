@@ -1172,9 +1172,9 @@ static void luaError(lua_State* L, const QString& event, const QString& name, Wo
 
     // Display in output window
     if (doc) {
-        // Orange error text on black background (BGR format for MUSHclient compatibility)
-        doc->colourNote(BGR(255, 140, 0), BGR(0, 0, 0), QString("=== %1: %2 ===").arg(event, name));
-        doc->colourNote(BGR(255, 140, 0), BGR(0, 0, 0), errorMsg);
+        // Orangered error text on black background (original: SCRIPTERRORFORECOLOUR = "orangered")
+        doc->colourNote(BGR(255, 69, 0), BGR(0, 0, 0), QString("=== %1: %2 ===").arg(event, name));
+        doc->colourNote(BGR(255, 69, 0), BGR(0, 0, 0), errorMsg);
 
         // Show error lines (if we have a line number and script file)
         if (lineNumber > 0) {

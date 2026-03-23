@@ -646,7 +646,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [~] L106: mxp -- Extra elements defined (strikeout, sbr) not in original. Mushkin: mxp_engine.cpp:78,88 (WONTFIX: benign extensions that don't affect existing behavior)
 - [x] L107: mxp -- <p> tag defined as TAG_COMMAND (self-closing) instead of block element. Mushkin: mxp_engine.cpp:85
 - [x] L108: mxp -- user/password tags have TAG_OPEN flag (conflicts with inverted security). Mushkin: mxp_engine.cpp:134-138
-- [ ] L109: mxp -- <send> element missing xch_cmd/xch_hint in argument spec. Mushkin: mxp_engine.cpp:111
+- [x] L109: mxp -- <send> element missing xch_cmd/xch_hint in argument spec. Mushkin: mxp_engine.cpp:111
 
 ## v2 Audit: Scripting Engine (2026-03-22)
 
@@ -664,9 +664,9 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] M189: scripting -- ePluginCouldNotSaveState = 30038 instead of 30037 (duplicates ePluginDoesNotSaveState). Mushkin: script_engine.cpp:912
 
 ### LOW
-- [ ] L110: scripting -- Error display color is darkorange instead of orangered. Mushkin: script_engine.cpp:1176
-- [ ] L111: scripting -- executeLua uses qCDebug instead of m_doc->Trace() for trace output. Mushkin: script_engine_callbacks.cpp:241
-- [ ] L112: scripting -- error_code table has extra constants not in original (30055, 30075-30077). Mushkin: script_engine.cpp:922,942-944
+- [x] L110: scripting -- Error display color is darkorange instead of orangered. Mushkin: script_engine.cpp:1176
+- [x] L111: scripting -- executeLua uses qCDebug instead of m_doc->Trace() for trace output. Mushkin: script_engine_callbacks.cpp:241
+- [~] L112: scripting -- error_code table has extra constants not in original (30055, 30075-30077). Mushkin: script_engine.cpp:922,942-944 (WONTFIX: extra constants are Mushkin extensions, don't affect existing behavior)
 
 ## v2 Audit: World File Edge Cases (2026-03-22)
 
@@ -686,10 +686,10 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] M196: world-edge -- Password prompt dialog not triggered on connect. Mushkin: src/world/connection_manager.cpp:146-165 (QInputDialog password prompt added before auto-login block)
 
 ### LOW
-- [ ] L113: world-edge -- No unused attribute/element warnings during XML load. Mushkin: src/world/xml_serialization.cpp
-- [ ] L114: world-edge -- Tab-to-space conversion not performed during XML parsing. Mushkin: handled by QXmlStreamReader
-- [ ] L115: world-edge -- m_bLoaded flag never set to true after loading. Mushkin: src/world/world_document.cpp:286
-- [ ] L116: world-edge -- XML file size limit (100MB) not enforced. Mushkin: src/world/xml_serialization.cpp:477-488
+- [~] L113: world-edge -- No unused attribute/element warnings during XML load. Mushkin: src/world/xml_serialization.cpp (WONTFIX: original's custom XML parser tracked unknown attributes; Qt's QXmlStreamReader doesn't expose this)
+- [~] L114: world-edge -- Tab-to-space conversion not performed during XML parsing. Mushkin: handled by QXmlStreamReader (WONTFIX: Qt handles whitespace normalization differently by design)
+- [x] L115: world-edge -- m_bLoaded flag never set to true after loading. Mushkin: src/world/world_document.cpp:286
+- [x] L116: world-edge -- XML file size limit (100MB) not enforced. Mushkin: src/world/xml_serialization.cpp:477-488
 
 ## v2 Audit: Enum/Constant Integrity (2026-03-22)
 

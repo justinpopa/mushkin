@@ -237,9 +237,9 @@ bool ScriptEngine::executeLua(qint32& dispid, const QString& szProcedure, Action
     // Clear stack
     lua_settop(L, 0);
 
-    // Trace (skip noisy callbacks)
+    // Trace to output window (original: lua_scripting.cpp:477,698)
     if (szProcedure != "OnPluginDrawOutputWindow" && szProcedure != "OnPluginTick") {
-        qCDebug(lcScript) << QString("Executing %1 script \"%2\"").arg(szType, szProcedure);
+        m_doc->Trace(QString("Executing %1 script \"%2\"").arg(szType, szProcedure));
     }
 
     // Time the call

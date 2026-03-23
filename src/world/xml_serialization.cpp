@@ -507,6 +507,15 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
         return false;
     }
 
+    // File size limit (original: 100MB sanity check)
+    constexpr qint64 MAX_XML_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
+    if (file.size() > MAX_XML_FILE_SIZE) {
+        qWarning() << "LoadWorldXML: file too large:" << file.size() << "bytes (max"
+                   << MAX_XML_FILE_SIZE << ")";
+        file.close();
+        return false;
+    }
+
     // Check if file is actually XML
     if (!IsArchiveXML(file)) {
         qWarning() << "LoadWorldXML: file does not appear to be XML:" << filename;
@@ -904,6 +913,9 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
 
     // Notify all plugins once after batch loading (original: xml_load_world.cpp:473-474)
     doc->PluginListChanged();
+
+    // Mark world as loaded (original: xml_load_world.cpp sets m_bLoaded)
+    doc->m_bLoaded = true;
 
     qCDebug(lcWorld) << "LoadWorldXML: successfully loaded from" << filename;
     return true;
