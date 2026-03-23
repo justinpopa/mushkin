@@ -485,7 +485,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] H84: sound -- PlaySoundMemory now uses per-buffer unique temp files (fixed in H83). Mushkin: src/world/lua_api/world_sounds.cpp:158-159
 
 ### MEDIUM
-- [ ] M136: sound -- PlaySound filename is required (luaCheckQString); original allows nil for sound adjustment. Mushkin: src/world/lua_api/world_sounds.cpp:47
+- [x] M136: sound -- PlaySound filename is required (luaCheckQString); original allows nil for sound adjustment. Mushkin: src/world/lua_api/world_sounds.cpp:47
 - [ ] M137: sound -- play_sounds_in_background option parsed but never applied. Mushkin: src/world/sound_manager.cpp
 - [ ] M138: sound -- MXP sound tag ignores volume, loops, priority, URL parameters. Mushkin: src/world/mxp_engine.cpp:2039-2067
 - [ ] M139: sound -- MSP MUSIC hardcodes buffer 1; MSP STOP stops ALL buffers instead of per-channel. Mushkin: src/world/telnet_parser.cpp:1150-1157

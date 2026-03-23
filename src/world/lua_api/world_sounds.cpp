@@ -45,7 +45,8 @@ int L_PlaySound(lua_State* L)
     double pan = luaL_optnumber(L, 5, 0.0);    // Default: center
 
     // Call PlaySound
-    return luaReturn(L, pDoc->PlaySound(buffer, luaCheckQString(L, 2), loop, volume, pan));
+    // filename is optional — nil/empty means "adjust existing playing sound" (original behavior)
+    return luaReturn(L, pDoc->PlaySound(buffer, luaOptQString(L, 2), loop, volume, pan));
 }
 
 /**
