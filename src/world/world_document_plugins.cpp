@@ -231,7 +231,8 @@ static QString preprocessPluginXml(const QString& content)
     return processed;
 }
 
-Plugin* WorldDocument::LoadPlugin(const QString& filepath, QString& errorMsg)
+Plugin* WorldDocument::LoadPlugin(const QString& filepath, QString& errorMsg,
+                                  bool suppressListChanged)
 {
     errorMsg.clear();
 
@@ -564,8 +565,11 @@ Plugin* WorldDocument::LoadPlugin(const QString& filepath, QString& errorMsg)
         qCDebug(lcPlugin) << "  Skipping OnPluginInstall - no script engine";
     }
 
-    // Notify other plugins that plugin list changed
-    PluginListChanged();
+    // Notify other plugins that plugin list changed (unless batch loading)
+    // Original calls PluginListChanged once after ALL plugins loaded (xml_load_world.cpp:473-474)
+    if (!suppressListChanged) {
+        PluginListChanged();
+    }
 
     return pluginPtr;
 }

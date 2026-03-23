@@ -675,7 +675,7 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
                                     resolvePluginPath(pluginPath, filename, pluginDir);
 
                                 QString errorMsg;
-                                Plugin* plugin = doc->LoadPlugin(fullPath, errorMsg);
+                                Plugin* plugin = doc->LoadPlugin(fullPath, errorMsg, true);
                                 if (plugin) {
                                     qDebug() << "Loaded plugin:" << plugin->m_strName
                                              << "| Aliases:" << plugin->m_AliasMap.size()
@@ -841,7 +841,7 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
                         QString fullPath = resolvePluginPath(pluginPath, filename, pluginDir2);
 
                         QString errorMsg;
-                        Plugin* plugin = doc->LoadPlugin(fullPath, errorMsg);
+                        Plugin* plugin = doc->LoadPlugin(fullPath, errorMsg, true);
                         if (plugin) {
                             qDebug() << "Loaded plugin:" << plugin->m_strName
                                      << "| Aliases:" << plugin->m_AliasMap.size()
@@ -892,6 +892,9 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
 
     // Mark as loaded from disk (original: xml_serialize.cpp:51)
     doc->m_bLoaded = true;
+
+    // Notify all plugins once after batch loading (original: xml_load_world.cpp:473-474)
+    doc->PluginListChanged();
 
     qCDebug(lcWorld) << "LoadWorldXML: successfully loaded from" << filename;
     return true;
