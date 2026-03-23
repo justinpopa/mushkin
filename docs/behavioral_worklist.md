@@ -585,8 +585,8 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 
 ### LOW
 - [x] L99: colors -- ColourNameToRGB missing "rebeccapurple" (0x663399). Mushkin: src/world/lua_api/world_colors.cpp:34-185
-- [ ] L100: colors -- ColourNameToRGB has extra non-standard names (darkyellow, lightmagenta, lightred). Mushkin: src/world/lua_api/world_colors.cpp:75,110,112
-- [ ] L101: colors -- ColourNameToRGB empty-string returns white instead of undefined. Mushkin: src/world/lua_api/world_colors.cpp:27-29
+- [~] L100: colors -- ColourNameToRGB has extra non-standard names (darkyellow, lightmagenta, lightred). Mushkin: src/world/lua_api/world_colors.cpp:75,110,112 (WONTFIX: extra names are strictly additive, don't affect existing behavior)
+- [x] L101: colors -- ColourNameToRGB empty-string returns white instead of undefined. Mushkin: src/world/lua_api/world_colors.cpp:27-29
 
 ## v2 Audit: UI Dialogs (2026-03-22)
 

@@ -23,9 +23,10 @@
  */
 QRgb ColourNameToRGB(const QString& name)
 {
-    // If empty, return default (white)
-    if (name.isEmpty()) {
-        return BGR(255, 255, 255);
+    // Empty name: original returns uninitialized value (UB in methods_colours.cpp:29-34).
+    // Return -1 (error indicator) as the safest defined behavior.
+    if (name.trimmed().isEmpty()) {
+        return static_cast<QRgb>(-1);
     }
 
     QString lowerName = name.toLower();
