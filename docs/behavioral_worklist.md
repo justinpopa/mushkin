@@ -465,7 +465,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] M130: miniwindows -- Gradient bounds check rejects valid coordinates that original would clip. Mushkin: miniwindow.cpp:973-974
 - [~] M131: miniwindows -- Filter MonoNoise (op 2) applies independent noise per channel instead of same noise. Mushkin: miniwindow.cpp:2631-2647 (NOT A BUG: code already uses single noise value for all 3 channels, matching original)
 - [x] M132: miniwindows -- Filter blur (ops 3,25,26) ignores Options parameter for h/v direction. Mushkin: miniwindow.cpp:2649-2680
-- [ ] M133: miniwindows -- Filter sharpen/edge/emboss use single-pass instead of separable convolution. Mushkin: miniwindow.cpp:2682-2772
+- [x] M133: miniwindows -- Filter sharpen/edge/emboss use single-pass instead of separable convolution. Mushkin: miniwindow.cpp:2682-2772
 - [x] M134: miniwindows -- DeleteAllHotspots/DeleteHotspot don't clear callbackPlugin. Mushkin: world_miniwindow_images.cpp:906-948
 - [x] M135: miniwindows -- WindowInfo case 21 returns current time instead of installation time. Mushkin: world_miniwindow_lifecycle.cpp:488-493
 
@@ -486,10 +486,10 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 
 ### MEDIUM
 - [x] M136: sound -- PlaySound filename is required (luaCheckQString); original allows nil for sound adjustment. Mushkin: src/world/lua_api/world_sounds.cpp:47
-- [ ] M137: sound -- play_sounds_in_background option parsed but never applied. Mushkin: src/world/sound_manager.cpp
+- [x] M137: sound -- play_sounds_in_background option parsed but never applied. Mushkin: src/world/sound_manager.cpp
 - [ ] M138: sound -- MXP sound tag ignores volume, loops, priority, URL parameters. Mushkin: src/world/mxp_engine.cpp:2039-2067
 - [ ] M139: sound -- MSP MUSIC hardcodes buffer 1; MSP STOP stops ALL buffers instead of per-channel. Mushkin: src/world/telnet_parser.cpp:1150-1157
-- [ ] M140: sound -- releaseInactiveSoundBuffers is no-op; sounds stay marked playing forever. Mushkin: src/world/sound_manager.cpp:199-204
+- [x] M140: sound -- releaseInactiveSoundBuffers is no-op; sounds stay marked playing forever. Mushkin: src/world/sound_manager.cpp:199-204
 
 ### LOW
 - [ ] L89: sound -- PlaySound filename path length limit (127 chars) not enforced. Mushkin: src/world/sound_manager.cpp:298-301
@@ -630,9 +630,9 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [~] H114: mxp -- No MXP style stack. DEFERRED: requires style marker system (save/restore per-tag). Architectural, needs dedicated plan.. Mushkin: mxp_engine.cpp:2414-2425
 
 ### MEDIUM
-- [ ] M174: mxp -- Entity lookup is case-sensitive; original is partially case-insensitive for custom entities. Mushkin: mxp_engine.cpp:1189-1213
-- [ ] M175: mxp -- MXP_On always clears custom elements/entities; original preserves on manual toggle. Mushkin: mxp_engine.cpp:511-538
-- [ ] M176: mxp -- <reset> tag only closes open tags, doesn't reset ANSI/paragraph mode. Mushkin: mxp_engine.cpp:2207-2210
+- [x] M174: mxp -- Entity lookup is case-sensitive; original is partially case-insensitive for custom entities. Mushkin: mxp_engine.cpp:1189-1213
+- [x] M175: mxp -- MXP_On always clears custom elements/entities; original preserves on manual toggle. Mushkin: mxp_engine.cpp:511-538
+- [x] M176: mxp -- <reset> tag only closes open tags, doesn't reset ANSI/paragraph mode. Mushkin: mxp_engine.cpp:2207-2210
 - [ ] M177: mxp -- <mxp off> keyword not handled (no-op stub). Mushkin: mxp_engine.cpp:2212-2216
 - [ ] M178: mxp -- SUPPORT response does not list sub-attributes. Mushkin: mxp_engine.cpp:2218-2255
 - [ ] M179: mxp -- <li> tag does not render bullet/number prefix. Mushkin: mxp_engine.cpp:2293-2298

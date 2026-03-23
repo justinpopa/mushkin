@@ -46,7 +46,7 @@ class MXPEngine {
     MXPEngine& operator=(MXPEngine&&) = delete;
 
     // ========== Lifecycle ==========
-    void MXP_On();                    // Activate MXP
+    void MXP_On(bool manual = false); // Activate MXP (manual=true preserves custom defs)
     void MXP_Off(bool force = false); // Deactivate or reset MXP
     void MXP_mode_change(int mode);   // Change MXP line security mode
 

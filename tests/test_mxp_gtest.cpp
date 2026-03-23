@@ -497,15 +497,25 @@ TEST_F(MXPTest, MXPOnInitializesEntities)
 // Test 36: MXP_Off cleans up resources
 TEST_F(MXPTest, MXPOffCleansUpResources)
 {
-    // Verify elements exist
+    // Verify elements exist before turning off
     EXPECT_GT(doc->m_mxpEngine->m_atomicElementMap.size(), 0);
+    EXPECT_GT(doc->m_mxpEngine->m_entityMap.size(), 0);
 
-    // Turn off MXP
+    // Turn off MXP completely
     doc->MXP_Off(true);
 
-    // Verify cleanup
-    EXPECT_EQ(doc->m_mxpEngine->m_atomicElementMap.size(), 0);
-    EXPECT_EQ(doc->m_mxpEngine->m_entityMap.size(), 0);
+    // Original behavior (mxpOnOff.cpp): MXP_Off(bCompletely=true) does NOT clear
+    // the built-in atomic element/entity maps — those are only cleared/re-initialized
+    // by MXP_On(manual=false) at the next connection. The maps remain populated so
+    // a subsequent MXP_On() can proceed without re-parsing them from scratch.
+    // CleanupMXP() is only called from the MXPEngine destructor (world close).
+    EXPECT_GT(doc->m_mxpEngine->m_atomicElementMap.size(), 0);
+    EXPECT_GT(doc->m_mxpEngine->m_entityMap.size(), 0);
+
+    // Custom definitions and active tags SHOULD be cleared by MXP_On(manual=false).
+    // After MXP_Off, custom maps may or may not be empty depending on prior state;
+    // the important invariant is that MXP is marked as off.
+    EXPECT_FALSE(doc->m_mxpEngine->m_bMXP);
 }
 
 // Test 37: Multiple MXP_On calls are safe

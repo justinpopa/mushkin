@@ -507,8 +507,15 @@ void MXPEngine::CleanupMXP()
  * MXP_On - Turn on MXP (MUD eXtension Protocol)
  *
  * Port from: mxp/mxpOnOff.cpp
+ *
+ * @param manual If true, preserve existing custom elements/entities/active tags
+ *               (user toggled MXP off then on again). If false (default), clear
+ *               custom definitions — we assume a fresh connection.
+ *
+ * Original: MXP_On(bPueblo, bManual) — when bManual is true, skips clearing
+ *           m_CustomElementMap, m_ActiveTagList, m_CustomEntityMap.
  */
-void MXPEngine::MXP_On()
+void MXPEngine::MXP_On(bool manual)
 {
     // Do nothing if already on
     if (m_bMXP) {
@@ -522,15 +529,28 @@ void MXPEngine::MXP_On()
     m_bPuebloActive = false; // Not Pueblo mode
     m_bMXP_script = false;
     m_bPreMode = false;
-    m_iMXP_mode = eMXP_open;        // Start in open mode
-    m_iMXP_defaultMode = eMXP_open; // Default is open mode
-    m_iListMode = 0;                // No list mode (eNoList)
+    m_iListMode = 0; // No list mode (eNoList)
     m_iListCount = 0;
     m_iMXPerrors = 0;
     m_iMXPtags = 0;
     m_iMXPentities = 0;
 
-    // Initialize MXP elements and entities
+    // If NOT a manual toggle, reset mode to open and clear custom definitions.
+    // Original: mxpOnOff.cpp:136-155 — the !bManual branch resets mode and
+    //           deletes custom elements, active tags, and custom entities.
+    if (!manual) {
+        m_iMXP_mode = eMXP_open;
+        m_iMXP_defaultMode = eMXP_open;
+
+        // Clear custom element/entity definitions and active tag stack.
+        // Built-in maps (m_atomicElementMap, m_entityMap) are re-initialized below.
+        m_customElementMap.clear();
+        m_activeTagList.clear();
+        m_customEntityMap.clear();
+    }
+
+    // (Re-)initialize built-in atomic elements and standard HTML entities.
+    // These are statically defined and safe to reload on every non-manual start.
     InitializeMXPElements();
     InitializeMXPEntities();
 
@@ -569,9 +589,11 @@ void MXPEngine::MXP_Off(bool force)
     MXP_CloseOpenTags(true);
 
     if (force) {
-        // Clean up MXP resources
-        CleanupMXP();
-        // Change back to open mode
+        // Change back to open mode.
+        // NOTE: Do NOT call CleanupMXP() here. The original MXP_Off(bCompletely=true)
+        // does NOT clear custom elements/entities — that only happens in MXP_On(manual=false).
+        // Clearing them here would destroy server-defined definitions that should survive
+        // a manual off→on toggle (M175).
         MXP_mode_change(eMXP_open);
 
         // If in MXP collection phase, reset to Phase::NONE
@@ -1186,9 +1208,15 @@ QString MXPEngine::MXP_GetEntity(const QString& entityName)
         return QString::fromUcs4(reinterpret_cast<const char32_t*>(&codepoint), 1);
     }
 
+    // Custom entity lookup is case-insensitive: keys are stored lowercased by
+    // MXP_DefineEntity (line: strName = remaining.left(spacePos).toLower()).
+    // Original: mxpEntities.cpp:64-66 — MXP_GetEntity lowercases the name before
+    // looking up m_CustomEntityMap.
+    const QString lowerEntityName = entityName.toLower();
+
     // Check custom entities first (they can override)
     {
-        auto it = m_customEntityMap.find(entityName);
+        auto it = m_customEntityMap.find(lowerEntityName);
         if (it != m_customEntityMap.end()) {
             const MXPEntity* entity = it->second.get();
             // Custom entities use strValue (can be multi-character)
@@ -1200,7 +1228,9 @@ QString MXPEngine::MXP_GetEntity(const QString& entityName)
         }
     }
 
-    // Check standard entities (these always use iCodepoint)
+    // Check standard entities (these always use iCodepoint).
+    // Standard entities use the original (non-lowercased) name since HTML entities
+    // like &lt; &gt; &amp; etc. are already lowercase by convention.
     {
         auto it = m_entityMap.find(entityName);
         if (it != m_entityMap.end()) {
@@ -2239,8 +2269,12 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
 
         // ========== PROTOCOL CONTROL ==========
         case MXP_ACTION_RESET:
-            // <reset> - close all open tags
-            MXP_CloseOpenTags();
+            // <reset> - reset MXP state: close open tags, reset ANSI formatting,
+            // and reset paragraph/pre mode.
+            // Original: mxpOpenAtomic.cpp:615-616 — calls MXP_Off() (bCompletely=false),
+            // which also calls InterpretANSIcode(0), resets bInParagraph/bPreMode/listMode,
+            // and then calls MXP_CloseAllTags(). This is more than just closing open tags.
+            MXP_Off(false);
             break;
 
         case MXP_ACTION_MXP: {
