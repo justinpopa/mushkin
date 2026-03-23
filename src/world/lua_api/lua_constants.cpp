@@ -138,7 +138,9 @@ void register_lua_constants(lua_State* L)
     lua_pushnumber(L, eNotAPlugin);
     lua_setfield(L, -2, "eNotAPlugin");
 
-    lua_pushnumber(L, ePluginCouldNotSaveState);
+    // M189: original lua_methods.cpp:6991 maps ePluginCouldNotSaveState to 30037
+    // (same as ePluginDoesNotSaveState) — the C++ enum value 30038 is never exposed to Lua
+    lua_pushnumber(L, ePluginDoesNotSaveState); // intentionally 30037 to match original
     lua_setfield(L, -2, "ePluginCouldNotSaveState");
 
     // Array error codes
@@ -255,8 +257,9 @@ void register_lua_constants(lua_State* L)
     lua_pushstring(L, "Not a plugin");
     lua_rawseti(L, -2, eNotAPlugin);
 
+    // M189: error message table indexed by numeric code; use 30037 to match original
     lua_pushstring(L, "Plugin could not save state");
-    lua_rawseti(L, -2, ePluginCouldNotSaveState);
+    lua_rawseti(L, -2, ePluginDoesNotSaveState); // intentionally 30037 to match original
 
     lua_pushstring(L, "Array already exists");
     lua_rawseti(L, -2, eArrayAlreadyExists);

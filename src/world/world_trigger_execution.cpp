@@ -437,9 +437,17 @@ void WorldDocument::executeTriggerScript(Trigger* trigger, const QString& matche
     // Prevent deletion during script execution
     trigger->executing_script = true;
 
+    // M185: Save and reset note style before callback, restore after
+    // (original: lua_scripting.cpp:487-488 saves iOldStyle and sets to NORMAL)
+    quint16 oldNoteStyle = m_iNoteStyle;
+    m_iNoteStyle = 0; // NORMAL
+
     // Call with traceback error handler for readable stack traces
     // (original: lua_scripting.cpp:624 uses CallLuaWithTraceBack)
     int callResult = callLuaWithTraceBack(L, 4, 0);
+
+    // M185: Restore note style after callback
+    m_iNoteStyle = oldNoteStyle;
 
     bool error = (callResult != 0);
     if (error) {
@@ -458,9 +466,6 @@ void WorldDocument::executeTriggerScript(Trigger* trigger, const QString& matche
         lua_pop(L, 1); // Pop error message
     }
 
-    // Update invocation count
-    trigger->invocation_count++;
-
     // Allow deletion again
     trigger->executing_script = false;
 
@@ -469,11 +474,9 @@ void WorldDocument::executeTriggerScript(Trigger* trigger, const QString& matche
         trigger->dispid = DISPID_UNKNOWN;
         qDebug() << "TRIGGER SCRIPT ERROR:" << trigger->procedure;
     } else {
-        // DEBUG: Log successful script execution for command_executed
-        if (trigger->procedure == "command_executed") {
-            qDebug() << "command_executed script ran successfully, invocations:"
-                     << trigger->invocation_count;
-        }
+        // M186: Only increment invocation_count on success
+        // (original: lua_scripting.cpp:736 increments after error check)
+        trigger->invocation_count++;
     }
 
     qCDebug(lcWorld) << "Trigger script executed:" << trigger->procedure

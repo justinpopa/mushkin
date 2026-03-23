@@ -973,7 +973,8 @@ int L_SendPkt(lua_State* L)
  * @return (number) Error code:
  *   - eOK (0): Success
  *   - eNotAPlugin (30036): Not called from a plugin
- *   - ePluginCouldNotSaveState (30037): Save failed (disk error, etc.)
+ *   - ePluginCouldNotSaveState (30037, same as ePluginDoesNotSaveState): Save failed (disk error,
+ * etc.)
  *
  * @example
  * -- Save important data before disconnecting
@@ -995,7 +996,8 @@ int L_SaveState(lua_State* L)
 
     // Check if already saving (prevent recursion)
     if (currentPlugin->m_bSavingStateNow) {
-        return luaReturnError(L, ePluginCouldNotSaveState);
+        // M189: original lua_methods.cpp:6991 maps ePluginCouldNotSaveState to 30037
+        return luaReturnError(L, ePluginDoesNotSaveState); // 30037, matches original
     }
 
     // Save state
@@ -1004,7 +1006,8 @@ int L_SaveState(lua_State* L)
     if (result.has_value()) {
         lua_pushnumber(L, eOK);
     } else {
-        lua_pushnumber(L, ePluginCouldNotSaveState);
+        // M189: original lua_methods.cpp:6991 maps ePluginCouldNotSaveState to 30037
+        lua_pushnumber(L, ePluginDoesNotSaveState); // 30037, matches original
     }
 
     return 1;

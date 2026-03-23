@@ -236,15 +236,19 @@ void WorldDocument::executeAliasScript(Alias* alias, const QString& command)
         lua_settable(L, -3);
     }
 
-    // Save old action source
+    // Save old action source and note style
+    // M185: Reset note style before callback (original: lua_scripting.cpp:708-709)
     ActionSource oldActionSource = m_iCurrentActionSource;
     m_iCurrentActionSource = ActionSource::eTriggerFired;
+    quint16 oldNoteStyle = m_iNoteStyle;
+    m_iNoteStyle = 0; // NORMAL
 
     // Call function with 3 parameters (name, line, wildcards)
     int error = lua_pcall(L, 3, 0, 0);
 
-    // Restore action source
+    // Restore action source and note style
     m_iCurrentActionSource = oldActionSource;
+    m_iNoteStyle = oldNoteStyle;
 
     if (error) {
         QString errorMsg = QString::fromUtf8(lua_tostring(L, -1));
