@@ -466,17 +466,17 @@ static int L_ArrayExport(lua_State* L)
         return 1;
     }
 
-    // Validate delimiter
-    if (delimiter.length() != 1 || delimiter == "\\") {
-        lua_pushnumber(L, eBadDelimiter);
+    const QMap<QString, QString>& arr = arrays[arrayName];
+
+    // Empty array returns empty string (original checks before delimiter: methods_arrays.cpp:403)
+    if (arr.isEmpty()) {
+        lua_pushstring(L, "");
         return 1;
     }
 
-    const QMap<QString, QString>& arr = arrays[arrayName];
-
-    // Empty array returns empty string
-    if (arr.isEmpty()) {
-        lua_pushstring(L, "");
+    // Validate delimiter (original: methods_arrays.cpp:410-416)
+    if (delimiter.length() != 1 || delimiter == "\\") {
+        lua_pushnumber(L, eBadDelimiter);
         return 1;
     }
 
@@ -524,17 +524,17 @@ static int L_ArrayExportKeys(lua_State* L)
         return 1;
     }
 
-    // Validate delimiter
-    if (delimiter.length() != 1 || delimiter == "\\") {
-        lua_pushnumber(L, eBadDelimiter);
+    const QMap<QString, QString>& arr = arrays[arrayName];
+
+    // Empty array returns empty string (original checks before delimiter: methods_arrays.cpp:403)
+    if (arr.isEmpty()) {
+        lua_pushstring(L, "");
         return 1;
     }
 
-    const QMap<QString, QString>& arr = arrays[arrayName];
-
-    // Empty array returns empty string
-    if (arr.isEmpty()) {
-        lua_pushstring(L, "");
+    // Validate delimiter (original: methods_arrays.cpp:410-416)
+    if (delimiter.length() != 1 || delimiter == "\\") {
+        lua_pushnumber(L, eBadDelimiter);
         return 1;
     }
 

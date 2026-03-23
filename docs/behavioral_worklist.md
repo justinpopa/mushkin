@@ -510,7 +510,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] M143: notepad -- New notepads ignore global notepad color preferences. Mushkin: src/world/notepad_widget.cpp:30-35
 
 ### LOW
-- [ ] L90: notepad -- GetNotepadList(true) does not enumerate other worlds' notepads (deferred, single-world). Mushkin: src/world/world_notepad.cpp:277-289
+- [~] L90: notepad -- GetNotepadList(true) does not enumerate other worlds' notepads (deferred, single-world). Mushkin: src/world/world_notepad.cpp:277-289 (DEFERRED: requires global notepad registry across worlds — architectural difference)
 
 ## v2 Audit: Arrays (2026-03-22)
 
@@ -520,7 +520,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] M146: arrays -- ArrayImport from Lua table silently converts integer keys to strings; original raises error. Mushkin: src/world/lua_api/world_arrays.cpp:592-593
 
 ### LOW
-- [ ] L91: arrays -- ArrayExport/ArrayExportKeys check delimiter validity before empty check (different error for empty+bad delimiter). Mushkin: src/world/lua_api/world_arrays.cpp:470-481
+- [x] L91: arrays -- ArrayExport/ArrayExportKeys check delimiter validity before empty check (different error for empty+bad delimiter). Mushkin: src/world/lua_api/world_arrays.cpp:470-481
 - [ ] L92: arrays -- ArrayImport from table always returns eOK; original returns eImportedWithDuplicates. Mushkin: src/world/lua_api/world_arrays.cpp:599
 
 ## v2 Audit: Database (2026-03-22)
