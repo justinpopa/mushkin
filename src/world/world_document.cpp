@@ -1395,6 +1395,10 @@ void WorldDocument::Execute(const QString& command, bool allowScriptPrefix, bool
 
     if (m_speedwalk.enabled && !m_speedwalk.prefix.isEmpty() &&
         strFixedCommand.startsWith(m_speedwalk.prefix)) {
+        // Check connection before processing speedwalk (original: evaluate.cpp:52-53)
+        if (connectPhase() != eConnectConnectedToMud) {
+            return;
+        }
         // Remove prefix and evaluate speedwalk
         QString speedwalkInput = strFixedCommand.mid(m_speedwalk.prefix.length());
         QString expandedSpeedwalk = speedwalk::evaluate(speedwalkInput, m_speedwalk.filler);
