@@ -305,10 +305,12 @@ qint32 MiniWindow::RectOp(qint16 action, qint32 left, qint32 top, qint32 right, 
             break;
         }
 
-        case 3: // Invert (XOR)
+        case 3: { // InvertRect — inverts all pixels (original: miniwindow.cpp:289-293)
+            // Win32 InvertRect does a bitwise NOT, equivalent to XOR with white
             painter.setCompositionMode(QPainter::RasterOp_SourceXorDestination);
-            painter.fillRect(rect, bgrToColor(penColor));
+            painter.fillRect(rect, Qt::white);
             break;
+        }
 
         case 5: { // DrawEdge (original: miniwindow.cpp:301-321)
             // penColor = nEdge (Win32 EDGE_* constant): must be 5, 6, 9, or 10
