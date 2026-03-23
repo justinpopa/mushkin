@@ -110,7 +110,8 @@ int L_CloseNotepad(lua_State* L)
 
     qint32 result = pDoc->CloseNotepad(luaCheckQString(L, 1), querySave);
 
-    lua_pushnumber(L, result);
+    // Original returns boolean (true=success, false=failure), not error codes
+    lua_pushboolean(L, result == eOK);
     return 1;
 }
 
@@ -205,7 +206,8 @@ int L_SaveNotepad(lua_State* L)
     qint32 result =
         pDoc->SaveNotepad(luaCheckQString(L, 1), luaCheckQString(L, 2), replaceExisting);
 
-    lua_pushnumber(L, result);
+    // Original returns boolean (true=success, false=failure)
+    lua_pushboolean(L, result == eOK);
     return 1;
 }
 
@@ -231,7 +233,8 @@ int L_NotepadFont(lua_State* L)
     qint32 result =
         pDoc->NotepadFont(luaCheckQString(L, 1), luaCheckQString(L, 2), size, style, charset);
 
-    lua_pushnumber(L, result);
+    // Original returns boolean (true=success, false=failure)
+    lua_pushboolean(L, result == eOK);
     return 1;
 }
 
@@ -253,7 +256,8 @@ int L_NotepadColour(lua_State* L)
     qint32 result =
         pDoc->NotepadColour(luaCheckQString(L, 1), luaCheckQString(L, 2), luaCheckQString(L, 3));
 
-    lua_pushnumber(L, result);
+    // Original returns boolean (true=success, false=failure)
+    lua_pushboolean(L, result == eOK);
     return 1;
 }
 
@@ -274,7 +278,8 @@ int L_NotepadReadOnly(lua_State* L)
 
     qint32 result = pDoc->NotepadReadOnly(luaCheckQString(L, 1), readOnly);
 
-    lua_pushnumber(L, result);
+    // Original returns boolean (true=success, false=failure)
+    lua_pushboolean(L, result == eOK);
     return 1;
 }
 
@@ -294,7 +299,8 @@ int L_NotepadSaveMethod(lua_State* L)
 
     qint32 result = pDoc->NotepadSaveMethod(luaCheckQString(L, 1), method);
 
-    lua_pushnumber(L, result);
+    // Original returns boolean (true=success, false=failure)
+    lua_pushboolean(L, result == eOK);
     return 1;
 }
 

@@ -497,12 +497,12 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 ## v2 Audit: Notepad (2026-03-22)
 
 ### HIGH
-- [ ] H85: notepad -- CloseNotepad returns error codes (0=success) instead of boolean (0=failure). Inverted convention. Mushkin: src/world/world_notepad.cpp:216-248
-- [ ] H86: notepad -- NotepadColour returns error codes instead of boolean. Mushkin: src/world/world_notepad.cpp:322-341
-- [ ] H87: notepad -- NotepadFont returns error codes instead of boolean. Mushkin: src/world/world_notepad.cpp:301-312
-- [ ] H88: notepad -- NotepadReadOnly returns error codes instead of boolean. Mushkin: src/world/world_notepad.cpp:350-360
-- [ ] H89: notepad -- NotepadSaveMethod returns error codes instead of boolean. Mushkin: src/world/world_notepad.cpp:369-385
-- [ ] H90: notepad -- SaveNotepad returns error codes instead of boolean. Mushkin: src/world/world_notepad.cpp:258-269
+- [x] H85: notepad -- CloseNotepad now returns boolean (true=success). Mushkin: src/world/world_notepad.cpp:216-248
+- [x] H86: notepad -- NotepadColour now returns boolean. Mushkin: src/world/world_notepad.cpp:322-341
+- [x] H87: notepad -- NotepadFont now returns boolean. Mushkin: src/world/world_notepad.cpp:301-312
+- [x] H88: notepad -- NotepadReadOnly now returns boolean. Mushkin: src/world/world_notepad.cpp:350-360
+- [x] H89: notepad -- NotepadSaveMethod now returns boolean. Mushkin: src/world/world_notepad.cpp:369-385
+- [x] H90: notepad -- SaveNotepad now returns boolean. Mushkin: src/world/world_notepad.cpp:258-269
 
 ### MEDIUM
 - [ ] M141: notepad -- ReplaceNotepad returns boolean; original returns nil. Mushkin: src/world/lua_api/world_notepads.cpp:74-80
