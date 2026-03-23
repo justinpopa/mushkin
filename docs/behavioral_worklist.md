@@ -438,7 +438,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] M121: speedwalks -- SetSpeedWalkDelay now clamps to 0-30000 range. Mushkin: src/world/connection_manager.cpp:380-394
 - [x] M122: speedwalks -- ReverseSpeedwalk now handles all directions (n/s/e/w/u/d + full names + diagonals). Mushkin: src/world/speedwalk_engine.cpp:309-334
 - [x] M123: speedwalks -- Speed walk pipeline now checks connection before processing. Mushkin: src/world/world_document.cpp:1394-1395
-- [ ] M124: speedwalks -- Speed walk error shows note() instead of modal dialog. Mushkin: src/world/world_document.cpp:1389-1390
+- [~] M124: speedwalks -- Speed walk error shows note() instead of modal dialog. Intentional UX improvement — inline errors are less disruptive than modals.. Mushkin: src/world/world_document.cpp:1389-1390
 
 ### LOW
 - [ ] L81: speedwalks -- GetSpeedWalkDelay returns lua_Integer instead of short. Mushkin: src/world/lua_api/world_logging_opts.cpp:297-301
