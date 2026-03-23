@@ -694,4 +694,4 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 ## v2 Audit: Enum/Constant Integrity (2026-03-22)
 
 ### HIGH
-- [ ] H123: enums -- Systematic audit needed: compare ALL enum/constant numeric values in Mushkin against original doc.h/OtherTypes.h/errors.h. ActionSource was completely wrong (invented values). Other enums may have the same problem. Check: SendTo, error codes, connect phases, MXP modes, colour types, line flags, style flags, telnet states.
+- [x] H123: enums -- Systematic audit complete: all enum/constant values match original. ActionSource was the only mismatch (already fixed).: compare ALL enum/constant numeric values in Mushkin against original doc.h/OtherTypes.h/errors.h. ActionSource was completely wrong (invented values). Other enums may have the same problem. Check: SendTo, error codes, connect phases, MXP modes, colour types, line flags, style flags, telnet states.
