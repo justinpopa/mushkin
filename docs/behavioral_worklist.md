@@ -526,7 +526,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 ## v2 Audit: Database (2026-03-22)
 
 ### HIGH
-- [ ] H91: database -- DatabaseClose double-frees sqlite3 handles (manual finalize/close then destructor does it again). Mushkin: src/world/lua_api/world_database.cpp:127-136
+- [x] H91: database -- DatabaseClose now nulls pointers after manual finalize/close to prevent double-free in destructor. Mushkin: src/world/lua_api/world_database.cpp:127-136
 
 ### MEDIUM
 - [ ] M147: database -- DatabaseGetField does not reset bValidRow/iColumns state on database struct. Mushkin: src/world/lua_api/world_database.cpp:913-957

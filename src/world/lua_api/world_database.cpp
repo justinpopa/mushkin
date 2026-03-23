@@ -127,10 +127,12 @@ int L_DatabaseClose(lua_State* L)
     // Finalize any outstanding statement
     if (it->second->pStmt) {
         sqlite3_finalize(it->second->pStmt);
+        it->second->pStmt = nullptr; // prevent double-finalize in destructor
     }
 
     // Close the database
     int rc = sqlite3_close(it->second->db);
+    it->second->db = nullptr; // prevent double-close in destructor
 
     // Remove from map (this deletes the LuaDatabase via unique_ptr)
     pDoc->m_DatabaseMap.erase(it);
