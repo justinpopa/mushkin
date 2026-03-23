@@ -482,7 +482,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] H81: sound -- GetSoundStatus now returns -3 when audio engine not initialized. Mushkin: src/world/sound_manager.cpp:414-438
 - [x] H82: sound -- GetSoundStatus now returns 1 for looping sounds (bug-compatible with original). Mushkin: src/world/sound_manager.cpp:432-437
 - [x] H83: sound -- PlaySoundMemory now passes buffer, loop, volume, pan to playSound; uses unique temp files. Mushkin: src/world/lua_api/world_sounds.cpp:140-170
-- [ ] H84: sound -- PlaySoundMemory uses single fixed temp file; race condition on concurrent calls. Mushkin: src/world/lua_api/world_sounds.cpp:158-159
+- [x] H84: sound -- PlaySoundMemory now uses per-buffer unique temp files (fixed in H83). Mushkin: src/world/lua_api/world_sounds.cpp:158-159
 
 ### MEDIUM
 - [ ] M136: sound -- PlaySound filename is required (luaCheckQString); original allows nil for sound adjustment. Mushkin: src/world/lua_api/world_sounds.cpp:47
