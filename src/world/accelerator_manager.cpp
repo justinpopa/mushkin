@@ -294,6 +294,12 @@ int AcceleratorManager::addAccelerator(const QString& keyString, const QString& 
         return 0; // eOK
     }
 
+    // Enforce a maximum of 1000 accelerators, matching the original MUSHclient limit.
+    // Only reject when this would be a genuinely new entry (not a replacement).
+    if (!m_accelerators.contains(normalizedKey) && m_accelerators.size() >= 1000) {
+        return eBadParameter; // too many accelerators
+    }
+
     // Create new entry
     AcceleratorEntry entry;
     entry.keyString = keyString;

@@ -464,7 +464,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [~] M129: miniwindows -- WindowFont weight returns Qt QFont::Weight scale instead of Windows FW_ values. Mushkin: miniwindow.cpp:1157 (NOT A BUG: Qt 6 Weight enum uses CSS-compatible values that match Windows FW_* exactly: Normal=400, Bold=700)
 - [x] M130: miniwindows -- Gradient bounds check rejects valid coordinates that original would clip. Mushkin: miniwindow.cpp:973-974
 - [~] M131: miniwindows -- Filter MonoNoise (op 2) applies independent noise per channel instead of same noise. Mushkin: miniwindow.cpp:2631-2647 (NOT A BUG: code already uses single noise value for all 3 channels, matching original)
-- [ ] M132: miniwindows -- Filter blur (ops 3,25,26) ignores Options parameter for h/v direction. Mushkin: miniwindow.cpp:2649-2680
+- [x] M132: miniwindows -- Filter blur (ops 3,25,26) ignores Options parameter for h/v direction. Mushkin: miniwindow.cpp:2649-2680
 - [ ] M133: miniwindows -- Filter sharpen/edge/emboss use single-pass instead of separable convolution. Mushkin: miniwindow.cpp:2682-2772
 - [x] M134: miniwindows -- DeleteAllHotspots/DeleteHotspot don't clear callbackPlugin. Mushkin: world_miniwindow_images.cpp:906-948
 - [x] M135: miniwindows -- WindowInfo case 21 returns current time instead of installation time. Mushkin: world_miniwindow_lifecycle.cpp:488-493
@@ -551,7 +551,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] M151: options -- SetOption missing OPT_USE_MXP side effect. Mushkin: world_settings.cpp:1616
 - [x] M152: options -- SetOption missing OPT_FIX_TOOLTIP side effects. Mushkin: world_settings.cpp:1616
 - [x] M153: options -- GetInfo(212) returns configured font height instead of rendered pixel height. Mushkin: world_settings.cpp:992
-- [ ] M154: options -- GetInfo(236/237) command selection start/end values differ from original. Mushkin: world_settings.cpp:1116-1128
+- [x] M154: options -- GetInfo(236/237) command selection start/end values differ from original. Mushkin: world_settings.cpp:1116-1128
 - [x] M155: options -- SetOption does not call SetModifiedFlag when option changes. Mushkin: world_settings.cpp:1613
 
 ### LOW
@@ -569,7 +569,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 
 ### MEDIUM
 - [ ] M156: accelerators -- AcceleratorList key name format differs (Qt vs MUSHclient names). Mushkin: src/world/accelerator_manager.cpp:268-272
-- [ ] M157: accelerators -- No maximum accelerator count limit (original caps at 1000). Mushkin: src/world/accelerator_manager.cpp:274-317
+- [x] M157: accelerators -- No maximum accelerator count limit (original caps at 1000). Mushkin: src/world/accelerator_manager.cpp:274-317
 - [x] M158: accelerators -- Dispatch now passes omit_from_output=true and omit_from_log=true (fixed with H98). Mushkin: src/ui/views/world_widget.cpp:167
 - [x] M159: accelerators -- Dispatch now passes "Accelerator" description string (fixed with H98). Mushkin: src/ui/views/world_widget.cpp:167
 

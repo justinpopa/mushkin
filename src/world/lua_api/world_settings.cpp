@@ -1119,22 +1119,27 @@ int L_GetInfo(lua_State* L)
 
         case 236: // Command selection start column
         {
+            // Original always returns nStartChar + 1 (1-based cursor/start position),
+            // even when there is no selection — it reflects the cursor position.
             auto* inputView = pDoc->activeInputView();
-            if (inputView && inputView->selectionStart() != inputView->selectionEnd()) {
-                lua_pushinteger(L, inputView->selectionStart() + 1); // 1-based
+            if (inputView) {
+                lua_pushinteger(L, inputView->selectionStart() + 1);
             } else {
-                lua_pushinteger(L, 0); // No selection
+                lua_pushinteger(L, 0);
             }
             break;
         }
 
         case 237: // Command selection end column
         {
+            // Original returns nEndChar as-is (0-based end), or 0 if nEndChar <= nStartChar
+            // (no selection). Note: NO +1 here — the end is deliberately asymmetric with
+            // the start, matching the original GetSel() behaviour.
             auto* inputView = pDoc->activeInputView();
-            if (inputView && inputView->selectionStart() != inputView->selectionEnd()) {
-                lua_pushinteger(L, inputView->selectionEnd() + 1); // 1-based
+            if (inputView && inputView->selectionEnd() > inputView->selectionStart()) {
+                lua_pushinteger(L, inputView->selectionEnd());
             } else {
-                lua_pushinteger(L, 0); // No selection
+                lua_pushinteger(L, 0);
             }
             break;
         }
