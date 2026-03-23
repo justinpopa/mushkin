@@ -148,8 +148,11 @@ bool IsArchiveXML(QFile& file)
 
     // Look for XML signatures
     // Note: Using case-insensitive contains for robustness
-    QStringList signatures = {"<?xml",  "<!--",      "<!DOCTYPE", "<muclient",
-                              "<world", "<triggers", "<aliases",  "<timers"};
+    // All 17 signatures from original xml_serialize.cpp:79-98
+    QStringList signatures = {"<?xml",     "<!--",     "<!DOCTYPE", "<muclient", "<world",
+                              "<triggers", "<aliases", "<timers",   "<macros",   "<variables",
+                              "<colours",  "<keypad",  "<printing", "<comment",  "<include",
+                              "<plugin",   "<script"};
 
     for (const QString& sig : signatures) {
         if (content.contains(sig, Qt::CaseInsensitive)) {
