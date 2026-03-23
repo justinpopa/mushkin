@@ -154,6 +154,7 @@ QRgb ColourNameToRGB(const QString& name)
         {"plum", BGR(221, 160, 221)},
         {"powderblue", BGR(176, 224, 230)},
         {"purple", BGR(128, 0, 128)},
+        {"rebeccapurple", BGR(102, 51, 153)}, // added in MUSHclient 5.07
         {"red", BGR(255, 0, 0)},
         {"rosybrown", BGR(188, 143, 143)},
         {"royalblue", BGR(65, 105, 225)},
@@ -341,6 +342,7 @@ QString RGBColourToName(QRgb bgr)
         map[BGR(221, 160, 221)] = "plum";
         map[BGR(176, 224, 230)] = "powderblue";
         map[BGR(128, 0, 128)] = "purple";
+        map[BGR(102, 51, 153)] = "rebeccapurple";
         map[BGR(255, 0, 0)] = "red";
         map[BGR(188, 143, 143)] = "rosybrown";
         map[BGR(65, 105, 225)] = "royalblue";

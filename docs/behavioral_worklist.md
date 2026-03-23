@@ -557,7 +557,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 ### LOW
 - [~] L95: options -- Default font names "Courier New" instead of "FixedSys". Mushkin: config_options.cpp:333,361 (WONTFIX: FixedSys is Windows-only bitmap font. Courier New is intentional cross-platform substitute.)
 - [x] L96: options -- GetInfo(55) returns SetTitle value instead of document title. Mushkin: world_settings.cpp:612
-- [ ] L97: options -- Extra numeric/alpha options in Mushkin (proxy, remote, log_lines). Mushkin: config_options.cpp
+- [~] L97: options -- Extra numeric/alpha options in Mushkin (proxy, remote, log_lines). Mushkin: config_options.cpp (WONTFIX: these are Mushkin-only extensions, not behavioral deviations from original)
 
 ## v2 Audit: Accelerators (2026-03-22)
 
@@ -574,7 +574,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] M159: accelerators -- Dispatch now passes "Accelerator" description string (fixed with H98). Mushkin: src/ui/views/world_widget.cpp:167
 
 ### LOW
-- [ ] L98: accelerators -- Extra key name aliases accepted (e.g., "Escape" in addition to "Esc"). Mushkin: src/world/accelerator_manager.cpp:62-63
+- [~] L98: accelerators -- Extra key name aliases accepted (e.g., "Escape" in addition to "Esc"). Mushkin: src/world/accelerator_manager.cpp:62-63 (WONTFIX: strictly more permissive, not a behavioral deviation)
 
 ## v2 Audit: Colors (2026-03-22)
 
@@ -584,7 +584,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] M162: colors -- FilterPixel gamma operations (modes 9/12/15/18) missing negative Options clamping. Mushkin: src/world/lua_api/world_misc.cpp:2302-2306
 
 ### LOW
-- [ ] L99: colors -- ColourNameToRGB missing "rebeccapurple" (0x663399). Mushkin: src/world/lua_api/world_colors.cpp:34-185
+- [x] L99: colors -- ColourNameToRGB missing "rebeccapurple" (0x663399). Mushkin: src/world/lua_api/world_colors.cpp:34-185
 - [ ] L100: colors -- ColourNameToRGB has extra non-standard names (darkyellow, lightmagenta, lightred). Mushkin: src/world/lua_api/world_colors.cpp:75,110,112
 - [ ] L101: colors -- ColourNameToRGB empty-string returns white instead of undefined. Mushkin: src/world/lua_api/world_colors.cpp:27-29
 
