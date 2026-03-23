@@ -2462,8 +2462,8 @@ void WorldDocument::StartNewLine(bool bNewLine, unsigned char iFlags)
  */
 void WorldDocument::addToCommandHistory(const QString& command)
 {
-    // Don't add empty commands
-    if (command.trimmed().isEmpty()) {
+    // Don't add empty commands (original: strlen(Message) > 0 — only rejects truly empty)
+    if (command.isEmpty()) {
         return;
     }
 
