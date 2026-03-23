@@ -306,17 +306,30 @@ QString reverse(const QString& speedWalkString)
             case '(': // special string (e.g., (ne/sw))
             {
                 // Static map for diagonal direction reverses (ne<->sw, nw<->se)
-                static QMap<QString, QString> diagonalReverseMap;
-                if (diagonalReverseMap.isEmpty()) {
-                    diagonalReverseMap["ne"] = "sw";
-                    diagonalReverseMap["sw"] = "ne";
-                    diagonalReverseMap["nw"] = "se";
-                    diagonalReverseMap["se"] = "nw";
-                    // Also add the full direction names if needed
-                    diagonalReverseMap["northeast"] = "southwest";
-                    diagonalReverseMap["southwest"] = "northeast";
-                    diagonalReverseMap["northwest"] = "southeast";
-                    diagonalReverseMap["southeast"] = "northwest";
+                // All directions from original MapDirectionsMap
+                // (original: methods_speedwalks.cpp:279-283 uses MapDirectionsMap)
+                static QMap<QString, QString> directionReverseMap;
+                if (directionReverseMap.isEmpty()) {
+                    directionReverseMap["n"] = "s";
+                    directionReverseMap["s"] = "n";
+                    directionReverseMap["e"] = "w";
+                    directionReverseMap["w"] = "e";
+                    directionReverseMap["u"] = "d";
+                    directionReverseMap["d"] = "u";
+                    directionReverseMap["ne"] = "sw";
+                    directionReverseMap["sw"] = "ne";
+                    directionReverseMap["nw"] = "se";
+                    directionReverseMap["se"] = "nw";
+                    directionReverseMap["north"] = "south";
+                    directionReverseMap["south"] = "north";
+                    directionReverseMap["east"] = "west";
+                    directionReverseMap["west"] = "east";
+                    directionReverseMap["up"] = "down";
+                    directionReverseMap["down"] = "up";
+                    directionReverseMap["northeast"] = "southwest";
+                    directionReverseMap["southwest"] = "northeast";
+                    directionReverseMap["northwest"] = "southeast";
+                    directionReverseMap["southeast"] = "northwest";
                 }
 
                 str.clear();
@@ -330,8 +343,8 @@ QString reverse(const QString& speedWalkString)
                 int iSlash = str.indexOf("/");
                 if (iSlash == -1) {
                     // No slash - try to look up reverse (for simple directions like "ne")
-                    if (diagonalReverseMap.contains(str))
-                        str = diagonalReverseMap[str];
+                    if (directionReverseMap.contains(str))
+                        str = directionReverseMap[str];
                     // Otherwise keep as-is
                 } else {
                     // Swap left and right parts
