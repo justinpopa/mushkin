@@ -565,7 +565,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] H97: accelerators -- Dispatch now uses eSendToExecute (10) instead of hardcoded 12. Mushkin: src/ui/views/world_widget.cpp:162
 - [x] H98: accelerators -- Dispatch now suppresses auto-say during execution. Mushkin: src/ui/views/world_widget.cpp:158-170
 - [x] H99: accelerators -- Dispatch now sets m_iCurrentActionSource to eUserAccelerator. Mushkin: src/world/world_document.h:168-178
-- [ ] H100: accelerators -- Dispatch does not set/restore plugin context for plugin-registered accelerators. Mushkin: src/ui/views/world_widget.cpp:158-170
+- [x] H100: accelerators -- Dispatch now sets/restores m_CurrentPlugin for plugin-registered accelerators. Mushkin: src/ui/views/world_widget.cpp:158-170
 
 ### MEDIUM
 - [ ] M156: accelerators -- AcceleratorList key name format differs (Qt vs MUSHclient names). Mushkin: src/world/accelerator_manager.cpp:268-272

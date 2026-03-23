@@ -156,12 +156,20 @@ void WorldWidget::setupUi()
     // Setup accelerator manager - set parent widget and connect signal
     m_document->m_acceleratorManager->setParentWidget(this);
     connect(m_document->m_acceleratorManager, &AcceleratorManager::acceleratorTriggered, this,
-            [this](const QString& action, int sendTo) {
+            [this](const QString& action, int sendTo, const QString& pluginId) {
                 // Suppress auto-say and set action source during accelerator execution
-                // (original: sendvw.cpp:2559-2563)
+                // (original: sendvw.cpp:2559-2606)
                 bool savedAutoSay = m_document->m_auto_say.enabled;
                 m_document->m_auto_say.enabled = false;
                 m_document->m_iCurrentActionSource = ActionSource::eUserAccelerator;
+
+                // Set plugin context if registered by a plugin (original: sendvw.cpp:2587-2606)
+                Plugin* savedPlugin = m_document->m_CurrentPlugin;
+                if (!pluginId.isEmpty()) {
+                    m_document->m_CurrentPlugin = m_document->getPlugin(pluginId);
+                } else {
+                    m_document->m_CurrentPlugin = nullptr;
+                }
 
                 // Handle accelerator execution based on sendTo type
                 if (sendTo == eSendToExecute) { // 10: re-parse as command
@@ -173,7 +181,8 @@ void WorldWidget::setupUi()
                                        QStringLiteral("Accelerator"), QString(), output);
                 }
 
-                // Restore auto-say
+                // Restore plugin context and auto-say
+                m_document->m_CurrentPlugin = savedPlugin;
                 m_document->m_auto_say.enabled = savedAutoSay;
             });
 
