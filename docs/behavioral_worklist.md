@@ -563,15 +563,15 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 
 ### HIGH
 - [x] H97: accelerators -- Dispatch now uses eSendToExecute (10) instead of hardcoded 12. Mushkin: src/ui/views/world_widget.cpp:162
-- [ ] H98: accelerators -- Dispatch does not suppress auto-say during execution. Mushkin: src/ui/views/world_widget.cpp:158-170
+- [x] H98: accelerators -- Dispatch now suppresses auto-say during execution. Mushkin: src/ui/views/world_widget.cpp:158-170
 - [ ] H99: accelerators -- Dispatch does not set m_iCurrentActionSource to eUserAccelerator. Mushkin: src/world/world_document.h:168-178
 - [ ] H100: accelerators -- Dispatch does not set/restore plugin context for plugin-registered accelerators. Mushkin: src/ui/views/world_widget.cpp:158-170
 
 ### MEDIUM
 - [ ] M156: accelerators -- AcceleratorList key name format differs (Qt vs MUSHclient names). Mushkin: src/world/accelerator_manager.cpp:268-272
 - [ ] M157: accelerators -- No maximum accelerator count limit (original caps at 1000). Mushkin: src/world/accelerator_manager.cpp:274-317
-- [ ] M158: accelerators -- Dispatch passes omit_from_output=false and omit_from_log=false (should be true). Mushkin: src/ui/views/world_widget.cpp:167
-- [ ] M159: accelerators -- Dispatch omits "Accelerator: <key>" description string. Mushkin: src/ui/views/world_widget.cpp:167
+- [x] M158: accelerators -- Dispatch now passes omit_from_output=true and omit_from_log=true (fixed with H98). Mushkin: src/ui/views/world_widget.cpp:167
+- [x] M159: accelerators -- Dispatch now passes "Accelerator" description string (fixed with H98). Mushkin: src/ui/views/world_widget.cpp:167
 
 ### LOW
 - [ ] L98: accelerators -- Extra key name aliases accepted (e.g., "Escape" in addition to "Esc"). Mushkin: src/world/accelerator_manager.cpp:62-63
