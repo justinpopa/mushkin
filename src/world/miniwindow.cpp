@@ -1309,6 +1309,14 @@ qint32 MiniWindow::LoadImage(const QString& imageId, const QString& filepath)
         return eOK;
     }
 
+    // Original (miniwindow.cpp:1067-1076) requires minimum 5 chars and .bmp/.png extension
+    if (filepath.trimmed().length() < 5)
+        return eBadParameter;
+
+    if (!filepath.endsWith(".bmp", Qt::CaseInsensitive) &&
+        !filepath.endsWith(".png", Qt::CaseInsensitive))
+        return eBadParameter;
+
     // Load image using Qt (QImage is platform-independent)
     auto img = std::make_unique<QImage>(filepath);
     if (img->isNull()) {
