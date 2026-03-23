@@ -157,10 +157,11 @@ void WorldWidget::setupUi()
     m_document->m_acceleratorManager->setParentWidget(this);
     connect(m_document->m_acceleratorManager, &AcceleratorManager::acceleratorTriggered, this,
             [this](const QString& action, int sendTo) {
-                // Suppress auto-say during accelerator execution
-                // (original: sendvw.cpp:2559-2560 saves/restores m_bEnableAutoSay)
+                // Suppress auto-say and set action source during accelerator execution
+                // (original: sendvw.cpp:2559-2563)
                 bool savedAutoSay = m_document->m_auto_say.enabled;
                 m_document->m_auto_say.enabled = false;
+                m_document->m_iCurrentActionSource = ActionSource::eUserAccelerator;
 
                 // Handle accelerator execution based on sendTo type
                 if (sendTo == eSendToExecute) { // 10: re-parse as command

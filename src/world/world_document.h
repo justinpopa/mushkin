@@ -170,6 +170,7 @@ enum class ActionSource : quint32 {
     eUserAction,              // User typed a command
     eWorldAction,             // World event (connect, disconnect, open, close)
     eTriggerAction,           // Trigger fired
+    eUserAccelerator,         // User pressed an accelerator key (original: doc.h:165)
     eAliasAction,             // Alias matched
     eTimerAction,             // Timer fired
     ePluginAction,            // Plugin called function
