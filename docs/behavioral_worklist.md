@@ -595,7 +595,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [~] H102: ui -- MXP settings page missing. DEFERRED: requires new preference page. (MXP enable mode, Pueblo, debug, hyperlink settings). Mushkin: no equivalent
 - [~] H103: ui -- Auto-say settings page missing. DEFERRED: requires new preference page.. Mushkin: no equivalent
 - [x] H104: ui -- Alias edit dialog now has ignore_case, temporary, one_shot, menu checkboxes. Mushkin: src/ui/dialogs/alias_edit_dialog.h
-- [ ] H105: ui -- Connecting page missing connect_text and connect_method fields. Mushkin: src/ui/dialogs/world_properties_dialog.cpp
+- [x] H105: ui -- Connecting page now has connect method combo and connect text field. Mushkin: src/ui/dialogs/world_properties_dialog.cpp
 
 ### MEDIUM
 - [ ] M163: ui -- Macros page (function key bindings) missing from world properties. Mushkin: no equivalent

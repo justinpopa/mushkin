@@ -3,6 +3,7 @@
 
 #include <QDialog>
 #include <QFont>
+#include <QTextEdit>
 #include <array>
 
 // Forward declarations
@@ -100,7 +101,8 @@ class WorldPropertiesDialog : public QDialog {
     QSpinBox* m_portSpin;
     QLineEdit* m_nameEdit;
     QLineEdit* m_passwordEdit;
-    QCheckBox* m_autoConnectCheck;
+    QComboBox* m_connectMethodCombo;
+    QTextEdit* m_connectTextEdit;
 
     // Proxy widgets
     QComboBox* m_proxyTypeCombo;

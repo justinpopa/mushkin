@@ -101,9 +101,19 @@ void WorldPropertiesDialog::setupConnectionTab()
     m_passwordEdit->setPlaceholderText("Optional");
     layout->addRow("Password:", m_passwordEdit);
 
-    // Auto-connect (note: backend support may need to be added)
-    m_autoConnectCheck = new QCheckBox("Connect automatically on startup");
-    layout->addRow("", m_autoConnectCheck);
+    // Auto-connect method (original: configuration.cpp:702-710)
+    m_connectMethodCombo = new QComboBox();
+    m_connectMethodCombo->addItem("No auto-connect", eNoAutoConnect);
+    m_connectMethodCombo->addItem("MUSH (send: connect name password)", eConnectMUSH);
+    m_connectMethodCombo->addItem("Diku (send: name then password)", eConnectDiku);
+    m_connectMethodCombo->addItem("MXP", eConnectMXP);
+    layout->addRow("Connect method:", m_connectMethodCombo);
+
+    // Connect text (multi-line text sent on connection)
+    m_connectTextEdit = new QTextEdit();
+    m_connectTextEdit->setMaximumHeight(80);
+    m_connectTextEdit->setPlaceholderText("Text to send after connecting (optional)");
+    layout->addRow("Connect text:", m_connectTextEdit);
 
     // Proxy settings
     QGroupBox* proxyGroup = new QGroupBox("Proxy");
@@ -632,7 +642,10 @@ void WorldPropertiesDialog::loadSettings()
     m_portSpin->setValue(m_doc->m_port);
     m_nameEdit->setText(m_doc->m_mush_name);
     m_passwordEdit->setText(m_doc->m_password);
-    m_autoConnectCheck->setChecked(m_doc->m_connect_now != eNoAutoConnect);
+    int connectIdx = m_connectMethodCombo->findData(m_doc->m_connect_now);
+    if (connectIdx >= 0)
+        m_connectMethodCombo->setCurrentIndex(connectIdx);
+    m_connectTextEdit->setPlainText(m_doc->m_connect_text);
 
     // Output tab
     // Reconstruct QFont from WorldDocument font properties
@@ -778,7 +791,8 @@ void WorldPropertiesDialog::saveSettings()
     m_doc->m_port = m_portSpin->value();
     m_doc->m_mush_name = m_nameEdit->text();
     m_doc->m_password = m_passwordEdit->text();
-    m_doc->m_connect_now = m_autoConnectCheck->isChecked() ? eConnectMUSH : eNoAutoConnect;
+    m_doc->m_connect_now = m_connectMethodCombo->currentData().toInt();
+    m_doc->m_connect_text = m_connectTextEdit->toPlainText();
 
     // Output tab
     m_doc->m_output.font_name = m_outputFont.family();
