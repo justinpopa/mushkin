@@ -1112,8 +1112,11 @@ qint32 MiniWindow::Text(const QString& fontId, const QString& text, qint32 left,
     dirty = true;
     emit needsRedraw();
 
-    // Return the width of the text drawn (MUSHclient API returns text length in pixels)
-    return fm.horizontalAdvance(displayText);
+    // Return the lesser of text width and clip rect width
+    // (original: miniwindow.cpp:882 — min(textsize.cx, FixRight(Right) - Left))
+    qint32 textWidth = fm.horizontalAdvance(displayText);
+    qint32 rectWidth = fixedRight - left;
+    return qMin(textWidth, rectWidth);
 }
 
 /**
