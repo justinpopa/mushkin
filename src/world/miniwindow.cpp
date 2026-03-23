@@ -2776,94 +2776,67 @@ qint32 MiniWindow::Filter(qint32 left, qint32 top, qint32 right, qint32 bottom, 
             break;
         }
 
-        case 4: { // Sharpen
-            QImage temp = image->copy(left, top, w, h);
-            // Sharpen kernel: [-1, -1, 7, -1, -1] with divisor 3 (from original line 3224)
-            double kernel[5] = {-1, -1, 7, -1, -1};
-            double divisor = 3.0;
-
-            for (qint32 y = top; y < bottom; y++) {
-                for (qint32 x = left; x < right; x++) {
-                    double r = 0, g = 0, b = 0;
-
-                    // Apply 1D kernel horizontally and vertically
-                    for (int i = -2; i <= 2; i++) {
-                        int px = qBound(left, x + i, right - 1);
-                        int py = qBound(top, y + i, bottom - 1);
-                        QRgb hPixel = temp.pixel(px - left, py - top);
-                        QRgb vPixel = temp.pixel(x - left, py - top);
-
-                        r += (qRed(hPixel) + qRed(vPixel)) * kernel[i + 2];
-                        g += (qGreen(hPixel) + qGreen(vPixel)) * kernel[i + 2];
-                        b += (qBlue(hPixel) + qBlue(vPixel)) * kernel[i + 2];
-                    }
-
-                    image->setPixel(x, y,
-                                    qRgb(qBound(0, (int)(r / divisor), 255),
-                                         qBound(0, (int)(g / divisor), 255),
-                                         qBound(0, (int)(b / divisor), 255)));
-                }
+        case 4:   // Sharpen (5-tap separable kernel {-1,-1,7,-1,-1}/3)
+        case 5:   // Edge detect (5-tap separable kernel {0,2.5,-6,2.5,0}/1)
+        case 6: { // Emboss (5-tap separable kernel {1,2,1,-1,-2}/1)
+            // All three use GeneralFilter (separable two-pass: horizontal then vertical),
+            // identical in structure to blur (cases 3/25/26) — only kernel/divisor differs.
+            std::array<double, 5> kernel;
+            double divisor;
+            if (operation == 4) {
+                kernel = {-1, -1, 7, -1, -1};
+                divisor = 3.0;
+            } else if (operation == 5) {
+                kernel = {0, 2.5, -6, 2.5, 0};
+                divisor = 1.0;
+            } else {
+                kernel = {1, 2, 1, -1, -2};
+                divisor = 1.0;
             }
-            break;
-        }
 
-        case 5: { // Edge detect (from original line 3228)
-            QImage temp = image->copy(left, top, w, h);
-            // Edge detect kernel: [0, 2.5, -6, 2.5, 0] with divisor 1
-            double kernel[5] = {0, 2.5, -6, 2.5, 0};
-            double divisor = 1.0;
+            // Options controls direction: 1=horizontal only, 2=vertical only, other=both.
+            QImage work = image->copy(left, top, w, h).convertToFormat(QImage::Format_RGB32);
 
-            for (qint32 y = top; y < bottom; y++) {
-                for (qint32 x = left; x < right; x++) {
-                    double r = 0, g = 0, b = 0;
-
-                    // Apply 1D kernel horizontally and vertically
-                    for (int i = -2; i <= 2; i++) {
-                        int px = qBound(left, x + i, right - 1);
-                        int py = qBound(top, y + i, bottom - 1);
-                        QRgb hPixel = temp.pixel(px - left, py - top);
-                        QRgb vPixel = temp.pixel(x - left, py - top);
-
-                        r += (qRed(hPixel) + qRed(vPixel)) * kernel[i + 2];
-                        g += (qGreen(hPixel) + qGreen(vPixel)) * kernel[i + 2];
-                        b += (qBlue(hPixel) + qBlue(vPixel)) * kernel[i + 2];
+            // Horizontal pass (skip if options == 2)
+            if (options != 2.0) {
+                for (qint32 y = 0; y < h; y++) {
+                    for (qint32 x = 0; x < w; x++) {
+                        double r = 0, g = 0, b = 0;
+                        for (int k = 0; k < 5; k++) {
+                            int sx = qBound(0, x + k - 2, w - 1);
+                            QRgb px = work.pixel(sx, y);
+                            r += qRed(px) * kernel[k];
+                            g += qGreen(px) * kernel[k];
+                            b += qBlue(px) * kernel[k];
+                        }
+                        image->setPixel(left + x, top + y,
+                                        qRgb(qBound(0, (int)(r / divisor), 255),
+                                             qBound(0, (int)(g / divisor), 255),
+                                             qBound(0, (int)(b / divisor), 255)));
                     }
-
-                    image->setPixel(x, y,
-                                    qRgb(qBound(0, (int)(r / divisor), 255),
-                                         qBound(0, (int)(g / divisor), 255),
-                                         qBound(0, (int)(b / divisor), 255)));
                 }
+                // Refresh work from the horizontally-filtered image for the vertical pass
+                if (options != 1.0)
+                    work = image->copy(left, top, w, h).convertToFormat(QImage::Format_RGB32);
             }
-            break;
-        }
 
-        case 6: { // Emboss (from original line 3234)
-            QImage temp = image->copy(left, top, w, h);
-            // Emboss kernel: [1, 2, 1, -1, -2] with divisor 1
-            double kernel[5] = {1, 2, 1, -1, -2};
-            double divisor = 1.0;
-
-            for (qint32 y = top; y < bottom; y++) {
-                for (qint32 x = left; x < right; x++) {
-                    double r = 0, g = 0, b = 0;
-
-                    // Apply 1D kernel horizontally and vertically
-                    for (int i = -2; i <= 2; i++) {
-                        int px = qBound(left, x + i, right - 1);
-                        int py = qBound(top, y + i, bottom - 1);
-                        QRgb hPixel = temp.pixel(px - left, py - top);
-                        QRgb vPixel = temp.pixel(x - left, py - top);
-
-                        r += (qRed(hPixel) + qRed(vPixel)) * kernel[i + 2];
-                        g += (qGreen(hPixel) + qGreen(vPixel)) * kernel[i + 2];
-                        b += (qBlue(hPixel) + qBlue(vPixel)) * kernel[i + 2];
+            // Vertical pass (skip if options == 1)
+            if (options != 1.0) {
+                for (qint32 x = 0; x < w; x++) {
+                    for (qint32 y = 0; y < h; y++) {
+                        double r = 0, g = 0, b = 0;
+                        for (int k = 0; k < 5; k++) {
+                            int sy = qBound(0, y + k - 2, h - 1);
+                            QRgb px = work.pixel(x, sy);
+                            r += qRed(px) * kernel[k];
+                            g += qGreen(px) * kernel[k];
+                            b += qBlue(px) * kernel[k];
+                        }
+                        image->setPixel(left + x, top + y,
+                                        qRgb(qBound(0, (int)(r / divisor), 255),
+                                             qBound(0, (int)(g / divisor), 255),
+                                             qBound(0, (int)(b / divisor), 255)));
                     }
-
-                    image->setPixel(x, y,
-                                    qRgb(qBound(0, (int)(r / divisor), 255),
-                                         qBound(0, (int)(g / divisor), 255),
-                                         qBound(0, (int)(b / divisor), 255)));
                 }
             }
             break;
