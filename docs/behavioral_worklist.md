@@ -454,7 +454,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] H77: miniwindows -- WindowFont now deletes font when name="" and size=0. Mushkin: miniwindow.cpp:1043-1058
 - [x] H78: miniwindows -- CircleOp chord/pie now use GDI point-based params converted to Qt angles via atan2. Mushkin: miniwindow.cpp:517-525
 - [x] H79: miniwindows -- CircleOp action 6 now returns eUnknownOption (use WindowArc instead). Mushkin: miniwindow.cpp:608-611
-- [ ] H80: miniwindows -- BlendImage source-rect clamping order wrong for out-of-bounds rects. Mushkin: miniwindow.cpp:1377-1396
+- [~] H80: miniwindows -- BlendImage source-rect clamping order matches original (both clamp before FixRight; same behavior). Verified as false positive.. Mushkin: miniwindow.cpp:1377-1396
 
 ### MEDIUM
 - [ ] M125: miniwindows -- WindowInfo cases 12/13 (rect.right/bottom) off by one due to Qt inclusive QRect. Mushkin: world_miniwindow_lifecycle.cpp:442-447
