@@ -133,8 +133,8 @@ QString WorldDocument::FormatTime(const QDateTime& dt, const QString& pattern, b
     result.replace("%B", dt.toString("MMMM")); // Full month
     result.replace("%%", "%");                 // Literal %
 
-    // Restore escaped percents
-    result.replace(escapedPercent, "%%");
+    // Restore escaped percents — single % (the %% → % conversion already happened at line 134)
+    result.replace(escapedPercent, "%");
 
     return result;
 }

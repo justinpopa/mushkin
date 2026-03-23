@@ -395,7 +395,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] H68: logging -- Trigger omit_from_log now checks !multi_line matching original. Mushkin: src/world/world_trigger_execution.cpp:214
 
 ### MEDIUM
-- [ ] M111: logging -- FormatTime percent-in-custom-values bug: % in world/player names doubled in log output. Mushkin: src/world/world_logging.cpp:77-138
+- [x] M111: logging -- FormatTime percent escaping fixed: % in values no longer doubled. Mushkin: src/world/world_logging.cpp:77-138
 - [ ] M112: logging -- HTML world name header not HTML-escaped (TODO in code). Mushkin: src/world/world_logging.cpp:244
 - [ ] M113: logging -- LogLineInHTMLcolour processes single Line only, not multi-line paragraphs. Mushkin: src/world/world_logging.cpp:504-602
 - [ ] M114: logging -- Retrospective HTML colour logging uses different tag structure than original. Mushkin: src/world/world_logging.cpp:785-787
