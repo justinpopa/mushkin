@@ -507,7 +507,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 ### MEDIUM
 - [x] M141: notepad -- ReplaceNotepad returns boolean; original returns nil. Mushkin: src/world/lua_api/world_notepads.cpp:74-80
 - [x] M142: notepad -- NotepadColour rejects empty color strings; original treats as no-op. Mushkin: src/world/world_notepad.cpp:335-336
-- [ ] M143: notepad -- New notepads ignore global notepad color preferences. Mushkin: src/world/notepad_widget.cpp:30-35
+- [x] M143: notepad -- New notepads ignore global notepad color preferences. Mushkin: src/world/notepad_widget.cpp:30-35
 
 ### LOW
 - [ ] L90: notepad -- GetNotepadList(true) does not enumerate other worlds' notepads (deferred, single-world). Mushkin: src/world/world_notepad.cpp:277-289
@@ -515,8 +515,8 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 ## v2 Audit: Arrays (2026-03-22)
 
 ### MEDIUM
-- [ ] M144: arrays -- ArrayExport delimiter is required; original defaults to ",". Mushkin: src/world/lua_api/world_arrays.cpp:459
-- [ ] M145: arrays -- ArrayExportKeys delimiter is required; original defaults to ",". Mushkin: src/world/lua_api/world_arrays.cpp:517
+- [x] M144: arrays -- ArrayExport delimiter is required; original defaults to ",". Mushkin: src/world/lua_api/world_arrays.cpp:459
+- [x] M145: arrays -- ArrayExportKeys delimiter is required; original defaults to ",". Mushkin: src/world/lua_api/world_arrays.cpp:517
 - [ ] M146: arrays -- ArrayImport from Lua table silently converts integer keys to strings; original raises error. Mushkin: src/world/lua_api/world_arrays.cpp:592-593
 
 ### LOW

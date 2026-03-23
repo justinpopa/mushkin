@@ -456,7 +456,7 @@ static int L_ArrayExport(lua_State* L)
     WorldDocument* pDoc = doc(L);
 
     QString arrayName = luaCheckQString(L, 1);
-    QString delimiter = luaCheckQString(L, 2);
+    QString delimiter = luaOptQString(L, 2, ",");
 
     // Original checks array first, then delimiter (methods_arrays.cpp:394-416)
     const ArraysMap& arrays = pDoc->getArrayMap();
@@ -514,7 +514,7 @@ static int L_ArrayExportKeys(lua_State* L)
     WorldDocument* pDoc = doc(L);
 
     QString arrayName = luaCheckQString(L, 1);
-    QString delimiter = luaCheckQString(L, 2);
+    QString delimiter = luaOptQString(L, 2, ",");
 
     // Original checks array first, then delimiter
     const ArraysMap& arrays = pDoc->getArrayMap();
