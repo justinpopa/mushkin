@@ -353,9 +353,12 @@ void ConnectionManager::drainCommandQueue()
         const QString text = encoded.mid(1);
 
         // Decode echo/log from prefix character
-        const bool isImmediate = (prefix == u'I' || prefix == u'i');
-        const bool echo = (prefix == u'Q' || prefix == u'I');
-        const bool log = prefix.isUpper(); // uppercase = log=true, lowercase = log=false
+        // E/e=queue+echo, N/n=queue+no-echo, I/i=immediate+echo, W/w=immediate+no-echo
+        // Uppercase = log, lowercase = no-log (original: doc.h:241-249)
+        const QChar upper = prefix.toUpper();
+        const bool isImmediate = (upper == u'I' || upper == u'W');
+        const bool echo = (upper == u'E' || upper == u'I');
+        const bool log = prefix.isUpper();
 
         m_doc.DoSendMsg(text, echo, log);
 

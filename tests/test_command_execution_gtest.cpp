@@ -74,38 +74,31 @@ TEST_F(CommandExecutionTest, CommandQueueEncoding)
 {
     doc->m_speedwalk.delay = 100; // Enable queueing
 
-    // Test 1: Queue with echo and log
+    // Test 1: Queue with echo and log → E prefix (original: doc.h:241)
     doc->m_connectionManager->m_CommandQueue.clear();
     doc->SendMsg("test1", true, true, true);
     ASSERT_EQ(doc->m_connectionManager->m_CommandQueue.count(), 1);
-    EXPECT_TRUE(doc->m_connectionManager->m_CommandQueue[0].startsWith("Q"))
-        << "Should have uppercase Q prefix (echo + log)";
-    EXPECT_EQ(doc->m_connectionManager->m_CommandQueue[0], "Qtest1");
+    EXPECT_EQ(doc->m_connectionManager->m_CommandQueue[0], "Etest1") << "E = queue + echo + log";
 
-    // Test 2: Queue without echo, with log
+    // Test 2: Queue without echo, with log → N prefix (original: doc.h:242)
     doc->m_connectionManager->m_CommandQueue.clear();
     doc->SendMsg("test2", false, true, true);
     ASSERT_EQ(doc->m_connectionManager->m_CommandQueue.count(), 1);
-    EXPECT_TRUE(doc->m_connectionManager->m_CommandQueue[0].startsWith("q"))
-        << "Should have lowercase q prefix (no-echo + log)";
-    EXPECT_EQ(doc->m_connectionManager->m_CommandQueue[0], "qtest2");
+    EXPECT_EQ(doc->m_connectionManager->m_CommandQueue[0], "Ntest2") << "N = queue + no-echo + log";
 
-    // Test 3: Queue with echo, without log
+    // Test 3: Queue with echo, without log → e prefix (original: doc.h:246)
     doc->m_connectionManager->m_CommandQueue.clear();
     doc->SendMsg("test3", true, true, false);
     ASSERT_EQ(doc->m_connectionManager->m_CommandQueue.count(), 1);
-    EXPECT_TRUE(doc->m_connectionManager->m_CommandQueue[0].startsWith("q"))
-        << "Should have lowercase prefix (no log)";
-    EXPECT_EQ(doc->m_connectionManager->m_CommandQueue[0], "qtest3");
+    EXPECT_EQ(doc->m_connectionManager->m_CommandQueue[0], "etest3") << "e = queue + echo + no-log";
 
-    // Test 4: Immediate with echo and log (forced to queue because queue not empty)
+    // Test 4: Immediate with echo and log (forced to queue because queue not empty) → I prefix
     doc->m_connectionManager->m_CommandQueue.clear();
-    doc->SendMsg("test4", true, true, true);  // First one goes to queue
-    doc->SendMsg("test5", true, false, true); // Second one is "immediate" but queue not empty
+    doc->SendMsg("test4", true, true, true);  // First one goes to queue (E)
+    doc->SendMsg("test5", true, false, true); // Second is "immediate" but queue not empty (I)
     ASSERT_EQ(doc->m_connectionManager->m_CommandQueue.count(), 2);
-    EXPECT_TRUE(doc->m_connectionManager->m_CommandQueue[1].startsWith("I"))
-        << "Should have uppercase I prefix (immediate + echo + log)";
-    EXPECT_EQ(doc->m_connectionManager->m_CommandQueue[1], "Itest5");
+    EXPECT_EQ(doc->m_connectionManager->m_CommandQueue[1], "Itest5")
+        << "I = immediate + echo + log";
 }
 
 /**

@@ -411,7 +411,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 ### HIGH
 - [x] H69: commands -- L_Send() now routes through SendMsg() for full pipeline (echo/log/spam/callbacks). Mushkin: src/world/lua_api/world_network.cpp:44
 - [x] H70: commands -- L_LogSend() now routes through SendMsg() for full pipeline. Mushkin: src/world/lua_api/world_logging_opts.cpp:273
-- [ ] H71: commands -- Queue prefix encoding conflates echo and log flags; toLower() destroys echo flag. Mushkin: src/world/world_document.cpp:962-977
+- [x] H71: commands -- Queue prefix encoding now uses E/N/I/W scheme matching original doc.h:241-249. Mushkin: src/world/world_document.cpp:962-977
 - [ ] H72: commands -- Execute() does not save/restore m_CurrentPlugin; causes plugin context corruption during nested calls. Mushkin: src/world/world_document.cpp:1331
 
 ### MEDIUM

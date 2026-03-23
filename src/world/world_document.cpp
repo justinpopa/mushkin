@@ -959,16 +959,16 @@ void WorldDocument::SendMsg(const QString& text, bool bEcho, bool bQueue, bool b
     for (const QString& line : lines) {
         // Queue if speedwalk delay active OR already items in queue
         if (m_speedwalk.delay > 0 && (bQueue || !commandQueue.isEmpty())) {
-            // Encode echo/log flags in prefix character
-            // Original uses: Q = queue+echo, q = queue+no-echo,
-            //                I = immediate+echo, i = immediate+no-echo
-            // Lowercase prefix = no logging
-            QString prefix;
+            // Encode echo/log flags in prefix character using original's scheme:
+            // E=queue+echo, N=queue+no-echo, I=immediate+echo, W=immediate+no-echo
+            // Lowercase = no logging (e/n/i/w)
+            // (original: doc.h:241-249, doc.cpp:1140-1153)
+            QChar prefix;
 
             if (bQueue) {
-                prefix = bEcho ? "Q" : "q"; // QUEUE_WITH_ECHO / QUEUE_WITHOUT_ECHO
+                prefix = bEcho ? QChar('E') : QChar('N');
             } else {
-                prefix = bEcho ? "I" : "i"; // IMMEDIATE_WITH_ECHO / IMMEDIATE_WITHOUT_ECHO
+                prefix = bEcho ? QChar('I') : QChar('W');
             }
 
             // Lowercase = no logging
