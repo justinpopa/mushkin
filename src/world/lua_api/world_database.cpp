@@ -649,6 +649,27 @@ int L_DatabaseError(lua_State* L)
         case SQLITE_DONE:
             lua_pushstring(L, "finished");
             break;
+        case to_underlying(DatabaseError::IdNotFound):
+            lua_pushstring(L, "database id not found");
+            break;
+        case to_underlying(DatabaseError::NotOpen):
+            lua_pushstring(L, "database not open");
+            break;
+        case to_underlying(DatabaseError::HavePreparedStatement):
+            lua_pushstring(L, "already have prepared statement");
+            break;
+        case to_underlying(DatabaseError::NoPreparedStatement):
+            lua_pushstring(L, "do not have prepared statement");
+            break;
+        case to_underlying(DatabaseError::NoValidRow):
+            lua_pushstring(L, "do not have a valid row");
+            break;
+        case to_underlying(DatabaseError::DatabaseAlreadyExists):
+            lua_pushstring(L, "database already exists under a different disk name");
+            break;
+        case to_underlying(DatabaseError::ColumnOutOfRange):
+            lua_pushstring(L, "column count out of valid range");
+            break;
         default: {
             const char* errMsg = sqlite3_errmsg(it->second->db);
             lua_pushstring(L, errMsg ? errMsg : "");
@@ -930,7 +951,10 @@ int L_DatabaseGetField(lua_State* L)
         return 1;
     }
 
-    // Prepare the statement
+    // Prepare the statement — mirrors DatabasePrepare: reset row state first
+    it->second->bValidRow = false;
+    it->second->iColumns = 0;
+
     sqlite3_stmt* pStmt = nullptr;
     const char* pzTail;
     int rc = sqlite3_prepare_v2(it->second->db, sql, -1, &pStmt, &pzTail);
@@ -943,8 +967,12 @@ int L_DatabaseGetField(lua_State* L)
         return 1;
     }
 
-    // Step to get first row
+    // Record column count now that statement is prepared (mirrors DatabasePrepare)
+    it->second->iColumns = sqlite3_column_count(pStmt);
+
+    // Step to get first row — mirrors DatabaseStep: update bValidRow
     rc = sqlite3_step(pStmt);
+    it->second->bValidRow = (rc == SQLITE_ROW);
 
     if (rc == SQLITE_ROW && sqlite3_column_count(pStmt) > 0) {
         pushDatabaseColumnValue(L, pStmt, 0);
@@ -952,8 +980,10 @@ int L_DatabaseGetField(lua_State* L)
         lua_pushnil(L);
     }
 
-    // Clean up
+    // Finalize — mirrors DatabaseFinalize: clear row state
     sqlite3_finalize(pStmt);
+    it->second->bValidRow = false;
+    it->second->iColumns = 0;
 
     return 1;
 }

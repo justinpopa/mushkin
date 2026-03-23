@@ -529,8 +529,8 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] H91: database -- DatabaseClose now nulls pointers after manual finalize/close to prevent double-free in destructor. Mushkin: src/world/lua_api/world_database.cpp:127-136
 
 ### MEDIUM
-- [ ] M147: database -- DatabaseGetField does not reset bValidRow/iColumns state on database struct. Mushkin: src/world/lua_api/world_database.cpp:913-957
-- [ ] M148: database -- DatabaseError missing switch cases for DATABASE_ERROR_* negative codes. Mushkin: src/world/lua_api/world_database.cpp:642-656
+- [x] M147: database -- DatabaseGetField does not reset bValidRow/iColumns state on database struct. Mushkin: src/world/lua_api/world_database.cpp:913-957
+- [x] M148: database -- DatabaseError missing switch cases for DATABASE_ERROR_* negative codes. Mushkin: src/world/lua_api/world_database.cpp:642-656
 
 ### LOW
 - [ ] L93: database -- DatabaseColumnValue uses int64 instead of int32 (strictly better but different). Mushkin: src/world/lua_api/world_database.cpp:746
@@ -552,7 +552,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] M152: options -- SetOption missing OPT_FIX_TOOLTIP side effects. Mushkin: world_settings.cpp:1616
 - [x] M153: options -- GetInfo(212) returns configured font height instead of rendered pixel height. Mushkin: world_settings.cpp:992
 - [ ] M154: options -- GetInfo(236/237) command selection start/end values differ from original. Mushkin: world_settings.cpp:1116-1128
-- [ ] M155: options -- SetOption does not call SetModifiedFlag when option changes. Mushkin: world_settings.cpp:1613
+- [x] M155: options -- SetOption does not call SetModifiedFlag when option changes. Mushkin: world_settings.cpp:1613
 
 ### LOW
 - [ ] L95: options -- Default font names "Courier New" instead of "FixedSys". Mushkin: config_options.cpp:333,361
@@ -579,9 +579,9 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 ## v2 Audit: Colors (2026-03-22)
 
 ### MEDIUM
-- [ ] M160: colors -- FilterPixel mode 1 (Noise) uses same random value for all channels (identical to MonoNoise). Mushkin: src/world/lua_api/world_misc.cpp:2279-2288
-- [ ] M161: colors -- FilterPixel mode 20 (Perceptual Grayscale) missing /3 divisor; results 3x brighter. Mushkin: src/world/lua_api/world_misc.cpp:2350-2353
-- [ ] M162: colors -- FilterPixel gamma operations (modes 9/12/15/18) missing negative Options clamping. Mushkin: src/world/lua_api/world_misc.cpp:2302-2306
+- [x] M160: colors -- FilterPixel mode 1 (Noise) uses same random value for all channels (identical to MonoNoise). Mushkin: src/world/lua_api/world_misc.cpp:2279-2288
+- [x] M161: colors -- FilterPixel mode 20 (Perceptual Grayscale) missing /3 divisor; results 3x brighter. Mushkin: src/world/lua_api/world_misc.cpp:2350-2353
+- [x] M162: colors -- FilterPixel gamma operations (modes 9/12/15/18) missing negative Options clamping. Mushkin: src/world/lua_api/world_misc.cpp:2302-2306
 
 ### LOW
 - [ ] L99: colors -- ColourNameToRGB missing "rebeccapurple" (0x663399). Mushkin: src/world/lua_api/world_colors.cpp:34-185

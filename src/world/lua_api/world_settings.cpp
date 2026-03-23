@@ -1622,7 +1622,14 @@ int L_SetOption(lua_State* L)
     if (opt.iFlags & OPT_CUSTOM_COLOUR) {
         storeValue = value - 1;
     }
+
+    // Mark document modified only when the value actually changes
+    // (original: scriptingoptions.cpp:498-499 — SetModifiedFlag() only if bChanged)
+    double oldValue = opt.getter(*pDoc);
     opt.setter(*pDoc, storeValue);
+    if (opt.getter(*pDoc) != oldValue) {
+        pDoc->setModified(true);
+    }
 
     // Apply side effects based on option flags (original: scriptingoptions.cpp:513-603)
     int flags = opt.iFlags;

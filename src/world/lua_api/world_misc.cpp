@@ -2276,8 +2276,20 @@ int L_FilterPixel(lua_State* L)
     int r = pixel & 0xFF;
 
     switch (operation) {
-        case 1:   // Noise (requires random context - add random noise)
-        case 2: { // MonoNoise
+        case 1: { // Noise: independent random noise per channel
+            double threshold = options / 100.0;
+            r = clamp255(r + static_cast<int>(
+                                 (128.0 - QRandomGenerator::global()->generateDouble() * 256.0) *
+                                 threshold));
+            g = clamp255(g + static_cast<int>(
+                                 (128.0 - QRandomGenerator::global()->generateDouble() * 256.0) *
+                                 threshold));
+            b = clamp255(b + static_cast<int>(
+                                 (128.0 - QRandomGenerator::global()->generateDouble() * 256.0) *
+                                 threshold));
+            break;
+        }
+        case 2: { // MonoNoise: same random noise for all channels
             double threshold = options / 100.0;
             int noise = static_cast<int>(
                 (128.0 - QRandomGenerator::global()->generateDouble() * 256.0) * threshold);
@@ -2300,6 +2312,7 @@ int L_FilterPixel(lua_State* L)
             break;
 
         case 9: // Gamma: pow(c/255, options) * 255
+            options = std::max(0.0, options);
             r = clamp255d(255.0 * qPow(r / 255.0, options));
             g = clamp255d(255.0 * qPow(g / 255.0, options));
             b = clamp255d(255.0 * qPow(b / 255.0, options));
@@ -2314,6 +2327,7 @@ int L_FilterPixel(lua_State* L)
             break;
 
         case 12: // Red gamma
+            options = std::max(0.0, options);
             r = clamp255d(255.0 * qPow(r / 255.0, options));
             break;
 
@@ -2326,6 +2340,7 @@ int L_FilterPixel(lua_State* L)
             break;
 
         case 15: // Green gamma
+            options = std::max(0.0, options);
             g = clamp255d(255.0 * qPow(g / 255.0, options));
             break;
 
@@ -2338,6 +2353,7 @@ int L_FilterPixel(lua_State* L)
             break;
 
         case 18: // Blue gamma
+            options = std::max(0.0, options);
             b = clamp255d(255.0 * qPow(b / 255.0, options));
             break;
 
@@ -2347,8 +2363,8 @@ int L_FilterPixel(lua_State* L)
             break;
         }
 
-        case 20: { // Grayscale (perceptual: 0.30*R + 0.59*G + 0.11*B)
-            int gray = static_cast<int>(r * 0.30 + g * 0.59 + b * 0.11);
+        case 20: { // Grayscale (perceptual: (0.30*R + 0.59*G + 0.11*B) / 3)
+            int gray = static_cast<int>((r * 0.30 + g * 0.59 + b * 0.11) / 3.0);
             r = g = b = gray;
             break;
         }
