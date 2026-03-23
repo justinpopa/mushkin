@@ -929,6 +929,9 @@ class WorldDocument : public QObject, public IWorldContext {
     int m_selectionEndLine;
     int m_selectionEndChar;
 
+    // ========== Utilities ==========
+    QString fixupEscapeSequences(const QString& input) const; // Translate \n \t \\ etc.
+
     // ========== Line Buffer ==========
     void trimLineBuffer();                         // trim excess lines to m_display.max_lines
     std::vector<std::unique_ptr<Line>> m_lineList; // list of output buffer lines

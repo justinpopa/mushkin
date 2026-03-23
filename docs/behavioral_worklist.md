@@ -418,7 +418,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] M115: commands -- ON_PLUGIN_SENT now fires before echo/log/send matching original. Mushkin: src/world/world_document.cpp:1232-1235
 - [x] M116: commands -- SendMsg() now has m_bPluginProcessingSent re-entrancy guard. Mushkin: src/world/world_document.cpp:934
 - [x] M117: commands -- m_bNoEcho now checked in SendMsg before queue encoding. Mushkin: src/world/world_document.cpp:1189
-- [ ] M118: commands -- Backslash escape sequences not applied for typed commands. Mushkin: src/ui/views/world_widget.cpp:508
+- [x] M118: commands -- Backslash escape sequences now applied for typed commands when enabled. Mushkin: src/ui/views/world_widget.cpp:508
 - [ ] M119: commands -- m_iExecutionDepth not reset for normal (non-auto-say) commands. Mushkin: src/ui/views/world_widget.cpp:508
 - [ ] M120: commands -- Hardcoded "/" immediate prefix in Execute() not in original; changes Execute() behavior for Lua callers. Mushkin: src/world/world_document.cpp:1458-1463
 

@@ -518,11 +518,18 @@ void WorldWidget::sendCommand()
         return;
     }
 
+    // ========== Backslash Escape Translation ==========
+    // Apply \n, \t, etc. for typed commands (original: sendvw.cpp:706-707)
+    QString processedCommand = command;
+    if (m_document->m_bTranslateBackslashSequences && !command.isEmpty()) {
+        processedCommand = m_document->fixupEscapeSequences(command);
+    }
+
     // ========== Normal Command Execution ==========
     // If auto-say is disabled or was disabled by exclusion rules, execute normally
     // Execute() handles command stacking, alias evaluation, and sending
     // Note: Empty commands are allowed - sends blank line to MUD (matches original MUSHclient)
-    m_document->Execute(command);
+    m_document->Execute(processedCommand);
 
     // ========== Clear Input ==========
     // Clear input after sending (configurable)

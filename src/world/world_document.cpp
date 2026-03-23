@@ -1803,6 +1803,48 @@ void WorldDocument::trimLineBuffer()
     }
 }
 
+QString WorldDocument::fixupEscapeSequences(const QString& input) const
+{
+    // Translate backslash escape sequences (original: Utilities.cpp FixupEscapeSequences)
+    QString result;
+    result.reserve(input.length());
+    for (int i = 0; i < input.length(); ++i) {
+        if (input[i] == '\\' && i + 1 < input.length()) {
+            ++i;
+            switch (input[i].toLatin1()) {
+                case 'a':
+                    result += '\a';
+                    break;
+                case 'b':
+                    result += '\b';
+                    break;
+                case 'f':
+                    result += '\f';
+                    break;
+                case 'n':
+                    result += '\n';
+                    break;
+                case 'r':
+                    result += '\r';
+                    break;
+                case 't':
+                    result += '\t';
+                    break;
+                case '\\':
+                    result += '\\';
+                    break;
+                default:
+                    result += '\\';
+                    result += input[i];
+                    break; // unknown: keep both
+            }
+        } else {
+            result += input[i];
+        }
+    }
+    return result;
+}
+
 // ========== AddToLine() - Character Accumulation ==========
 
 /**
