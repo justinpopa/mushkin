@@ -570,6 +570,10 @@ void WorldWidget::sendCommand()
     }
 
     // ========== Normal Command Execution ==========
+    // Prompt to reconnect if not connected (original: evaluate.cpp:139, sendvw.cpp:650)
+    if (m_document->checkConnected())
+        return;
+
     // Reset execution depth for each hand-typed command (original: sendvw.cpp:701)
     m_document->m_iExecutionDepth = 0;
     // Execute() handles command stacking, alias evaluation, and sending

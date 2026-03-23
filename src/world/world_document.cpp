@@ -1350,6 +1350,46 @@ void WorldDocument::logCommand(const QString& text)
  *
  * @param command - User-entered command (may contain multiple commands)
  */
+/**
+ * checkConnected - Prompt to reconnect if not connected
+ *
+ * Returns true if NOT connected (caller should abort the send).
+ * Based on original doc.cpp:5158-5197.
+ */
+bool WorldDocument::checkConnected()
+{
+    // No reconnecting while disconnecting
+    if (connectPhase() == eConnectDisconnecting)
+        return true;
+
+    if (connectPhase() != eConnectConnectedToMud) {
+        // Don't prompt for null address
+        if (m_server.isEmpty() || m_server == "0.0.0.0")
+            return true;
+
+        if (connectPhase() != eConnectNotConnected) {
+            // Connection in progress
+            QMessageBox::information(
+                nullptr, QStringLiteral("Mushkin"),
+                QStringLiteral("The connection to %1 is currently being established.")
+                    .arg(m_mush_name));
+        } else {
+            // Not connected — offer to reconnect
+            int result = QMessageBox::question(
+                nullptr, QStringLiteral("Mushkin"),
+                QStringLiteral("The connection to %1 is not open. Attempt to reconnect?")
+                    .arg(m_mush_name),
+                QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+            if (result == QMessageBox::Yes) {
+                m_connectionManager->connectToMud();
+            }
+        }
+        return true;
+    }
+
+    return false;
+}
+
 void WorldDocument::Execute(const QString& command, bool allowScriptPrefix, bool addHistory,
                             const QString& originalCommand)
 {
@@ -1408,9 +1448,8 @@ void WorldDocument::Execute(const QString& command, bool allowScriptPrefix, bool
     if (m_speedwalk.enabled && !m_speedwalk.prefix.isEmpty() &&
         strFixedCommand.startsWith(m_speedwalk.prefix)) {
         // Check connection before processing speedwalk (original: evaluate.cpp:52-53)
-        if (connectPhase() != eConnectConnectedToMud) {
+        if (connectPhase() != eConnectConnectedToMud)
             return;
-        }
         // Remove prefix and evaluate speedwalk
         QString speedwalkInput = strFixedCommand.mid(m_speedwalk.prefix.length());
         QString expandedSpeedwalk = speedwalk::evaluate(speedwalkInput, m_speedwalk.filler);
