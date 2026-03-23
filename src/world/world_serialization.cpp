@@ -231,6 +231,13 @@ void WorldDocument::loadTriggersFromXml(QXmlStreamReader& xml, Plugin* plugin)
                 trigger->enabled = attrs.value("enabled").toString() == "y";
             }
             trigger->trigger = attrs.value("match").toString();
+            // Validate: skip triggers with empty match text
+            // (original: xml_load_world.cpp:1276 ThrowErrorException for empty match)
+            if (trigger->trigger.isEmpty()) {
+                qCWarning(lcWorld) << "Skipping trigger with empty match text:" << trigger->label;
+                xml.skipCurrentElement();
+                continue;
+            }
             trigger->send_to = static_cast<SendTo>(attrs.value("send_to").toInt());
             trigger->sequence = attrs.value("sequence").toInt();
             trigger->procedure = attrs.value("script").toString();
@@ -508,6 +515,12 @@ void WorldDocument::loadAliasesFromXml(QXmlStreamReader& xml, Plugin* plugin)
                 alias->enabled = attrs.value("enabled").toString() == "y";
             }
             alias->name = attrs.value("match").toString();
+            // Validate: skip aliases with empty match text
+            if (alias->name.isEmpty()) {
+                qCWarning(lcWorld) << "Skipping alias with empty match text:" << alias->label;
+                xml.skipCurrentElement();
+                continue;
+            }
             alias->send_to = static_cast<SendTo>(attrs.value("send_to").toInt());
             alias->sequence = attrs.value("sequence").toInt();
             alias->procedure = attrs.value("script").toString();
