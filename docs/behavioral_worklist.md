@@ -370,7 +370,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] H65: xml -- Trigger/alias/timer internal names now lowercased for case-insensitive lookup. Case-insensitive lookup by name (GetTriggerInfo, DeleteTrigger) may fail. Mushkin: xml_serialization.cpp:232-233,504-506
 
 ### MEDIUM
-- [ ] M102: xml -- Named color parsing not supported (e.g., "red", "darkgreen"). Only #RRGGBB hex works. Mushkin: xml_serialization.cpp:63-79
+- [x] M102: xml -- Named color parsing now supported via ColourNameToRGB (handles 150+ named colors + hex). Mushkin: xml_serialization.cpp:63-79
 - [ ] M103: xml -- Pre-v3.35 backward compat attributes (speed_walk, set_variable, queue) not handled. Mushkin: xml_serialization.cpp (absent)
 - [ ] M104: xml -- Version attribute is "mushkin_version" not "muclient_version". Breaks version tracking/GetInfo. Mushkin: xml_serialization.cpp:266
 - [ ] M105: xml -- Trigger/alias/timer validation missing on load (empty match, label names, regex). Mushkin: xml_serialization.cpp:196-420

@@ -60,22 +60,15 @@ static QString colorToName(QRgb bgr)
 
 // Helper function to parse color name (#RRGGBB) to BGR
 // Returns BGR format for internal storage
+// Forward-declare the color name resolver from world_colors.cpp
+QRgb ColourNameToRGB(const QString& name);
+
 static QRgb nameToColor(const QString& name)
 {
-    if (name.startsWith("#")) {
-        // Hex format: #RRGGBB - parse as RGB then convert to BGR
-        bool ok;
-        unsigned int rgb = name.mid(1).toUInt(&ok, 16);
-        if (ok) {
-            int r = (rgb >> 16) & 0xFF;
-            int g = (rgb >> 8) & 0xFF;
-            int b = rgb & 0xFF;
-            return BGR(r, g, b);
-        }
-    }
-    // Could add named color lookup here (red, blue, etc.)
-    // For now, return black as default
-    return BGR(0, 0, 0);
+    // Delegate to the full color name resolver which handles both
+    // named colors ("red", "darkgreen") and hex format ("#RRGGBB")
+    // (original: mxputils.cpp SetColour handles named + hex)
+    return ColourNameToRGB(name);
 }
 
 void WorldDocument::saveTriggersToXml(QXmlStreamWriter& xml)
