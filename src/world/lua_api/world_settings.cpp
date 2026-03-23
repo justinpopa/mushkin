@@ -609,9 +609,12 @@ int L_GetInfo(lua_State* L)
             luaPushQString(L, pDoc->m_strWorldFilePath);
         } break;
 
-        case 55: // Window title (GetTitle)
+        case 55: // World title — MFC GetTitle() returns document name (original:
+                 // methods_info.cpp:469)
         {
-            luaPushQString(L, pDoc->m_strWindowTitle);
+            // Original returns CDocument::GetTitle() which is the world name, not SetTitle value.
+            // SetTitle value is returned by GetInfo(88) instead.
+            luaPushQString(L, pDoc->m_mush_name);
         } break;
 
         case 56: // MUSHclient executable path

@@ -555,8 +555,8 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] M155: options -- SetOption does not call SetModifiedFlag when option changes. Mushkin: world_settings.cpp:1613
 
 ### LOW
-- [ ] L95: options -- Default font names "Courier New" instead of "FixedSys". Mushkin: config_options.cpp:333,361
-- [ ] L96: options -- GetInfo(55) returns SetTitle value instead of document title. Mushkin: world_settings.cpp:612
+- [~] L95: options -- Default font names "Courier New" instead of "FixedSys". Mushkin: config_options.cpp:333,361 (WONTFIX: FixedSys is Windows-only bitmap font. Courier New is intentional cross-platform substitute.)
+- [x] L96: options -- GetInfo(55) returns SetTitle value instead of document title. Mushkin: world_settings.cpp:612
 - [ ] L97: options -- Extra numeric/alpha options in Mushkin (proxy, remote, log_lines). Mushkin: config_options.cpp
 
 ## v2 Audit: Accelerators (2026-03-22)
