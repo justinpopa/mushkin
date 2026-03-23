@@ -1056,6 +1056,12 @@ qint32 MiniWindow::Gradient(qint32 left, qint32 top, qint32 right, qint32 bottom
 qint32 MiniWindow::Font(const QString& fontId, const QString& fontName, double size, bool bold,
                         bool italic, bool underline, bool strikeout)
 {
+    // Delete font if name is empty and size is 0 (original: miniwindow.cpp:637-639)
+    if (fontName.isEmpty() && size == 0.0) {
+        fonts.remove(fontId);
+        return eOK;
+    }
+
     // Use createScaledFontF for cross-platform DPI-consistent sizing
     QFont font = createScaledFontF(fontName, size);
 
