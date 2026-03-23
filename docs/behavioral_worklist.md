@@ -492,7 +492,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] M140: sound -- releaseInactiveSoundBuffers is no-op; sounds stay marked playing forever. Mushkin: src/world/sound_manager.cpp:199-204
 
 ### LOW
-- [ ] L89: sound -- PlaySound filename path length limit (127 chars) not enforced. Mushkin: src/world/sound_manager.cpp:298-301
+- [x] L89: sound -- PlaySound filename path length limit (127 chars) not enforced. Mushkin: src/world/sound_manager.cpp:298-301
 
 ## v2 Audit: Notepad (2026-03-22)
 

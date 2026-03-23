@@ -317,6 +317,10 @@ qint32 SoundManager::playSound(qint16 buffer, const QString& filename, bool loop
     // Resolve file path
     QString fullPath = resolveFilePath(filename);
 
+    // Path length limit (original: methods_sounds.cpp:169-170)
+    if (fullPath.length() > 127)
+        return eBadParameter;
+
     if (!QFile::exists(fullPath)) {
         qWarning() << "playSound: File not found:" << fullPath;
         return eFileNotFound;
