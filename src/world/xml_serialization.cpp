@@ -890,6 +890,9 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
                          << "plugins by sequence";
     }
 
+    // Mark as loaded from disk (original: xml_serialize.cpp:51)
+    doc->m_bLoaded = true;
+
     qCDebug(lcWorld) << "LoadWorldXML: successfully loaded from" << filename;
     return true;
 }

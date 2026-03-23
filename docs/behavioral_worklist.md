@@ -376,7 +376,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] M105: xml -- Trigger/alias with empty match text now skipped with warning on load. Mushkin: xml_serialization.cpp:196-420
 - [x] M106: xml -- IsArchiveXML now checks all 17 signature patterns matching original. Mushkin: xml_serialization.cpp:151-152
 - [x] M107: xml -- date_saved now written to world file (respects omit_date_from_save_files). Mushkin: xml_serialization.cpp:261-267
-- [ ] M108: xml -- m_bLoaded never set to true after loading. Mushkin: world_document.cpp:286
+- [x] M108: xml -- m_bLoaded now set to true after successful LoadWorldXML. Mushkin: world_document.cpp:286
 - [ ] M109: xml -- PluginListChanged called per-plugin instead of batch after all plugins loaded. Mushkin: world_document_plugins.cpp:568
 - [ ] M110: xml -- Load order depends on file element order rather than explicit sequence. Mushkin: xml_serialization.cpp
 
