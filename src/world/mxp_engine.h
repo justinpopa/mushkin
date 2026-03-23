@@ -85,8 +85,8 @@ class MXPEngine {
     QRgb MXP_GetColor(const QString& colorSpec); // Resolve color name/#RRGGBB
 
     // ========== Tag Stack ==========
-    void MXP_CloseOpenTags();                  // Close all unclosed tags
-    void MXP_CloseTag(const QString& tagName); // Close specific tag (internal)
+    void MXP_CloseOpenTags(bool closeAll = false); // Close tags (closeAll=true closes secure too)
+    void MXP_CloseTag(const QString& tagName);     // Close specific tag (internal)
 
     // ========== Mode Helpers ==========
     bool MXP_Open() const;   // True if current mode allows open (unsecure) tags

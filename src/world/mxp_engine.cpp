@@ -565,8 +565,8 @@ void MXPEngine::MXP_Off(bool force)
     m_iListMode = 0;
     m_iListCount = 0;
 
-    // Close all open tags
-    MXP_CloseOpenTags();
+    // Close ALL tags including secure ones (original: mxpOnOff.cpp:34 calls MXP_CloseAllTags)
+    MXP_CloseOpenTags(true);
 
     if (force) {
         // Clean up MXP resources
@@ -2622,17 +2622,18 @@ QRgb MXPEngine::MXP_GetColor(const QString& colorSpec)
  * Closes all tags in the active tag list, executing their end actions.
  * Tags marked with TAG_NO_RESET are protected from this.
  */
-void MXPEngine::MXP_CloseOpenTags()
+void MXPEngine::MXP_CloseOpenTags(bool closeAll)
 {
-    qCDebug(lcMXP) << "Closing open tags (stopping at secure)";
+    qCDebug(lcMXP) << "Closing" << (closeAll ? "ALL" : "open") << "tags";
 
     // Close tags in reverse order (most recent first)
-    // Original mxpClose.cpp:363-387 — stops when it encounters a secure tag
+    // Original: MXP_CloseOpenTags (mxpClose.cpp:363-387) stops at secure tags
+    //           MXP_CloseAllTags (mxpClose.cpp:389-406) closes all except TAG_NO_RESET
     while (!m_activeTagList.empty()) {
         ActiveTag* tag = m_activeTagList.back().get();
 
-        // Don't close securely-opened tags (original: line 373-374)
-        if (tag->bSecure) {
+        // Don't close securely-opened tags (unless closeAll is true)
+        if (!closeAll && tag->bSecure) {
             return;
         }
 
