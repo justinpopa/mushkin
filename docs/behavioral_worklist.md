@@ -671,9 +671,9 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 ## v2 Audit: World File Edge Cases (2026-03-22)
 
 ### HIGH
-- [ ] H119: world-edge -- OnWorldOpen script callback is never invoked. Mushkin: src/ui/views/world_widget.cpp:304-346
-- [ ] H120: world-edge -- Global plugins never loaded at world open time. Mushkin: no equivalent code
-- [ ] H121: world-edge -- Non-plugin include files silently ignored. Mushkin: src/world/xml_serialization.cpp:645-673
+- [~] H119: world-edge -- OnWorldOpen callback. DEFERRED: needs integration with world loading sequence.. Mushkin: src/ui/views/world_widget.cpp:304-346
+- [~] H120: world-edge -- Global plugins not loaded. DEFERRED: requires global plugin loading system.. Mushkin: no equivalent code
+- [~] H121: world-edge -- Non-plugin includes. DEFERRED: same as H63, requires recursive XML loading.. Mushkin: src/world/xml_serialization.cpp:645-673
 - [x] H122: world-edge -- Plugin SaveState() now called for all plugins during world save. Mushkin: src/world/xml_serialization.cpp:233-235
 
 ### MEDIUM
