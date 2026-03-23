@@ -485,11 +485,8 @@ int L_WindowInfo(lua_State* L)
 
         case 21: // Date installed (OLE DATE)
         {
-            // Original: COleDateTime(m_tDateInstalled.GetTime())
-            // Mushkin doesn't track installation time — return current time as approximation
-            // Known gap: should track when WindowCreate was first called for this window
-            QDateTime now = QDateTime::currentDateTime();
-            double oleDate = (static_cast<double>(now.toSecsSinceEpoch()) / 86400.0) + 25569.0;
+            // Original: COleDateTime(m_tDateInstalled.GetTime()) — set in constructor
+            double oleDate = (static_cast<double>(win->dateInstalled) / 86400.0) + 25569.0;
             lua_pushnumber(L, oleDate);
             break;
         }

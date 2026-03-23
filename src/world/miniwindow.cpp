@@ -4,6 +4,7 @@
 #include "blend_modes.h"
 #include "color_utils.h"
 #include <QColor>
+#include <QDateTime>
 #include <QDebug>
 #include <QFontMetrics>
 #include <QImage>
@@ -156,7 +157,8 @@ MiniWindow::MiniWindow(WorldDocument* doc, QObject* parent)
       ,
       show(false) // Hidden by default (must call WindowShow)
       ,
-      temporarilyHide(false), dirty(true), zOrder(0), executingScript(false)
+      temporarilyHide(false), dirty(true), zOrder(0),
+      dateInstalled(QDateTime::currentSecsSinceEpoch()), executingScript(false)
 {
     // Collections are empty by default (unique_ptr members automatically initialize to nullptr)
 }

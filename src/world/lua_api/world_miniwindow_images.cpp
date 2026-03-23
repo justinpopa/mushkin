@@ -914,6 +914,12 @@ int L_WindowDeleteHotspot(lua_State* L)
         win->mouseDownHotspot.clear();
     }
 
+    // Clear callbackPlugin when the last hotspot is deleted
+    // Original: miniwindow.cpp:1798-1799
+    if (win->hotspots.empty()) {
+        win->callbackPlugin.clear();
+    }
+
     return luaReturnOK(L);
 }
 
@@ -944,8 +950,12 @@ int L_WindowDeleteAllHotspots(lua_State* L)
         return luaReturnError(L, eNoSuchWindow);
     }
 
-    // Clear all hotspots
+    // Clear all hotspots and reset all associated tracking state
+    // Original: miniwindow.cpp:1841-1844
     win->hotspots.clear();
+    win->mouseOverHotspot.clear();
+    win->mouseDownHotspot.clear();
+    win->callbackPlugin.clear();
 
     return luaReturnOK(L);
 }

@@ -463,11 +463,11 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] M128: miniwindows -- Pen style validation missing. Mushkin: miniwindow.cpp:629-646
 - [~] M129: miniwindows -- WindowFont weight returns Qt QFont::Weight scale instead of Windows FW_ values. Mushkin: miniwindow.cpp:1157 (NOT A BUG: Qt 6 Weight enum uses CSS-compatible values that match Windows FW_* exactly: Normal=400, Bold=700)
 - [x] M130: miniwindows -- Gradient bounds check rejects valid coordinates that original would clip. Mushkin: miniwindow.cpp:973-974
-- [ ] M131: miniwindows -- Filter MonoNoise (op 2) applies independent noise per channel instead of same noise. Mushkin: miniwindow.cpp:2631-2647
+- [~] M131: miniwindows -- Filter MonoNoise (op 2) applies independent noise per channel instead of same noise. Mushkin: miniwindow.cpp:2631-2647 (NOT A BUG: code already uses single noise value for all 3 channels, matching original)
 - [ ] M132: miniwindows -- Filter blur (ops 3,25,26) ignores Options parameter for h/v direction. Mushkin: miniwindow.cpp:2649-2680
 - [ ] M133: miniwindows -- Filter sharpen/edge/emboss use single-pass instead of separable convolution. Mushkin: miniwindow.cpp:2682-2772
-- [ ] M134: miniwindows -- DeleteAllHotspots/DeleteHotspot don't clear callbackPlugin. Mushkin: world_miniwindow_images.cpp:906-948
-- [ ] M135: miniwindows -- WindowInfo case 21 returns current time instead of installation time. Mushkin: world_miniwindow_lifecycle.cpp:488-493
+- [x] M134: miniwindows -- DeleteAllHotspots/DeleteHotspot don't clear callbackPlugin. Mushkin: world_miniwindow_images.cpp:906-948
+- [x] M135: miniwindows -- WindowInfo case 21 returns current time instead of installation time. Mushkin: world_miniwindow_lifecycle.cpp:488-493
 
 ### LOW
 - [ ] L84: miniwindows -- SetPixel returns eBadParameter for out-of-bounds instead of silently succeeding. Mushkin: miniwindow.cpp:790-792

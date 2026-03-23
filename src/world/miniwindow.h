@@ -110,7 +110,9 @@ class MiniWindow : public QObject {
 
     // ========== Tracking ==========
 
-    qint32 zOrder;          // Draw order (lower = earlier, 0 = alphabetical)
+    qint32 zOrder; // Draw order (lower = earlier, 0 = alphabetical)
+    qint64
+        dateInstalled; // Unix timestamp when WindowCreate was called (original: m_tDateInstalled)
     QString creatingPlugin; // Plugin ID that created this window
     QString callbackPlugin; // Plugin ID for hotspot callbacks (defaults to creatingPlugin)
     bool executingScript;   // Currently executing Lua callback? (prevents deletion)
