@@ -96,7 +96,7 @@ TEST_F(XmlSerializationTest, IsArchiveXMLDetectsUTF8BOM)
     // Write UTF-8 BOM followed by XML
     unsigned char bom[] = {0xEF, 0xBB, 0xBF};
     tmpFile.write(reinterpret_cast<const char*>(bom), 3);
-    tmpFile.write("<muclient/>");
+    tmpFile.write("<muclient></muclient>");
     tmpFile.close();
 
     QFile file(tmpFile.fileName());

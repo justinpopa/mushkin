@@ -131,34 +131,43 @@ bool IsArchiveXML(QFile& file)
         return false;
     }
 
-    // Check for UTF-8 BOM (EF BB BF)
-    if (buffer.size() >= 3 && (unsigned char)buffer[0] == 0xEF &&
-        (unsigned char)buffer[1] == 0xBB && (unsigned char)buffer[2] == 0xBF) {
-        qCDebug(lcWorld) << "Detected UTF-8 BOM";
+    // Skip BOM and convert to char* for prefix matching (original: xml_serialize.cpp:113-124)
+    const char* p = buffer.constData();
+    const char* end = p + buffer.size();
+
+    // Skip UTF-16LE BOM (FF FE) — original converts to UTF-8
+    if (buffer.size() >= 2 && (unsigned char)p[0] == 0xFF && (unsigned char)p[1] == 0xFE) {
+        // Convert from UTF-16LE, skip BOM
+        QString utf16 =
+            QString::fromUtf16(reinterpret_cast<const char16_t*>(p + 2), (buffer.size() - 2) / 2);
+        buffer = utf16.toUtf8();
+        p = buffer.constData();
+        end = p + buffer.size();
+    }
+    // Skip UTF-8 BOM (EF BB BF)
+    else if (buffer.size() >= 3 && (unsigned char)p[0] == 0xEF && (unsigned char)p[1] == 0xBB &&
+             (unsigned char)p[2] == 0xBF) {
+        p += 3;
     }
 
-    // Check for UTF-16LE BOM (FF FE)
-    if (buffer.size() >= 2 && (unsigned char)buffer[0] == 0xFF &&
-        (unsigned char)buffer[1] == 0xFE) {
-        qCDebug(lcWorld) << "Detected UTF-16LE BOM";
-    }
+    // Skip leading whitespace (original: xml_serialize.cpp:129-130)
+    while (p < end && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r'))
+        p++;
 
-    // Convert to string for signature search
-    QString content = QString::fromUtf8(buffer);
+    // Need at least 15 chars for minimum valid XML (original: xml_serialize.cpp:134)
+    if (end - p < 15)
+        return false;
 
-    // Look for XML signatures
-    // Note: Using case-insensitive contains for robustness
-    // All 17 signatures from original xml_serialize.cpp:79-98
-    QStringList signatures = {"<?xml",     "<!--",     "<!DOCTYPE", "<muclient", "<world",
-                              "<triggers", "<aliases", "<timers",   "<macros",   "<variables",
-                              "<colours",  "<keypad",  "<printing", "<comment",  "<include",
-                              "<plugin",   "<script"};
+    // Case-sensitive prefix match against signatures (original: xml_serialize.cpp:137-139)
+    static const char* sigs[] = {"<?xml",     "<!--",     "<!DOCTYPE", "<muclient", "<world",
+                                 "<triggers", "<aliases", "<timers",   "<macros",   "<variables",
+                                 "<colours",  "<keypad",  "<printing", "<comment",  "<include",
+                                 "<plugin",   "<script"};
 
-    for (const QString& sig : signatures) {
-        if (content.contains(sig, Qt::CaseInsensitive)) {
-            qCDebug(lcWorld) << "Found XML signature:" << sig;
+    for (const char* sig : sigs) {
+        size_t len = strlen(sig);
+        if (static_cast<size_t>(end - p) >= len && memcmp(p, sig, len) == 0)
             return true;
-        }
     }
 
     return false;

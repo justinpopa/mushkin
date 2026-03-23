@@ -383,9 +383,9 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 ### LOW
 - [x] L67: xml -- Timer seconds saved with 4 decimal places instead of 2. Mushkin: xml_serialization.cpp:625
 - [x] L68: xml -- Boolean/number attributes always written vs only-when-non-default. Mushkin: xml_serialization.cpp:97-181
-- [ ] L69: xml -- XML encoding is UTF-8 instead of iso-8859-1. Mushkin: xml_serialization.cpp:253
-- [ ] L70: xml -- Base64 clipboard XML detection missing. Mushkin: (absent)
-- [ ] L71: xml -- IsArchiveXML uses case-insensitive contains() instead of case-sensitive prefix match. Mushkin: xml_serialization.cpp:154-159
+- [~] L69: xml -- XML encoding is UTF-8 instead of iso-8859-1. Mushkin: xml_serialization.cpp:253 (WONTFIX: intentional platform adaptation — Qt outputs valid UTF-8, declaring iso-8859-1 in a UTF-8 file would be incorrect. Original parser doesn't check encoding declaration.)
+- [~] L70: xml -- Base64 clipboard XML detection missing. Mushkin: (absent) (DEFERRED: clipboard paste of base64-encoded trigger/alias XML is a niche UI feature requiring new infrastructure)
+- [x] L71: xml -- IsArchiveXML uses case-insensitive contains() instead of case-sensitive prefix match. Mushkin: xml_serialization.cpp:154-159
 
 ## v2 Audit: Logging (2026-03-22)
 
