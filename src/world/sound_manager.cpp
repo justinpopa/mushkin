@@ -413,6 +413,11 @@ bool SoundManager::playSoundFile(const QString& filename)
  */
 qint32 SoundManager::getSoundStatus(qint16 buffer)
 {
+    // No sound system initialized? Return -3 (original: methods_sounds.cpp:416-417)
+    if (!m_audioEngine) {
+        return -3;
+    }
+
     // Make buffer zero-relative (original MUSHclient uses 1-based indexing)
     buffer--;
 
