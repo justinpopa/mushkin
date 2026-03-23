@@ -335,7 +335,9 @@ void InputView::recallNextCommand()
 }
 
 /**
- * applyInputSettings - Apply font and color settings from document
+ * applyInputSettings - Apply font, color, and wrap settings from document
+ *
+ * Also applies input word-wrap mode (original: FixInputWrap → CSendView::UpdateWrap).
  */
 void InputView::applyInputSettings()
 {
@@ -362,6 +364,11 @@ void InputView::applyInputSettings()
             .arg(textColor.name(), bgColor.name(), m_doc->m_input.font_name,
                  QString::number(fontSizePx), fontStyle, fontWeight);
     setStyleSheet(style);
+
+    // Apply word-wrap mode from document setting
+    // (original: FixInputWrap → CSendView::UpdateWrap toggles edit control wrapping)
+    setLineWrapMode(m_doc->m_input.auto_wrap ? QPlainTextEdit::WidgetWidth
+                                             : QPlainTextEdit::NoWrap);
 
     // Update height after font change
     updateHeight();

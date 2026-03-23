@@ -517,7 +517,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 ### MEDIUM
 - [x] M144: arrays -- ArrayExport delimiter is required; original defaults to ",". Mushkin: src/world/lua_api/world_arrays.cpp:459
 - [x] M145: arrays -- ArrayExportKeys delimiter is required; original defaults to ",". Mushkin: src/world/lua_api/world_arrays.cpp:517
-- [ ] M146: arrays -- ArrayImport from Lua table silently converts integer keys to strings; original raises error. Mushkin: src/world/lua_api/world_arrays.cpp:592-593
+- [x] M146: arrays -- ArrayImport from Lua table silently converts integer keys to strings; original raises error. Mushkin: src/world/lua_api/world_arrays.cpp:592-593
 
 ### LOW
 - [ ] L91: arrays -- ArrayExport/ArrayExportKeys check delimiter validity before empty check (different error for empty+bad delimiter). Mushkin: src/world/lua_api/world_arrays.cpp:470-481
@@ -546,11 +546,11 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] H96: options -- SetOption OPT_FIX_OUTPUT_BUFFER now calls trimLineBuffer() to trim excess lines immediately. Mushkin: world_settings.cpp:1618-1621
 
 ### MEDIUM
-- [ ] M149: options -- SetOption missing OPT_FIX_INPUT_WRAP side effect. Mushkin: world_settings.cpp:1616
-- [ ] M150: options -- SetOption missing OPT_FIX_SPEEDWALK_DELAY side effect. Mushkin: world_settings.cpp:1616
-- [ ] M151: options -- SetOption missing OPT_USE_MXP side effect. Mushkin: world_settings.cpp:1616
-- [ ] M152: options -- SetOption missing OPT_FIX_TOOLTIP side effects. Mushkin: world_settings.cpp:1616
-- [ ] M153: options -- GetInfo(212) returns configured font height instead of rendered pixel height. Mushkin: world_settings.cpp:992
+- [x] M149: options -- SetOption missing OPT_FIX_INPUT_WRAP side effect. Mushkin: world_settings.cpp:1616
+- [x] M150: options -- SetOption missing OPT_FIX_SPEEDWALK_DELAY side effect. Mushkin: world_settings.cpp:1616
+- [x] M151: options -- SetOption missing OPT_USE_MXP side effect. Mushkin: world_settings.cpp:1616
+- [x] M152: options -- SetOption missing OPT_FIX_TOOLTIP side effects. Mushkin: world_settings.cpp:1616
+- [x] M153: options -- GetInfo(212) returns configured font height instead of rendered pixel height. Mushkin: world_settings.cpp:992
 - [ ] M154: options -- GetInfo(236/237) command selection start/end values differ from original. Mushkin: world_settings.cpp:1116-1128
 - [ ] M155: options -- SetOption does not call SetModifiedFlag when option changes. Mushkin: world_settings.cpp:1613
 

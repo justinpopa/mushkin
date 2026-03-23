@@ -587,16 +587,22 @@ static int L_ArrayImport(lua_State* L)
             return 1;
         }
         QMap<QString, QString>& arr = arrays[arrayName];
+        int duplicates = 0;
         lua_pushnil(L);
         while (lua_next(L, 2) != 0) {
-            QString key = lua_isstring(L, -2) ? QString::fromUtf8(lua_tostring(L, -2))
-                                              : QString::number(lua_tointeger(L, -2));
-            QString value = lua_isstring(L, -1) ? QString::fromUtf8(lua_tostring(L, -1))
-                                                : QString::number(lua_tonumber(L, -1));
-            arr[key] = value;
+            if (lua_type(L, -2) != LUA_TSTRING)
+                luaL_error(L, "table must have string keys");
+            QString key = QString::fromUtf8(lua_tostring(L, -2));
+            QString value = QString::fromUtf8(lua_tostring(L, -1));
+            if (arr.contains(key)) {
+                arr[key] = value;
+                duplicates++;
+            } else {
+                arr[key] = value;
+            }
             lua_pop(L, 1); // pop value, keep key for next iteration
         }
-        lua_pushnumber(L, eOK);
+        lua_pushnumber(L, duplicates ? eImportedWithDuplicates : eOK);
         return 1;
     }
 

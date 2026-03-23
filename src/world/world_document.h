@@ -1993,6 +1993,7 @@ class WorldDocument : public QObject, public IWorldContext {
     void activateWorldWindow();                  // Emitted to bring world window to front
     void activateClientWindow();                 // Emitted to bring main window to front
     void infoBarChanged();                       // Emitted when info bar text/style changes
+    void tooltipSettingsChanged();               // Emitted when tooltip timing changes
 
   private slots:
     void onScriptFileChanged(const QString& path); // Handle script file change notification

@@ -22,6 +22,7 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QFontDatabase>
+#include <QFontMetrics>
 #include <QGuiApplication>
 #include <QHostAddress>
 #include <QHostInfo>
@@ -40,6 +41,7 @@ extern "C" {
 #include <lualib.h>
 }
 
+#include "../../utils/font_utils.h"
 #include "logging.h"
 #include "lua_common.h"
 
@@ -988,8 +990,13 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 212: // Output font height
-            // Based on: methods_info.cpp
-            lua_pushinteger(L, pDoc->m_output.font_height);
+            // Original returns tm.tmHeight (rendered pixel height from TEXTMETRIC).
+            // Use QFontMetrics::height() on the same font that OutputView renders with.
+            {
+                QFont outputFont =
+                    createScaledFont(pDoc->m_output.font_name, pDoc->m_output.font_height);
+                lua_pushinteger(L, QFontMetrics(outputFont).height());
+            }
             break;
 
         case 213: // Output font width
@@ -1146,9 +1153,12 @@ int L_GetInfo(lua_State* L)
             lua_pushinteger(L, pDoc->m_FontWidth);
             break;
 
-        case 241: // Character height
-            lua_pushinteger(L, pDoc->m_output.font_height);
-            break;
+        case 241: // Character height (rendered pixel height, same as GetInfo(212))
+        {
+            QFont outputFont =
+                createScaledFont(pDoc->m_output.font_name, pDoc->m_output.font_height);
+            lua_pushinteger(L, QFontMetrics(outputFont).height());
+        } break;
 
         case 242: // UTF-8 error count
             lua_pushinteger(L, pDoc->m_iUTF8ErrorCount);
@@ -1638,6 +1648,34 @@ int L_SetOption(lua_State* L)
 
     if (flags & OPT_UPDATE_VIEWS) {
         emit pDoc->linesAdded(); // triggers view repaint
+    }
+
+    if (flags & OPT_FIX_INPUT_WRAP) {
+        // Notify input view to update its wrap mode
+        // (original: scriptingoptions.cpp:517-518 calls FixInputWrap → CSendView::UpdateWrap)
+        emit pDoc->inputSettingsChanged();
+    }
+
+    if (flags & OPT_FIX_SPEEDWALK_DELAY) {
+        // Apply the new delay to the connection manager's speedwalk timer
+        // (original: scriptingoptions.cpp:544-545 calls SetSpeedWalkDelay(Value))
+        pDoc->m_connectionManager->setSpeedWalkDelay(static_cast<int>(value));
+    }
+
+    if (flags & OPT_USE_MXP) {
+        // Toggle MXP on/off immediately based on the new setting
+        // (original: scriptingoptions.cpp:577-583)
+        if (pDoc->m_iUseMXP == MXPMode::eMXP_Off && pDoc->m_mxpEngine->m_bMXP) {
+            pDoc->MXP_Off(true);
+        } else if (pDoc->m_iUseMXP == MXPMode::eMXP_On && !pDoc->m_mxpEngine->m_bMXP) {
+            pDoc->MXP_On();
+        }
+    }
+
+    if (flags & (OPT_FIX_TOOLTIP_VISIBLE | OPT_FIX_TOOLTIP_START)) {
+        // Notify views to update tooltip timing
+        // (original: scriptingoptions.cpp:549-575 sends TTM_SETDELAYTIME to each view)
+        emit pDoc->tooltipSettingsChanged();
     }
 
     return luaReturnOK(L);

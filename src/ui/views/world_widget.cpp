@@ -141,6 +141,12 @@ void WorldWidget::setupUi()
     // Connect info bar signal
     connect(m_document, &WorldDocument::infoBarChanged, this, &WorldWidget::updateInfoBar);
 
+    // Connect tooltip settings signal — apply visible duration to output view
+    // (original: scriptingoptions.cpp:549-575 sends TTM_SETDELAYTIME to each CMUSHView)
+    connect(m_document, &WorldDocument::tooltipSettingsChanged, this, [this]() {
+        m_outputView->setToolTipDuration(static_cast<int>(m_document->m_iToolTipVisibleTime));
+    });
+
     // Connect miniwindow needsRedraw signals to OutputView update
     connect(m_document, &WorldDocument::miniwindowCreated, this, [this](MiniWindow* iwin) {
         // Cast to concrete MiniWindow to access Qt signals
