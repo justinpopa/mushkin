@@ -898,9 +898,9 @@ void WorldDocument::sendToMud(const QString& text)
     // Convert to UTF-8 (or Latin-1 if not UTF-8 mode)
     QByteArray data = m_display.utf8 ? text.toUtf8() : text.toLatin1();
 
-    // Add newline - most MUDs expect \n, some want \r\n
-    // For now, send just \n (Unix style)
-    data.append('\n');
+    // Telnet protocol requires \r\n line terminator (RFC 854)
+    // Original MUSHclient uses ENDLINE = "\r\n" (doc.cpp:1186-1187)
+    data.append("\r\n");
 
     // Send through socket
     SendPacket({reinterpret_cast<const unsigned char*>(data.constData()),
@@ -1244,8 +1244,8 @@ void WorldDocument::DoSendMsg(const QString& text, bool bEcho, bool bLog)
             }
         }
 
-        // Send the doubled data + newline
-        doubled.append('\n');
+        // Send the doubled data + \r\n (telnet line terminator)
+        doubled.append("\r\n");
         SendPacket({reinterpret_cast<const unsigned char*>(doubled.constData()),
                     static_cast<std::size_t>(doubled.length())});
     } else {
