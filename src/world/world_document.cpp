@@ -938,6 +938,12 @@ void WorldDocument::SendMsg(const QString& text, bool bEcho, bool bQueue, bool b
         return;
     }
 
+    // Suppress echo if MUD requested it (password entry)
+    // Must happen before queue encoding (original: doc.cpp:1106-1107)
+    if (m_telnetParser->m_bNoEcho) {
+        bEcho = false;
+    }
+
     QString strText = text;
 
     // Strip trailing \r\n (ENDLINE in original)
