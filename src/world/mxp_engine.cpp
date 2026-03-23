@@ -2063,7 +2063,7 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
         case MXP_ACTION_SEND: {
             // <send href="command" hint="tooltip" prompt>
             // Pueblo fallback: xch_cmd if href empty, xch_hint if hint empty
-            // (original: mxpOpenAtomic.cpp:193-203)
+            // (original: mxpOpenAtomic.cpp:172-205)
             QString href = MXP_GetArgument("href", args);
             if (href.isEmpty())
                 href = MXP_GetArgument("xch_cmd", args);
@@ -2077,8 +2077,20 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
             m_strMXP_hint = hint;
             m_bMXP_link_prompt = prompt;
 
-            // Mark that we're in a clickable region
-            m_doc.m_iFlags |= 0x0400; // ACTION_SEND flag (part of ACTIONTYPE bits)
+            // Set action type bits: cancel old, set SEND or PROMPT
+            // (original: mxpOpenAtomic.cpp:175-179)
+            m_doc.m_iFlags &= ~ACTIONTYPE;
+            m_doc.m_iFlags |= prompt ? ACTION_PROMPT : ACTION_SEND;
+
+            // Apply underline if world option is set (original: mxpOpenAtomic.cpp:181-182)
+            if (m_doc.m_bUnderlineHyperlinks)
+                m_doc.m_iFlags |= UNDERLINE;
+
+            // Apply custom link color if configured (original: mxpOpenAtomic.cpp:184-191)
+            if (m_doc.m_bUseCustomLinkColour) {
+                m_doc.m_iForeColour = static_cast<int>(m_doc.m_colors.hyperlink_colour);
+                m_doc.m_iFlags = (m_doc.m_iFlags & ~COLOURTYPE) | COLOUR_RGB;
+            }
 
             qCDebug(lcMXP) << "Begin send link:" << href << "hint:" << hint << "prompt:" << prompt;
             break;
@@ -2086,6 +2098,7 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
 
         case MXP_ACTION_HYPERLINK: {
             // <a href="http://url">
+            // (original: mxpOpenAtomic.cpp:207-224)
             QString href = MXP_GetArgument("href", args);
             QString hint = MXP_GetArgument("hint", args);
 
@@ -2094,8 +2107,16 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
             m_strMXP_hint = hint;
             m_bMXP_link_prompt = false;
 
-            // Mark that we're in a hyperlink region
-            m_doc.m_iFlags |= 0x0800; // ACTION_HYPERLINK flag (part of ACTIONTYPE bits)
+            // Set action type bits and unconditionally apply underline
+            // (original: mxpOpenAtomic.cpp:213-214 — <a> always underlines)
+            m_doc.m_iFlags &= ~ACTIONTYPE;
+            m_doc.m_iFlags |= ACTION_HYPERLINK | UNDERLINE;
+
+            // Apply custom link color if configured (original: mxpOpenAtomic.cpp:216-222)
+            if (m_doc.m_bUseCustomLinkColour) {
+                m_doc.m_iForeColour = static_cast<int>(m_doc.m_colors.hyperlink_colour);
+                m_doc.m_iFlags = (m_doc.m_iFlags & ~COLOURTYPE) | COLOUR_RGB;
+            }
 
             qCDebug(lcMXP) << "Begin hyperlink:" << href << "hint:" << hint;
             break;
@@ -2103,32 +2124,47 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
 
         // ========== MEDIA ==========
         case MXP_ACTION_SOUND: {
-            // <sound fname="file.wav" v=100 l=1 p=50 t=music u="http://url">
+            // <sound fname="file.wav" v=100 l=1 p=50 t=category u="http://url">
+            // <music fname="file.mp3" v=100 l=-1 p=50 t=category u="http://url" c=1>
+            // MXP spec: fname=filename, v=volume(1-100), l=loops(-1=infinite,1=once),
+            //           p=priority, t=type/category, u=base URL for download.
+            // MUSIC also has c=continue (don't restart if same file already playing).
+            // Original: TAG_NOT_IMP in reference; behavioural spec from MXP standard.
             QString fname = MXP_GetArgument("fname", args);
-            QString volume = MXP_GetArgument("v", args);
-            QString loops = MXP_GetArgument("l", args);
-            QString priority = MXP_GetArgument("p", args);
-            QString type = MXP_GetArgument("t", args);
+            QString volumeStr = MXP_GetArgument("v", args);
+            QString loopsStr = MXP_GetArgument("l", args);
+            // Priority is not implemented — no sound priority queue in Mushkin.
+            (void)MXP_GetArgument("p", args);
+            // Type/category is informational only.
+            QString typeStr = MXP_GetArgument("t", args);
+            if (!typeStr.isEmpty())
+                qCDebug(lcMXP) << "Sound type/category:" << typeStr;
             QString url = MXP_GetArgument("u", args);
+            // c=continue is MUSIC-only; consume so it isn't flagged as unused.
+            (void)MXP_GetArgument("c", args);
 
-            if (fname.isEmpty() && url.isEmpty()) {
+            QString soundFile = fname.isEmpty() ? url : fname;
+            if (soundFile.isEmpty()) {
                 qCWarning(lcMXP) << "Sound tag has no fname or URL";
                 break;
             }
 
-            // Use Lua sound API
-            int vol = volume.isEmpty() ? 100 : volume.toInt();
-            int loop = loops.isEmpty() ? 1 : (loops.toInt() == -1 ? -1 : loops.toInt());
+            // v=1-100 (MXP spec, 100=full); convert to Mushkin API scale (-100..0).
+            int vol = volumeStr.isEmpty() ? 100 : qBound(1, volumeStr.toInt(), 100);
+            double volumeApi = static_cast<double>(vol) - 100.0; // 100→0.0, 1→-99.0
 
-            QString soundFile = fname.isEmpty() ? url : fname;
-            qCDebug(lcMXP) << "Playing sound:" << soundFile << "volume:" << vol << "loops:" << loop;
+            // l=loops: -1=infinite, 1=once (default), N>1=N times.
+            int loopCount = loopsStr.isEmpty() ? 1 : loopsStr.toInt();
+            bool loop = (loopCount < 0 || loopCount > 1);
 
-            // Play sound using Qt Multimedia system
-            if (m_doc.PlaySoundFile(soundFile)) {
-                qCDebug(lcMXP) << "Successfully started sound playback";
-            } else {
-                qCWarning(lcMXP) << "Failed to play sound:" << soundFile;
-            }
+            // <music> uses the dedicated music buffer (1); <sound> auto-selects (0).
+            bool isMusic = (elem->strName.compare("music", Qt::CaseInsensitive) == 0);
+            qint16 buffer = isMusic ? 1 : 0;
+
+            qCDebug(lcMXP) << (isMusic ? "MXP MUSIC" : "MXP SOUND") << "file:" << soundFile
+                           << "volume:" << vol << "loops:" << loopCount << "url:" << url;
+
+            m_doc.PlayMSPSound(soundFile, url, loop, volumeApi, buffer);
             break;
         }
 
@@ -2280,8 +2316,15 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
             break;
 
         case MXP_ACTION_MXP: {
-            // <mxp> - MXP protocol commands
-            qCDebug(lcMXP) << "MXP command (not implemented)";
+            // <mxp off> — server requests permanent MXP disable (original:
+            // mxpOpenAtomic.cpp:620-659) Only "off" is implemented; mode-change keywords
+            // (default_open, etc.) are commented out in the original too.
+            if (MXP_HasArgument("off", args)) {
+                qCDebug(lcMXP) << "MXP off: disabling MXP completely";
+                MXP_Off(true);
+            } else {
+                qCDebug(lcMXP) << "MXP command (no recognised keyword)";
+            }
             break;
         }
 
@@ -2496,19 +2539,19 @@ void MXPEngine::MXP_EndAction(int action)
 
         // ========== INTERACTIVE ELEMENTS ==========
         case MXP_ACTION_SEND:
-            // Clear send link state
+            // Clear send link state and undo style side-effects applied on open
             m_strMXP_link.clear();
             m_strMXP_hint.clear();
             m_bMXP_link_prompt = false;
-            m_doc.m_iFlags &= ~0x0400; // Clear ACTION_SEND flag
+            m_doc.m_iFlags &= ~(ACTIONTYPE | UNDERLINE);
             qCDebug(lcMXP) << "End send link";
             break;
 
         case MXP_ACTION_HYPERLINK:
-            // Clear hyperlink state
+            // Clear hyperlink state and undo style side-effects applied on open
             m_strMXP_link.clear();
             m_strMXP_hint.clear();
-            m_doc.m_iFlags &= ~0x0800; // Clear ACTION_HYPERLINK flag
+            m_doc.m_iFlags &= ~(ACTIONTYPE | UNDERLINE);
             qCDebug(lcMXP) << "End hyperlink";
             break;
 
