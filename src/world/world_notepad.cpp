@@ -328,12 +328,27 @@ qint32 WorldDocument::NotepadColour(const QString& title, const QString& textCol
         return eNoSuchNotepad;
     }
 
-    // Parse colors - QColor handles both names and #RRGGBB format
-    QColor textColor(textColour);
-    QColor backColor(backColour);
+    // Parse colors - QColor handles both names and #RRGGBB format.
+    // Empty string is a no-op for that slot (matches original MUSHclient SetColour behavior).
+    QColor textColor;
+    QColor backColor;
 
-    if (!textColor.isValid() || !backColor.isValid()) {
-        return eInvalidColourName;
+    if (textColour.trimmed().isEmpty()) {
+        textColor = QColor(notepad->m_textColour);
+    } else {
+        textColor = QColor(textColour);
+        if (!textColor.isValid()) {
+            return eInvalidColourName;
+        }
+    }
+
+    if (backColour.trimmed().isEmpty()) {
+        backColor = QColor(notepad->m_backColour);
+    } else {
+        backColor = QColor(backColour);
+        if (!backColor.isValid()) {
+            return eInvalidColourName;
+        }
     }
 
     notepad->SetColours(textColor.rgb(), backColor.rgb());

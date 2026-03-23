@@ -78,10 +78,14 @@ TEST_F(NotepadApiTest, AppendToNotepadAppendsExisting)
 }
 
 // Test 5: ReplaceNotepad creates new notepad if not found (matches original)
+// Original returns nil (pushes boolean but return 0 — Lua sees nil)
 TEST_F(NotepadApiTest, ReplaceNotepadCreatesIfNotExists)
 {
     executeLua("result = world.ReplaceNotepad('NonExistent', 'text')");
-    EXPECT_TRUE(getGlobalBool("result"));
+    // Original returns nil, not a boolean
+    lua_getglobal(L, "result");
+    EXPECT_TRUE(lua_isnil(L, -1));
+    lua_pop(L, 1);
 
     NotepadWidget* notepad = doc->FindNotepad("NonExistent");
     ASSERT_NE(notepad, nullptr);
@@ -89,11 +93,15 @@ TEST_F(NotepadApiTest, ReplaceNotepadCreatesIfNotExists)
 }
 
 // Test 6: ReplaceNotepad replaces existing notepad
+// Original returns nil (pushes boolean but return 0 — Lua sees nil)
 TEST_F(NotepadApiTest, ReplaceNotepadReplacesExisting)
 {
     executeLua("world.SendToNotepad('Replace', 'Original')");
     executeLua("result = world.ReplaceNotepad('Replace', 'New Content')");
-    EXPECT_TRUE(getGlobalBool("result"));
+    // Original returns nil, not a boolean
+    lua_getglobal(L, "result");
+    EXPECT_TRUE(lua_isnil(L, -1));
+    lua_pop(L, 1);
 
     NotepadWidget* notepad = doc->FindNotepad("Replace");
     ASSERT_NE(notepad, nullptr);

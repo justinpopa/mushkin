@@ -63,20 +63,22 @@ int L_AppendToNotepad(lua_State* L)
 }
 
 /**
- * world.ReplaceNotepad(title, contents) -> boolean
+ * world.ReplaceNotepad(title, contents) -> nil
  *
  * Replace notepad contents. Only works if notepad already exists.
  *
  * @param title Notepad window title
  * @param contents New text content
- * @return true if notepad found and replaced
+ * @return nil (original pushes boolean but returns 0 results — Lua sees nil)
  */
 int L_ReplaceNotepad(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
     QString title = luaCheckQString(L, 1);
     QString contents = concatLuaArgs(L, 2); // original: concatArgs(L, "", 2)
-    return luaReturn(L, pDoc->ReplaceNotepad(title, contents).has_value());
+    // Original: lua_pushboolean + return 0 — boolean is pushed but discarded; Lua sees nil
+    lua_pushboolean(L, pDoc->ReplaceNotepad(title, contents).has_value() ? 1 : 0);
+    return 0;
 }
 
 /**

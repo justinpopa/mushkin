@@ -505,8 +505,8 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] H90: notepad -- SaveNotepad now returns boolean. Mushkin: src/world/world_notepad.cpp:258-269
 
 ### MEDIUM
-- [ ] M141: notepad -- ReplaceNotepad returns boolean; original returns nil. Mushkin: src/world/lua_api/world_notepads.cpp:74-80
-- [ ] M142: notepad -- NotepadColour rejects empty color strings; original treats as no-op. Mushkin: src/world/world_notepad.cpp:335-336
+- [x] M141: notepad -- ReplaceNotepad returns boolean; original returns nil. Mushkin: src/world/lua_api/world_notepads.cpp:74-80
+- [x] M142: notepad -- NotepadColour rejects empty color strings; original treats as no-op. Mushkin: src/world/world_notepad.cpp:335-336
 - [ ] M143: notepad -- New notepads ignore global notepad color preferences. Mushkin: src/world/notepad_widget.cpp:30-35
 
 ### LOW
