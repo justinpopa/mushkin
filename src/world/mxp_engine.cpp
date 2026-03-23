@@ -1276,9 +1276,10 @@ void MXPEngine::MXP_StartTag(const QString& tagString)
         bCommand = pCustomElement->bCommand;
     }
 
-    // SECURITY CHECK: Tags WITH TAG_OPEN require open mode (blocked in secure mode)
-    if (bOpen && bSecure) {
-        qCWarning(lcMXP) << "Open-mode tag blocked in secure mode:" << tagName;
+    // SECURITY CHECK: Tags WITHOUT TAG_OPEN are secure-only; reject in non-secure mode
+    // (original: mxpStart.cpp:140-148 — if (!bOpen && !bSecure) reject)
+    if (!bOpen && !bSecure) {
+        qCWarning(lcMXP) << "Secure MXP tag ignored when not in secure mode:" << tagName;
         m_iMXPerrors++;
         return;
     }

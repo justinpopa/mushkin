@@ -619,7 +619,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 ## v2 Audit: MXP Engine (2026-03-22)
 
 ### HIGH
-- [ ] H106: mxp -- Security model inverted: secure tags blocked in secure mode, open tags allowed. Mushkin: mxp_engine.cpp:1279-1284
+- [x] H106: mxp -- Security model fixed: secure-only tags now rejected in non-secure mode. Mushkin: mxp_engine.cpp:1279-1284
 - [ ] H107: mxp -- !ELEMENT and !ENTITY definitions have no secure-mode check (security hole). Mushkin: mxp_engine.cpp:1476-1485
 - [ ] H108: mxp -- !ATTLIST not implemented (custom element attribute extension). Mushkin: mxp_engine.cpp:1476-1485
 - [ ] H109: mxp -- MXP_Off calls MXP_CloseOpenTags instead of MXP_CloseAllTags (secure tags leak). Mushkin: mxp_engine.cpp:568-569
