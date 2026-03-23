@@ -82,7 +82,7 @@ void MXPEngine::InitializeMXPElements()
         {"high", TAG_MXP, MXP_ACTION_HIGH, ""},
 
         // Paragraph and formatting (secure)
-        {"p", TAG_MXP | TAG_COMMAND, MXP_ACTION_P, ""},
+        {"p", 0, MXP_ACTION_P, ""}, // original: flags=0 (not self-closing)
         {"br", TAG_MXP | TAG_COMMAND, MXP_ACTION_BR, ""},
         {"nobr", TAG_MXP, MXP_ACTION_NOBR, ""},
         {"sbr", TAG_MXP | TAG_COMMAND, MXP_ACTION_BR, ""},
@@ -131,10 +131,11 @@ void MXPEngine::InitializeMXPElements()
         {"var", TAG_MXP | TAG_COMMAND, MXP_ACTION_VAR, ""},
 
         // User/password (open mode)
-        {"user", TAG_OPEN | TAG_COMMAND | TAG_MXP, MXP_ACTION_USER, ""},
-        {"username", TAG_OPEN | TAG_COMMAND | TAG_MXP, MXP_ACTION_USER, ""},
-        {"password", TAG_OPEN | TAG_COMMAND | TAG_MXP, MXP_ACTION_PASSWORD, ""},
-        {"pass", TAG_OPEN | TAG_COMMAND | TAG_MXP, MXP_ACTION_PASSWORD, ""},
+        {"user", TAG_COMMAND, MXP_ACTION_USER, ""},     // secure only (original: mxpinit.cpp:89)
+        {"username", TAG_COMMAND, MXP_ACTION_USER, ""}, // alias for user
+        {"password", TAG_COMMAND, MXP_ACTION_PASSWORD,
+         ""},                                           // secure only (original: mxpinit.cpp:90)
+        {"pass", TAG_COMMAND, MXP_ACTION_PASSWORD, ""}, // alias for password
         {"relocate", TAG_OPEN | TAG_COMMAND | TAG_MXP | TAG_NOT_IMP, MXP_ACTION_RELOCATE, ""},
 
         // Frame operations (secure - not fully implemented)

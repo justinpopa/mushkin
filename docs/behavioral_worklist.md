@@ -611,10 +611,10 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [~] M173: ui -- Timer edit dialog missing temporary and variable fields. Mushkin: src/ui/dialogs/timer_edit_dialog.h (DEFERRED: requires dialog layout changes)
 
 ### LOW
-- [ ] L102: ui -- Printing page missing (Windows-specific, limited cross-platform value). Mushkin: no equivalent
-- [ ] L103: ui -- Use-default-X checkboxes missing throughout preferences. Mushkin: no equivalent
-- [ ] L104: ui -- Import/Export XML buttons missing from trigger/alias/timer list dialogs. Mushkin: no equivalent
-- [ ] L105: ui -- Filter functionality missing from list dialogs. Mushkin: no equivalent
+- [~] L102: ui -- Printing page missing (Windows-specific, limited cross-platform value). Mushkin: no equivalent (DEFERRED: Windows-only feature, no cross-platform equivalent needed)
+- [~] L103: ui -- Use-default-X checkboxes missing throughout preferences. Mushkin: no equivalent (DEFERRED: requires UI changes across many settings pages)
+- [~] L104: ui -- Import/Export XML buttons missing from trigger/alias/timer list dialogs. Mushkin: no equivalent (DEFERRED: requires new UI infrastructure for XML import/export dialogs)
+- [~] L105: ui -- Filter functionality missing from list dialogs. Mushkin: no equivalent (DEFERRED: requires search/filter UI in all list dialogs)
 
 ## v2 Audit: MXP Engine (2026-03-22)
 
@@ -643,9 +643,9 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] M184: mxp -- MXP color table has only 15 named colors vs original's 147. Mushkin: mxp_engine.cpp:2545-2598
 
 ### LOW
-- [ ] L106: mxp -- Extra elements defined (strikeout, sbr) not in original. Mushkin: mxp_engine.cpp:78,88
-- [ ] L107: mxp -- <p> tag defined as TAG_COMMAND (self-closing) instead of block element. Mushkin: mxp_engine.cpp:85
-- [ ] L108: mxp -- user/password tags have TAG_OPEN flag (conflicts with inverted security). Mushkin: mxp_engine.cpp:134-138
+- [~] L106: mxp -- Extra elements defined (strikeout, sbr) not in original. Mushkin: mxp_engine.cpp:78,88 (WONTFIX: benign extensions that don't affect existing behavior)
+- [x] L107: mxp -- <p> tag defined as TAG_COMMAND (self-closing) instead of block element. Mushkin: mxp_engine.cpp:85
+- [x] L108: mxp -- user/password tags have TAG_OPEN flag (conflicts with inverted security). Mushkin: mxp_engine.cpp:134-138
 - [ ] L109: mxp -- <send> element missing xch_cmd/xch_hint in argument spec. Mushkin: mxp_engine.cpp:111
 
 ## v2 Audit: Scripting Engine (2026-03-22)
