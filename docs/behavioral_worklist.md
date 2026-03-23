@@ -404,7 +404,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] L72: logging -- CSS spacing in HTML colour span tags differs (no spaces after colons). Mushkin: src/world/world_logging.cpp:561
 - [x] L73: logging -- WriteLog newline: Mushkin correctly detects trailing newline; original always appends for 2+ char messages. Mushkin: src/world/world_logging.cpp:392
 - [x] L74: logging -- flushLogIfNeeded flushes every call instead of every 120 seconds. Mushkin: src/world/world_document.cpp:2966-2973
-- [ ] L75: logging -- LogSend bypasses alias processing (calls sendToMud directly). Mushkin: src/world/lua_api/world_logging_opts.cpp:273
+- [~] L75: logging -- LogSend bypasses alias processing (calls sendToMud directly). Mushkin: src/world/lua_api/world_logging_opts.cpp:273 (NOT A BUG: Mushkin correctly calls SendMsg which goes through full pipeline including aliases)
 
 ## v2 Audit: Command Processing (2026-03-22)
 
@@ -423,7 +423,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] M120: commands -- Removed hardcoded "/" immediate prefix from Execute() (not in original). Mushkin: src/world/world_document.cpp:1458-1463
 
 ### LOW
-- [ ] L76: commands -- German umlaut translation not implemented in SendMsg. Mushkin: src/world/world_document.cpp:934
+- [x] L76: commands -- German umlaut translation not implemented in SendMsg. Mushkin: src/world/world_document.cpp:934
 - [ ] L77: commands -- addToCommandHistory rejects whitespace-only strings; original accepts them. Mushkin: src/world/world_document.cpp:2399
 - [ ] L78: commands -- DoSendMsg sends \n instead of \r\n. Mushkin: src/world/world_document.cpp:903,1218
 - [ ] L79: commands -- Command history stores processed command instead of original typed command. Mushkin: src/world/world_document.cpp:1493

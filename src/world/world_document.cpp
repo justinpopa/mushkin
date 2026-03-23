@@ -953,6 +953,17 @@ void WorldDocument::SendMsg(const QString& text, bool bEcho, bool bQueue, bool b
         strText.chop(1);
     }
 
+    // Fix up German umlauts (original: doc.cpp:1114-1115, Utilities.cpp:791-805)
+    if (m_bTranslateGerman) {
+        strText.replace(QChar(0xFC), QStringLiteral("ue")); // ü → ue
+        strText.replace(QChar(0xDC), QStringLiteral("Ue")); // Ü → Ue
+        strText.replace(QChar(0xE4), QStringLiteral("ae")); // ä → ae
+        strText.replace(QChar(0xC4), QStringLiteral("Ae")); // Ä → Ae
+        strText.replace(QChar(0xF6), QStringLiteral("oe")); // ö → oe
+        strText.replace(QChar(0xD6), QStringLiteral("Oe")); // Ö → Oe
+        strText.replace(QChar(0xDF), QStringLiteral("ss")); // ß → ss
+    }
+
     // Break into individual lines (split on \r\n or \n)
     // First replace \r\n with \n, then split on \n
     QString normalized = strText;
