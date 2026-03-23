@@ -432,7 +432,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 ## v2 Audit: Speedwalks (2026-03-22)
 
 ### HIGH
-- [ ] H73: speedwalks -- eSendToSpeedwalk bypasses queue, ignores echo/log flags, silently drops parse errors. Calls sendToMud() directly. Mushkin: src/world/world_sendto.cpp:169-174
+- [x] H73: speedwalks -- eSendToSpeedwalk now routes through SendMsg with echo/log flags and error handling. Mushkin: src/world/world_sendto.cpp:169-174
 
 ### MEDIUM
 - [ ] M121: speedwalks -- SetSpeedWalkDelay does not clamp to 0-30000 range; accepts 0-65535. Mushkin: src/world/connection_manager.cpp:380-394

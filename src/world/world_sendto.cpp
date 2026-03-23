@@ -168,11 +168,19 @@ void WorldDocument::sendTo(SendTo iWhere, const QString& strSendText, bool omit_
             break;
 
         // ========== eSendToSpeedwalk: Expand speedwalk and send to MUD ==========
-        // Original: doc.cpp
+        // Original: doc.cpp:6335-6351 — evaluates, checks for errors, sends via SendMsg
         case eSendToSpeedwalk: {
             QString expanded = speedwalk::evaluate(strSendText, m_speedwalk.filler);
             if (!expanded.isEmpty()) {
-                sendToMud(expanded);
+                if (expanded.at(0) == '*') {
+                    // Error in speedwalk string — show in output (original shows UMessageBox)
+                    note(expanded.mid(1));
+                } else {
+                    // Send with proper echo/log flags through the full pipeline, queued
+                    SendMsg(expanded, omit_from_output ? false : m_display_my_input,
+                            true, // queue it
+                            omit_from_log ? false : m_logging.log_input);
+                }
             }
             break;
         }
