@@ -495,7 +495,7 @@ QString WorldDocument::FixHTMLString(const QString& text)
  *
  * HTML Structure:
  * - <font color="#RRGGBB"> for foreground
- * - <span style="color:#RRGGBB;background:#RRGGBB"> for background (only if not black)
+ * - <span style="color: #RRGGBB; background: #RRGGBB"> for background (only if not black)
  * - <u>...</u> for underline
  * - Newline at end of line
  *
@@ -558,7 +558,7 @@ void WorldDocument::LogLineInHTMLcolour(Line* line)
             // Open span for background color (only if not black)
             if (colour2 != 0) {
                 QColor back = bgrToQColor(colour2);
-                WriteToLog(QString("<span style=\"color:#%1%2%3;background:#%4%5%6\">")
+                WriteToLog(QString("<span style=\"color: #%1%2%3; background: #%4%5%6\">")
                                .arg(fore.red(), 2, 16, QChar('0'))
                                .arg(fore.green(), 2, 16, QChar('0'))
                                .arg(fore.blue(), 2, 16, QChar('0'))
