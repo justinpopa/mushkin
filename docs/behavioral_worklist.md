@@ -598,17 +598,17 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] H105: ui -- Connecting page now has connect method combo and connect text field. Mushkin: src/ui/dialogs/world_properties_dialog.cpp
 
 ### MEDIUM
-- [ ] M163: ui -- Macros page (function key bindings) missing from world properties. Mushkin: no equivalent
-- [ ] M164: ui -- Keypad page (numpad bindings) missing. Mushkin: no equivalent
-- [ ] M165: ui -- Notes page (per-world notes field) missing. Mushkin: no equivalent
-- [ ] M166: ui -- Info/Statistics page missing (buffer/connection/trigger stats). Mushkin: no equivalent
-- [ ] M167: ui -- World properties dialog has NO input validation. Mushkin: src/ui/dialogs/world_properties_dialog.cpp:921-926
-- [ ] M168: ui -- Logging page missing ~12 settings (preamble/postamble, per-line formatting). Mushkin: src/ui/dialogs/world_properties_dialog.cpp:325-355
-- [ ] M169: ui -- Input tab missing ~15 settings (auto-repeat, spell check, spam prevention, etc.). Mushkin: src/ui/dialogs/world_properties_dialog.cpp:254-322
-- [ ] M170: ui -- Output tab missing ~15 settings (beeps, compression, GA conversion, etc.). Mushkin: src/ui/dialogs/world_properties_dialog.cpp:142-252
-- [ ] M171: ui -- Scripting page missing MXP callbacks, script prefix, editor path. Mushkin: src/ui/dialogs/world_properties_dialog.cpp:357-416
-- [ ] M172: ui -- Trigger edit dialog missing ignore_case and sound file fields. Mushkin: src/ui/dialogs/trigger_edit_dialog.h
-- [ ] M173: ui -- Timer edit dialog missing temporary and variable fields. Mushkin: src/ui/dialogs/timer_edit_dialog.h
+- [~] M163: ui -- Macros page (function key bindings) missing from world properties. Mushkin: no equivalent (DEFERRED: requires new settings page with 12+ keybind widgets)
+- [~] M164: ui -- Keypad page (numpad bindings) missing. Mushkin: no equivalent (DEFERRED: requires new settings page with numpad grid layout)
+- [~] M165: ui -- Notes page (per-world notes field) missing. Mushkin: no equivalent (DEFERRED: requires new settings page)
+- [~] M166: ui -- Info/Statistics page missing (buffer/connection/trigger stats). Mushkin: no equivalent (DEFERRED: requires new settings page with live stats)
+- [~] M167: ui -- World properties dialog has NO input validation. Mushkin: src/ui/dialogs/world_properties_dialog.cpp:921-926 (DEFERRED: needs per-field validators across all settings pages)
+- [~] M168: ui -- Logging page missing ~12 settings (preamble/postamble, per-line formatting). Mushkin: src/ui/dialogs/world_properties_dialog.cpp:325-355 (DEFERRED: requires expanding existing page with 12+ widgets)
+- [~] M169: ui -- Input tab missing ~15 settings (auto-repeat, spell check, spam prevention, etc.). Mushkin: src/ui/dialogs/world_properties_dialog.cpp:254-322 (DEFERRED: requires expanding existing page with 15+ widgets)
+- [~] M170: ui -- Output tab missing ~15 settings (beeps, compression, GA conversion, etc.). Mushkin: src/ui/dialogs/world_properties_dialog.cpp:142-252 (DEFERRED: requires expanding existing page with 15+ widgets)
+- [~] M171: ui -- Scripting page missing MXP callbacks, script prefix, editor path. Mushkin: src/ui/dialogs/world_properties_dialog.cpp:357-416 (DEFERRED: requires expanding existing page)
+- [~] M172: ui -- Trigger edit dialog missing ignore_case and sound file fields. Mushkin: src/ui/dialogs/trigger_edit_dialog.h (DEFERRED: requires dialog layout changes)
+- [~] M173: ui -- Timer edit dialog missing temporary and variable fields. Mushkin: src/ui/dialogs/timer_edit_dialog.h (DEFERRED: requires dialog layout changes)
 
 ### LOW
 - [ ] L102: ui -- Printing page missing (Windows-specific, limited cross-platform value). Mushkin: no equivalent
@@ -637,7 +637,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] M178: mxp -- SUPPORT response does not list sub-attributes. Mushkin: mxp_engine.cpp:2218-2255
 - [x] M179: mxp -- <li> tag does not render bullet/number prefix. Mushkin: mxp_engine.cpp:2293-2298
 - [x] M180: mxp -- <image> tag does not render placeholder text/link. Mushkin: mxp_engine.cpp:2069-2084
-- [ ] M181: mxp -- No OnMXP_Error/OnMXP_OpenTag/OnMXP_CloseTag/OnMXP_SetVariable callbacks. Mushkin: TODO stubs
+- [~] M181: mxp -- No OnMXP_Error/OnMXP_OpenTag/OnMXP_CloseTag/OnMXP_SetVariable callbacks. Mushkin: TODO stubs (DEFERRED: blocked on MXP callback infrastructure, same as H9)
 - [x] M182: mxp -- COLOR tag does not check m_bIgnoreMXPcolourChanges. Mushkin: mxp_engine.cpp:1923-1948
 - [x] M183: mxp -- Hyperlinks missing underline and custom link color. Mushkin: mxp_engine.cpp:2003-2036
 - [x] M184: mxp -- MXP color table has only 15 named colors vs original's 147. Mushkin: mxp_engine.cpp:2545-2598
