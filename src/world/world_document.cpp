@@ -1346,6 +1346,12 @@ void WorldDocument::Execute(const QString& command, bool allowScriptPrefix, bool
         }
     } depthGuard{m_iExecutionDepth};
 
+    // Save and restore plugin context across Execute() calls
+    // (original: methods_commands.cpp:258,272,295,379,397)
+    Plugin* savedPlugin = m_CurrentPlugin;
+    m_CurrentPlugin = nullptr;
+    const auto restorePlugin = qScopeGuard([&] { m_CurrentPlugin = savedPlugin; });
+
     QString strFixedCommand = command;
 
     // NOTE: Auto-say is NOT applied here. The original MUSHclient explicitly
