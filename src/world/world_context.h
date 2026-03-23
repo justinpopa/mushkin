@@ -53,6 +53,10 @@ class IWorldContext {
     virtual bool isConnectedToMud() const = 0;
     virtual const std::deque<QString>& recentLines() const = 0;
 
+    // M137: whether sounds should play when the world window is not the active window.
+    // When false, playSound() suppresses playback while the window is inactive.
+    virtual bool playSoundsInBackground() const = 0;
+
     // ========== Trigger Evaluation Control ==========
     // 0 = keep evaluating, 1 = stop current phase, 2 = stop all phases
     virtual quint16 stopTriggerEvaluation() const = 0;

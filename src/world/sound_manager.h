@@ -28,6 +28,7 @@
  * Internally converted to 0-based (0–9) before use.
  */
 
+#include <QElapsedTimer>
 #include <QObject>
 #include <QString>
 #include <array>
@@ -46,6 +47,12 @@ struct SoundBuffer {
     bool isPlaying = false;
     bool isLooping = false;
     QString filename;
+
+    // M140: track playback start time and probed duration for non-looping sounds.
+    // releaseInactiveSoundBuffers() clears isPlaying when elapsed >= playDurationMs.
+    // playDurationMs == -1 means duration is not yet known (probe pending or failed).
+    QElapsedTimer playTimer;
+    qint64 playDurationMs = -1;
 };
 
 class SoundManager {

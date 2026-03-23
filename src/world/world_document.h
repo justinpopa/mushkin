@@ -1430,9 +1430,9 @@ class WorldDocument : public QObject, public IWorldContext {
     // ========== MXP — forwarding wrappers to m_mxpEngine ==========
     // These keep the existing call sites in telnet_parser.cpp and
     // world_protocol.cpp compiling without modification.
-    void MXP_On()
+    void MXP_On(bool manual = false)
     {
-        m_mxpEngine->MXP_On();
+        m_mxpEngine->MXP_On(manual);
     }
     void MXP_Off(bool force = false)
     {
@@ -1970,6 +1970,10 @@ class WorldDocument : public QObject, public IWorldContext {
     }
     bool isConnectedToMud() const override;
     void flushLogIfNeeded() override;
+    bool playSoundsInBackground() const override
+    {
+        return m_sound.play_in_background;
+    }
     quint16 stopTriggerEvaluation() const override
     {
         return m_iStopTriggerEvaluation;

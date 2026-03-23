@@ -32,6 +32,7 @@
 #include "lua_api/lua_common.h" // For error codes: eOK, eCannotPlaySound
 #include "view_interfaces.h"
 #include "world_context.h"
+#include <QAudioDecoder>
 #include <QAudioEngine>
 #include <QAudioListener>
 #include <QDir>
@@ -85,6 +86,7 @@ void SoundManager::initialize()
         m_soundBuffers[i].isPlaying = false;
         m_soundBuffers[i].isLooping = false;
         m_soundBuffers[i].filename.clear();
+        m_soundBuffers[i].playDurationMs = -1;
     }
 
     // Try to create the audio engine — may fail on headless systems
@@ -152,6 +154,7 @@ void SoundManager::cleanup()
         m_soundBuffers[i].isPlaying = false;
         m_soundBuffers[i].isLooping = false;
         m_soundBuffers[i].filename.clear();
+        m_soundBuffers[i].playDurationMs = -1;
     }
 
     // Signal UAF guard: any in-flight MSP lambda will see alive == false and bail out.
@@ -187,20 +190,37 @@ bool SoundManager::isSoundBufferAvailable(qint16 buffer)
 }
 
 /**
- * releaseInactiveSoundBuffers - Update buffer states
+ * releaseInactiveSoundBuffers - Clear isPlaying for non-looping sounds that have finished.
  *
- * Note: QSpatialSound doesn't provide a way to check if playback has finished.
- * For non-looping sounds, the buffer remains marked as "in use" until:
- * - A new sound is played in the same buffer
- * - stopSound() is called explicitly
+ * QSpatialSound has no playback-completion signal or playbackState() query.
+ * We detect completion by comparing elapsed time against the file duration that was
+ * probed asynchronously via QAudioDecoder when the sound started.  If duration is
+ * not yet known (probe still in flight or failed) we leave isPlaying set to avoid
+ * premature buffer recycling.
  *
- * This is a minor limitation but acceptable for most use cases.
+ * This is called at the top of every playSound() so free buffers are found.
+ * Original: methods_sounds.cpp:55-67 (ReleaseInactiveSoundBuffers).
  */
 void SoundManager::releaseInactiveSoundBuffers()
 {
-    // QSpatialSound has no mediaStatus() or playbackState() method.
-    // Buffers are released when stop() is called or buffer is reused.
-    // This function is kept for API compatibility but is effectively a no-op.
+    for (int i = 0; i < MAX_SOUND_BUFFERS; i++) {
+        SoundBuffer& sb = m_soundBuffers[i];
+
+        if (!sb.isPlaying || sb.isLooping)
+            continue;
+
+        // Duration unknown — probe hasn't completed yet; leave buffer reserved.
+        if (sb.playDurationMs < 0)
+            continue;
+
+        // Sound has been playing long enough to have finished.
+        if (sb.playTimer.elapsed() >= sb.playDurationMs) {
+            qDebug() << "releaseInactiveSoundBuffers: buffer" << (i + 1) << "released (elapsed"
+                     << sb.playTimer.elapsed() << "ms >= duration" << sb.playDurationMs << "ms)";
+            sb.isPlaying = false;
+            sb.playDurationMs = -1;
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -330,9 +350,58 @@ qint32 SoundManager::playSound(qint16 buffer, const QString& filename, bool loop
     float panPosition = static_cast<float>(pan);
     sb.spatialSound->setPosition(QVector3D(panPosition, 0, 100));
 
+    // M137: honour play_sounds_in_background setting.
+    // Original: methods_sounds.cpp:270-271 — DSBCAPS_GLOBALFOCUS is only set when this flag
+    // is true.  Without GLOBALFOCUS the OS silences the buffer when the app loses focus.
+    // We reproduce that by skipping play() when the window is inactive.  All validation
+    // (file-exists check, buffer setup) still runs so error codes are returned correctly.
+    const bool windowIsActive = isWindowActive();
+    if (!m_ctx.playSoundsInBackground() && !windowIsActive) {
+        qDebug() << "playSound: suppressed (window inactive, play_in_background=false)";
+        return eOK;
+    }
+
     // Play
     sb.spatialSound->play();
     sb.isPlaying = true;
+
+    // M140: probe sound duration so releaseInactiveSoundBuffers() can detect completion.
+    // Only needed for non-looping sounds (looping sounds are released by stopSound()).
+    // QAudioDecoder decodes asynchronously; duration is emitted via durationChanged once
+    // enough of the file header has been read (typically within a few milliseconds).
+    // We capture buffer index by value so the lambda is safe even if 'this' outlives it.
+    sb.playDurationMs = -1; // Reset: probe pending
+    sb.playTimer.restart();
+
+    if (!loop) {
+        // Capture alive guard so the lambda doesn't touch freed SoundManager state.
+        std::weak_ptr<bool> weakAlive{m_alive};
+        int bufIdx = buffer; // 0-based
+
+        auto* decoder = new QAudioDecoder(nullptr);
+        decoder->setSource(QUrl::fromLocalFile(fullPath));
+
+        // durationChanged fires once the decoder has read enough of the file header.
+        QObject::connect(decoder, &QAudioDecoder::durationChanged, decoder,
+                         [this, weakAlive, bufIdx, decoder](qint64 duration) {
+                             auto alive = weakAlive.lock();
+                             if (!alive || !*alive) {
+                                 decoder->deleteLater();
+                                 return;
+                             }
+                             if (duration > 0)
+                                 m_soundBuffers[bufIdx].playDurationMs = duration;
+                             decoder->deleteLater();
+                         });
+
+        // If decoding fails or duration stays unknown, clean up the decoder.
+        // Use qOverload to resolve the ambiguity between the error() property getter
+        // and the error(QAudioDecoder::Error) signal in Qt 6.
+        QObject::connect(decoder, qOverload<QAudioDecoder::Error>(&QAudioDecoder::error), decoder,
+                         [decoder](QAudioDecoder::Error /*err*/) { decoder->deleteLater(); });
+
+        decoder->start();
+    }
 
     qDebug() << "Playing sound:" << filename << "buffer:" << (buffer + 1) << "loop:" << loop
              << "volume:" << linearVolume << "pan:" << pan;
@@ -360,6 +429,7 @@ qint32 SoundManager::stopSound(qint16 buffer)
                 m_soundBuffers[i].spatialSound->stop();
                 m_soundBuffers[i].isPlaying = false;
                 m_soundBuffers[i].filename.clear();
+                m_soundBuffers[i].playDurationMs = -1;
             }
         }
         return eOK;
@@ -379,6 +449,7 @@ qint32 SoundManager::stopSound(qint16 buffer)
     }
     m_soundBuffers[buffer].isPlaying = false;
     m_soundBuffers[buffer].filename.clear();
+    m_soundBuffers[buffer].playDurationMs = -1;
 
     return eOK;
 }
