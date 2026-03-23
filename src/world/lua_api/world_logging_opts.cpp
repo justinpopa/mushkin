@@ -269,8 +269,9 @@ int L_LogSend(lua_State* L)
     // Concatenate all arguments (matches original concatArgs behavior)
     QString text = concatArgs(L);
 
-    // Send the message
-    pDoc->sendToMud(text);
+    // Send through full pipeline then log
+    // Original: methods_sending.cpp:139 calls Send() which calls SendMsg(), then LogCommand()
+    pDoc->SendMsg(text, pDoc->m_display_my_input, false, false);
 
     // Log the command unconditionally (regardless of m_log_input setting)
     if (pDoc->IsLogOpen()) {
