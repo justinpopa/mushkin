@@ -396,7 +396,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 
 ### MEDIUM
 - [x] M111: logging -- FormatTime percent escaping fixed: % in values no longer doubled. Mushkin: src/world/world_logging.cpp:77-138
-- [ ] M112: logging -- HTML world name header not HTML-escaped (TODO in code). Mushkin: src/world/world_logging.cpp:244
+- [x] M112: logging -- HTML world name header now escaped via FixHTMLString. Mushkin: src/world/world_logging.cpp:244
 - [ ] M113: logging -- LogLineInHTMLcolour processes single Line only, not multi-line paragraphs. Mushkin: src/world/world_logging.cpp:504-602
 - [ ] M114: logging -- Retrospective HTML colour logging uses different tag structure than original. Mushkin: src/world/world_logging.cpp:785-787
 

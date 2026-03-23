@@ -241,7 +241,7 @@ qint32 WorldDocument::OpenLog(const QString& filename, bool append, bool writePr
 
         if (m_logging.log_html) {
             WriteToLog("<br>\n");
-            WriteToLog(header); // TODO: HTML-escape header text
+            WriteToLog(FixHTMLString(header));
             WriteToLog("<br>\n");
         } else {
             WriteToLog("\n");
