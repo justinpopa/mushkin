@@ -414,8 +414,8 @@ int L_WindowInfo(lua_State* L)
             lua_pushboolean(L, win->show);
             break;
 
-        case 6: // Hidden flag (opposite of visible)
-            lua_pushboolean(L, !win->show);
+        case 6: // Temporarily hidden (no room in layout — original: m_bTemporarilyHide)
+            lua_pushboolean(L, win->temporarilyHide);
             break;
 
         case 7: // Layout/position mode
