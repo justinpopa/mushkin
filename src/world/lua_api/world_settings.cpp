@@ -1488,64 +1488,60 @@ int L_GetInfo(lua_State* L)
 
             // Helper lambda: convert QDateTime to OLE DATE (days since 1899-12-30)
             // Original returns COleDateTime which uses this format.
-            // Formula: (unix_epoch_seconds / 86400.0) + 25569.0
-            //   25569 = days from 1899-12-30 to 1970-01-01 (Unix epoch)
-#define DATETIME_TO_OLE(dt) ((static_cast<double>((dt).toSecsSinceEpoch()) / 86400.0) + 25569.0)
+            // Original converts VT_DATE → CTime → GetTime() which returns time_t
+            // (seconds since 1970-01-01). Use toSecsSinceEpoch() for the same result.
+            // (original: lua_methods.cpp:125-142 pushVariant VT_DATE case)
 
-        case 301: // Time connected (OLE DATE)
+        case 301: // Time connected (Unix timestamp)
         {
             const QDateTime& ct = pDoc->m_connectionManager->m_tConnectTime;
             if (ct.isValid()) {
-                lua_pushnumber(L, DATETIME_TO_OLE(ct));
+                lua_pushnumber(L, static_cast<double>(ct.toSecsSinceEpoch()));
             } else {
                 lua_pushnil(L);
             }
         } break;
 
-        case 302: // Time log file last flushed (OLE DATE)
+        case 302: // Time log file last flushed (Unix timestamp)
         {
             if (pDoc->m_LastFlushTime.isValid()) {
-                lua_pushnumber(L, DATETIME_TO_OLE(pDoc->m_LastFlushTime));
+                lua_pushnumber(L, static_cast<double>(pDoc->m_LastFlushTime.toSecsSinceEpoch()));
             } else {
                 lua_pushnil(L);
             }
         } break;
 
-        case 303: // Script file modification time (OLE DATE)
+        case 303: // Script file modification time (Unix timestamp)
         {
             if (pDoc->m_timeScriptFileMod.isValid()) {
-                lua_pushnumber(L, DATETIME_TO_OLE(pDoc->m_timeScriptFileMod));
+                lua_pushnumber(L,
+                               static_cast<double>(pDoc->m_timeScriptFileMod.toSecsSinceEpoch()));
             } else {
                 lua_pushnil(L);
             }
         } break;
 
-        case 304: // Current time (OLE DATE)
+        case 304: // Current time (Unix timestamp)
         {
-            QDateTime now = QDateTime::currentDateTime();
-            lua_pushnumber(L, DATETIME_TO_OLE(now));
+            lua_pushnumber(L, static_cast<double>(QDateTime::currentDateTime().toSecsSinceEpoch()));
         } break;
 
-        case 305: // Client start time (OLE DATE)
+        case 305: // Client start time (Unix timestamp)
         {
-            static const double s_appStartOle = []() {
-                QDateTime now = QDateTime::currentDateTime();
-                return DATETIME_TO_OLE(now);
-            }();
-            lua_pushnumber(L, s_appStartOle);
+            static const double s_appStartTime =
+                static_cast<double>(QDateTime::currentDateTime().toSecsSinceEpoch());
+            lua_pushnumber(L, s_appStartTime);
         } break;
 
-        case 306: // World start time (OLE DATE)
+        case 306: // World start time (Unix timestamp)
         {
             const QDateTime& ws = pDoc->m_connectionManager->m_whenWorldStarted;
             if (ws.isValid()) {
-                lua_pushnumber(L, DATETIME_TO_OLE(ws));
+                lua_pushnumber(L, static_cast<double>(ws.toSecsSinceEpoch()));
             } else {
                 lua_pushnil(L);
             }
         } break;
-
-#undef DATETIME_TO_OLE
 
         case 310: // Newlines received count
             lua_pushinteger(L, pDoc->m_newlines_received);
