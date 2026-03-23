@@ -276,6 +276,12 @@ bool SaveWorldXML(WorldDocument* doc, const QString& filename)
     writer.writeAttribute("mushkin_version", QCoreApplication::applicationVersion());
     writer.writeAttribute("world_file_version", "15");
 
+    // Write date_saved unless omitted (original: xml_save_world.cpp:31-32)
+    if (!doc->m_bOmitSavedDateFromSaveFiles) {
+        writer.writeAttribute("date_saved",
+                              QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss"));
+    }
+
     // ========================================================================
     // SAVE NUMERIC OPTIONS
     // ========================================================================
