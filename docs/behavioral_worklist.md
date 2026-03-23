@@ -487,8 +487,8 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 ### MEDIUM
 - [x] M136: sound -- PlaySound filename is required (luaCheckQString); original allows nil for sound adjustment. Mushkin: src/world/lua_api/world_sounds.cpp:47
 - [x] M137: sound -- play_sounds_in_background option parsed but never applied. Mushkin: src/world/sound_manager.cpp
-- [ ] M138: sound -- MXP sound tag ignores volume, loops, priority, URL parameters. Mushkin: src/world/mxp_engine.cpp:2039-2067
-- [ ] M139: sound -- MSP MUSIC hardcodes buffer 1; MSP STOP stops ALL buffers instead of per-channel. Mushkin: src/world/telnet_parser.cpp:1150-1157
+- [x] M138: sound -- MXP sound tag ignores volume, loops, priority, URL parameters. Mushkin: src/world/mxp_engine.cpp:2039-2067
+- [x] M139: sound -- MSP MUSIC hardcodes buffer 1; MSP STOP stops ALL buffers instead of per-channel. Mushkin: src/world/telnet_parser.cpp:1150-1157
 - [x] M140: sound -- releaseInactiveSoundBuffers is no-op; sounds stay marked playing forever. Mushkin: src/world/sound_manager.cpp:199-204
 
 ### LOW
@@ -633,13 +633,13 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] M174: mxp -- Entity lookup is case-sensitive; original is partially case-insensitive for custom entities. Mushkin: mxp_engine.cpp:1189-1213
 - [x] M175: mxp -- MXP_On always clears custom elements/entities; original preserves on manual toggle. Mushkin: mxp_engine.cpp:511-538
 - [x] M176: mxp -- <reset> tag only closes open tags, doesn't reset ANSI/paragraph mode. Mushkin: mxp_engine.cpp:2207-2210
-- [ ] M177: mxp -- <mxp off> keyword not handled (no-op stub). Mushkin: mxp_engine.cpp:2212-2216
+- [x] M177: mxp -- <mxp off> keyword not handled (no-op stub). Mushkin: mxp_engine.cpp:2212-2216
 - [ ] M178: mxp -- SUPPORT response does not list sub-attributes. Mushkin: mxp_engine.cpp:2218-2255
 - [ ] M179: mxp -- <li> tag does not render bullet/number prefix. Mushkin: mxp_engine.cpp:2293-2298
 - [ ] M180: mxp -- <image> tag does not render placeholder text/link. Mushkin: mxp_engine.cpp:2069-2084
 - [ ] M181: mxp -- No OnMXP_Error/OnMXP_OpenTag/OnMXP_CloseTag/OnMXP_SetVariable callbacks. Mushkin: TODO stubs
 - [x] M182: mxp -- COLOR tag does not check m_bIgnoreMXPcolourChanges. Mushkin: mxp_engine.cpp:1923-1948
-- [ ] M183: mxp -- Hyperlinks missing underline and custom link color. Mushkin: mxp_engine.cpp:2003-2036
+- [x] M183: mxp -- Hyperlinks missing underline and custom link color. Mushkin: mxp_engine.cpp:2003-2036
 - [x] M184: mxp -- MXP color table has only 15 named colors vs original's 147. Mushkin: mxp_engine.cpp:2545-2598
 
 ### LOW
@@ -681,9 +681,9 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] M191: world-edge -- No welcome message displayed on world open. Mushkin: src/ui/views/world_widget.cpp (showWelcomeMessage() added; called from loadFromFile and newWorld)
 - [x] M192: world-edge -- m_bStartPaused never applied to output view. Mushkin: src/ui/views/world_widget.cpp (applyStartPaused() added; called from loadFromFile after XML load)
 - [ ] M193: world-edge -- Duplicate world ID not detected when opening same file twice. Mushkin: no equivalent
-- [ ] M194: world-edge -- m_bSaveWorldAutomatically not honored on close. Mushkin: src/ui/main_window.cpp:2227-2252
-- [ ] M195: world-edge -- Variables-only-changed save prompt missing on close. Mushkin: src/ui/main_window.cpp:2227-2252
-- [ ] M196: world-edge -- Password prompt dialog not triggered on connect. Mushkin: src/world/connection_manager.cpp:146-165
+- [x] M194: world-edge -- m_bSaveWorldAutomatically not honored on close. Mushkin: src/ui/main_window.cpp:2227-2252 (auto-save in closeWorld and closeEvent before unsaved-changes prompt)
+- [~] M195: world-edge -- Variables-only-changed save prompt missing on close. Deferred: requires a dedicated m_bVariablesChanged flag on WorldDocument that must be set whenever plugin variables are written and cleared on save — significant cross-module tracking work with no existing infrastructure.
+- [x] M196: world-edge -- Password prompt dialog not triggered on connect. Mushkin: src/world/connection_manager.cpp:146-165 (QInputDialog password prompt added before auto-login block)
 
 ### LOW
 - [ ] L113: world-edge -- No unused attribute/element warnings during XML load. Mushkin: src/world/xml_serialization.cpp

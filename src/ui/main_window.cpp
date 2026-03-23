@@ -1550,11 +1550,34 @@ void MainWindow::closeEvent(QCloseEvent* event)
 
     // Check if any worlds have unsaved changes
     QList<QMdiSubWindow*> windows = m_mdiArea->subWindowList();
-    QStringList unsavedWorlds;
 
+    // Auto-save worlds with m_bSaveWorldAutomatically set (M194).
+    // Original: SaveModified() calls DoSave silently when m_bSaveWorldAutomatically is true.
+    for (QMdiSubWindow* window : windows) {
+        WorldWidget* worldWidget = qobject_cast<WorldWidget*>(window->widget());
+        if (!worldWidget || !worldWidget->isModified())
+            continue;
+        WorldDocument* doc = worldWidget->document();
+        if (doc && doc->m_bSaveWorldAutomatically) {
+            QString filename = worldWidget->filename();
+            if (!filename.isEmpty()) {
+                if (auto result = worldWidget->saveToFile(filename); !result) {
+                    QMessageBox::critical(
+                        this, "Error",
+                        QString("Failed to auto-save world file:\n%1").arg(result.error()));
+                }
+            }
+        }
+    }
+
+    QStringList unsavedWorlds;
     for (QMdiSubWindow* window : windows) {
         WorldWidget* worldWidget = qobject_cast<WorldWidget*>(window->widget());
         if (worldWidget && worldWidget->isModified()) {
+            WorldDocument* doc = worldWidget->document();
+            // Skip worlds that have auto-save set (already handled above).
+            if (doc && doc->m_bSaveWorldAutomatically)
+                continue;
             unsavedWorlds.append(worldWidget->worldName());
         }
     }
@@ -2247,6 +2270,25 @@ void MainWindow::closeWorld()
                     QMessageBox::Ok | QMessageBox::Cancel, QMessageBox::Ok);
                 if (reply != QMessageBox::Ok) {
                     return;
+                }
+            }
+        }
+    }
+
+    // Auto-save without prompting if m_bSaveWorldAutomatically is set (M194).
+    // Original: SaveModified() calls DoSave silently when m_bSaveWorldAutomatically is true.
+    {
+        auto* widget = qobject_cast<WorldWidget*>(sub->widget());
+        if (widget && widget->isModified()) {
+            WorldDocument* doc = widget->document();
+            if (doc && doc->m_bSaveWorldAutomatically) {
+                QString filename = widget->filename();
+                if (!filename.isEmpty()) {
+                    if (auto result = widget->saveToFile(filename); !result) {
+                        QMessageBox::critical(
+                            this, "Error",
+                            QString("Failed to auto-save world file:\n%1").arg(result.error()));
+                    }
                 }
             }
         }

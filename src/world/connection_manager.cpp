@@ -18,6 +18,8 @@
 #include "world_socket.h"
 
 #include <QDateTime>
+#include <QInputDialog>
+#include <QLineEdit>
 #include <QList>
 
 // ========== Construction / destruction ==========
@@ -143,21 +145,37 @@ void ConnectionManager::onConnect(int errorCode)
         m_doc.SendToAllPluginCallbacks(ON_PLUGIN_CONNECT);
 
         // Auto-login: send connect credentials based on connect_method.
-        // Matches original MUSHclient doc.cpp:6753-6795 (ConnectionEstablished).
+        // Matches original MUSHclient doc.cpp:6731-6795 (ConnectionEstablished).
+
+        // Prompt for password if none is stored but one is needed (M196).
+        // Original: doc.cpp:6735-6751 — shows CPasswordDialog when password is empty and
+        // either (a) connect_now is set with a character name, or (b) connect_text uses %password%.
+        QString password = m_doc.m_password;
+        if (password.isEmpty() &&
+            ((m_doc.m_connect_now != eNoAutoConnect && !m_doc.m_name.isEmpty()) ||
+             m_doc.m_connect_text.contains(QStringLiteral("%password%")))) {
+            bool ok = false;
+            QString entered =
+                QInputDialog::getText(nullptr, QStringLiteral("Enter Password"),
+                                      QStringLiteral("Password for %1:").arg(m_doc.m_name),
+                                      QLineEdit::Password, QString(), &ok);
+            if (ok)
+                password = entered;
+        }
+
         switch (m_doc.m_connect_now) {
             case eConnectMUSH:
                 // Send: connect name password
-                if (!m_doc.m_password.isEmpty()) {
-                    QString cmd =
-                        QStringLiteral("connect %1 %2").arg(m_doc.m_name, m_doc.m_password);
+                if (!password.isEmpty()) {
+                    QString cmd = QStringLiteral("connect %1 %2").arg(m_doc.m_name, password);
                     m_doc.SendMsg(cmd, false, false, false); // don't echo password
                 }
                 break;
             case eConnectDiku:
                 // Send: name\npassword
                 m_doc.SendMsg(m_doc.m_name, m_doc.m_display_my_input, false, false);
-                if (!m_doc.m_password.isEmpty()) {
-                    m_doc.SendMsg(m_doc.m_password, false, false, false);
+                if (!password.isEmpty()) {
+                    m_doc.SendMsg(password, false, false, false);
                 }
                 break;
             default:
@@ -169,7 +187,7 @@ void ConnectionManager::onConnect(int errorCode)
         if (!m_doc.m_connect_text.isEmpty()) {
             QString text = m_doc.m_connect_text;
             text.replace(QStringLiteral("%name%"), m_doc.m_name);
-            text.replace(QStringLiteral("%password%"), m_doc.m_password);
+            text.replace(QStringLiteral("%password%"), password);
             m_doc.SendMsg(text, false, false, false); // don't display (may contain password)
         }
 
