@@ -632,17 +632,17 @@ void WorldDocument::saveTimersToXml(QXmlStreamWriter& xml)
         if (isAtTime) {
             xml.writeAttribute("hour", QString::number(timer->at_hour));
             xml.writeAttribute("minute", QString::number(timer->at_minute));
-            xml.writeAttribute("second", QString::number(timer->at_second, 'f', 4));
+            xml.writeAttribute("second", QString::number(timer->at_second, 'f', 2));
         } else {
             xml.writeAttribute("hour", QString::number(timer->every_hour));
             xml.writeAttribute("minute", QString::number(timer->every_minute));
-            xml.writeAttribute("second", QString::number(timer->every_second, 'f', 4));
+            xml.writeAttribute("second", QString::number(timer->every_second, 'f', 2));
         }
 
         // Offset fields (always written)
         xml.writeAttribute("offset_hour", QString::number(timer->offset_hour));
         xml.writeAttribute("offset_minute", QString::number(timer->offset_minute));
-        xml.writeAttribute("offset_second", QString::number(timer->offset_second, 'f', 4));
+        xml.writeAttribute("offset_second", QString::number(timer->offset_second, 'f', 2));
 
         // Behavior flags
         xml.writeAttribute("one_shot", timer->one_shot ? "y" : "n");

@@ -381,7 +381,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [~] M110: xml -- Load order depends on file element order. DEFERRED: only matters for hand-edited files; well-formed MUSHclient files are always in correct order.. Mushkin: xml_serialization.cpp
 
 ### LOW
-- [ ] L67: xml -- Timer seconds saved with 4 decimal places instead of 2. Mushkin: xml_serialization.cpp:625
+- [x] L67: xml -- Timer seconds saved with 4 decimal places instead of 2. Mushkin: xml_serialization.cpp:625
 - [ ] L68: xml -- Boolean/number attributes always written vs only-when-non-default. Mushkin: xml_serialization.cpp:97-181
 - [ ] L69: xml -- XML encoding is UTF-8 instead of iso-8859-1. Mushkin: xml_serialization.cpp:253
 - [ ] L70: xml -- Base64 clipboard XML detection missing. Mushkin: (absent)
