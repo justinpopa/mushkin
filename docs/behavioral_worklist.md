@@ -562,7 +562,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 ## v2 Audit: Accelerators (2026-03-22)
 
 ### HIGH
-- [ ] H97: accelerators -- Dispatch uses sendTo==12 (eSendToScript) instead of sendTo==10 (eSendToExecute). Mushkin: src/ui/views/world_widget.cpp:162
+- [x] H97: accelerators -- Dispatch now uses eSendToExecute (10) instead of hardcoded 12. Mushkin: src/ui/views/world_widget.cpp:162
 - [ ] H98: accelerators -- Dispatch does not suppress auto-say during execution. Mushkin: src/ui/views/world_widget.cpp:158-170
 - [ ] H99: accelerators -- Dispatch does not set m_iCurrentActionSource to eUserAccelerator. Mushkin: src/world/world_document.h:168-178
 - [ ] H100: accelerators -- Dispatch does not set/restore plugin context for plugin-registered accelerators. Mushkin: src/ui/views/world_widget.cpp:158-170

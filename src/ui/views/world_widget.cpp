@@ -158,8 +158,7 @@ void WorldWidget::setupUi()
     connect(m_document->m_acceleratorManager, &AcceleratorManager::acceleratorTriggered, this,
             [this](const QString& action, int sendTo) {
                 // Handle accelerator execution based on sendTo type
-                // eSendToExecute = 12 (normal command execution)
-                if (sendTo == 12) {
+                if (sendTo == eSendToExecute) { // 10: re-parse as command
                     m_document->Execute(action);
                 } else {
                     // For other sendTo types, use sendTo() method
