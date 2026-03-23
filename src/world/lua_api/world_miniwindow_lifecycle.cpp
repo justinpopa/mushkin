@@ -438,12 +438,13 @@ int L_WindowInfo(lua_State* L)
             lua_pushnumber(L, win->rect.top());
             break;
 
-        case 12: // Rect right
-            lua_pushnumber(L, win->rect.right());
+        case 12: // Rect right (Qt QRect::right() is inclusive; add 1 for Windows CRect
+                 // compatibility)
+            lua_pushnumber(L, win->rect.right() + 1);
             break;
 
-        case 13: // Rect bottom
-            lua_pushnumber(L, win->rect.bottom());
+        case 13: // Rect bottom (same +1 adjustment)
+            lua_pushnumber(L, win->rect.bottom() + 1);
             break;
 
         case 14: // Last mouse X position (miniwindow-relative)

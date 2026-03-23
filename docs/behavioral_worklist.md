@@ -457,7 +457,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [~] H80: miniwindows -- BlendImage source-rect clamping order matches original (both clamp before FixRight; same behavior). Verified as false positive.. Mushkin: miniwindow.cpp:1377-1396
 
 ### MEDIUM
-- [ ] M125: miniwindows -- WindowInfo cases 12/13 (rect.right/bottom) off by one due to Qt inclusive QRect. Mushkin: world_miniwindow_lifecycle.cpp:442-447
+- [x] M125: miniwindows -- WindowInfo cases 12/13 now add +1 for Qt QRect to Windows CRect compatibility. Mushkin: world_miniwindow_lifecycle.cpp:442-447
 - [ ] M126: miniwindows -- RectOp action 2 (fill) uses brushColor/penColor fallback instead of always Colour1. Mushkin: miniwindow.cpp:291-296
 - [ ] M127: miniwindows -- RectOp action 3 (InvertRect) XORs with penColor instead of white. Mushkin: miniwindow.cpp:299-302
 - [ ] M128: miniwindows -- Pen style validation missing. Mushkin: miniwindow.cpp:629-646
