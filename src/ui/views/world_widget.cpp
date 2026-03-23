@@ -320,6 +320,39 @@ void WorldWidget::updateInfoBar()
 }
 
 /**
+ * showWelcomeMessage - Display welcome banner in output view
+ *
+ * Matches CMUSHclientDoc::SetUpOutputWindow() welcome notes (doc.cpp:750-772).
+ * Called after the world is fully configured (fonts applied, XML loaded).
+ * Safe to call before the network connection is established.
+ */
+void WorldWidget::showWelcomeMessage()
+{
+    if (!m_document) {
+        return;
+    }
+
+    const QString version = QApplication::applicationVersion();
+    m_document->note(QString());
+    m_document->note(QString("Welcome to Mushkin version %1!").arg(version));
+    m_document->note(QString());
+}
+
+/**
+ * applyStartPaused - Apply m_bStartPaused to the output view freeze state
+ *
+ * Matches CMUSHclientDoc::SetUpOutputWindow() freeze assignment (doc.cpp:789):
+ *   pmyView->m_freeze = m_bStartPaused;
+ * Called after world XML is loaded so m_bStartPaused reflects the saved setting.
+ */
+void WorldWidget::applyStartPaused()
+{
+    if (m_outputView && m_document) {
+        m_outputView->setFrozen(m_document->m_bStartPaused);
+    }
+}
+
+/**
  * Load world from .mcl file
  *
  * Uses XML serialization from
@@ -362,8 +395,13 @@ std::expected<void, QString> WorldWidget::loadFromFile(const QString& filename)
     // This will monitor the script file and reload it based on m_scripting.reload_option
     m_document->setupScriptFileWatcher();
 
-    // Note: Welcome messages will be shown when OutputView is connected to document
-    // Text will appear when StartNewLine() is called from network data
+    // Apply start_paused setting to output view (M192)
+    // Original: doc.cpp:789 — pmyView->m_freeze = m_bStartPaused
+    applyStartPaused();
+
+    // Show welcome message in output view (M191)
+    // Original: doc.cpp:750-772 — SetUpOutputWindow welcome notes
+    showWelcomeMessage();
 
     return {};
 }

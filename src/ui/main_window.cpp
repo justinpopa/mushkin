@@ -2111,6 +2111,10 @@ void MainWindow::newWorld()
         }
     }
 
+    // Show welcome message (M191)
+    // Original: doc_construct.cpp:763 — SetUpOutputWindow() called for new worlds
+    worldWidget->showWelcomeMessage();
+
     // Show the subwindow
     if (GlobalOptions::instance().openWorldsMaximized()) {
         subWindow->showMaximized();

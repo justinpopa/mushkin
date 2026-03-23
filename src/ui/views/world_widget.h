@@ -72,6 +72,9 @@ class WorldWidget : public QWidget {
     [[nodiscard]] std::expected<void, QString> loadFromFile(const QString& filename);
     [[nodiscard]] std::expected<void, QString> saveToFile(const QString& filename);
 
+    // World setup
+    void showWelcomeMessage(); // Display welcome banner in output view (M191)
+
     // Connection state
     bool isConnected() const
     {
@@ -109,7 +112,8 @@ class WorldWidget : public QWidget {
   private:
     void setupUi();
     void updateWindowTitle();
-    void updateInfoBar(); // Update info bar appearance from document state
+    void updateInfoBar();    // Update info bar appearance from document state
+    void applyStartPaused(); // Apply m_bStartPaused to output view (M192)
 
     // Components
     WorldDocument* m_document; // The world data (we own this)

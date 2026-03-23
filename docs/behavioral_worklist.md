@@ -638,9 +638,9 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [ ] M179: mxp -- <li> tag does not render bullet/number prefix. Mushkin: mxp_engine.cpp:2293-2298
 - [ ] M180: mxp -- <image> tag does not render placeholder text/link. Mushkin: mxp_engine.cpp:2069-2084
 - [ ] M181: mxp -- No OnMXP_Error/OnMXP_OpenTag/OnMXP_CloseTag/OnMXP_SetVariable callbacks. Mushkin: TODO stubs
-- [ ] M182: mxp -- COLOR tag does not check m_bIgnoreMXPcolourChanges. Mushkin: mxp_engine.cpp:1923-1948
+- [x] M182: mxp -- COLOR tag does not check m_bIgnoreMXPcolourChanges. Mushkin: mxp_engine.cpp:1923-1948
 - [ ] M183: mxp -- Hyperlinks missing underline and custom link color. Mushkin: mxp_engine.cpp:2003-2036
-- [ ] M184: mxp -- MXP color table has only 15 named colors vs original's 147. Mushkin: mxp_engine.cpp:2545-2598
+- [x] M184: mxp -- MXP color table has only 15 named colors vs original's 147. Mushkin: mxp_engine.cpp:2545-2598
 
 ### LOW
 - [ ] L106: mxp -- Extra elements defined (strikeout, sbr) not in original. Mushkin: mxp_engine.cpp:78,88
@@ -657,11 +657,11 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] H118: scripting -- Trigger script errors now display in output window via colourNote. Mushkin: world_trigger_execution.cpp:431-435
 
 ### MEDIUM
-- [ ] M185: scripting -- Trigger/alias does not reset m_iNoteStyle to NORMAL before callbacks. Mushkin: world_trigger_execution.cpp
-- [ ] M186: scripting -- Trigger invocation_count incremented even on script error. Mushkin: world_trigger_execution.cpp:441
+- [x] M185: scripting -- Trigger/alias does not reset m_iNoteStyle to NORMAL before callbacks. Mushkin: world_trigger_execution.cpp
+- [x] M186: scripting -- Trigger invocation_count incremented even on script error. Mushkin: world_trigger_execution.cpp:441
 - [ ] M187: scripting -- Trigger style runs table (4th callback arg) is always empty. Mushkin: world_trigger_execution.cpp:413-414
 - [ ] M188: scripting -- parseLua() does not track per-plugin script timing. Mushkin: script_engine.cpp:1236-1238
-- [ ] M189: scripting -- ePluginCouldNotSaveState = 30038 instead of 30037 (duplicates ePluginDoesNotSaveState). Mushkin: script_engine.cpp:912
+- [x] M189: scripting -- ePluginCouldNotSaveState = 30038 instead of 30037 (duplicates ePluginDoesNotSaveState). Mushkin: script_engine.cpp:912
 
 ### LOW
 - [ ] L110: scripting -- Error display color is darkorange instead of orangered. Mushkin: script_engine.cpp:1176
@@ -677,9 +677,9 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] H122: world-edge -- Plugin SaveState() now called for all plugins during world save. Mushkin: src/world/xml_serialization.cpp:233-235
 
 ### MEDIUM
-- [ ] M190: world-edge -- PluginListChanged called per-plugin instead of once after all loaded. Mushkin: src/world/world_document_plugins.cpp:568
-- [ ] M191: world-edge -- No welcome message displayed on world open. Mushkin: src/ui/views/world_widget.cpp:342
-- [ ] M192: world-edge -- m_bStartPaused never applied to output view. Mushkin: src/world/world_document.cpp:168
+- [x] M190: world-edge -- PluginListChanged called per-plugin instead of once after all loaded. Mushkin: src/world/xml_serialization.cpp:896-897 (LoadPlugin called with suppressListChanged=true during batch load; PluginListChanged called once at end)
+- [x] M191: world-edge -- No welcome message displayed on world open. Mushkin: src/ui/views/world_widget.cpp (showWelcomeMessage() added; called from loadFromFile and newWorld)
+- [x] M192: world-edge -- m_bStartPaused never applied to output view. Mushkin: src/ui/views/world_widget.cpp (applyStartPaused() added; called from loadFromFile after XML load)
 - [ ] M193: world-edge -- Duplicate world ID not detected when opening same file twice. Mushkin: no equivalent
 - [ ] M194: world-edge -- m_bSaveWorldAutomatically not honored on close. Mushkin: src/ui/main_window.cpp:2227-2252
 - [ ] M195: world-edge -- Variables-only-changed save prompt missing on close. Mushkin: src/ui/main_window.cpp:2227-2252
