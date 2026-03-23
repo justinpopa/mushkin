@@ -449,7 +449,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 
 ### HIGH
 - [x] H74: miniwindows -- WindowInfo case 6 now returns temporarilyHide instead of !show. Mushkin: world_miniwindow_lifecycle.cpp:418
-- [ ] H75: miniwindows -- WindowResize does not preserve existing content (creates fresh image). Mushkin: miniwindow.cpp:168-192
+- [x] H75: miniwindows -- WindowResize now preserves existing content by copying old image back. Mushkin: miniwindow.cpp:168-192
 - [ ] H76: miniwindows -- WindowText return value not clipped to rectangle width. Mushkin: miniwindow.cpp:1103
 - [ ] H77: miniwindows -- WindowFont does not support deletion when name="" and size=0. Mushkin: miniwindow.cpp:1043-1058
 - [ ] H78: miniwindows -- CircleOp chord/pie (actions 4,5) use angle-based params instead of GDI point-based params. Mushkin: miniwindow.cpp:517-525

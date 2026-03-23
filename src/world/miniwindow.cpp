@@ -171,18 +171,31 @@ qint32 MiniWindow::Resize(qint32 newWidth, qint32 newHeight, QRgb bgColor)
     if (newWidth <= 0 || newHeight <= 0)
         return eBadParameter;
 
+    // No change? Early return (original: miniwindow.cpp:4125-4126)
+    if (newWidth == width && newHeight == height)
+        return eOK;
+
+    // Save old image for content preservation (original: miniwindow.cpp:4140-4157)
+    auto oldImage = std::move(image);
+    qint32 oldWidth = width;
+    qint32 oldHeight = height;
+
     // Update dimensions
     width = newWidth;
     height = newHeight;
     backgroundColor = bgColor;
 
-    // Create new image with ARGB32 format (platform-independent, supports alpha)
-    // Old image is automatically deleted when unique_ptr is reassigned
+    // Create new image
     image = std::make_unique<QImage>(width, height, QImage::Format_ARGB32);
 
-    // Fill with background color - start fresh (no content preservation)
-    // This matches original MUSHclient behavior where WindowCreate/Resize clears the window
+    // Fill with background color
     image->fill(bgrToColor(bgColor));
+
+    // Copy old content back (original: miniwindow.cpp:4157 BitBlt)
+    if (oldImage) {
+        QPainter painter(image.get());
+        painter.drawImage(0, 0, *oldImage, 0, 0, oldWidth, oldHeight);
+    }
 
     // Mark for redraw
     dirty = true;
