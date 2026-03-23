@@ -591,10 +591,10 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 ## v2 Audit: UI Dialogs (2026-03-22)
 
 ### HIGH
-- [ ] H101: ui -- Custom Colours page missing (32 custom colour pairs with names). Mushkin: no equivalent
-- [ ] H102: ui -- MXP settings page missing (MXP enable mode, Pueblo, debug, hyperlink settings). Mushkin: no equivalent
-- [ ] H103: ui -- Auto-say settings page missing entirely. Mushkin: no equivalent
-- [ ] H104: ui -- Alias edit dialog missing ignore_case, temporary, one_shot, menu fields. Mushkin: src/ui/dialogs/alias_edit_dialog.h
+- [~] H101: ui -- Custom Colours page missing. DEFERRED: requires new preference page with 32 colour pair pickers + name fields.. Mushkin: no equivalent
+- [~] H102: ui -- MXP settings page missing. DEFERRED: requires new preference page. (MXP enable mode, Pueblo, debug, hyperlink settings). Mushkin: no equivalent
+- [~] H103: ui -- Auto-say settings page missing. DEFERRED: requires new preference page.. Mushkin: no equivalent
+- [x] H104: ui -- Alias edit dialog now has ignore_case, temporary, one_shot, menu checkboxes. Mushkin: src/ui/dialogs/alias_edit_dialog.h
 - [ ] H105: ui -- Connecting page missing connect_text and connect_method fields. Mushkin: src/ui/dialogs/world_properties_dialog.cpp
 
 ### MEDIUM
