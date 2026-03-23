@@ -402,7 +402,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 
 ### LOW
 - [x] L72: logging -- CSS spacing in HTML colour span tags differs (no spaces after colons). Mushkin: src/world/world_logging.cpp:561
-- [ ] L73: logging -- WriteLog newline: Mushkin correctly detects trailing newline; original always appends for 2+ char messages. Mushkin: src/world/world_logging.cpp:392
+- [x] L73: logging -- WriteLog newline: Mushkin correctly detects trailing newline; original always appends for 2+ char messages. Mushkin: src/world/world_logging.cpp:392
 - [ ] L74: logging -- flushLogIfNeeded flushes every call instead of every 120 seconds. Mushkin: src/world/world_document.cpp:2966-2973
 - [ ] L75: logging -- LogSend bypasses alias processing (calls sendToMud directly). Mushkin: src/world/lua_api/world_logging_opts.cpp:273
 

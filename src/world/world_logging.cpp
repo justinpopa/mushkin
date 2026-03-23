@@ -387,9 +387,11 @@ qint32 WorldDocument::WriteLog(const QString& message)
         return eLogFileNotOpen;
     }
 
-    // Ensure message ends with newline
+    // Append newline — original uses Right(2) != "\n" which always appends
+    // for messages of 2+ chars (even if they already end with \n).
+    // Only a single "\n" message avoids the append.
     QString msg = message;
-    if (!msg.endsWith("\n")) {
+    if (msg.right(2) != QStringLiteral("\n")) {
         msg += "\n";
     }
 
