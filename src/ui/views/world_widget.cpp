@@ -526,7 +526,8 @@ void WorldWidget::sendCommand()
     }
 
     // ========== Normal Command Execution ==========
-    // If auto-say is disabled or was disabled by exclusion rules, execute normally
+    // Reset execution depth for each hand-typed command (original: sendvw.cpp:701)
+    m_document->m_iExecutionDepth = 0;
     // Execute() handles command stacking, alias evaluation, and sending
     // Note: Empty commands are allowed - sends blank line to MUD (matches original MUSHclient)
     m_document->Execute(processedCommand);
