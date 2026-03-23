@@ -165,17 +165,21 @@ inline constexpr qint32 eConnectDisconnecting = CONNECT_DISCONNECTING;
 // Action source values (Lua callbacks)
 // These tell scripts what triggered the current code execution
 // Based on doc.h action source enum
+// Values for m_iCurrentActionSource — must match original doc.h:159-172 for GetInfo(239)
 enum class ActionSource : quint32 {
-    eUnknownActionSource = 0, // Unknown/not set
-    eUserAction,              // User typed a command
-    eWorldAction,             // World event (connect, disconnect, open, close)
-    eTriggerAction,           // Trigger fired
-    eUserAccelerator,         // User pressed an accelerator key (original: doc.h:165)
-    eAliasAction,             // Alias matched
-    eTimerAction,             // Timer fired
-    ePluginAction,            // Plugin called function
-    eLuaSandbox,              // Sandbox initialization
-    eDontChangeAction = 9999  // Special: don't change m_iCurrentActionSource
+    eUnknownActionSource = 0, // no particular reason
+    eUserTyping = 1,          // user typed command and pressed Enter
+    eUserMacro = 2,           // user typed a macro (e.g., F2)
+    eUserKeypad = 3,          // user used numeric keypad
+    eUserAccelerator = 4,     // user used accelerator key
+    eUserMenuAction = 5,      // item chosen from pop-up menu
+    eTriggerFired = 6,        // trigger fired
+    eTimerFired = 7,          // timer fired
+    eInputFromServer = 8,     // input arrived from MUD
+    eWorldAction = 9,         // world action (connect, disconnect, open, close)
+    eLuaSandbox = 10,         // executing Lua sandbox
+    eHotspotCallback = 11,    // miniwindow hotspot callback
+    eDontChangeAction = 999   // special: leave current action alone (original: 999)
 };
 
 // Command history position status (command history navigation)
