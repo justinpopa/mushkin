@@ -1476,6 +1476,22 @@ void MXPEngine::MXP_EndTag(const QString& tagString)
  */
 void MXPEngine::MXP_Definition(const QString& defString)
 {
+    // Definitions require secure mode (original: mxpDefs.cpp:30-42)
+    bool bSecure = (m_iMXP_mode == eMXP_secure || m_iMXP_mode == eMXP_perm_secure ||
+                    m_iMXP_mode == eMXP_secure_once);
+
+    // Restore mode (cancel secure-once)
+    if (m_iMXP_mode == eMXP_secure_once) {
+        m_iMXP_mode = m_iMXP_previousMode;
+    }
+
+    if (!bSecure) {
+        qCWarning(lcMXP) << "MXP definition ignored when not in secure mode: <!" << defString
+                         << ">";
+        m_iMXPerrors++;
+        return;
+    }
+
     if (defString.startsWith("ELEMENT", Qt::CaseInsensitive)) {
         MXP_DefineElement(defString.mid(7).trimmed());
     } else if (defString.startsWith("ENTITY", Qt::CaseInsensitive)) {
