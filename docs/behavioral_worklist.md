@@ -568,7 +568,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] H100: accelerators -- Dispatch now sets/restores m_CurrentPlugin for plugin-registered accelerators. Mushkin: src/ui/views/world_widget.cpp:158-170
 
 ### MEDIUM
-- [ ] M156: accelerators -- AcceleratorList key name format differs (Qt vs MUSHclient names). Mushkin: src/world/accelerator_manager.cpp:268-272
+- [x] M156: accelerators -- AcceleratorList key name format differs (Qt vs MUSHclient names). Mushkin: src/world/accelerator_manager.cpp:268-338
 - [x] M157: accelerators -- No maximum accelerator count limit (original caps at 1000). Mushkin: src/world/accelerator_manager.cpp:274-317
 - [x] M158: accelerators -- Dispatch now passes omit_from_output=true and omit_from_log=true (fixed with H98). Mushkin: src/ui/views/world_widget.cpp:167
 - [x] M159: accelerators -- Dispatch now passes "Accelerator" description string (fixed with H98). Mushkin: src/ui/views/world_widget.cpp:167
@@ -634,9 +634,9 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] M175: mxp -- MXP_On always clears custom elements/entities; original preserves on manual toggle. Mushkin: mxp_engine.cpp:511-538
 - [x] M176: mxp -- <reset> tag only closes open tags, doesn't reset ANSI/paragraph mode. Mushkin: mxp_engine.cpp:2207-2210
 - [x] M177: mxp -- <mxp off> keyword not handled (no-op stub). Mushkin: mxp_engine.cpp:2212-2216
-- [ ] M178: mxp -- SUPPORT response does not list sub-attributes. Mushkin: mxp_engine.cpp:2218-2255
-- [ ] M179: mxp -- <li> tag does not render bullet/number prefix. Mushkin: mxp_engine.cpp:2293-2298
-- [ ] M180: mxp -- <image> tag does not render placeholder text/link. Mushkin: mxp_engine.cpp:2069-2084
+- [x] M178: mxp -- SUPPORT response does not list sub-attributes. Mushkin: mxp_engine.cpp:2218-2255
+- [x] M179: mxp -- <li> tag does not render bullet/number prefix. Mushkin: mxp_engine.cpp:2293-2298
+- [x] M180: mxp -- <image> tag does not render placeholder text/link. Mushkin: mxp_engine.cpp:2069-2084
 - [ ] M181: mxp -- No OnMXP_Error/OnMXP_OpenTag/OnMXP_CloseTag/OnMXP_SetVariable callbacks. Mushkin: TODO stubs
 - [x] M182: mxp -- COLOR tag does not check m_bIgnoreMXPcolourChanges. Mushkin: mxp_engine.cpp:1923-1948
 - [x] M183: mxp -- Hyperlinks missing underline and custom link color. Mushkin: mxp_engine.cpp:2003-2036
@@ -659,8 +659,8 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 ### MEDIUM
 - [x] M185: scripting -- Trigger/alias does not reset m_iNoteStyle to NORMAL before callbacks. Mushkin: world_trigger_execution.cpp
 - [x] M186: scripting -- Trigger invocation_count incremented even on script error. Mushkin: world_trigger_execution.cpp:441
-- [ ] M187: scripting -- Trigger style runs table (4th callback arg) is always empty. Mushkin: world_trigger_execution.cpp:413-414
-- [ ] M188: scripting -- parseLua() does not track per-plugin script timing. Mushkin: script_engine.cpp:1236-1238
+- [x] M187: scripting -- Trigger style runs table (4th callback arg) is always empty. Mushkin: world_trigger_execution.cpp:434-470
+- [x] M188: scripting -- parseLua() does not track per-plugin script timing. Mushkin: script_engine.cpp:1236-1242
 - [x] M189: scripting -- ePluginCouldNotSaveState = 30038 instead of 30037 (duplicates ePluginDoesNotSaveState). Mushkin: script_engine.cpp:912
 
 ### LOW
@@ -680,7 +680,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] M190: world-edge -- PluginListChanged called per-plugin instead of once after all loaded. Mushkin: src/world/xml_serialization.cpp:896-897 (LoadPlugin called with suppressListChanged=true during batch load; PluginListChanged called once at end)
 - [x] M191: world-edge -- No welcome message displayed on world open. Mushkin: src/ui/views/world_widget.cpp (showWelcomeMessage() added; called from loadFromFile and newWorld)
 - [x] M192: world-edge -- m_bStartPaused never applied to output view. Mushkin: src/ui/views/world_widget.cpp (applyStartPaused() added; called from loadFromFile after XML load)
-- [ ] M193: world-edge -- Duplicate world ID not detected when opening same file twice. Mushkin: no equivalent
+- [x] M193: world-edge -- Duplicate world ID not detected when opening same file twice. Mushkin: src/ui/main_window.cpp:2171-2184 (canonical path comparison of open subwindows, activates existing window)
 - [x] M194: world-edge -- m_bSaveWorldAutomatically not honored on close. Mushkin: src/ui/main_window.cpp:2227-2252 (auto-save in closeWorld and closeEvent before unsaved-changes prompt)
 - [~] M195: world-edge -- Variables-only-changed save prompt missing on close. Deferred: requires a dedicated m_bVariablesChanged flag on WorldDocument that must be set whenever plugin variables are written and cleared on save — significant cross-module tracking work with no existing infrastructure.
 - [x] M196: world-edge -- Password prompt dialog not triggered on connect. Mushkin: src/world/connection_manager.cpp:146-165 (QInputDialog password prompt added before auto-login block)

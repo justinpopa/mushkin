@@ -529,7 +529,7 @@ void MXPEngine::MXP_On(bool manual)
     m_bPuebloActive = false; // Not Pueblo mode
     m_bMXP_script = false;
     m_bPreMode = false;
-    m_iListMode = 0; // No list mode (eNoList)
+    m_iListMode = eNoList;
     m_iListCount = 0;
     m_iMXPerrors = 0;
     m_iMXPtags = 0;
@@ -582,7 +582,7 @@ void MXPEngine::MXP_Off(bool force)
     m_bInParagraph = false;
     m_bMXP_script = false;
     m_bPreMode = false;
-    m_iListMode = 0;
+    m_iListMode = eNoList;
     m_iListCount = 0;
 
     // Close ALL tags including secure ones (original: mxpOnOff.cpp:34 calls MXP_CloseAllTags)
@@ -2171,17 +2171,69 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
         case MXP_ACTION_IMAGE:
         case MXP_ACTION_IMG: {
             // <image fname="pic.png" url="http://..." align=left h=100 w=100>
-            // Display inline image in text flow
+            // We are a text client — display a clickable placeholder link instead.
+            // Original (mxpOpenAtomic.cpp:723-796): when url is present, appends fname to
+            // url, outputs "[url+fname]" as a hyperlink on its own line, then restores style.
+            // Pueblo also checks "src" as a fallback for url.
             QString fname = MXP_GetArgument("fname", args);
             QString url = MXP_GetArgument("url", args);
-            QString align = MXP_GetArgument("align", args);
-            QString height = MXP_GetArgument("h", args);
-            QString width = MXP_GetArgument("w", args);
+            if (url.isEmpty())
+                url = MXP_GetArgument("src", args); // Pueblo fallback
+            // Consume remaining recognised args to suppress unused-arg warnings
+            (void)MXP_GetArgument("align", args);
+            (void)MXP_GetArgument("h", args);
+            (void)MXP_GetArgument("w", args);
+            (void)MXP_GetArgument("hspace", args);
+            (void)MXP_GetArgument("vspace", args);
+            (void)MXP_GetArgument("t", args);
+            (void)MXP_GetArgument("ismap", args);
+            (void)MXP_GetArgument("xch_mode", args);
 
-            QString imgSource = fname.isEmpty() ? url : fname;
-            qCDebug(lcMXP) << "Image: src=" << imgSource << "align=" << align << "w=" << width
-                           << "h=" << height
-                           << "(requires text pipeline integration for inline images)";
+            if (!url.isEmpty()) {
+                // Append filename to URL as the original does (original:770 strArgument +=
+                // strFilename)
+                QString linkTarget = url + fname;
+
+                // Ensure image link appears on its own line (original:755-756)
+                if (m_doc.m_currentLine && m_doc.m_currentLine->len() > 0)
+                    m_doc.StartNewLine(true, 0);
+
+                // Save current style
+                quint16 savedFlags = m_doc.m_iFlags;
+                QRgb savedFore = m_doc.m_iForeColour;
+                QRgb savedBack = m_doc.m_iBackColour;
+                auto savedAction = m_doc.m_currentAction;
+
+                // Set hyperlink style (original:762-776)
+                m_doc.m_currentAction =
+                    std::make_shared<Action>(linkTarget, linkTarget, QString(), &m_doc);
+                m_doc.m_iFlags &= ~ACTIONTYPE;
+                m_doc.m_iFlags |= ACTION_HYPERLINK;
+                if (m_doc.m_bUnderlineHyperlinks)
+                    m_doc.m_iFlags |= UNDERLINE;
+                if (m_doc.m_bUseCustomLinkColour) {
+                    m_doc.m_iForeColour = static_cast<int>(m_doc.m_colors.hyperlink_colour);
+                    m_doc.m_iFlags = (m_doc.m_iFlags & ~COLOURTYPE) | COLOUR_RGB;
+                }
+
+                // Output "[url+fname]" as clickable text (original:778-780)
+                QByteArray linkBytes = QString("[%1]").arg(linkTarget).toUtf8();
+                m_doc.AddToLine(linkBytes.constData(), linkBytes.size());
+
+                // Restore style (original:787-793)
+                m_doc.m_iFlags = savedFlags;
+                m_doc.m_iForeColour = savedFore;
+                m_doc.m_iBackColour = savedBack;
+                m_doc.m_currentAction = savedAction;
+
+                // Start a new line after the image link (original:786)
+                m_doc.StartNewLine(true, 0);
+
+                qCDebug(lcMXP) << "Image placeholder link:" << linkTarget;
+            } else if (!fname.isEmpty()) {
+                // No URL — just log; can't make a clickable link without a URL
+                qCDebug(lcMXP) << "Image: fname=" << fname << "(no URL; no placeholder output)";
+            }
             break;
         }
 
@@ -2333,25 +2385,75 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
             QString supports;
 
             if (args.empty()) {
-                // No args: report all supported elements
+                // No args: report all supported elements and their sub-attributes
+                // (original: lists +elem for each implemented element, then +elem.attr
+                // for each attribute in pElement->strArgs)
                 for (const auto& [name, elem] : m_atomicElementMap) {
                     if (elem->iFlags & TAG_NOT_IMP) {
                         supports += QString("-%1 ").arg(name);
                     } else {
                         supports += QString("+%1 ").arg(name);
+                        // Also list each supported sub-attribute (original: 345-355)
+                        if (!elem->strArgs.isEmpty()) {
+                            const QStringList subAttrs =
+                                elem->strArgs.split(',', Qt::SkipEmptyParts);
+                            for (const QString& attr : subAttrs) {
+                                supports += QString("+%1.%2 ").arg(name, attr.trimmed());
+                            }
+                        }
                     }
                 }
             } else {
-                // Report on specific requested elements
+                // Report on specific requested elements, with dot-notation sub-attribute
+                // and wildcard support (original: mxpOpenAtomic.cpp:361-451).
+                // Arguments are positional: strValue holds the full "elem" or "elem.attr"
+                // token (original: pArgument->strValue).
                 for (const auto& arg : args) {
-                    QString elemName = arg->strName.toLower();
-                    auto it = m_atomicElementMap.find(elemName);
-                    if (it != m_atomicElementMap.end()) {
-                        supports += (it->second->iFlags & TAG_NOT_IMP)
-                                        ? QString("-%1 ").arg(elemName)
-                                        : QString("+%1 ").arg(elemName);
+                    if (arg->bKeyword)
+                        continue;
+                    // Use strValue for positional args (the full "elem" or "elem.attr" token)
+                    QString argValue = arg->strValue.isEmpty() ? arg->strName : arg->strValue;
+                    argValue = argValue.toLower();
+
+                    const QStringList parts = argValue.split('.', Qt::SkipEmptyParts);
+                    if (parts.isEmpty() || parts.size() > 2) {
+                        qCWarning(lcMXP) << "Invalid <support> argument:" << argValue;
+                        continue;
+                    }
+
+                    const QString tagName = parts[0];
+                    auto it = m_atomicElementMap.find(tagName);
+                    if (it == m_atomicElementMap.end() || (it->second->iFlags & TAG_NOT_IMP)) {
+                        // Tag unknown or not supported
+                        supports += QString("-%1 ").arg(tagName);
+                        continue;
+                    }
+
+                    if (parts.size() == 1) {
+                        // Just "elem" — report supported
+                        supports += QString("+%1 ").arg(tagName);
+                        continue;
+                    }
+
+                    // "elem.subtag" or "elem.*"
+                    const QString subtag = parts[1];
+                    const QStringList subAttrs = it->second->strArgs.split(',', Qt::SkipEmptyParts);
+                    if (subtag == "*") {
+                        // Wildcard: list all sub-attributes (original: 411-424)
+                        for (const QString& attr : subAttrs) {
+                            supports += QString("+%1.%2 ").arg(tagName, attr.trimmed());
+                        }
                     } else {
-                        supports += QString("-%1 ").arg(elemName);
+                        // Specific sub-attribute lookup (original: 437-449)
+                        bool found = false;
+                        for (const QString& attr : subAttrs) {
+                            if (attr.trimmed().compare(subtag, Qt::CaseInsensitive) == 0) {
+                                found = true;
+                                break;
+                            }
+                        }
+                        supports += found ? QString("+%1.%2 ").arg(tagName, subtag)
+                                          : QString("-%1.%2 ").arg(tagName, subtag);
                     }
                 }
             }
@@ -2391,24 +2493,33 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
 
         // ========== LISTS ==========
         case MXP_ACTION_UL:
-            // Unordered list
+            // Unordered list (original: mxpOpenAtomic.cpp:692-695)
             m_iMXP_list_depth++;
+            m_iListMode = eUnorderedList;
+            m_iListCount = 0;
             qCDebug(lcMXP) << "Start unordered list (depth:" << m_iMXP_list_depth << ")";
             break;
 
         case MXP_ACTION_OL:
-            // Ordered list
+            // Ordered list (original: mxpOpenAtomic.cpp:696-699)
             m_iMXP_list_depth++;
-            m_iMXP_list_counter = 1;
+            m_iListMode = eOrderedList;
+            m_iListCount = 0;
             qCDebug(lcMXP) << "Start ordered list (depth:" << m_iMXP_list_depth << ")";
             break;
 
-        case MXP_ACTION_LI:
-            // List item
-            // Not implemented: MXP LI tag — bulleted/numbered lists. Text-only rendering;
-            // decorative.
-            qCDebug(lcMXP) << "List item";
+        case MXP_ACTION_LI: {
+            // List item — output bullet or number prefix (original: mxpOpenAtomic.cpp:700-710)
+            // Wrap up previous line if necessary
+            if (m_doc.m_currentLine && m_doc.m_currentLine->len() > 0)
+                m_doc.StartNewLine(true, 0);
+            QString listItem = " * ";
+            if (m_iListMode == eOrderedList)
+                listItem = QString(" %1. ").arg(++m_iListCount);
+            m_doc.AddToLine(listItem.toLatin1().constData());
+            qCDebug(lcMXP) << "List item:" << listItem.trimmed();
             break;
+        }
 
         // ========== ALIGNMENT ==========
         case MXP_ACTION_CENTER:
@@ -2558,9 +2669,14 @@ void MXPEngine::MXP_EndAction(int action)
         // ========== LISTS ==========
         case MXP_ACTION_UL:
         case MXP_ACTION_OL:
+            // Reset list mode and wrap up the last item (original: mxpCloseAtomic.cpp:126-139)
+            m_iListMode = eNoList;
+            m_iListCount = 0;
             if (m_iMXP_list_depth > 0) {
                 m_iMXP_list_depth--;
             }
+            if (m_doc.m_currentLine && m_doc.m_currentLine->len() > 0)
+                m_doc.StartNewLine(true, 0);
             qCDebug(lcMXP) << "End list (depth:" << m_iMXP_list_depth << ")";
             break;
 
