@@ -1797,8 +1797,9 @@ class WorldDocument : public QObject, public IWorldContext {
                        ProgressCallback progressCallback = nullptr);
 
     // ========== Command Stacking ==========
-    void Execute(const QString& command, bool allowScriptPrefix = true,
-                 bool addHistory = true); // Process command with stacking support
+    void
+    Execute(const QString& command, bool allowScriptPrefix = true, bool addHistory = true,
+            const QString& originalCommand = QString()); // Process command with stacking support
 
     // ========== Log File Management ==========
     qint32 OpenLog(const QString& filename, bool append, bool writePreamble = true);

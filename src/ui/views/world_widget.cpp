@@ -574,7 +574,8 @@ void WorldWidget::sendCommand()
     m_document->m_iExecutionDepth = 0;
     // Execute() handles command stacking, alias evaluation, and sending
     // Note: Empty commands are allowed - sends blank line to MUD (matches original MUSHclient)
-    m_document->Execute(processedCommand);
+    // Pass original command for history (before escape processing, sendvw.cpp:714)
+    m_document->Execute(processedCommand, true, true, command);
 
     // ========== Clear Input ==========
     // Clear input after sending (configurable)

@@ -426,7 +426,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] L76: commands -- German umlaut translation not implemented in SendMsg. Mushkin: src/world/world_document.cpp:934
 - [x] L77: commands -- addToCommandHistory rejects whitespace-only strings; original accepts them. Mushkin: src/world/world_document.cpp:2399
 - [x] L78: commands -- DoSendMsg sends \n instead of \r\n. Mushkin: src/world/world_document.cpp:903,1218
-- [ ] L79: commands -- Command history stores processed command instead of original typed command. Mushkin: src/world/world_document.cpp:1493
+- [x] L79: commands -- Command history stores processed command instead of original typed command. Mushkin: src/world/world_document.cpp:1493
 - [ ] L80: commands -- Execute() doesn't check empty lines for reconnect prompt. Mushkin: src/world/world_document.cpp:1438
 
 ## v2 Audit: Speedwalks (2026-03-22)

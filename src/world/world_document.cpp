@@ -1350,7 +1350,8 @@ void WorldDocument::logCommand(const QString& text)
  *
  * @param command - User-entered command (may contain multiple commands)
  */
-void WorldDocument::Execute(const QString& command, bool allowScriptPrefix, bool addHistory)
+void WorldDocument::Execute(const QString& command, bool allowScriptPrefix, bool addHistory,
+                            const QString& originalCommand)
 {
     // Recursion depth guard — prevents infinite alias loops from crashing.
     // Original: methods_commands.cpp:254 — MAX_EXECUTION_DEPTH = 100
@@ -1508,9 +1509,10 @@ void WorldDocument::Execute(const QString& command, bool allowScriptPrefix, bool
         }
 
         // Add original command to history AFTER alias cycle (original: sendvw.cpp:713-714)
+        // Use the original typed command (before escape processing) if provided
         // Alias omit_from_command_history flag sets m_bOmitFromCommandHistory during execution
         if (addHistory && !m_bOmitFromCommandHistory) {
-            addToCommandHistory(processedCommand);
+            addToCommandHistory(originalCommand.isEmpty() ? str : originalCommand);
         }
     }
 }
