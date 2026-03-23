@@ -435,7 +435,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] H73: speedwalks -- eSendToSpeedwalk now routes through SendMsg with echo/log flags and error handling. Mushkin: src/world/world_sendto.cpp:169-174
 
 ### MEDIUM
-- [ ] M121: speedwalks -- SetSpeedWalkDelay does not clamp to 0-30000 range; accepts 0-65535. Mushkin: src/world/connection_manager.cpp:380-394
+- [x] M121: speedwalks -- SetSpeedWalkDelay now clamps to 0-30000 range. Mushkin: src/world/connection_manager.cpp:380-394
 - [ ] M122: speedwalks -- ReverseSpeedwalk cannot reverse single-letter or full-name directions inside parentheses (only diagonals). Mushkin: src/world/speedwalk_engine.cpp:309-334
 - [ ] M123: speedwalks -- Speed walk pipeline does not check connection before sending. Mushkin: src/world/world_document.cpp:1394-1395
 - [ ] M124: speedwalks -- Speed walk error shows note() instead of modal dialog. Mushkin: src/world/world_document.cpp:1389-1390

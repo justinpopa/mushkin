@@ -382,6 +382,12 @@ void ConnectionManager::drainCommandQueue()
  */
 void ConnectionManager::setSpeedWalkDelay(int delayMs)
 {
+    // Clamp to 0-30000 range (original: TimerWnd.cpp:74-81)
+    if (delayMs < 0)
+        delayMs = 0;
+    if (delayMs > 30000)
+        delayMs = 30000;
+
     if (delayMs <= 0) {
         // Flush all remaining commands immediately
         m_pQueueTimer->stop();
