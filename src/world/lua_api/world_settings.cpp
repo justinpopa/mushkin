@@ -1610,7 +1610,13 @@ int L_SetOption(lua_State* L)
         return luaReturnError(L, eOptionOutOfRange);
     }
 
-    opt.setter(*pDoc, value);
+    // For custom colours, subtract 1 on set (original: scriptingoptions.cpp:428-431)
+    // API uses 0=no-change, 1=colour1, etc.; storage uses -1=no-change, 0=colour1, etc.
+    double storeValue = value;
+    if (opt.iFlags & OPT_CUSTOM_COLOUR) {
+        storeValue = value - 1;
+    }
+    opt.setter(*pDoc, storeValue);
 
     // Apply side effects based on option flags (original: scriptingoptions.cpp:513-603)
     int flags = opt.iFlags;
@@ -1663,7 +1669,14 @@ int L_GetOption(lua_State* L)
     {
         auto it = getNumericOptionMap().find(key);
         if (it != getNumericOptionMap().end()) {
-            lua_pushnumber(L, OptionsTable[it->second].getter(*pDoc));
+            double value = OptionsTable[it->second].getter(*pDoc);
+            // For custom colours, add 1 on get (original: scriptingoptions.cpp:655-663)
+            if (OptionsTable[it->second].iFlags & OPT_CUSTOM_COLOUR) {
+                value += 1;
+                if (value == 65536) // -1 stored as 65535, +1 = 65536 → map to 0
+                    value = 0;
+            }
+            lua_pushnumber(L, value);
             return 1;
         }
     }

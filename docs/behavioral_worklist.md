@@ -541,7 +541,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 ### HIGH
 - [~] H92: options -- OPT_PLUGIN_CANNOT_READ flag defined but no options use it in original. No behavioral impact.. Mushkin: world_settings.cpp:1653-1683
 - [x] H93: options -- GetOption no longer falls through to alpha options; returns -1 for non-numeric option names. Mushkin: world_settings.cpp:1671-1678
-- [ ] H94: options -- SetOption OPT_CUSTOM_COLOUR adjustment missing; echo_colour off by 1. Mushkin: world_settings.cpp:1613
+- [x] H94: options -- SetOption/GetOption now applies +1/-1 OPT_CUSTOM_COLOUR adjustment for echo_colour. Mushkin: world_settings.cpp:1613
 - [ ] H95: options -- GetInfo dates (301-306) return OLE DATE instead of Unix timestamps. Mushkin: world_settings.cpp:1495-1546
 - [ ] H96: options -- SetOption OPT_FIX_OUTPUT_BUFFER is a no-op; buffer not trimmed. Mushkin: world_settings.cpp:1618-1621
 
