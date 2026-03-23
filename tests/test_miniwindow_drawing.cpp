@@ -278,12 +278,13 @@ int main(int argc, char* argv[])
     }
 
     result = getGlobalNumber(L, "result");
-    if (result != 0) {
-        qDebug() << "✗ FAIL: WindowCircleOp arc returned" << result;
+    // Action 6 (arc) is NOT valid for CircleOp in original MUSHclient — returns eUnknownOption
+    if (result != 30025) { // eUnknownOption
+        qDebug() << "✗ FAIL: WindowCircleOp arc should return eUnknownOption(30025), got" << result;
         return 1;
     }
 
-    qDebug() << "✓ WindowCircleOp arc draws arc with angles\n";
+    qDebug() << "✓ WindowCircleOp arc correctly returns eUnknownOption (use WindowArc instead)\n";
 
     // ========== Test 7: WindowLine ==========
     qDebug() << "Test 7: WindowLine";

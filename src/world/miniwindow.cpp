@@ -543,9 +543,7 @@ qint32 MiniWindow::CircleOp(qint16 action, qint32 left, qint32 top, qint32 right
                     painter.drawPie(rect, qRound(psa * 16), qRound(pspan * 16));
                 break;
             }
-            case 6: // Arc
-                painter.drawArc(rect, extra1 * 16, extra2 * 16);
-                break;
+                // Note: action 6 (arc) is NOT valid for CircleOp in original — only 1-5
         }
 
         // Now set up pattern brush with penColor for the pattern lines
@@ -639,11 +637,7 @@ qint32 MiniWindow::CircleOp(qint16 action, qint32 left, qint32 top, qint32 right
             break;
         }
 
-        case 6: // Arc
-            // extra1=start angle (degrees), extra2=span angle (degrees)
-            painter.drawArc(rect, extra1 * 16, extra2 * 16);
-            break;
-
+        // Note: action 6 (arc) is NOT valid for CircleOp — use WindowArc instead
         default:
             return eUnknownOption;
     }
