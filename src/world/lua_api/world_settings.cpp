@@ -1618,8 +1618,9 @@ int L_SetOption(lua_State* L)
     int flags = opt.iFlags;
 
     if (flags & OPT_FIX_OUTPUT_BUFFER) {
-        // Resize output line buffer to new max_output_lines value
-        // FixUpOutputBuffer trims excess lines — handled naturally on next line add
+        // Trim excess lines immediately when max_output_lines is reduced
+        // (original: scriptingoptions.cpp:513-515 calls FixUpOutputBuffer)
+        pDoc->trimLineBuffer();
     }
 
     if (flags & OPT_FIX_WRAP_COLUMN) {

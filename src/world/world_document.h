@@ -925,6 +925,7 @@ class WorldDocument : public QObject, public IWorldContext {
     int m_selectionEndChar;
 
     // ========== Line Buffer ==========
+    void trimLineBuffer();                         // trim excess lines to m_display.max_lines
     std::vector<std::unique_ptr<Line>> m_lineList; // list of output buffer lines
     std::unique_ptr<Line> m_currentLine;           // the line currently receiving (owns the line)
     QString m_strCurrentLine;                      // current line from MUD (no control codes)

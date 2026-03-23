@@ -1782,8 +1782,13 @@ void WorldDocument::AddLineToBuffer(std::unique_ptr<Line> line)
     m_lineList.push_back(std::move(line));
 
     // Trim buffer if too large
+    trimLineBuffer();
+}
+
+void WorldDocument::trimLineBuffer()
+{
     while (static_cast<qint32>(m_lineList.size()) > m_display.max_lines) {
-        m_lineList.erase(m_lineList.begin()); // oldest line is deleted automatically
+        m_lineList.erase(m_lineList.begin());
     }
 }
 

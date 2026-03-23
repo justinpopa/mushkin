@@ -543,7 +543,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] H93: options -- GetOption no longer falls through to alpha options; returns -1 for non-numeric option names. Mushkin: world_settings.cpp:1671-1678
 - [x] H94: options -- SetOption/GetOption now applies +1/-1 OPT_CUSTOM_COLOUR adjustment for echo_colour. Mushkin: world_settings.cpp:1613
 - [x] H95: options -- GetInfo dates (301-306) now return Unix timestamps (toSecsSinceEpoch). Mushkin: world_settings.cpp:1495-1546
-- [ ] H96: options -- SetOption OPT_FIX_OUTPUT_BUFFER is a no-op; buffer not trimmed. Mushkin: world_settings.cpp:1618-1621
+- [x] H96: options -- SetOption OPT_FIX_OUTPUT_BUFFER now calls trimLineBuffer() to trim excess lines immediately. Mushkin: world_settings.cpp:1618-1621
 
 ### MEDIUM
 - [ ] M149: options -- SetOption missing OPT_FIX_INPUT_WRAP side effect. Mushkin: world_settings.cpp:1616
