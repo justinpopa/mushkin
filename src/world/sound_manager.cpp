@@ -433,9 +433,12 @@ qint32 SoundManager::getSoundStatus(qint16 buffer)
         return -2;
     }
 
-    // Check if playing
+    // Check if playing — always return 1 (playing), never 2 (looping)
+    // Original bug: DSBSTATUS_PLAYING is checked first, DSBSTATUS_LOOPING second.
+    // Since both flags are set for looping sounds, playing always matches first.
+    // Scripts depend on this behavior. (original: methods_sounds.cpp:434-438)
     if (sb.isPlaying) {
-        return sb.isLooping ? 2 : 1;
+        return 1;
     }
 
     // Not playing
