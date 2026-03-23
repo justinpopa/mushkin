@@ -163,8 +163,8 @@ void CommandHistoryDialog::sendCommand()
 
     QString command = item->text();
 
-    // Send to MUD
-    m_doc->sendToMud(command);
+    // Send through the full pipeline (echo, logging, plugin callbacks)
+    m_doc->SendMsg(command, m_doc->m_display_my_input, false, m_doc->m_logging.log_input);
 
     // Add to history (will move to end)
     m_doc->addToCommandHistory(command);

@@ -3441,7 +3441,7 @@ void MainWindow::sendToAllWorlds()
                 if (echo) {
                     openWorlds[i]->note(QString("> %1").arg(text));
                 }
-                openWorlds[i]->sendToMud(text + "\n");
+                openWorlds[i]->sendToMud(text);
             }
         }
     }

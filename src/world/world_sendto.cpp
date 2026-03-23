@@ -206,11 +206,13 @@ void WorldDocument::sendTo(SendTo iWhere, const QString& strSendText, bool omit_
             break;
 
         // ========== eSendImmediate: Send immediately (bypass queue) ==========
-        // Original: doc.cpp
+        // Original: doc.cpp:6368-6373 — DoSendMsg bypasses the speedwalk queue entirely
         case eSendImmediate:
-            // Sends immediately, bypassing any future command queue — same as eSendToWorld for now.
+            // Sends immediately via DoSendMsg, bypassing SendMsg's queue logic.
+            // Uses same echo/log flags as the original: m_display_my_input and LoggingInput().
             if (!strSendText.isEmpty()) {
-                sendToMud(strSendText);
+                DoSendMsg(strSendText, omit_from_output ? false : m_display_my_input,
+                          omit_from_log ? false : m_logging.log_input);
             }
             break;
 

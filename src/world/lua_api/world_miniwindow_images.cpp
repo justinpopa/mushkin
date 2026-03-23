@@ -1392,10 +1392,14 @@ int L_WindowHotspotInfo(lua_State* L)
             lua_pushinteger(L, hotspot->m_rect.top());
             break;
         case 3: // right
-            lua_pushinteger(L, hotspot->m_rect.right());
+            // Qt QRect::right() is inclusive (x + width - 1); Windows CRect is exclusive.
+            // Add +1 to match MUSHclient's exclusive right coordinate.
+            lua_pushinteger(L, hotspot->m_rect.right() + 1);
             break;
         case 4: // bottom
-            lua_pushinteger(L, hotspot->m_rect.bottom());
+            // Qt QRect::bottom() is inclusive (y + height - 1); Windows CRect is exclusive.
+            // Add +1 to match MUSHclient's exclusive bottom coordinate.
+            lua_pushinteger(L, hotspot->m_rect.bottom() + 1);
             break;
         case 5: // MouseOver callback
             luaPushQString(L, hotspot->m_sMouseOver);
