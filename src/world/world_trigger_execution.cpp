@@ -276,6 +276,10 @@ void WorldDocument::executeTriggerScript(Trigger* trigger, const QString& matche
         return;
     }
 
+    // Set action source so scripts can query GetInfo(239)
+    // (original: lua_scripting.cpp:621-627 sets eTriggerFired via ExecuteLua)
+    m_iCurrentActionSource = ActionSource::eTriggerFired;
+
     // Determine which script engine to use:
     // - If trigger belongs to a plugin, use the plugin's script engine
     // - Otherwise, use the world's script engine
