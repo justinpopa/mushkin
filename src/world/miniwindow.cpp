@@ -14,6 +14,34 @@
 
 #include "../utils/error_codes.h"
 
+// Validate pen style flags (original: miniwindow.cpp:353-398)
+static bool validatePenStyle(qint32 penStyle, qint32 penWidth)
+{
+    int linePat = penStyle & 0x0F; // PS_STYLE_MASK
+    switch (linePat) {
+        case 0: // PS_SOLID
+        case 5: // PS_NULL
+        case 6: // PS_INSIDEFRAME
+            break;
+        case 1: // PS_DASH
+        case 2: // PS_DOT
+        case 3: // PS_DASHDOT
+        case 4: // PS_DASHDOTDOT
+            if (penWidth > 1)
+                return false;
+            break;
+        default:
+            return false;
+    }
+    int endCap = (penStyle >> 8) & 0x0F; // PS_ENDCAP_MASK
+    if (endCap > 2) // PS_ENDCAP_ROUND(0), PS_ENDCAP_SQUARE(1), PS_ENDCAP_FLAT(2)
+        return false;
+    int join = (penStyle >> 12) & 0x0F; // PS_JOIN_MASK
+    if (join > 2)                       // PS_JOIN_ROUND(0), PS_JOIN_BEVEL(1), PS_JOIN_MITER(2)
+        return false;
+    return true;
+}
+
 // Helper to create a pen with Windows GDI-compatible dash patterns
 // Windows GDI cosmetic pens (width 0 or 1) render dash patterns as nearly solid
 // because the dash pattern is device-dependent and effectively invisible at 1 pixel.
@@ -485,6 +513,9 @@ qint32 MiniWindow::CircleOp(qint16 action, qint32 left, qint32 top, qint32 right
     if (!image)
         return eBadParameter;
 
+    if (!validatePenStyle(penStyle, penWidth))
+        return ePenStyleNotValid;
+
     // Handle special meaning for right/bottom (from miniwindow.cpp)
     // - right <= 0 means offset from right edge (0 = right edge, -1 = 1px from right)
     // - bottom <= 0 means offset from bottom edge (0 = bottom edge, -1 = 1px from bottom)
@@ -658,6 +689,9 @@ qint32 MiniWindow::Line(qint32 x1, qint32 y1, qint32 x2, qint32 y2, QRgb penColo
     if (!image)
         return eBadParameter;
 
+    if (!validatePenStyle(penStyle, penWidth))
+        return ePenStyleNotValid;
+
     QPainter painter(image.get());
     // Don't use antialiasing - can cause pixels to extend beyond bounds
     // painter.setRenderHint(QPainter::Antialiasing);
@@ -690,6 +724,9 @@ qint32 MiniWindow::Arc(qint32 left, qint32 top, qint32 right, qint32 bottom, qin
 {
     if (!image)
         return eBadParameter;
+
+    if (!validatePenStyle(penStyle, penWidth))
+        return ePenStyleNotValid;
 
     QPainter painter(image.get());
 
@@ -746,6 +783,9 @@ qint32 MiniWindow::Bezier(const QString& pointsStr, QRgb penColor, qint32 penSty
 {
     if (!image)
         return eBadParameter;
+
+    if (!validatePenStyle(penStyle, penWidth))
+        return ePenStyleNotValid;
 
     // Parse comma-separated points
     QStringList parts = pointsStr.split(',');
@@ -855,6 +895,9 @@ qint32 MiniWindow::Polygon(const QString& points, QRgb penColor, qint32 penStyle
 {
     if (!image)
         return eBadParameter;
+
+    if (!validatePenStyle(penStyle, penWidth))
+        return ePenStyleNotValid;
 
     // Parse comma-separated coordinate pairs (x1,y1,x2,y2,...)
     QStringList coords = points.split(',', Qt::SkipEmptyParts);
@@ -2026,24 +2069,8 @@ qint32 MiniWindow::ImageOp(qint16 action, qint32 left, qint32 top, qint32 right,
 
     QImage* brushImg = it->second.get();
 
-    // Validate pen style (original: miniwindow.cpp:353-398, 1909-1910)
-    {
-        int linePat = penStyle & 0x0F; // PS_STYLE_MASK
-        if (linePat >= 1 && linePat <= 4 && penWidth > 1) {
-            return ePenStyleNotValid; // dash/dot styles require width <= 1
-        }
-        if (linePat > 6) {
-            return ePenStyleNotValid; // unknown style
-        }
-        int endCap = (penStyle >> 8) & 0x0F; // PS_ENDCAP_MASK
-        if (endCap > 2) {
-            return ePenStyleNotValid;
-        }
-        int join = (penStyle >> 12) & 0x0F; // PS_JOIN_MASK
-        if (join > 2) {
-            return ePenStyleNotValid;
-        }
-    }
+    if (!validatePenStyle(penStyle, penWidth))
+        return ePenStyleNotValid;
 
     // Create painter
     QPainter painter(image.get());

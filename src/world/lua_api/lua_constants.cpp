@@ -619,24 +619,34 @@ void register_lua_constants(lua_State* L)
     lua_pushnumber(L, 6);
     lua_setfield(L, -2, "circle_arc");
 
-    // Pen styles - Qt::PenStyle values
-    lua_pushnumber(L, 0); // Qt::NoPen
-    lua_setfield(L, -2, "pen_none");
-
-    lua_pushnumber(L, 1); // Qt::SolidLine
+    // Pen styles - Windows GDI PS_* values (original: lua_methods.cpp:7156-7161)
+    lua_pushnumber(L, 0); // PS_SOLID
     lua_setfield(L, -2, "pen_solid");
 
-    lua_pushnumber(L, 2); // Qt::DashLine
+    lua_pushnumber(L, 1); // PS_DASH
     lua_setfield(L, -2, "pen_dash");
 
-    lua_pushnumber(L, 3); // Qt::DotLine
+    lua_pushnumber(L, 2); // PS_DOT
     lua_setfield(L, -2, "pen_dot");
 
-    lua_pushnumber(L, 4); // Qt::DashDotLine
+    lua_pushnumber(L, 3); // PS_DASHDOT
+    lua_setfield(L, -2, "pen_dash_dot");
+
+    lua_pushnumber(L, 4); // PS_DASHDOTDOT
+    lua_setfield(L, -2, "pen_dash_dot_dot");
+
+    lua_pushnumber(L, 5); // PS_NULL
+    lua_setfield(L, -2, "pen_null");
+
+    // Backwards-compat aliases for old Mushkin names
+    lua_pushnumber(L, 3); // PS_DASHDOT
     lua_setfield(L, -2, "pen_dashdot");
 
-    lua_pushnumber(L, 5); // Qt::DashDotDotLine
+    lua_pushnumber(L, 4); // PS_DASHDOTDOT
     lua_setfield(L, -2, "pen_dashdotdot");
+
+    lua_pushnumber(L, 5); // PS_NULL (alias — original uses pen_null)
+    lua_setfield(L, -2, "pen_none");
 
     // Pen endcap styles (Windows GDI constants)
     lua_pushnumber(L, 0x00000000); // PS_ENDCAP_ROUND
