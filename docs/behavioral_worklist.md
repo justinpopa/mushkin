@@ -441,7 +441,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [~] M124: speedwalks -- Speed walk error shows note() instead of modal dialog. Intentional UX improvement — inline errors are less disruptive than modals.. Mushkin: src/world/world_document.cpp:1389-1390
 
 ### LOW
-- [ ] L81: speedwalks -- GetSpeedWalkDelay returns lua_Integer instead of short. Mushkin: src/world/lua_api/world_logging_opts.cpp:297-301
+- [x] L81: speedwalks -- GetSpeedWalkDelay returns lua_Integer instead of short. Mushkin: src/world/lua_api/world_logging_opts.cpp:297-301
 - [ ] L82: speedwalks -- Speed walk prefix empty guard prevents all commands being parsed as speedwalks. Mushkin: src/world/world_document.cpp:1379-1380
 - [ ] L83: speedwalks -- RemoveBacktracks cannot cancel custom parenthesized directions. Mushkin: src/world/speedwalk_engine.cpp:409-439
 

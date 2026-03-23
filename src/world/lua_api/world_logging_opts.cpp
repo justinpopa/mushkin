@@ -298,7 +298,8 @@ int L_LogSend(lua_State* L)
 int L_GetSpeedWalkDelay(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    lua_pushinteger(L, pDoc->m_speedwalk.delay);
+    // Original returns short via lua_pushnumber (methods_speedwalks.cpp:350-353)
+    lua_pushnumber(L, static_cast<short>(pDoc->m_speedwalk.delay));
     return 1;
 }
 
