@@ -388,7 +388,7 @@ QString reverse(const QString& speedWalkString)
  */
 QString removeBacktracks(const QString& speedWalkString, const QString& filler)
 {
-    // Initialize direction map with reverses
+    // Initialize direction map with reverses (all entries from MapDirectionsMap)
     static QMap<QString, QString> reverseMap;
     if (reverseMap.isEmpty()) {
         reverseMap["n"] = "s";
@@ -397,12 +397,20 @@ QString removeBacktracks(const QString& speedWalkString, const QString& filler)
         reverseMap["w"] = "e";
         reverseMap["u"] = "d";
         reverseMap["d"] = "u";
+        reverseMap["ne"] = "sw";
+        reverseMap["sw"] = "ne";
+        reverseMap["nw"] = "se";
+        reverseMap["se"] = "nw";
         reverseMap["north"] = "south";
         reverseMap["south"] = "north";
         reverseMap["east"] = "west";
         reverseMap["west"] = "east";
         reverseMap["up"] = "down";
         reverseMap["down"] = "up";
+        reverseMap["northeast"] = "southwest";
+        reverseMap["southwest"] = "northeast";
+        reverseMap["northwest"] = "southeast";
+        reverseMap["southeast"] = "northwest";
     }
 
     // First expand the speedwalk
@@ -425,6 +433,7 @@ QString removeBacktracks(const QString& speedWalkString, const QString& filler)
             continue;
 
         // Convert full direction to single letter for comparison
+        // Normalize full direction names to short codes (original: MapDirectionsMap lookup)
         QString normalized = trimmed;
         if (trimmed == "north")
             normalized = "n";
@@ -438,6 +447,14 @@ QString removeBacktracks(const QString& speedWalkString, const QString& filler)
             normalized = "u";
         else if (trimmed == "down")
             normalized = "d";
+        else if (trimmed == "northeast")
+            normalized = "ne";
+        else if (trimmed == "southwest")
+            normalized = "sw";
+        else if (trimmed == "northwest")
+            normalized = "nw";
+        else if (trimmed == "southeast")
+            normalized = "se";
 
         if (stack.isEmpty()) {
             stack.append(normalized);
