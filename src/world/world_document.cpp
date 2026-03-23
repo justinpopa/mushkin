@@ -933,6 +933,11 @@ void WorldDocument::sendToMud(const QString& text)
  */
 void WorldDocument::SendMsg(const QString& text, bool bEcho, bool bQueue, bool bLog)
 {
+    // Cannot change what we are sending during OnPluginSent (original: doc.cpp:1099-1100)
+    if (m_bPluginProcessingSent) {
+        return;
+    }
+
     QString strText = text;
 
     // Strip trailing \r\n (ENDLINE in original)
