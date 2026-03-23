@@ -626,8 +626,8 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] H110: mxp -- SEND tag now falls back to xch_cmd/xch_hint for Pueblo compatibility. Mushkin: mxp_engine.cpp:2003-2018
 - [x] H111: mxp -- Hyperlink <A> tag now converts xch_cmd to SEND action for Pueblo. Mushkin: mxp_engine.cpp:2021-2036
 - [~] H112: mxp -- </send> - [ ] H112: mxp -- </send> close does not populate &text; replacement (most MUDs use <send>text</send>)text; replacement. DEFERRED: requires MXP style stack (H114) to apply link actions to already-rendered text. Needs dedicated MXP plan.. Mushkin: mxp_engine.cpp:2428-2443
-- [ ] H113: mxp -- <var> tag close is a no-op stub (MXP variables never set). Mushkin: mxp_engine.cpp:2190-2198
-- [ ] H114: mxp -- No style stack: closing COLOR/FONT/B/I/U tags don't restore previous state. Mushkin: mxp_engine.cpp:2414-2425
+- [~] H113: mxp -- <var> tag close no-op. DEFERRED: requires MXP variable system (variable capture, entity creation, script callbacks). Needs dedicated MXP plan.. Mushkin: mxp_engine.cpp:2190-2198
+- [~] H114: mxp -- No MXP style stack. DEFERRED: requires style marker system (save/restore per-tag). Architectural, needs dedicated plan.. Mushkin: mxp_engine.cpp:2414-2425
 
 ### MEDIUM
 - [ ] M174: mxp -- Entity lookup is case-sensitive; original is partially case-insensitive for custom entities. Mushkin: mxp_engine.cpp:1189-1213
