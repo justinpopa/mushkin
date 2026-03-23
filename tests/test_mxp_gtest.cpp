@@ -85,7 +85,9 @@ TEST_F(MXPTest, InitializeLoadsBasicFormattingTags)
     ASSERT_NE(bold, nullptr);
     EXPECT_EQ(bold->strName, "bold");
     EXPECT_EQ(bold->iAction, MXP_ACTION_BOLD);
-    EXPECT_TRUE(bold->iFlags & TAG_MXP);
+    // bold is an open tag (TAG_OPEN = 0x01) — works in open/unsecure mode
+    // Source: mxpinit.cpp:26
+    EXPECT_TRUE(bold->iFlags & TAG_OPEN);
 
     AtomicElement* italic = doc->m_mxpEngine->MXP_FindAtomicElement("italic");
     ASSERT_NE(italic, nullptr);
@@ -123,9 +125,9 @@ TEST_F(MXPTest, InitializeLoadsHyperlinkTag)
     AtomicElement* a = doc->m_mxpEngine->MXP_FindAtomicElement("a");
     ASSERT_NE(a, nullptr);
     EXPECT_EQ(a->iAction, MXP_ACTION_HYPERLINK);
-    EXPECT_TRUE(a->iFlags & TAG_MXP);
-    // Hyperlink is secure - does NOT require TAG_OPEN
-    EXPECT_FALSE(a->iFlags & TAG_OPEN);
+    // Hyperlink is secure (flags=0) — no TAG_OPEN, no TAG_COMMAND
+    // Source: mxpinit.cpp:54
+    EXPECT_EQ(a->iFlags, 0);
 }
 
 // Test 9: Element lookup is case-insensitive
@@ -162,9 +164,9 @@ TEST_F(MXPTest, InitializeLoadsFontTag)
     AtomicElement* font = doc->m_mxpEngine->MXP_FindAtomicElement("font");
     ASSERT_NE(font, nullptr);
     EXPECT_EQ(font->iAction, MXP_ACTION_FONT);
-    EXPECT_TRUE(font->iFlags & TAG_MXP);
-    // Font is secure - does NOT require TAG_OPEN
-    EXPECT_FALSE(font->iFlags & TAG_OPEN);
+    // font is an open tag (TAG_OPEN = 0x01) — works in open/unsecure mode
+    // Source: mxpinit.cpp:44
+    EXPECT_TRUE(font->iFlags & TAG_OPEN);
 }
 
 // Test 13: InitializeMXPElements loads image tag
@@ -771,7 +773,7 @@ TEST_F(MXPTest, ActiveTagStackPushesOnOpeningTag)
 
     int initialSize = doc->m_mxpEngine->m_activeTagList.size();
 
-    // Open a safe tag (bold doesn't have TAG_OPEN)
+    // Open a tag that works in secure mode (bold has TAG_OPEN, works in any mode)
     doc->m_mxpEngine->m_strMXPstring = "bold";
     doc->m_mxpEngine->MXP_collected_element();
 
