@@ -267,8 +267,72 @@ bool AcceleratorManager::parseKeyString(const QString& keyString, QKeySequence& 
 
 QString AcceleratorManager::keySequenceToString(const QKeySequence& keySeq)
 {
-    // Qt provides a portable string representation
-    return keySeq.toString(QKeySequence::PortableText);
+    // M156: Match MUSHclient's KeyCodeToString format.
+    // Original outputs modifiers in order: Shift+Ctrl+Alt+ then key name.
+    // Qt's PortableText uses Ctrl+Shift+Alt+Meta order and different key names
+    // (e.g., "PgDown" vs "PageDown", "Ins" vs "Insert").
+
+    if (keySeq.isEmpty()) {
+        return {};
+    }
+
+    int combo = keySeq[0].toCombined();
+    Qt::KeyboardModifiers mods =
+        Qt::KeyboardModifiers(combo & static_cast<int>(Qt::KeyboardModifierMask));
+    Qt::Key key = static_cast<Qt::Key>(combo & ~static_cast<int>(Qt::KeyboardModifierMask));
+
+    QString result;
+
+    // MUSHclient modifier order: Shift, Ctrl, Alt (never Meta on original)
+    if (mods & Qt::ShiftModifier) {
+        result += "Shift+";
+    }
+    if (mods & Qt::ControlModifier) {
+        result += "Ctrl+";
+    }
+    if (mods & Qt::AltModifier) {
+        result += "Alt+";
+    }
+
+    // Reverse-lookup key name from our s_keyNameMap (MUSHclient names)
+    initKeyNameMap();
+    QString keyName;
+
+    // Special handling for numpad digits (KeypadModifier + digit key)
+    if ((mods & Qt::KeypadModifier) && key >= Qt::Key_0 && key <= Qt::Key_9) {
+        keyName = QString("Numpad%1").arg(key - Qt::Key_0);
+    } else {
+        // Look up using the same names MUSHclient uses (first match wins)
+        // Prefer canonical names: avoid alias duplicates by checking length
+        // (shorter canonical names like "Esc" preferred over "Escape")
+        for (auto it = s_keyNameMap.constBegin(); it != s_keyNameMap.constEnd(); ++it) {
+            if (it.value() == key) {
+                // Skip "Numpad" prefix entries for non-keypad lookups
+                if (it.key().startsWith("Numpad") && it.key().length() == 7 &&
+                    it.key().back().isDigit()) {
+                    continue;
+                }
+                if (keyName.isEmpty() || it.key().length() < keyName.length()) {
+                    keyName = it.key();
+                }
+            }
+        }
+    }
+
+    if (keyName.isEmpty()) {
+        // Fallback: single character for printable keys
+        if (key >= Qt::Key_A && key <= Qt::Key_Z) {
+            keyName = QChar('A' + (key - Qt::Key_A));
+        } else if (key >= Qt::Key_0 && key <= Qt::Key_9) {
+            keyName = QChar('0' + (key - Qt::Key_0));
+        } else {
+            // Last resort: Qt's portable text for the key part
+            keyName = QKeySequence(key).toString(QKeySequence::PortableText);
+        }
+    }
+
+    result += keyName;
+    return result;
 }
 
 int AcceleratorManager::addAccelerator(const QString& keyString, const QString& action, int sendTo,

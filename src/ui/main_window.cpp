@@ -2167,6 +2167,23 @@ void MainWindow::openWorld(const QString& filename)
 {
     statusBar()->showMessage(QString("Opening %1...").arg(filename));
 
+    // M193: Check if this file is already open (MFC's OpenDocumentFile does this automatically).
+    // Compare canonical paths so symlinks and relative paths are handled correctly.
+    QString canonicalPath = QFileInfo(filename).canonicalFilePath();
+    if (!canonicalPath.isEmpty()) {
+        for (QMdiSubWindow* sub : m_mdiArea->subWindowList()) {
+            auto* existingWidget = qobject_cast<WorldWidget*>(sub->widget());
+            if (existingWidget &&
+                QFileInfo(existingWidget->filename()).canonicalFilePath() == canonicalPath) {
+                // Already open — activate the existing window instead
+                m_mdiArea->setActiveSubWindow(sub);
+                statusBar()->showMessage(
+                    QString("World already open: %1").arg(existingWidget->worldName()), 3000);
+                return;
+            }
+        }
+    }
+
     // Create world widget
     auto worldWidgetOwner = std::make_unique<WorldWidget>();
 

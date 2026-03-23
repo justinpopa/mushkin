@@ -1233,9 +1233,13 @@ bool ScriptEngine::parseLua(const QString& code, const QString& name)
     lua_settop(L, 0);
 
     // Update statistics (stored in document)
+    // M188: Also track per-plugin timing, matching original lua_scripting.cpp:291-293
     if (m_doc) {
         qint64 elapsed = timer.nsecsElapsed();
         m_doc->m_iScriptTimeTaken += elapsed;
+        if (m_doc->m_CurrentPlugin) {
+            m_doc->m_CurrentPlugin->m_iScriptTimeTaken += elapsed;
+        }
     }
 
     return false; // Success

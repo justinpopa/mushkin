@@ -247,7 +247,7 @@ void WorldDocument::executeTrigger(Trigger* trigger, Line* line, const QString& 
     // we also need to call executeTriggerScript for eSendToScriptAfterOmit)
     if (!trigger->procedure.isEmpty() &&
         (trigger->send_to == eSendToScript || trigger->send_to == eSendToScriptAfterOmit)) {
-        executeTriggerScript(trigger, matchedText);
+        executeTriggerScript(trigger, line, matchedText);
     }
 
     qCDebug(lcWorld) << "Trigger executed:" << trigger->label << "matched:" << trigger->matched
@@ -264,12 +264,13 @@ void WorldDocument::executeTrigger(Trigger* trigger, Line* line, const QString& 
  * 1. Trigger name (string)
  * 2. Matched line (string)
  * 3. Wildcards (table) - indexed 0..N where 0 is full match, 1+ are capture groups
- * 4. TriggerStyleRuns (table) - TODO styled line information
+ * 4. TriggerStyleRuns (table) - styled line information (text, length, colours, style)
  *
  * @param trigger The trigger that matched
+ * @param line The matched line (for style runs, may be nullptr)
  * @param matchedText The text that matched the trigger
  */
-void WorldDocument::executeTriggerScript(Trigger* trigger, const QString& matchedText)
+void WorldDocument::executeTriggerScript(Trigger* trigger, Line* line, const QString& matchedText)
 {
     // Safety check - need a procedure name
     if (trigger->procedure.isEmpty()) {
@@ -431,8 +432,48 @@ void WorldDocument::executeTriggerScript(Trigger* trigger, const QString& matche
         lua_settable(L, -3);
     }
 
-    // Argument 4: TriggerStyleRuns table (empty for now)
+    // Argument 4: TriggerStyleRuns table
+    // M187: Build style runs from the matched line (original: lua_scripting.cpp:599-619)
+    // Each entry is a sub-table with: text, length, textcolour, backcolour, style
     lua_newtable(L);
+    if (line) {
+        int styleIndex = 1;
+        int textOffset = 0;
+        for (const auto& style : line->styleList) {
+            lua_newtable(L);
+
+            // Extract text for this style run
+            int runLen = style->iLength;
+            QString runText;
+            if (textOffset + runLen <= line->len()) {
+                runText = QString::fromUtf8(line->textBuffer.data() + textOffset, runLen);
+            }
+            textOffset += runLen;
+
+            // "text" = the text content of this style run
+            QByteArray textBytes = runText.toUtf8();
+            lua_pushlstring(L, textBytes.constData(), textBytes.length());
+            lua_setfield(L, -2, "text");
+
+            // "length" = length of the text
+            lua_pushinteger(L, runText.length());
+            lua_setfield(L, -2, "length");
+
+            // "textcolour" = foreground colour (BGR format, matching original COLORREF)
+            lua_pushinteger(L, static_cast<lua_Integer>(style->iForeColour & 0x00FFFFFF));
+            lua_setfield(L, -2, "textcolour");
+
+            // "backcolour" = background colour (BGR format)
+            lua_pushinteger(L, static_cast<lua_Integer>(style->iBackColour & 0x00FFFFFF));
+            lua_setfield(L, -2, "backcolour");
+
+            // "style" = style flags (bold/underline/italic)
+            lua_pushinteger(L, style->iFlags & TEXT_STYLE);
+            lua_setfield(L, -2, "style");
+
+            lua_rawseti(L, -2, styleIndex++);
+        }
+    }
 
     // Prevent deletion during script execution
     trigger->executing_script = true;

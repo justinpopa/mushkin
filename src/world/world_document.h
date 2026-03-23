@@ -1637,7 +1637,7 @@ class WorldDocument : public QObject, public IWorldContext {
     // ========== Trigger Execution and Actions ==========
     void executeTrigger(Trigger* trigger, Line* line,
                         const QString& matchedText) override; // Execute trigger action
-    void executeTriggerScript(Trigger* trigger,
+    void executeTriggerScript(Trigger* trigger, Line* line,
                               const QString& matchedText); // Execute Lua script callback
     QString replaceWildcards(const QString& text, const QVector<QString>& wildcards,
                              const QString& itemName = {},
