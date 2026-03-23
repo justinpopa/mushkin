@@ -3021,9 +3021,12 @@ void WorldDocument::OutputOutstandingLines()
 
 void WorldDocument::flushLogIfNeeded()
 {
-    // Original (timers.cpp:278-284) does fclose/fopen every 120s to flush.
-    // QFile::flush() achieves the same data-safety goal without releasing the handle.
+    // Original (timers.cpp:272-288) flushes every 120 seconds (2 minutes)
     if (m_logfile && m_logfile->isOpen()) {
-        m_logfile->flush();
+        QDateTime now = QDateTime::currentDateTime();
+        if (m_LastFlushTime.isValid() && m_LastFlushTime.secsTo(now) > 120) {
+            m_LastFlushTime = now;
+            m_logfile->flush();
+        }
     }
 }
