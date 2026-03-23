@@ -855,14 +855,13 @@ qint32 MiniWindow::SetPixel(qint32 x, qint32 y, QRgb color)
     if (!image)
         return eBadParameter;
 
-    if (x < 0 || x >= image->width() || y < 0 || y >= image->height())
-        return eBadParameter;
-
-    // Convert BGR (from Lua) to ARGB (for QImage)
-    image->setPixel(x, y, bgrToQRgb(color));
-
-    dirty = true;
-    emit needsRedraw();
+    // Original (miniwindow.cpp:3293-3297) calls SetPixelV with no bounds check.
+    // GDI silently ignores out-of-bounds coordinates. Match that behavior.
+    if (x >= 0 && x < image->width() && y >= 0 && y < image->height()) {
+        image->setPixel(x, y, bgrToQRgb(color));
+        dirty = true;
+        emit needsRedraw();
+    }
     return eOK;
 }
 

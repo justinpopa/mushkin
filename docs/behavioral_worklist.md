@@ -470,7 +470,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] M135: miniwindows -- WindowInfo case 21 returns current time instead of installation time. Mushkin: world_miniwindow_lifecycle.cpp:488-493
 
 ### LOW
-- [ ] L84: miniwindows -- SetPixel returns eBadParameter for out-of-bounds instead of silently succeeding. Mushkin: miniwindow.cpp:790-792
+- [x] L84: miniwindows -- SetPixel returns eBadParameter for out-of-bounds instead of silently succeeding. Mushkin: miniwindow.cpp:790-792
 - [ ] L85: miniwindows -- GetPixel returns 0 for out-of-bounds instead of -1 (CLR_INVALID). Mushkin: miniwindow.cpp:813-814
 - [ ] L86: miniwindows -- WindowFont size=0 creates 1px font instead of defaulting to 10pt. Mushkin: miniwindow.cpp:1047
 - [ ] L87: miniwindows -- LoadImage accepts all Qt formats instead of only .bmp/.png. Mushkin: miniwindow.cpp:1217-1234
