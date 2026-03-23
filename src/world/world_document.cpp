@@ -1445,8 +1445,9 @@ void WorldDocument::Execute(const QString& command, bool allowScriptPrefix, bool
     // Check for speedwalk prefix BEFORE command stacking
     // Based on evaluate.cpp
 
-    if (m_speedwalk.enabled && !m_speedwalk.prefix.isEmpty() &&
-        strFixedCommand.startsWith(m_speedwalk.prefix)) {
+    // Original (evaluate.cpp:39-40) does NOT guard against empty prefix.
+    // An empty prefix means ALL input is treated as speedwalk (matches original).
+    if (m_speedwalk.enabled && strFixedCommand.startsWith(m_speedwalk.prefix)) {
         // Check connection before processing speedwalk (original: evaluate.cpp:52-53)
         if (connectPhase() != eConnectConnectedToMud)
             return;
