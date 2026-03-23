@@ -1123,8 +1123,11 @@ qint32 MiniWindow::Font(const QString& fontId, const QString& fontName, double s
         return eOK;
     }
 
+    // Default to 10pt if size is 0 (original: miniwindow.cpp:643 — Size ? Size : 10.0)
+    double effectiveSize = (size != 0.0) ? size : 10.0;
+
     // Use createScaledFontF for cross-platform DPI-consistent sizing
-    QFont font = createScaledFontF(fontName, size);
+    QFont font = createScaledFontF(fontName, effectiveSize);
 
     font.setBold(bold);
     font.setItalic(italic);
