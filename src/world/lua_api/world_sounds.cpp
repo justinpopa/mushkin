@@ -7,6 +7,7 @@
  * - world.Sound(filename)
  */
 
+#include "../sound_manager.h"
 #include "lua_common.h"
 #include <QDir>
 #include <QFile>
@@ -146,17 +147,21 @@ int L_PlaySoundMemory(lua_State* L)
 
     // Original: lua_methods.cpp:4510-4527 — calls PlaySoundHelper with memory buffer
     // buffer = arg 1, data = arg 2 (string), loop = arg 3, volume = arg 4, pan = arg 5
+    qint16 buffer = static_cast<qint16>(luaL_optinteger(L, 1, 0));
     size_t dataLen = 0;
     const char* data = luaL_checklstring(L, 2, &dataLen);
+    bool loop = lua_toboolean(L, 3);
+    double volume = luaL_optnumber(L, 4, 0.0); // 0 = full volume
+    double pan = luaL_optnumber(L, 5, 0.0);    // 0 = center
 
     if (!data || dataLen == 0) {
         return luaReturn(L, eCannotPlaySound);
     }
 
-    // Write memory buffer to a temp file and play via existing file-based infrastructure
+    // Write memory buffer to a unique temp file (avoids race condition with concurrent calls)
     // Qt Multimedia doesn't support raw memory buffer playback directly
     QString tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
-    QString tempPath = tempDir + "/mushkin_sound_mem.wav";
+    QString tempPath = tempDir + QString("/mushkin_sound_mem_%1.wav").arg(buffer);
 
     QFile tempFile(tempPath);
     if (!tempFile.open(QIODevice::WriteOnly)) {
@@ -165,8 +170,9 @@ int L_PlaySoundMemory(lua_State* L)
     tempFile.write(data, static_cast<qint64>(dataLen));
     tempFile.close();
 
-    bool ok = pDoc->PlaySoundFile(tempPath);
-    return luaReturn(L, ok ? eOK : eCannotPlaySound);
+    // Play with all parameters (buffer, loop, volume, pan)
+    qint32 result = pDoc->m_soundManager->playSound(buffer, tempPath, loop, volume, pan);
+    return luaReturn(L, result);
 }
 
 /**
