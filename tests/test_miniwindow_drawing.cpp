@@ -365,12 +365,13 @@ int main(int argc, char* argv[])
     }
 
     color = getGlobalNumber(L, "color");
-    if (color != 0) {
-        qDebug() << "✗ FAIL: WindowGetPixel out of bounds should return 0, got" << color;
+    // Original GDI GetPixel returns CLR_INVALID (0xFFFFFFFF = -1) for OOB
+    if (color != static_cast<double>(0xFFFFFFFF)) {
+        qDebug() << "✗ FAIL: WindowGetPixel out of bounds should return CLR_INVALID, got" << color;
         return 1;
     }
 
-    qDebug() << "✓ WindowGetPixel correctly handles out of bounds\n";
+    qDebug() << "✓ WindowGetPixel correctly returns CLR_INVALID for out of bounds\n";
 
     // ========== Test 10: WindowFont ==========
     qDebug() << "Test 10: WindowFont";

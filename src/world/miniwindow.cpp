@@ -874,11 +874,15 @@ qint32 MiniWindow::SetPixel(qint32 x, qint32 y, QRgb color)
  */
 QRgb MiniWindow::GetPixel(qint32 x, qint32 y)
 {
+    // Original (miniwindow.cpp:3306-3309) returns GDI GetPixel which
+    // returns CLR_INVALID (0xFFFFFFFF = -1) for out-of-bounds
+    constexpr QRgb CLR_INVALID = 0xFFFFFFFF;
+
     if (!image)
-        return 0;
+        return CLR_INVALID;
 
     if (x < 0 || x >= image->width() || y < 0 || y >= image->height())
-        return 0;
+        return CLR_INVALID;
 
     // Convert ARGB (from QImage) to BGR (for Lua)
     return qRgbToBgr(image->pixel(x, y));
