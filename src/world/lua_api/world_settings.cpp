@@ -1668,14 +1668,8 @@ int L_GetOption(lua_State* L)
         }
     }
 
-    // Search alpha (string) options table (O(1))
-    {
-        auto it = getAlphaOptionMap().find(key);
-        if (it != getAlphaOptionMap().end()) {
-            luaPushQString(L, AlphaOptionsTable[it->second].getter(*pDoc));
-            return 1;
-        }
-    }
+    // Original GetOption ONLY searches numeric options — does NOT fall through to alpha.
+    // Use GetAlphaOption for string options. (original: methods_defaults.cpp:27-37)
 
     // Option not found — return -1 to match original MUSHclient behavior
     lua_pushnumber(L, -1);
