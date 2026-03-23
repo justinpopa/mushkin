@@ -452,7 +452,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] H75: miniwindows -- WindowResize now preserves existing content by copying old image back. Mushkin: miniwindow.cpp:168-192
 - [x] H76: miniwindows -- WindowText return value now clipped to min(textWidth, rectWidth). Mushkin: miniwindow.cpp:1103
 - [x] H77: miniwindows -- WindowFont now deletes font when name="" and size=0. Mushkin: miniwindow.cpp:1043-1058
-- [ ] H78: miniwindows -- CircleOp chord/pie (actions 4,5) use angle-based params instead of GDI point-based params. Mushkin: miniwindow.cpp:517-525
+- [x] H78: miniwindows -- CircleOp chord/pie now use GDI point-based params converted to Qt angles via atan2. Mushkin: miniwindow.cpp:517-525
 - [ ] H79: miniwindows -- CircleOp accepts action 6 (arc) which is not valid in original. Mushkin: miniwindow.cpp:608-611
 - [ ] H80: miniwindows -- BlendImage source-rect clamping order wrong for out-of-bounds rects. Mushkin: miniwindow.cpp:1377-1396
 

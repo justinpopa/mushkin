@@ -527,12 +527,22 @@ qint32 MiniWindow::CircleOp(qint16 action, qint32 left, qint32 top, qint32 right
             case 3: // Rounded rectangle
                 painter.drawRoundedRect(rect, extra1, extra2);
                 break;
-            case 4: // Chord
-                painter.drawChord(rect, extra1 * 16, extra2 * 16);
-                break;
+            case 4: // Chord (point-based: extra1,2=start; extra3,4=end)
             case 5: // Pie
-                painter.drawPie(rect, extra1 * 16, extra2 * 16);
+            {
+                qreal pcx = rect.center().x();
+                qreal pcy = rect.center().y();
+                qreal psa = qAtan2(-(extra2 - pcy), extra1 - pcx) * 180.0 / M_PI;
+                qreal pea = qAtan2(-(extra4 - pcy), extra3 - pcx) * 180.0 / M_PI;
+                qreal pspan = pea - psa;
+                if (pspan <= 0)
+                    pspan += 360.0;
+                if (action == 4)
+                    painter.drawChord(rect, qRound(psa * 16), qRound(pspan * 16));
+                else
+                    painter.drawPie(rect, qRound(psa * 16), qRound(pspan * 16));
                 break;
+            }
             case 6: // Arc
                 painter.drawArc(rect, extra1 * 16, extra2 * 16);
                 break;
@@ -607,16 +617,27 @@ qint32 MiniWindow::CircleOp(qint16 action, qint32 left, qint32 top, qint32 right
             painter.drawRoundedRect(rect, extra1, extra2);
             break;
 
-        case 4: // Chord
-            // extra1=start angle (degrees), extra2=span angle (degrees)
-            // Qt uses 1/16 degree units
-            painter.drawChord(rect, extra1 * 16, extra2 * 16);
+        case 4: // Chord — extra1,extra2=start point; extra3,extra4=end point (GDI convention)
+        case 5: // Pie   — same point-based parameters
+        {
+            // Convert GDI point-based coords to Qt angle-based.
+            // GDI Chord/Pie draw counter-clockwise from startPoint to endPoint.
+            // (original: miniwindow.cpp:592-608)
+            qreal cx = rect.center().x();
+            qreal cy = rect.center().y();
+            qreal startAngle = qAtan2(-(extra2 - cy), extra1 - cx) * 180.0 / M_PI;
+            qreal endAngle = qAtan2(-(extra4 - cy), extra3 - cx) * 180.0 / M_PI;
+            qreal spanAngle = endAngle - startAngle;
+            if (spanAngle <= 0)
+                spanAngle += 360.0;
+            int qtStart = qRound(startAngle * 16);
+            int qtSpan = qRound(spanAngle * 16);
+            if (action == 4)
+                painter.drawChord(rect, qtStart, qtSpan);
+            else
+                painter.drawPie(rect, qtStart, qtSpan);
             break;
-
-        case 5: // Pie
-            // extra1=start angle (degrees), extra2=span angle (degrees)
-            painter.drawPie(rect, extra1 * 16, extra2 * 16);
-            break;
+        }
 
         case 6: // Arc
             // extra1=start angle (degrees), extra2=span angle (degrees)
