@@ -690,3 +690,8 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [ ] L114: world-edge -- Tab-to-space conversion not performed during XML parsing. Mushkin: handled by QXmlStreamReader
 - [ ] L115: world-edge -- m_bLoaded flag never set to true after loading. Mushkin: src/world/world_document.cpp:286
 - [ ] L116: world-edge -- XML file size limit (100MB) not enforced. Mushkin: src/world/xml_serialization.cpp:477-488
+
+## v2 Audit: Enum/Constant Integrity (2026-03-22)
+
+### HIGH
+- [ ] H123: enums -- Systematic audit needed: compare ALL enum/constant numeric values in Mushkin against original doc.h/OtherTypes.h/errors.h. ActionSource was completely wrong (invented values). Other enums may have the same problem. Check: SendTo, error codes, connect phases, MXP modes, colour types, line flags, style flags, telnet states.
