@@ -651,10 +651,10 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 ## v2 Audit: Scripting Engine (2026-03-22)
 
 ### HIGH
-- [ ] H115: scripting -- Trigger/alias script uses lua_getglobal() instead of GetNestedFunction(); dotted names (e.g., "utils.my_trigger") don't work. Mushkin: world_trigger_execution.cpp:324
+- [x] H115: scripting -- Trigger script now supports dotted function names via table traversal. Mushkin: world_trigger_execution.cpp:324
 - [x] H116: scripting -- Trigger script now sets m_iCurrentActionSource to eTriggerFired. Mushkin: world_trigger_execution.cpp
-- [ ] H117: scripting -- Trigger/alias script uses bare lua_pcall() instead of callLuaWithTraceBack(); no stack traces in errors. Mushkin: world_trigger_execution.cpp:420
-- [ ] H118: scripting -- Trigger/alias script errors only go to qWarning(), not displayed in output window. Mushkin: world_trigger_execution.cpp:431-435
+- [x] H117: scripting -- Trigger script now uses callLuaWithTraceBack for stack traces. Mushkin: world_trigger_execution.cpp:420
+- [x] H118: scripting -- Trigger script errors now display in output window via colourNote. Mushkin: world_trigger_execution.cpp:431-435
 
 ### MEDIUM
 - [ ] M185: scripting -- Trigger/alias does not reset m_iNoteStyle to NORMAL before callbacks. Mushkin: world_trigger_execution.cpp

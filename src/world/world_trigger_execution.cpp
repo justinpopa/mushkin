@@ -324,8 +324,25 @@ void WorldDocument::executeTriggerScript(Trigger* trigger, const QString& matche
     // Save stack top for cleanup
     int stackTop = lua_gettop(L);
 
-    // Push the function onto the stack
-    lua_getglobal(L, trigger->procedure.toUtf8().constData());
+    // Push the function onto the stack — support dotted names like "utils.my_trigger"
+    // (original: lua_scripting.cpp:490 uses GetNestedFunction)
+    QByteArray procName = trigger->procedure.toUtf8();
+    if (trigger->procedure.contains('.')) {
+        // Dotted name: split and traverse tables
+        QStringList parts = trigger->procedure.split('.');
+        lua_getglobal(L, parts[0].toUtf8().constData());
+        for (int i = 1; i < parts.size(); ++i) {
+            if (!lua_istable(L, -1)) {
+                lua_settop(L, stackTop);
+                trigger->dispid = DISPID_UNKNOWN;
+                return;
+            }
+            lua_getfield(L, -1, parts[i].toUtf8().constData());
+            lua_remove(L, -2); // remove parent table
+        }
+    } else {
+        lua_getglobal(L, procName.constData());
+    }
     if (!lua_isfunction(L, -1)) {
         lua_settop(L, stackTop);
         trigger->dispid = DISPID_UNKNOWN;
@@ -420,8 +437,9 @@ void WorldDocument::executeTriggerScript(Trigger* trigger, const QString& matche
     // Prevent deletion during script execution
     trigger->executing_script = true;
 
-    // Call the function with 4 arguments, 0 results
-    int callResult = lua_pcall(L, 4, 0, 0);
+    // Call with traceback error handler for readable stack traces
+    // (original: lua_scripting.cpp:624 uses CallLuaWithTraceBack)
+    int callResult = callLuaWithTraceBack(L, 4, 0);
 
     bool error = (callResult != 0);
     if (error) {
@@ -429,14 +447,13 @@ void WorldDocument::executeTriggerScript(Trigger* trigger, const QString& matche
         const char* errMsg = lua_tostring(L, -1);
         QString errorStr = errMsg ? QString::fromUtf8(errMsg) : "Unknown error";
 
-        // Log the error
+        // Display error in output window (original: lua_scripting.cpp:636 calls
+        // LuaError→ColourNote)
         QString strReason = QString("processing trigger \"%1\" when matching line: \"%2\"")
                                 .arg(triggerName, matchedText);
-        qWarning() << "=== Lua Error ===" << "\"Run-time error\"";
-        qWarning() << "  Context:"
-                   << QString("\"Function/Sub: %1 called by trigger\\nReason: %2\"")
-                          .arg(trigger->procedure, strReason);
-        qWarning() << "  Message:" << QString("\"%1\"").arg(errorStr);
+        // Orange error text on black background (BGR format)
+        colourNote(0x00008CFF, 0x00000000, QString("=== Run-time error: %1 ===").arg(triggerName));
+        colourNote(0x00008CFF, 0x00000000, errorStr);
 
         lua_pop(L, 1); // Pop error message
     }
