@@ -299,13 +299,9 @@ qint32 MiniWindow::RectOp(qint16 action, qint32 left, qint32 top, qint32 right, 
             break;
         }
 
-        case 2: { // Fill (solid)
-            // Uses brushColor for fill, but if brushColor is 0 (default), use penColor
-            // This matches MUSHclient behavior where scripts often pass only one color
-            QRgb fillColor = (brushColor != 0) ? brushColor : penColor;
-            painter.setPen(Qt::NoPen);
-            painter.setBrush(bgrToColor(fillColor));
-            painter.fillRect(rect, QBrush(bgrToColor(fillColor)));
+        case 2: { // Fill (solid) — always uses Colour1 (penColor)
+            // (original: miniwindow.cpp:283-286 creates brush from Colour1)
+            painter.fillRect(rect, bgrToColor(penColor));
             break;
         }
 

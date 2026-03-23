@@ -146,8 +146,8 @@ int main(int argc, char* argv[])
         result = world.WindowRectOp("draw_test",
                                     miniwin.rect_fill,
                                     60, 10, 100, 50,
-                                    0x000000,        -- pen (unused, BGR)
-                                    0x00FF00)        -- green brush (BGR)
+                                    0x00FF00,        -- green Colour1 (BGR) — fill uses this
+                                    0x000000)        -- Colour2 (unused for fill)
     )",
                     "WindowRectOp fill")) {
         return 1;
