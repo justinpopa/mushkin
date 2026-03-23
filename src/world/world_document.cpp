@@ -1183,6 +1183,14 @@ void WorldDocument::DoSendMsg(const QString& text, bool bEcho, bool bLog)
         m_iLastCommandCount = 1;
     }
 
+    // ========== Plugin Sent Notification ==========
+    // Original fires ON_PLUGIN_SENT BEFORE echo/log/send (doc.cpp:1230-1234)
+    if (!m_bPluginProcessingSent) {
+        m_bPluginProcessingSent = true;
+        SendToAllPluginCallbacks(ON_PLUGIN_SENT, str, false);
+        m_bPluginProcessingSent = false;
+    }
+
     // ========== Input Echoing ==========
     // Echo sent text to output window if requested
     // Don't echo if m_bNoEcho is set (MUD requested echo suppression for password entry)
@@ -1226,14 +1234,6 @@ void WorldDocument::DoSendMsg(const QString& text, bool bEcho, bool bLog)
     // Update statistics
     m_connectionManager->m_nTotalLinesSent++;
     m_tLastPlayerInput = QDateTime::currentDateTime();
-
-    // Notify plugins that send completed
-    // Use recursion guard to prevent infinite loops if plugin calls Send()
-    if (!m_bPluginProcessingSent) {
-        m_bPluginProcessingSent = true;
-        SendToAllPluginCallbacks(ON_PLUGIN_SENT, str, false);
-        m_bPluginProcessingSent = false;
-    }
 
     qCDebug(lcWorld) << "DoSendMsg:" << str << "(echo=" << bEcho << ", log=" << bLog << ")";
 }

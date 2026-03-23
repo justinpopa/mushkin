@@ -397,8 +397,8 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 ### MEDIUM
 - [x] M111: logging -- FormatTime percent escaping fixed: % in values no longer doubled. Mushkin: src/world/world_logging.cpp:77-138
 - [x] M112: logging -- HTML world name header now escaped via FixHTMLString. Mushkin: src/world/world_logging.cpp:244
-- [ ] M113: logging -- LogLineInHTMLcolour processes single Line only, not multi-line paragraphs. Mushkin: src/world/world_logging.cpp:504-602
-- [ ] M114: logging -- Retrospective HTML colour logging uses different tag structure than original. Mushkin: src/world/world_logging.cpp:785-787
+- [~] M113: logging -- LogLineInHTMLcolour single Line. DEFERRED: multi-line paragraph iteration requires understanding Mushkin line buffer architecture vs original CLine linked list.. Mushkin: src/world/world_logging.cpp:504-602
+- [~] M114: logging -- Retrospective HTML tag structure differs (<span> vs <font>). Cosmetic difference, functionally equivalent.. Mushkin: src/world/world_logging.cpp:785-787
 
 ### LOW
 - [ ] L72: logging -- CSS spacing in HTML colour span tags differs (no spaces after colons). Mushkin: src/world/world_logging.cpp:561
@@ -415,7 +415,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] H72: commands -- Execute() now saves/restores m_CurrentPlugin with RAII scope guard. Mushkin: src/world/world_document.cpp:1331
 
 ### MEDIUM
-- [ ] M115: commands -- ON_PLUGIN_SENT fires after echo/log/send instead of before. Mushkin: src/world/world_document.cpp:1232-1235
+- [x] M115: commands -- ON_PLUGIN_SENT now fires before echo/log/send matching original. Mushkin: src/world/world_document.cpp:1232-1235
 - [ ] M116: commands -- SendMsg() missing m_bPluginProcessingSent re-entrancy guard. Mushkin: src/world/world_document.cpp:934
 - [ ] M117: commands -- m_bNoEcho check in DoSendMsg instead of SendMsg; queued commands may encode wrong echo flag. Mushkin: src/world/world_document.cpp:1189
 - [ ] M118: commands -- Backslash escape sequences not applied for typed commands. Mushkin: src/ui/views/world_widget.cpp:508
