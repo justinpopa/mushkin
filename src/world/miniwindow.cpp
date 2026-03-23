@@ -1038,9 +1038,9 @@ qint32 MiniWindow::Gradient(qint32 left, qint32 top, qint32 right, qint32 bottom
     qint32 fixedRight = (right <= 0) ? width + right : right;
     qint32 fixedBottom = (bottom <= 0) ? height + bottom : bottom;
 
-    // Bounds check
-    if (left < 0 || top < 0 || fixedRight > width || fixedBottom > height)
-        return eBadParameter;
+    // Original (miniwindow.cpp:2596-2597): zero/negative size → return eOK (no error)
+    if (fixedRight - left <= 0 || fixedBottom - top <= 0)
+        return eOK;
 
     // Convert to QRect
     QRect rect(left, top, fixedRight - left, fixedBottom - top);
