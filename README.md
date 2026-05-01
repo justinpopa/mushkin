@@ -35,6 +35,7 @@ aqt install-qt mac desktop 6.9.3 -m qtmultimedia --outputdir ~/Qt
 
 # Clone and build
 git clone https://github.com/justinpopa/mushkin.git
+git submodule update --init --recursive
 cd mushkin
 
 LLVM_PREFIX=$(brew --prefix llvm)
@@ -74,6 +75,7 @@ aqt install-qt linux desktop 6.9.3 linux_gcc_64 -m qtmultimedia --outputdir ~/Qt
 
 # Clone and build
 git clone https://github.com/justinpopa/mushkin.git
+git submodule update --init --recursive
 cd mushkin
 
 cmake -B build -G Ninja \
@@ -105,6 +107,7 @@ C:\vcpkg\vcpkg install pcre:x64-windows luajit:x64-windows sqlite3:x64-windows `
 
 # Clone and build
 git clone https://github.com/justinpopa/mushkin.git
+git submodule update --init --recursive
 cd mushkin
 
 cmake -B build -G Ninja `
