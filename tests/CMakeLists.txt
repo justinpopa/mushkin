@@ -1069,3 +1069,19 @@ target_link_libraries(test-world-serialization-gtest PRIVATE
 gtest_discover_tests(test-world-serialization-gtest
     DISCOVERY_TIMEOUT 30
 )
+
+# Accelerator manager behavioral-parity tests (M69, M156)
+add_executable(test-accelerator-manager-gtest
+    test_accelerator_manager_gtest.cpp
+)
+
+target_link_libraries(test-accelerator-manager-gtest PRIVATE
+    test_main_core
+    Qt6::Gui
+    Qt6::Widgets
+    ui
+)
+
+gtest_discover_tests(test-accelerator-manager-gtest
+    DISCOVERY_TIMEOUT 30
+)

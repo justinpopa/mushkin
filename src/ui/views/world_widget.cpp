@@ -14,6 +14,7 @@
 #include <QLabel>
 #include <QMessageBox>
 #include <QSplitter>
+#include <QTextCursor>
 #include <QVBoxLayout>
 
 /**
@@ -217,6 +218,17 @@ void WorldWidget::setupUi()
 
                 // Reset action source after dispatch (original: sendvw.cpp:2615)
                 m_document->m_iCurrentActionSource = ActionSource::eUnknownActionSource;
+            });
+
+    // When keypad is disabled, numpad keys insert their literal character into
+    // the input line (original sendvw.cpp:1099 — GetEditCtrl().ReplaceSel).
+    connect(m_document->m_acceleratorManager, &AcceleratorManager::keypadLiteralInsert, this,
+            [this](const QString& literal) {
+                if (m_inputView) {
+                    QTextCursor cursor = m_inputView->textCursor();
+                    cursor.insertText(literal);
+                    m_inputView->setTextCursor(cursor);
+                }
             });
 
     // Focus on input
