@@ -94,6 +94,15 @@ class MXPEngine {
     // ========== Mode Helpers ==========
     bool MXP_Open() const;   // True if current mode allows open (unsecure) tags
     bool MXP_Secure() const; // True if current mode allows secure tags
+    // Cancel secure-once mode: if m_iMXP_mode == MXP_MODE_SECURE_ONCE, revert to
+    // m_iMXP_previousMode. Called when a non-'<' character arrives while in
+    // secure_once mode (original: doc.h inline MXP_Restore_Mode; doc.cpp:2000-2001).
+    void MXP_Restore_Mode()
+    {
+        if (m_iMXP_mode == MXP_MODE_SECURE_ONCE) {
+            m_iMXP_mode = m_iMXP_previousMode;
+        }
+    }
 
     // ========== Argument Parsing ==========
     void ParseMXPTag(const QString& tagString, QString& tagName,

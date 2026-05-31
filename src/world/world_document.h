@@ -1485,6 +1485,12 @@ class WorldDocument : public QObject, public IWorldContext {
     {
         return m_mxpEngine->MXP_Secure();
     }
+    // Cancel secure-once mode when a non-tag character arrives.
+    // Original: doc.h inline MXP_Restore_Mode, called at doc.cpp:2000-2001.
+    void MXP_Restore_Mode()
+    {
+        m_mxpEngine->MXP_Restore_Mode();
+    }
 
     // NOTE: SendWindowSizes moved to TelnetParser::sendWindowSizes(int width).
     // NOTE: MXP implementation methods (MXP_StartTag, MXP_EndTag, ParseMXPTag, etc.)

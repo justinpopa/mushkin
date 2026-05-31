@@ -608,4 +608,62 @@ TEST_F(WorldProtocolTest, LastFlushTime_ValidAtConstruction)
 {
     EXPECT_TRUE(doc->m_LastFlushTime.isValid())
         << "m_LastFlushTime must be valid at construction (original doc_construct.cpp:207)";
+// ========== Category 16: H46 — MXP secure-once mode cancelled on non-tag character ==========
+// Original: doc.cpp:1997-2001 — when MXP is active and a non-'<' character arrives,
+// secure-once mode must be reverted to the previous mode immediately (the "opening tag
+// right away" window has passed). Verified by checking m_iMXP_mode after feeding a
+// plain character, an ampersand, and a newline.
+
+TEST_F(WorldProtocolTest, MXP_SecureOnce_CancelledByPlainCharacter)
+{
+    doc->MXP_On();
+    auto& mxp = *doc->m_mxpEngine;
+    mxp.m_iMXP_previousMode = eMXP_open;
+    mxp.m_iMXP_mode = eMXP_secure_once;
+
+    feed({'A'}); // non-'<' character: must cancel secure-once
+
+    EXPECT_EQ(mxp.m_iMXP_mode, eMXP_open)
+        << "plain character in secure_once must revert to previousMode";
+}
+
+TEST_F(WorldProtocolTest, MXP_SecureOnce_CancelledByAmpersand)
+{
+    doc->MXP_On();
+    auto& mxp = *doc->m_mxpEngine;
+    mxp.m_iMXP_previousMode = eMXP_open;
+    mxp.m_iMXP_mode = eMXP_secure_once;
+
+    feed({'&'}); // entity start is also a non-'<' char: must cancel secure-once first
+
+    EXPECT_EQ(mxp.m_iMXP_mode, eMXP_open) << "ampersand in secure_once must revert to previousMode";
+}
+
+TEST_F(WorldProtocolTest, MXP_SecureOnce_CancelledByNewline)
+{
+    doc->MXP_On();
+    auto& mxp = *doc->m_mxpEngine;
+    mxp.m_iMXP_previousMode = eMXP_open;
+    mxp.m_iMXP_mode = eMXP_secure_once;
+
+    feed({'\n'}); // newline is also a non-'<' char: must cancel secure-once first
+
+    EXPECT_EQ(mxp.m_iMXP_mode, mxp.m_iMXP_defaultMode)
+        << "newline in secure_once must revert to previousMode (then newline reverts to "
+           "defaultMode)";
+}
+
+TEST_F(WorldProtocolTest, MXP_SecureOnce_NotCancelledByOpenTag)
+{
+    doc->MXP_On();
+    auto& mxp = *doc->m_mxpEngine;
+    mxp.m_iMXP_previousMode = eMXP_open;
+    mxp.m_iMXP_mode = eMXP_secure_once;
+
+    feed({'<'}); // '<' enters tag phase: secure-once stays active for tag processing
+
+    EXPECT_EQ(currentPhase(), Phase::HAVE_MXP_ELEMENT)
+        << "opening '<' must enter tag phase without cancelling secure-once";
+    EXPECT_EQ(mxp.m_iMXP_mode, eMXP_secure_once)
+        << "mode must remain secure_once until the tag is processed";
 }
