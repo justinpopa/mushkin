@@ -1037,6 +1037,23 @@ gtest_discover_tests(test-world-protocol-gtest
     DISCOVERY_TIMEOUT 30
 )
 
+# Accelerator dispatch behavioral parity test
+add_executable(test-accelerator-dispatch-gtest
+    test_accelerator_dispatch_gtest.cpp
+)
+
+target_link_libraries(test-accelerator-dispatch-gtest PRIVATE
+    test_main_core
+    Qt6::Gui
+    Qt6::Widgets
+    Qt6::Test
+    ui
+)
+
+gtest_discover_tests(test-accelerator-dispatch-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
 # World serialization test
 add_executable(test-world-serialization-gtest
     test_world_serialization_gtest.cpp

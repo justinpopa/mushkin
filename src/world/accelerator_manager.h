@@ -192,8 +192,11 @@ class AcceleratorManager : public QObject {
      *
      * @param action The action/script to execute
      * @param sendTo Where to send
+     * @param pluginId Plugin ID if registered by a plugin (empty otherwise)
+     * @param keyString The key string that triggered this accelerator (e.g. "Ctrl+F5", "Num+8")
      */
-    void acceleratorTriggered(const QString& action, int sendTo, const QString& pluginId);
+    void acceleratorTriggered(const QString& action, int sendTo, const QString& pluginId,
+                              const QString& keyString);
 
   private slots:
     void onShortcutActivated();

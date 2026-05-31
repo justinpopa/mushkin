@@ -631,5 +631,5 @@ void AcceleratorManager::onShortcutActivated()
         return;
     }
 
-    emit acceleratorTriggered(entry.action, entry.sendTo, entry.pluginId);
+    emit acceleratorTriggered(entry.action, entry.sendTo, entry.pluginId, keyString);
 }
