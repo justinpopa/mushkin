@@ -21,6 +21,9 @@
 #include "fixtures/world_fixtures.h"
 
 #include "../src/utils/error_codes.h"
+#include <QDir>
+#include <QFile>
+#include <QTextStream>
 
 // Test fixture for Notepad API tests
 class NotepadApiTest : public ConnectedWorldTest {};
@@ -401,6 +404,51 @@ TEST_F(NotepadApiTest, GetNotepadWindowPositionReturnsEmptyWithoutMDI)
     lua_getglobal(L, "pos");
     EXPECT_TRUE(lua_isnil(L, -1)); // Empty QString becomes nil in Lua
     lua_pop(L, 1);
+}
+
+// Test 31: SaveToFile writes content to disk (M79 — notepad has save-to-file capability)
+TEST_F(NotepadApiTest, SaveToFileWritesContent)
+{
+    executeLua(R"(world.SendToNotepad('SaveTest', "line one\nline two\n"))");
+    NotepadWidget* notepad = doc->FindNotepad("SaveTest");
+    ASSERT_NE(notepad, nullptr);
+
+    // Write to a temp file
+    const QString tmpPath = QDir::temp().filePath("mushkin_notepad_save_test.txt");
+    EXPECT_TRUE(notepad->SaveToFile(tmpPath, /*replaceExisting=*/true));
+
+    // Verify the file was written with correct content
+    QFile file(tmpPath);
+    ASSERT_TRUE(file.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString written = QTextStream(&file).readAll();
+    file.close();
+    EXPECT_EQ(written, "line one\nline two\n");
+
+    // After save the QTextDocument should report not-modified
+    EXPECT_FALSE(notepad->m_pTextEdit->document()->isModified());
+
+    // Filename is persisted on the widget
+    EXPECT_EQ(notepad->m_strFilename, tmpPath);
+
+    QFile::remove(tmpPath);
+}
+
+// Test 32: SaveToFile respects replaceExisting=false
+TEST_F(NotepadApiTest, SaveToFileRespectsNoReplace)
+{
+    executeLua("world.SendToNotepad('SaveGuard', 'content')");
+    NotepadWidget* notepad = doc->FindNotepad("SaveGuard");
+    ASSERT_NE(notepad, nullptr);
+
+    const QString tmpPath = QDir::temp().filePath("mushkin_notepad_guard_test.txt");
+
+    // First write creates the file
+    ASSERT_TRUE(notepad->SaveToFile(tmpPath, /*replaceExisting=*/true));
+
+    // Second write with replaceExisting=false should refuse
+    EXPECT_FALSE(notepad->SaveToFile(tmpPath, /*replaceExisting=*/false));
+
+    QFile::remove(tmpPath);
 }
 
 // Test 30: Functions work correctly when notepad exists

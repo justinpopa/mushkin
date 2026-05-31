@@ -2342,6 +2342,30 @@ void MainWindow::saveWorld()
         return;
     }
 
+    // Route to notepad save when the active MDI child is a notepad window.
+    // Original MUSHclient: CDocument::DoSave is routed to the active document
+    // (CTextDocument for notepads) via the MFC ID_FILE_SAVE command handler.
+    NotepadWidget* notepad = qobject_cast<NotepadWidget*>(activeSubWindow->widget());
+    if (notepad) {
+        QString filename = notepad->m_strFilename;
+        if (filename.isEmpty()) {
+            // No existing path: fall through to Save As behavior
+            filename = QFileDialog::getSaveFileName(this, "Save Notepad", QString(),
+                                                    "Text Files (*.txt);;All Files (*)");
+            if (filename.isEmpty()) {
+                return; // User cancelled
+            }
+        }
+        if (notepad->SaveToFile(filename, /*replaceExisting=*/true)) {
+            statusBar()->showMessage(QString("Saved %1").arg(QFileInfo(filename).fileName()), 3000);
+        } else {
+            QMessageBox::critical(this, "Error",
+                                  QString("Failed to save notepad:\n%1").arg(filename));
+            statusBar()->showMessage("Failed to save notepad", 3000);
+        }
+        return;
+    }
+
     WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
     if (!worldWidget) {
         return;
@@ -2377,6 +2401,28 @@ void MainWindow::saveWorldAs()
 {
     QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
     if (!activeSubWindow) {
+        return;
+    }
+
+    // Route to notepad Save As when the active MDI child is a notepad window.
+    // Original MUSHclient: ID_FILE_SAVE_AS is routed to the active document
+    // (CTextDocument for notepads) which calls DoSave with a new path.
+    NotepadWidget* notepad = qobject_cast<NotepadWidget*>(activeSubWindow->widget());
+    if (notepad) {
+        QString filename = QFileDialog::getSaveFileName(this, "Save Notepad As", QString(),
+                                                        "Text Files (*.txt);;All Files (*)");
+        if (filename.isEmpty()) {
+            return; // User cancelled
+        }
+        if (notepad->SaveToFile(filename, /*replaceExisting=*/true)) {
+            activeSubWindow->setWindowTitle(QFileInfo(filename).fileName());
+            statusBar()->showMessage(
+                QString("Saved notepad as %1").arg(QFileInfo(filename).fileName()), 3000);
+        } else {
+            QMessageBox::critical(this, "Error",
+                                  QString("Failed to save notepad:\n%1").arg(filename));
+            statusBar()->showMessage("Failed to save notepad", 3000);
+        }
         return;
     }
 
