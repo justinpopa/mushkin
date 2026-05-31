@@ -238,6 +238,45 @@ TEST_F(CommandColorAPITest, SetCustomColourNameNoChangeIfSame)
     EXPECT_FALSE(doc->m_bModified);
 }
 
+// ========== ColourNameToRGB Tests ==========
+
+// Helper: call ColourNameToRGB(name) and return the lua_Integer it pushed.
+static lua_Integer callColourNameToRGB(lua_State* L, const char* name)
+{
+    lua_getglobal(L, "ColourNameToRGB");
+    lua_pushstring(L, name);
+    EXPECT_EQ(lua_pcall(L, 1, 1, 0), 0)
+        << "ColourNameToRGB error: " << (lua_isstring(L, -1) ? lua_tostring(L, -1) : "");
+    lua_Integer result = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+    return result;
+}
+
+// Unknown color names must return -1 (matches original methods_colours.cpp:31-32),
+// NOT 4294967295 (0xFFFFFFFF reinterpreted as unsigned on 64-bit). Plugins do
+// `if ColourNameToRGB(x) == -1 then ...` and rely on the signed sentinel.
+TEST_F(CommandColorAPITest, ColourNameToRGBUnknownReturnsMinusOne)
+{
+    EXPECT_EQ(callColourNameToRGB(L, "not_a_real_colour"), -1);
+}
+
+// Valid named colors must return their positive BGR value, unchanged by the
+// sign-extension fix (top byte is zero, so they stay positive).
+TEST_F(CommandColorAPITest, ColourNameToRGBKnownReturnsPositiveBGR)
+{
+    // red => BGR(255,0,0) => 0x000000FF
+    EXPECT_EQ(callColourNameToRGB(L, "red"), 0x000000FF);
+    // white => BGR(255,255,255) => 0x00FFFFFF, the largest valid value
+    EXPECT_EQ(callColourNameToRGB(L, "white"), 0x00FFFFFF);
+}
+
+// Hex strings resolve to positive BGR values too (never the -1 sentinel).
+TEST_F(CommandColorAPITest, ColourNameToRGBHexReturnsPositive)
+{
+    // "#0000FF" (HTML blue, RGB) => BGR(0,0,255) => 0x00FF0000
+    EXPECT_EQ(callColourNameToRGB(L, "#0000FF"), 0x00FF0000);
+}
+
 // ========== Utility Function Tests ==========
 
 // Test GetUdpPort (deprecated, always returns 0)

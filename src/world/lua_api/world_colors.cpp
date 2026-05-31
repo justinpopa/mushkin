@@ -8,6 +8,7 @@
 #include "../color_utils.h"
 #include "lua_common.h"
 #include <QColorDialog>
+#include <cstdint>
 
 /**
  * ColourNameToRGB - Convert color name to BGR value
@@ -416,7 +417,14 @@ QString RGBColourToName(QRgb bgr)
 int L_ColourNameToRGB(lua_State* L)
 {
     auto [name] = luaArgs<QString>(L);
-    return luaReturn(L, static_cast<lua_Integer>(ColourNameToRGB(name)));
+    // Original (methods_colours.cpp:31-32) returns a signed long -1 on failure,
+    // which Lua sees as -1. QRgb is unsigned 32-bit, so the unknown-name sentinel
+    // 0xFFFFFFFF would otherwise reach Lua as 4294967295 on 64-bit platforms,
+    // breaking plugin `== -1` checks. Sign-extend the 32-bit result: valid BGR
+    // values are 0x00BBGGRR (top byte zero, always positive) and pass through
+    // unchanged, while the 0xFFFFFFFF sentinel becomes -1.
+    const QRgb rgb = ColourNameToRGB(name);
+    return luaReturn(L, static_cast<lua_Integer>(static_cast<std::int32_t>(rgb)));
 }
 
 /**
