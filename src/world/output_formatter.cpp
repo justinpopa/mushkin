@@ -69,8 +69,13 @@ void OutputFormatter::note(const QString& text)
  */
 void OutputFormatter::colourNote(QRgb foreColor, QRgb backColor, const QString& text)
 {
-    // Queue the note for deferred output during plugin callbacks
-    if (m_doc.m_bNotesNotWantedNow) {
+    // Defer note when: output buffer not yet ready, OR we are inside a plugin callback
+    // on a non-empty, non-note line (inserting here would corrupt the MUD line).
+    // Original condition: m_pCurrentLine == NULL || m_pLinePositions == NULL ||
+    //   (m_bNotesNotWantedNow && m_pCurrentLine->len != 0 &&
+    //    (m_pCurrentLine->flags & NOTE_OR_COMMAND) == 0)
+    if (!m_doc.m_currentLine || (m_doc.m_bNotesNotWantedNow && m_doc.m_currentLine->len() != 0 &&
+                                 (m_doc.m_currentLine->flags & NOTE_OR_COMMAND) == 0)) {
         m_doc.m_OutstandingLines.push_back({text, foreColor, backColor, m_doc.m_iNoteStyle});
         return;
     }
@@ -120,8 +125,9 @@ void OutputFormatter::colourNote(QRgb foreColor, QRgb backColor, const QString& 
  */
 void OutputFormatter::colourTell(QRgb foreColor, QRgb backColor, const QString& text)
 {
-    // Queue the tell for deferred output during plugin callbacks
-    if (m_doc.m_bNotesNotWantedNow) {
+    // Defer tell using the same condition as colourNote / original Tell().
+    if (!m_doc.m_currentLine || (m_doc.m_bNotesNotWantedNow && m_doc.m_currentLine->len() != 0 &&
+                                 (m_doc.m_currentLine->flags & NOTE_OR_COMMAND) == 0)) {
         m_doc.m_OutstandingLines.push_back({text, foreColor, backColor, m_doc.m_iNoteStyle});
         return;
     }

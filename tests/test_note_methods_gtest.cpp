@@ -156,18 +156,50 @@ TEST_F(NoteMethodsTest, ColourTellWithoutNewline)
     EXPECT_TRUE(completedText.contains("Part 3")) << "Part 3 should be in completed line";
 }
 
-// Test 4: m_bNotesNotWantedNow suppression
-TEST_F(NoteMethodsTest, NotesSuppression)
+// Test 4: m_bNotesNotWantedNow - note goes through when current line is EMPTY
+// Original behavior (methods_noting.cpp:52-53): deferral only when current line
+// is non-empty AND is not already a note/command line.
+TEST_F(NoteMethodsTest, NoteNotDeferredWhenCurrentLineEmpty)
 {
-    doc->m_bNotesNotWantedNow = true; // Disable notes
-    int lineCountBeforeSuppressed = static_cast<int>(doc->m_lineList.size());
+    // Current line in fixture is empty (len() == 0), so note must NOT be deferred
+    // even when m_bNotesNotWantedNow is true.
+    doc->m_bNotesNotWantedNow = true;
+    ASSERT_EQ(doc->m_currentLine->len(), 0) << "Fixture should have empty current line";
+    int lineCountBefore = static_cast<int>(doc->m_lineList.size());
+    std::size_t deferredBefore = doc->m_OutstandingLines.size();
 
-    doc->note("This should not appear");
+    doc->note("Should appear directly");
 
-    EXPECT_EQ(static_cast<int>(doc->m_lineList.size()), lineCountBeforeSuppressed)
-        << "Note should be suppressed when m_bNotesNotWantedNow = true";
+    EXPECT_GT(static_cast<int>(doc->m_lineList.size()), lineCountBefore)
+        << "Note should NOT be deferred when current line is empty";
+    EXPECT_EQ(doc->m_OutstandingLines.size(), deferredBefore)
+        << "m_OutstandingLines should be unchanged when note goes through directly";
 
-    doc->m_bNotesNotWantedNow = false; // Re-enable notes
+    doc->m_bNotesNotWantedNow = false;
+}
+
+// Test 4b: m_bNotesNotWantedNow - note IS deferred when inside a non-empty MUD line
+// Original behavior: defer only when in a non-empty, non-note/command line.
+TEST_F(NoteMethodsTest, NoteDeferredWhenInsideNonEmptyMudLine)
+{
+    // Put some MUD text on the current line so len() > 0, flags stay 0 (MUD output)
+    const char mudText[] = "Some MUD text";
+    doc->AddToLine(mudText, static_cast<int>(strlen(mudText)));
+    ASSERT_GT(doc->m_currentLine->len(), 0) << "Current line should be non-empty";
+    ASSERT_EQ(doc->m_currentLine->flags & NOTE_OR_COMMAND, 0) << "Should be MUD output line";
+
+    doc->m_bNotesNotWantedNow = true;
+    int lineCountBefore = static_cast<int>(doc->m_lineList.size());
+    std::size_t deferredBefore = doc->m_OutstandingLines.size();
+
+    doc->note("Deferred note");
+
+    EXPECT_EQ(static_cast<int>(doc->m_lineList.size()), lineCountBefore)
+        << "Note should NOT appear in line list when deferred mid-MUD-line";
+    EXPECT_EQ(doc->m_OutstandingLines.size(), deferredBefore + 1)
+        << "Note should be queued in m_OutstandingLines";
+
+    doc->m_bNotesNotWantedNow = false;
 }
 
 // Test 5: Unicode text in notes
