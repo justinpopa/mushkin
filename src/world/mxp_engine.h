@@ -13,6 +13,7 @@
 #include <QString>
 #include <cstdint>
 #include <map>
+#include <optional>
 
 class WorldDocument; // forward declaration
 
@@ -83,6 +84,8 @@ class MXPEngine {
     void MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args); // Execute element action
     void MXP_EndAction(int action);                                     // Reverse element action
     QRgb MXP_GetColor(const QString& colorSpec); // Resolve color name/#RRGGBB
+    std::optional<QRgb>
+    MXP_TryGetColor(const QString& colorSpec); // Like GetColor but nullopt on unknown
 
     // ========== Tag Stack ==========
     void MXP_CloseOpenTags(bool closeAll = false); // Close tags (closeAll=true closes secure too)

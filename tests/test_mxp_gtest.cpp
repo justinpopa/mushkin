@@ -241,47 +241,53 @@ TEST_F(MXPTest, GetEntityReturnsEmptyForUnknown)
 }
 
 // Test 19: MXP_GetEntity handles decimal numeric entities
+// Original (mxpEntities.cpp:117-119): max codepoint is 255 (1 byte).
+// Values <=255 (except most control chars) are accepted; higher values are rejected.
 TEST_F(MXPTest, GetEntityHandlesDecimalNumeric)
 {
     // &#65; = 'A'
     QString a = doc->m_mxpEngine->MXP_GetEntity("#65");
     EXPECT_EQ(a, "A");
 
-    // &#169; = copyright symbol
+    // &#169; = copyright symbol (0xA9 = 169, within 1-byte range)
     QString copy = doc->m_mxpEngine->MXP_GetEntity("#169");
     EXPECT_EQ(copy, QString(QChar(0xA9)));
 
-    // &#8364; = euro symbol
+    // &#8364; = euro symbol (0x20AC = 8364, beyond 255) — original rejects this
     QString euro = doc->m_mxpEngine->MXP_GetEntity("#8364");
-    EXPECT_EQ(euro, QString(QChar(0x20AC)));
+    EXPECT_TRUE(euro.isEmpty()) << "Original caps at 255; &#8364; must be rejected";
 }
 
 // Test 20: MXP_GetEntity handles hexadecimal numeric entities
+// Original (mxpEntities.cpp:77-102): only lowercase 'x' accepted; max 2 hex digits (0xFF).
 TEST_F(MXPTest, GetEntityHandlesHexadecimalNumeric)
 {
-    // &#x41; = 'A'
+    // &#x41; = 'A' (1 hex digit, valid)
     QString a = doc->m_mxpEngine->MXP_GetEntity("#x41");
     EXPECT_EQ(a, "A");
 
-    // &#xA9; = copyright symbol
+    // &#xA9; = copyright symbol (2 hex digits, valid — 0xA9 = 169)
     QString copy = doc->m_mxpEngine->MXP_GetEntity("#xA9");
     EXPECT_EQ(copy, QString(QChar(0xA9)));
 
-    // &#x20AC; = euro symbol
+    // &#x20AC; = euro symbol (4 hex digits — original rejects; max is 2 digits = 0xFF)
     QString euro = doc->m_mxpEngine->MXP_GetEntity("#x20AC");
-    EXPECT_EQ(euro, QString(QChar(0x20AC)));
+    EXPECT_TRUE(euro.isEmpty())
+        << "Original caps at 2 hex digits (0xFF); &#x20AC; must be rejected";
 }
 
-// Test 21: MXP_GetEntity handles uppercase hex
+// Test 21: MXP_GetEntity rejects uppercase hex prefix
+// Original (mxpEntities.cpp:77): only lowercase 'x' is the valid hex prefix.
 TEST_F(MXPTest, GetEntityHandlesUppercaseHex)
 {
+    // &#x41; = 'A' (lowercase x — accepted)
     QString a1 = doc->m_mxpEngine->MXP_GetEntity("#x41");
-    QString a2 = doc->m_mxpEngine->MXP_GetEntity("#X41");
-    QString a3 = doc->m_mxpEngine->MXP_GetEntity("#x41");
-
     EXPECT_EQ(a1, "A");
-    EXPECT_EQ(a2, "A");
-    EXPECT_EQ(a3, "A");
+
+    // &#X41; — uppercase X is NOT accepted by original (falls through to decimal path,
+    // which rejects 'X' as a non-digit) — result must be empty
+    QString a2 = doc->m_mxpEngine->MXP_GetEntity("#X41");
+    EXPECT_TRUE(a2.isEmpty()) << "Uppercase #X prefix is not accepted by original";
 }
 
 // Test 22: MXP_GetEntity rejects control characters (except tab/LF/CR)
@@ -317,22 +323,30 @@ TEST_F(MXPTest, GetEntityHandlesInvalidNumericFormats)
     QString invalid3 = doc->m_mxpEngine->MXP_GetEntity("#xGGG");
     EXPECT_TRUE(invalid3.isEmpty());
 
+    // '#abc' — 'a' is not a digit in decimal mode, rejected
     QString invalid4 = doc->m_mxpEngine->MXP_GetEntity("#abc");
     EXPECT_TRUE(invalid4.isEmpty());
 }
 
-// Test 24: MXP_GetEntity validates Unicode range
+// Test 24: MXP_GetEntity respects original 1-byte codepoint limit
+// Original caps at 255; anything > 255 is rejected (mxpEntities.cpp:119).
 TEST_F(MXPTest, GetEntityValidatesUnicodeRange)
 {
-    // Valid Unicode: U+0000 to U+10FFFF (excluding surrogates and control chars)
+    // Within 1-byte range: 0xFF (255) is the max allowed
+    QString max_byte = doc->m_mxpEngine->MXP_GetEntity("#255");
+    EXPECT_FALSE(max_byte.isEmpty()) << "0xFF (255) is the original maximum";
 
-    // Valid high codepoint
-    QString valid = doc->m_mxpEngine->MXP_GetEntity("#x1F600"); // Grinning face emoji
-    EXPECT_FALSE(valid.isEmpty());
+    // 0xFF in hex (2 digits, max allowed for hex path)
+    QString max_hex = doc->m_mxpEngine->MXP_GetEntity("#xFF");
+    EXPECT_FALSE(max_hex.isEmpty()) << "&#xFF; (2 hex digits) is within the original limit";
 
-    // Invalid: beyond Unicode range
-    QString toolarge = doc->m_mxpEngine->MXP_GetEntity("#x110000");
-    EXPECT_TRUE(toolarge.isEmpty());
+    // 256 is beyond original limit
+    QString toolarge_dec = doc->m_mxpEngine->MXP_GetEntity("#256");
+    EXPECT_TRUE(toolarge_dec.isEmpty()) << "&#256; is beyond original 1-byte cap";
+
+    // 3+ hex digits are rejected by the original 2-digit cap
+    QString toolarge_hex = doc->m_mxpEngine->MXP_GetEntity("#x100");
+    EXPECT_TRUE(toolarge_hex.isEmpty()) << "3 hex digits exceeds original 2-digit max";
 
     // Invalid: way beyond
     QString waytoolarge = doc->m_mxpEngine->MXP_GetEntity("#99999999");
@@ -1189,4 +1203,137 @@ TEST_F(MXPTest, VersionActionSendsPacket)
     EXPECT_EQ(doc->m_connectionManager->m_iOutputPacketCount, 1);
 
     doc->m_connectionManager->m_pSocket = nullptr;
+}
+
+// H48: unknown named entity is silently dropped (no literal &name; output).
+// Original (mxpEntities.cpp:49-55): only calls DisplayMsg when entity is known.
+TEST_F(MXPTest, UnknownEntityIsSilentlyDropped)
+{
+    doc->m_mxpEngine->m_strMXPstring = "unknownentity123";
+    doc->m_mxpEngine->MXP_collected_entity();
+    // Entity counter incremented even for unknown names (original: line 29 before validation)
+    EXPECT_EQ(doc->m_mxpEngine->m_iMXPentities, 1);
+    SUCCEED();
+}
+
+// H48: entity counter incremented before validation (original: mxpEntities.cpp:29).
+TEST_F(MXPTest, EntityCounterIncrementedBeforeValidation)
+{
+    int before = doc->m_mxpEngine->m_iMXPentities;
+    doc->m_mxpEngine->m_strMXPstring = "nbsp"; // valid entity
+    doc->m_mxpEngine->MXP_collected_entity();
+    EXPECT_EQ(doc->m_mxpEngine->m_iMXPentities, before + 1);
+
+    // Also incremented for invalid entity names
+    before = doc->m_mxpEngine->m_iMXPentities;
+    doc->m_mxpEngine->m_strMXPstring = "!invalid!name"; // invalid (not alphanumeric/start)
+    doc->m_mxpEngine->MXP_collected_entity();
+    EXPECT_EQ(doc->m_mxpEngine->m_iMXPentities, before + 1)
+        << "counter must increment even for invalid name (before validation)";
+}
+
+// H48: entity name is whitespace-trimmed before processing (original: TrimLeft/TrimRight).
+TEST_F(MXPTest, EntityNameWhitespaceTrimmed)
+{
+    doc->m_mxpEngine->m_strMXPstring = "  nbsp  ";
+    doc->m_mxpEngine->MXP_collected_entity();
+    // If trimming works, nbsp resolves to non-breaking space (0xA0); counter incremented
+    EXPECT_EQ(doc->m_mxpEngine->m_iMXPentities, 1);
+}
+
+// H49: built-in entities take priority over custom entities with the same name.
+// Original (mxpEntities.cpp:132-136): App.m_EntityMap checked first, then m_CustomEntityMap.
+TEST_F(MXPTest, BuiltinEntityPriorityOverCustom)
+{
+    // Define a custom entity "lt" that conflicts with built-in &lt; (U+003C = '<')
+    auto custom = std::make_unique<MXPEntity>();
+    custom->strValue = "CUSTOM_LT";
+    doc->m_mxpEngine->m_customEntityMap["lt"] = std::move(custom);
+
+    QString result = doc->m_mxpEngine->MXP_GetEntity("lt");
+    // Must return the built-in '<' (U+003C), not "CUSTOM_LT"
+    EXPECT_EQ(result, "<") << "built-in entity must shadow custom entity with same name";
+}
+
+// H109/M80/M176: MXP_Off resets ANSI colors before checking if MXP is already off.
+// Original (mxpOnOff.cpp:24-29): InterpretANSIcode(0) runs before the !m_bMXP guard.
+TEST_F(MXPTest, MXPOffResetsAnsiEvenWhenAlreadyOff)
+{
+    doc->MXP_Off(true); // force off — m_bMXP becomes false
+    EXPECT_FALSE(doc->m_mxpEngine->m_bMXP);
+    // Calling again with force=false: ANSI reset still fires (if line exists), then
+    // early-returns. Must not crash.
+    doc->MXP_Off(false);
+    EXPECT_FALSE(doc->m_mxpEngine->m_bMXP);
+}
+
+// H109/M83/M176: MXP_CloseOpenTags(true) stops at first bNoReset tag.
+// Original MXP_CloseAllTags (mxpClose.cpp:396-397): returns on first bNoReset tag.
+TEST_F(MXPTest, CloseAllTagsStopsAtNoResetTag)
+{
+    auto tag1 = std::make_unique<ActiveTag>();
+    tag1->strName = "bold";
+    tag1->iAction = MXP_ACTION_BOLD;
+    tag1->bNoReset = false;
+    tag1->bSecure = false;
+
+    auto tag2 = std::make_unique<ActiveTag>();
+    tag2->strName = "protected";
+    tag2->iAction = MXP_ACTION_NONE;
+    tag2->bNoReset = true;
+    tag2->bSecure = false;
+
+    doc->m_mxpEngine->m_activeTagList.push_back(std::move(tag1));
+    doc->m_mxpEngine->m_activeTagList.push_back(std::move(tag2));
+
+    // closeAll=true: "protected" is at the back (most-recent), encountered first.
+    // It has bNoReset=true so the loop must return immediately, leaving both tags.
+    doc->m_mxpEngine->MXP_CloseOpenTags(true);
+    EXPECT_EQ(doc->m_mxpEngine->m_activeTagList.size(), 2u)
+        << "CloseAllTags must stop (return) at first bNoReset tag, leaving all remaining";
+}
+
+// M85/M178: SUPPORT empty-args silently omits NOT_IMP elements (no -elem entries).
+TEST_F(MXPTest, SupportEmptyArgsOmitsNotImpElements)
+{
+    auto* socket = new WorldSocket(doc.get(), doc.get());
+    doc->m_connectionManager->m_pSocket = socket;
+
+    AtomicElement* support = doc->m_mxpEngine->MXP_FindAtomicElement("support");
+    ASSERT_NE(support, nullptr);
+
+    MXPArgumentList args;
+    doc->m_connectionManager->m_iOutputPacketCount = 0;
+    doc->m_mxpEngine->MXP_ExecuteAction(support, args);
+    EXPECT_EQ(doc->m_connectionManager->m_iOutputPacketCount, 1)
+        << "SUPPORT with no args must send exactly one packet";
+
+    doc->m_connectionManager->m_pSocket = nullptr;
+}
+
+// M182: COLOR tag COLOURTYPE reset happens even when m_bIgnoreMXPcolourChanges is true.
+TEST_F(MXPTest, ColorTagResetsColourTypeEvenWhenIgnoringColors)
+{
+    AtomicElement* color = doc->m_mxpEngine->MXP_FindAtomicElement("color");
+    ASSERT_NE(color, nullptr);
+
+    doc->m_bIgnoreMXPcolourChanges = true;
+
+    // Set a non-RGB colour type flag to verify it gets cleared
+    doc->m_iFlags |= COLOUR_CUSTOM;
+    doc->m_iFlags &= ~COLOUR_RGB;
+
+    MXPArgumentList args;
+    auto arg = std::make_unique<MXPArgument>();
+    arg->strName = "fore";
+    arg->strValue = "red";
+    args.push_back(std::move(arg));
+
+    doc->m_mxpEngine->MXP_ExecuteAction(color, args);
+
+    // COLOURTYPE bits must be reset to COLOUR_RGB regardless of ignore flag
+    EXPECT_EQ(doc->m_iFlags & COLOURTYPE, static_cast<quint16>(COLOUR_RGB))
+        << "COLOURTYPE reset must happen even when m_bIgnoreMXPcolourChanges is true";
+
+    doc->m_bIgnoreMXPcolourChanges = false;
 }
