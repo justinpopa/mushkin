@@ -281,3 +281,114 @@ end
 
     EXPECT_TRUE(saveResult.has_value()) << "SaveState should succeed (recursion prevention works)";
 }
+
+// Test 13: SaveState(bScripted=true) forces write even when m_bSaveState is false (H122)
+//
+// Original CPlugin::SaveState(bScripted=true) bypasses the m_bSaveState guard.
+// Mushkin previously omitted the bScripted parameter so the Lua-facing SaveState
+// silently did nothing when save_state="n" in the plugin XML.
+TEST_F(PluginErrorTest, SaveState_bScriptedBypassesSaveStateFlag)
+{
+    QString pluginPath = tempDir->path() + "/nosave_plugin.xml";
+    {
+        QFile f(pluginPath);
+        ASSERT_TRUE(f.open(QIODevice::WriteOnly | QIODevice::Text));
+        f.write(R"(<?xml version="1.0"?>
+<muclient>
+  <plugin name="NoSavePlugin" id="{66666666-6666-6666-6666-666666666666}" save_state="n">
+  </plugin>
+</muclient>)");
+        f.close();
+    }
+
+    QString errorMsg;
+    Plugin* noSavePlugin = doc->LoadPlugin(pluginPath, errorMsg);
+    ASSERT_NE(noSavePlugin, nullptr) << "LoadPlugin failed: " << errorMsg.toStdString();
+    ASSERT_FALSE(noSavePlugin->m_bSaveState) << "m_bSaveState must be false (save_state=\"n\")";
+
+    // Add a variable so there is something to write.
+    auto var = std::make_unique<Variable>();
+    var->label = "scripted_var";
+    var->contents = "scripted_value";
+    noSavePlugin->m_VariableMap["scripted_var"] = std::move(var);
+
+    QString stateFilePath =
+        tempDir->path() + "/" + doc->m_strWorldID + "-" + noSavePlugin->m_strID + "-state.xml";
+    QFile::remove(stateFilePath);
+
+    // Calling without bScripted (default false): must NOT write the file.
+    auto resultNormal = noSavePlugin->SaveState();
+    EXPECT_TRUE(resultNormal.has_value()) << "SaveState() should succeed (returns empty=ok)";
+    EXPECT_FALSE(QFile::exists(stateFilePath))
+        << "State file must NOT be written when m_bSaveState=false and bScripted=false";
+
+    // Calling with bScripted=true (Lua API path): MUST write the file.
+    auto resultScripted = noSavePlugin->SaveState(/*bScripted=*/true);
+    EXPECT_TRUE(resultScripted.has_value()) << "SaveState(true) should succeed";
+    EXPECT_TRUE(QFile::exists(stateFilePath))
+        << "State file MUST be written when bScripted=true regardless of m_bSaveState (H122)";
+}
+
+// Test 13: LoadPlugin - Script parse error must not leave plugin in list (M14)
+//
+// Original xml_load_world.cpp:559 inserts plugin ONLY after script parsing
+// succeeds (inside ThrowErrorException guard). Mushkin inserts before parsing,
+// so on error the plugin must be removed. Verify that a failed load due to a
+// script syntax error leaves m_PluginList unchanged.
+TEST_F(PluginErrorTest, LoadPlugin_ScriptError_DoesNotLeavePluginInList)
+{
+    QString badScriptPath = tempDir->path() + "/bad_script.xml";
+    QFile f(badScriptPath);
+    ASSERT_TRUE(f.open(QIODevice::WriteOnly | QIODevice::Text));
+    f.write(R"(<?xml version="1.0"?>
+<muclient>
+  <plugin name="BadScript" id="{66666666-6666-6666-6666-666666666666}" language="Lua">
+    <script>
+<![CDATA[
+-- deliberate syntax error
+this is not valid lua @@@@
+]]>
+    </script>
+  </plugin>
+</muclient>)");
+    f.close();
+
+    std::size_t countBefore = doc->m_PluginList.size();
+
+    QString errorMsg;
+    Plugin* result = doc->LoadPlugin(badScriptPath, errorMsg);
+
+    EXPECT_EQ(result, nullptr) << "LoadPlugin should return nullptr on script error";
+    EXPECT_EQ(doc->m_PluginList.size(), countBefore)
+        << "m_PluginList must not grow when script parse fails (M14)";
+}
+
+// Test 14: UnloadPlugin - must mark document modified (M16)
+//
+// Original methods_plugins.cpp:655 calls SetModifiedFlag(TRUE) after plugin
+// removal. Verify that m_bModified is true after a successful UnloadPlugin.
+TEST_F(PluginErrorTest, UnloadPlugin_SetsModifiedFlag)
+{
+    QString validPath = tempDir->path() + "/unload_test.xml";
+    QFile f(validPath);
+    ASSERT_TRUE(f.open(QIODevice::WriteOnly | QIODevice::Text));
+    f.write(R"(<?xml version="1.0"?>
+<muclient>
+  <plugin name="UnloadMe" id="{77777777-7777-7777-7777-777777777777}">
+  </plugin>
+</muclient>)");
+    f.close();
+
+    QString errorMsg;
+    Plugin* p = doc->LoadPlugin(validPath, errorMsg);
+    ASSERT_NE(p, nullptr) << "Setup LoadPlugin failed: " << errorMsg.toStdString();
+
+    // Clear the modified flag so the UnloadPlugin call is the one that sets it.
+    doc->setModified(false);
+
+    bool ok = doc->UnloadPlugin("{77777777-7777-7777-7777-777777777777}");
+
+    EXPECT_TRUE(ok) << "UnloadPlugin should return true";
+    EXPECT_TRUE(doc->isModified())
+        << "UnloadPlugin must mark the document modified after removing a plugin (M16)";
+}

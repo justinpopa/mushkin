@@ -481,3 +481,133 @@ TEST_F(LuaRegistrationTest, SendtoConstants)
 
     lua_pop(L, 1); // pop sendto table
 }
+
+// =============================================================================
+// Category 10: Behavioral parity regressions (M45, M97)
+// =============================================================================
+
+// M97: error_desc table must use correct numeric indices matching original MUSHclient
+// error_descriptions[] table (eNoNameSpecified=30003, eVariableNotFound=30019)
+TEST_F(LuaRegistrationTest, ErrorDescNoNameSpecifiedUsesCode30003)
+{
+    lua_getglobal(L, "error_desc");
+    ASSERT_TRUE(lua_istable(L, -1)) << "error_desc should be a table";
+
+    // Must be at index 30003 (eNoNameSpecified), NOT at index 2
+    lua_rawgeti(L, -1, 30003);
+    EXPECT_TRUE(lua_isstring(L, -1)) << "error_desc[30003] (eNoNameSpecified) should be a string";
+    lua_pop(L, 1);
+
+    // Index 2 must NOT have been set (was the old wrong value)
+    lua_rawgeti(L, -1, 2);
+    EXPECT_FALSE(lua_isstring(L, -1))
+        << "error_desc[2] should not exist; eNoNameSpecified belongs at 30003";
+    lua_pop(L, 1);
+
+    lua_pop(L, 1); // pop error_desc
+}
+
+TEST_F(LuaRegistrationTest, ErrorDescVariableNotFoundUsesCode30019)
+{
+    lua_getglobal(L, "error_desc");
+    ASSERT_TRUE(lua_istable(L, -1)) << "error_desc should be a table";
+
+    // Must be at index 30019 (eVariableNotFound), NOT at index 30
+    lua_rawgeti(L, -1, 30019);
+    EXPECT_TRUE(lua_isstring(L, -1)) << "error_desc[30019] (eVariableNotFound) should be a string";
+    lua_pop(L, 1);
+
+    // Index 30 must NOT have been set (was the old wrong value)
+    lua_rawgeti(L, -1, 30);
+    EXPECT_FALSE(lua_isstring(L, -1))
+        << "error_desc[30] should not exist; eVariableNotFound belongs at 30019";
+    lua_pop(L, 1);
+
+    lua_pop(L, 1); // pop error_desc
+}
+
+// M97 (LOW): error_desc table completeness — spot-check entries that were missing
+TEST_F(LuaRegistrationTest, ErrorDescCompleteness)
+{
+    lua_getglobal(L, "error_desc");
+    ASSERT_TRUE(lua_istable(L, -1)) << "error_desc should be a table";
+
+    // Spot-check a selection of codes that were previously absent
+    const int codes[] = {
+        30004, // eCannotPlaySound
+        30007, // eTriggerCannotBeEmpty
+        30008, // eInvalidObjectLabel
+        30021, // eBadRegularExpression
+        30025, // eUnknownOption
+        30032, // ePluginCannotSetOption
+        30033, // ePluginCannotGetOption
+        30041, // eCommandsNestedTooDeeply
+        30055, // eArrayAlreadyExists
+        30063, // eItemInUse
+        30065, // eCannotAddFont
+        30072, // eHotspotNotInstalled
+        30074, // eBrushStyleNotValid
+    };
+    for (int code : codes) {
+        lua_rawgeti(L, -1, code);
+        EXPECT_TRUE(lua_isstring(L, -1)) << "error_desc[" << code << "] should be a string";
+        lua_pop(L, 1);
+    }
+
+    lua_pop(L, 1); // pop error_desc
+}
+
+// M45: rect_3d_rect must equal 4 (not 5) to match original MUSHclient
+TEST_F(LuaRegistrationTest, MiniwinRect3dRectIsValue4)
+{
+    lua_getglobal(L, "miniwin");
+    ASSERT_TRUE(lua_istable(L, -1)) << "miniwin should be a table";
+
+    lua_getfield(L, -1, "rect_3d_rect");
+    ASSERT_TRUE(lua_isnumber(L, -1)) << "miniwin.rect_3d_rect should be a number";
+    EXPECT_EQ(static_cast<int>(lua_tonumber(L, -1)), 4)
+        << "miniwin.rect_3d_rect must be 4, not 5 (5 is rect_draw_edge)";
+    lua_pop(L, 1);
+
+    lua_pop(L, 1); // pop miniwin
+}
+
+// M45: rect_draw_edge and related constants must be present
+TEST_F(LuaRegistrationTest, MiniwinRectDrawEdgeConstants)
+{
+    lua_getglobal(L, "miniwin");
+    ASSERT_TRUE(lua_istable(L, -1)) << "miniwin should be a table";
+
+    auto checkField = [&](const char* name, int expected) {
+        lua_getfield(L, -1, name);
+        EXPECT_TRUE(lua_isnumber(L, -1)) << "miniwin." << name << " should be a number";
+        if (lua_isnumber(L, -1)) {
+            EXPECT_EQ(static_cast<int>(lua_tonumber(L, -1)), expected)
+                << "miniwin." << name << " should equal " << expected;
+        }
+        lua_pop(L, 1);
+    };
+
+    checkField("rect_draw_edge", 5);
+    checkField("rect_flood_fill_border", 6);
+    checkField("rect_flood_fill_surface", 7);
+    checkField("rect_edge_raised", 5);
+    checkField("rect_edge_etched", 6);
+    checkField("rect_edge_bump", 9);
+    checkField("rect_edge_sunken", 10);
+    checkField("rect_edge_at_top_left", 0x0003);
+    checkField("rect_edge_at_top_right", 0x0006);
+    checkField("rect_edge_at_bottom_left", 0x0009);
+    checkField("rect_edge_at_bottom_right", 0x000C);
+    checkField("rect_edge_at_all", 0x000F);
+    checkField("rect_diagonal_end_top_left", 0x0013);
+    checkField("rect_diagonal_end_top_right", 0x0016);
+    checkField("rect_diagonal_end_bottom_left", 0x0019);
+    checkField("rect_diagonal_end_bottom_right", 0x001C);
+    checkField("rect_option_fill_middle", 0x0800);
+    checkField("rect_option_softer_buttons", 0x1000);
+    checkField("rect_option_flat_borders", 0x4000);
+    checkField("rect_option_monochrom_borders", 0x8000);
+
+    lua_pop(L, 1); // pop miniwin
+}

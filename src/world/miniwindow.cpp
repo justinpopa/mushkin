@@ -238,9 +238,12 @@ MiniWindow::~MiniWindow()
  */
 qint32 MiniWindow::Resize(qint32 newWidth, qint32 newHeight, QRgb bgColor)
 {
-    // Validate dimensions
-    if (newWidth <= 0 || newHeight <= 0)
-        return eBadParameter;
+    // Coerce zero or negative dimensions to at least 1 (original: miniwindow.cpp:4149 —
+    // MAX(Width,1)) Original does not return eBadParameter; it just creates a 1×1 minimum image.
+    if (newWidth < 1)
+        newWidth = 1;
+    if (newHeight < 1)
+        newHeight = 1;
 
     // No change? Early return (original: miniwindow.cpp:4125-4126)
     if (newWidth == width && newHeight == height)
@@ -251,10 +254,10 @@ qint32 MiniWindow::Resize(qint32 newWidth, qint32 newHeight, QRgb bgColor)
     qint32 oldWidth = width;
     qint32 oldHeight = height;
 
-    // Update dimensions
+    // Update dimensions only — original (miniwindow.cpp:4166-4167) does NOT update
+    // backgroundColor; that field is set only at WindowCreate time.
     width = newWidth;
     height = newHeight;
-    backgroundColor = bgColor;
 
     // Create new image
     image = std::make_unique<QImage>(width, height, QImage::Format_ARGB32);
@@ -591,41 +594,66 @@ qint32 MiniWindow::CircleOp(qint16 action, qint32 left, qint32 top, qint32 right
     bool isPatternBrush = (brushStyle >= 2 && brushStyle <= 12);
 
     if (isPatternBrush) {
-        // For hatched patterns: first fill with background color (brushColor)
-        painter.setPen(Qt::NoPen);
-        painter.setBrush(bgrToColor(brushColor));
+        // Original color semantics (miniwindow.cpp:552-566):
+        //   Styles 2-7 (hatched): background = brushColor, lines = penColor
+        //   Styles 8-12 (bitmap pattern): set-bits (lines) = brushColor,
+        //                                 clear-bits (background) = penColor
+        // When brushColor == -1 (0xFFFFFFFF), SetBkMode(TRANSPARENT) is used —
+        // the background fill step must be skipped entirely.
 
-        switch (action) {
-            case 1: // Ellipse
-                painter.drawEllipse(rect);
-                break;
-            case 2: // Rectangle
-                painter.drawRect(rect);
-                break;
-            case 3: // Rounded rectangle
-                painter.drawRoundedRect(rect, extra1, extra2);
-                break;
-            case 4: // Chord (point-based: extra1,2=start; extra3,4=end)
-            case 5: // Pie
-            {
-                qreal pcx = rect.center().x();
-                qreal pcy = rect.center().y();
-                qreal psa = qAtan2(-(extra2 - pcy), extra1 - pcx) * 180.0 / M_PI;
-                qreal pea = qAtan2(-(extra4 - pcy), extra3 - pcx) * 180.0 / M_PI;
-                qreal pspan = pea - psa;
-                if (pspan <= 0)
-                    pspan += 360.0;
-                if (action == 4)
-                    painter.drawChord(rect, qRound(psa * 16), qRound(pspan * 16));
-                else
-                    painter.drawPie(rect, qRound(psa * 16), qRound(pspan * 16));
-                break;
-            }
-                // Note: action 6 (arc) is NOT valid for CircleOp in original — only 1-5
+        bool transparent = (static_cast<qint32>(brushColor) == -1);
+
+        // Choose background/foreground colors per style group
+        QColor bgColor, fgColor;
+        if (brushStyle >= 2 && brushStyle <= 7) {
+            // Hatched: background = brushColor, lines = penColor
+            bgColor = bgrToColor(brushColor);
+            fgColor = bgrToColor(penColor);
+        } else {
+            // Bitmap pattern (8-12): set-bits = brushColor, clear-bits (bg) = penColor
+            bgColor = bgrToColor(penColor);
+            fgColor = bgrToColor(brushColor);
         }
 
-        // Now set up pattern brush with penColor for the pattern lines
-        Qt::BrushStyle qtBrushStyle;
+        // First pass: fill background (skip when brushColor == -1 → TRANSPARENT)
+        if (!transparent) {
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(bgColor);
+
+            switch (action) {
+                case 1: // Ellipse
+                    painter.drawEllipse(rect);
+                    break;
+                case 2: // Rectangle
+                    painter.drawRect(rect);
+                    break;
+                case 3: // Rounded rectangle
+                    painter.drawRoundedRect(rect, extra1, extra2);
+                    break;
+                case 4: // Chord (point-based: extra1,2=start; extra3,4=end)
+                case 5: // Pie
+                {
+                    qreal pcx = rect.center().x();
+                    qreal pcy = rect.center().y();
+                    qreal psa = qAtan2(-(extra2 - pcy), extra1 - pcx) * 180.0 / M_PI;
+                    qreal pea = qAtan2(-(extra4 - pcy), extra3 - pcx) * 180.0 / M_PI;
+                    qreal pspan = pea - psa;
+                    if (pspan <= 0)
+                        pspan += 360.0;
+                    if (action == 4)
+                        painter.drawChord(rect, qRound(psa * 16), qRound(pspan * 16));
+                    else
+                        painter.drawPie(rect, qRound(psa * 16), qRound(pspan * 16));
+                    break;
+                }
+                    // Note: action 6 (arc) is NOT valid for CircleOp in original — only 1-5
+            }
+        }
+
+        // Second pass: draw pattern/hatch on top (fgColor for set bits)
+        Qt::BrushStyle qtBrushStyle = Qt::SolidPattern;
+        QImage patternImg; // used for styles 8-12 (bitmap patterns)
+
         switch (brushStyle) {
             case 2:
                 qtBrushStyle = Qt::HorPattern;
@@ -645,23 +673,73 @@ qint32 MiniWindow::CircleOp(qint16 action, qint32 left, qint32 top, qint32 right
             case 7:
                 qtBrushStyle = Qt::DiagCrossPattern;
                 break;
-            case 8:
-                qtBrushStyle = Qt::Dense6Pattern;
+            // Styles 8-12: bitmap pattern brushes (original uses 8×8 monochrome bitmaps)
+            // Bit layout: each WORD is one row, set bit = fgColor, clear bit = transparent
+            case 8: { // fine hatch: 0xAA,0x55,0xAA,0x55,...
+                static const quint8 bits8[] = {0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55};
+                patternImg = QImage(8, 8, QImage::Format_ARGB32);
+                patternImg.fill(Qt::transparent);
+                for (int row = 0; row < 8; ++row)
+                    for (int col = 0; col < 8; ++col)
+                        if (bits8[row] & (0x80 >> col))
+                            patternImg.setPixel(col, row, fgColor.rgba());
+                qtBrushStyle = Qt::TexturePattern;
                 break;
-            case 9:
-                qtBrushStyle = Qt::Dense4Pattern;
+            }
+            case 9: { // medium hatch: 0x33,0x33,0xCC,0xCC,...
+                static const quint8 bits9[] = {0x33, 0x33, 0xCC, 0xCC, 0x33, 0x33, 0xCC, 0xCC};
+                patternImg = QImage(8, 8, QImage::Format_ARGB32);
+                patternImg.fill(Qt::transparent);
+                for (int row = 0; row < 8; ++row)
+                    for (int col = 0; col < 8; ++col)
+                        if (bits9[row] & (0x80 >> col))
+                            patternImg.setPixel(col, row, fgColor.rgba());
+                qtBrushStyle = Qt::TexturePattern;
                 break;
-            case 10:
-                qtBrushStyle = Qt::Dense2Pattern;
+            }
+            case 10: { // coarse hatch: 0x0F,0x0F,0x0F,0x0F,0xF0,0xF0,0xF0,0xF0
+                static const quint8 bits10[] = {0x0F, 0x0F, 0x0F, 0x0F, 0xF0, 0xF0, 0xF0, 0xF0};
+                patternImg = QImage(8, 8, QImage::Format_ARGB32);
+                patternImg.fill(Qt::transparent);
+                for (int row = 0; row < 8; ++row)
+                    for (int col = 0; col < 8; ++col)
+                        if (bits10[row] & (0x80 >> col))
+                            patternImg.setPixel(col, row, fgColor.rgba());
+                qtBrushStyle = Qt::TexturePattern;
                 break;
+            }
+            case 11: { // waves - horizontal: 0xCC,0x33,0x00,0x00,...
+                static const quint8 bits11[] = {0xCC, 0x33, 0x00, 0x00, 0xCC, 0x33, 0x00, 0x00};
+                patternImg = QImage(8, 8, QImage::Format_ARGB32);
+                patternImg.fill(Qt::transparent);
+                for (int row = 0; row < 8; ++row)
+                    for (int col = 0; col < 8; ++col)
+                        if (bits11[row] & (0x80 >> col))
+                            patternImg.setPixel(col, row, fgColor.rgba());
+                qtBrushStyle = Qt::TexturePattern;
+                break;
+            }
+            case 12: { // waves - vertical: 0x11,0x11,0x22,0x22,...
+                static const quint8 bits12[] = {0x11, 0x11, 0x22, 0x22, 0x11, 0x11, 0x22, 0x22};
+                patternImg = QImage(8, 8, QImage::Format_ARGB32);
+                patternImg.fill(Qt::transparent);
+                for (int row = 0; row < 8; ++row)
+                    for (int col = 0; col < 8; ++col)
+                        if (bits12[row] & (0x80 >> col))
+                            patternImg.setPixel(col, row, fgColor.rgba());
+                qtBrushStyle = Qt::TexturePattern;
+                break;
+            }
             default:
                 qtBrushStyle = Qt::SolidPattern;
                 break;
         }
 
-        // Restore pen for drawing pattern
+        // Restore pen and apply pattern brush for second pass
         painter.setPen(pen);
-        painter.setBrush(QBrush(bgrToColor(penColor), qtBrushStyle));
+        QBrush patternBrush = (qtBrushStyle == Qt::TexturePattern) ? QBrush(patternImg)
+                                                                   : QBrush(fgColor, qtBrushStyle);
+        painter.setBrush(patternBrush);
     } else {
         // Solid or null brush - simple case
         Qt::BrushStyle qtBrushStyle;
@@ -784,11 +862,17 @@ qint32 MiniWindow::Arc(qint32 left, qint32 top, qint32 right, qint32 bottom, qin
     painter.setPen(pen);
     painter.setBrush(Qt::NoBrush);
 
-    // Handle special case: right=0 or bottom=0 means "use window edge"
+    // Apply FixRight/FixBottom to bounding rect (<=0 means offset from edge)
     if (right <= 0)
         right = width + right;
     if (bottom <= 0)
         bottom = height + bottom;
+
+    // Apply FixRight/FixBottom to arc end point as well (original: miniwindow.cpp:991)
+    if (x2 <= 0)
+        x2 = width + x2;
+    if (y2 <= 0)
+        y2 = height + y2;
 
     QRect rect(left, top, right - left, bottom - top);
 
@@ -1148,7 +1232,8 @@ qint32 MiniWindow::Gradient(qint32 left, qint32 top, qint32 right, qint32 bottom
             break;
 
         default:
-            return eBadParameter;
+            return eUnknownOption; // original: miniwindow.cpp:2678,2738 — default returns
+                                   // eUnknownOption
     }
 
     // Set gradient colors
@@ -1216,6 +1301,10 @@ qint32 MiniWindow::Text(const QString& fontId, const QString& text, qint32 left,
 
     QString displayText = unicode ? QString::fromUtf8(text.toUtf8()) : text;
 
+    // Early return for empty text — no drawing, no dirty flag (original: miniwindow.cpp:833-834)
+    if (displayText.isEmpty())
+        return 0;
+
     // Handle special meaning for right/bottom (from miniwindow.cpp)
     // - right <= 0 means offset from right edge (0 = right edge, -1 = 1px from right)
     // - bottom <= 0 means offset from bottom edge (0 = bottom edge, -1 = 1px from bottom)
@@ -1257,7 +1346,7 @@ qint32 MiniWindow::Text(const QString& fontId, const QString& text, qint32 left,
 qint32 MiniWindow::TextWidth(const QString& fontId, const QString& text, bool unicode)
 {
     if (!fonts.contains(fontId))
-        return 0;
+        return -2; // original: miniwindow.cpp:894-895 — returns -2 when font not found
 
     QString measureText = unicode ? QString::fromUtf8(text.toUtf8()) : text;
 
@@ -1424,16 +1513,30 @@ qint32 MiniWindow::DrawImage(const QString& imageId, qint32 left, qint32 top, qi
     qint32 fixedRight = (right <= 0) ? width + right : right;
     qint32 fixedBottom = (bottom <= 0) ? height + bottom : bottom;
 
+    // Resolve source rect using the same FixRight/FixBottom logic as the original
+    // (miniwindow.cpp:1392-1396): clamp to actual dimensions, then treat <=0 as
+    // offset from right/bottom edge.
+    if (srcLeft < 0)
+        srcLeft = 0;
+    if (srcTop < 0)
+        srcTop = 0;
+    if (srcRight > img->width())
+        srcRight = img->width();
+    if (srcBottom > img->height())
+        srcBottom = img->height();
+    if (srcRight <= 0)
+        srcRight = img->width() + srcRight;
+    if (srcBottom <= 0)
+        srcBottom = img->height() + srcBottom;
+
     QPainter painter(image.get());
     painter.setRenderHint(QPainter::SmoothPixmapTransform);
 
     QRect destRect(left, top, fixedRight - left, fixedBottom - top);
     QRect srcRect(srcLeft, srcTop, srcRight - srcLeft, srcBottom - srcTop);
 
-    // If source rect is 0,0,0,0 use full image
-    if (srcRect.isEmpty() || srcRect.width() == 0 || srcRect.height() == 0) {
-        srcRect = QRect(0, 0, img->width(), img->height());
-    }
+    if (srcRect.width() <= 0 || srcRect.height() <= 0)
+        return eOK; // sanity check — nothing to draw
 
     // Draw modes (original miniwindow.cpp:1403-1448):
     //   1 = BitBlt SRCCOPY (straight copy, no stretch — uses source dimensions)
@@ -1505,11 +1608,9 @@ qint32 MiniWindow::BlendImage(const QString& imageId, qint32 left, qint32 top, q
     if (it == images.end() || !it->second)
         return eImageNotInstalled;
 
-    // Clamp opacity
-    if (opacity < 0.0)
-        opacity = 0.0;
-    if (opacity > 1.0)
-        opacity = 1.0;
+    // Reject out-of-range opacity (original: miniwindow.cpp:2067-2068)
+    if (opacity < 0.0 || opacity > 1.0)
+        return eBadParameter;
 
     // ── Resolve destination rect ──────────────────────────────────────────
     qint32 destLeft = left;

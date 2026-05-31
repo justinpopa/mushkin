@@ -9,7 +9,9 @@
 #include "dialogs/complete_word_dialog.h"
 #include "logging.h"
 #include <QDebug>
+#include <QFontMetrics>
 #include <QKeyEvent>
+#include <QResizeEvent>
 #include <QScrollBar>
 #include <QTextCursor>
 #include <cctype>
@@ -367,11 +369,75 @@ void InputView::applyInputSettings()
 
     // Apply word-wrap mode from document setting
     // (original: FixInputWrap → CSendView::UpdateWrap toggles edit control wrapping)
-    setLineWrapMode(m_doc->m_input.auto_wrap ? QPlainTextEdit::WidgetWidth
-                                             : QPlainTextEdit::NoWrap);
+    //
+    // M149: Original wraps at m_nWrapColumn character columns (clamped to [20, MAX_LINE_WIDTH]),
+    // not at the widget pixel boundary.  QPlainTextEdit only supports WidgetWidth/NoWrap;
+    // to honour the column limit we set a right viewport margin that trims the visible width
+    // to exactly (wrap_column+1) * averageCharWidth pixels (mirroring the original's rMargin
+    // calculation: widgetWidth - (iWidth * m_InputFontWidth) - iOffset).
+    updateWrapMargin();
 
     // Update height after font change
     updateHeight();
+}
+
+/**
+ * updateWrapMargin - Apply column-based right viewport margin.
+ *
+ * M149: Mirrors CSendView::UpdateWrap() from sendvw.cpp:3015-3062.
+ * When auto_wrap is true, sets a right viewport margin so that WidgetWidth
+ * wrapping is effectively bounded at (wrap_column+1) characters.
+ * When false, removes the margin and sets NoWrap.
+ */
+void InputView::updateWrapMargin()
+{
+    if (!m_doc) {
+        return;
+    }
+
+    if (m_doc->m_input.auto_wrap) {
+        setLineWrapMode(QPlainTextEdit::WidgetWidth);
+
+        // Mirror original: iWidth = m_nWrapColumn + 1, clamped to [20, MAX_LINE_WIDTH]
+        int columns = static_cast<int>(m_doc->m_display.wrap_column) + 1;
+        if (columns < 20)
+            columns = 20;
+        if (columns > 32000) // MAX_LINE_WIDTH
+            columns = 32000;
+
+        // Compute average character width for the current input font
+        QFont inputFont(m_doc->m_input.font_name, static_cast<int>(m_doc->m_input.font_height));
+        int charWidth = QFontMetrics(inputFont).averageCharWidth();
+        if (charWidth < 1)
+            charWidth = 1;
+
+        // rMargin = widgetWidth - (columns * charWidth) - pixelOffset
+        // If rMargin < pixelOffset, clamp to pixelOffset (original sendvw.cpp:3040)
+        const int pixelOffset = static_cast<int>(m_doc->m_display.pixel_offset);
+        int rMargin = width() - (columns * charWidth) - pixelOffset;
+        if (rMargin < pixelOffset)
+            rMargin = pixelOffset;
+
+        // Apply as a right viewport margin so WidgetWidth wraps at the column boundary
+        setViewportMargins(pixelOffset, 0, rMargin, 0);
+    } else {
+        setViewportMargins(0, 0, 0, 0);
+        setLineWrapMode(QPlainTextEdit::NoWrap);
+    }
+}
+
+/**
+ * resizeEvent - Recalculate the wrap margin when the widget is resized.
+ *
+ * M149: The original calls UpdateWrap() on text change and initial creation;
+ * UpdateWrap() itself uses GetClientRect() to get the current width.
+ * In Qt we must also recompute the margin on resize since the right margin
+ * calculation is viewport-width-dependent.
+ */
+void InputView::resizeEvent(QResizeEvent* event)
+{
+    QPlainTextEdit::resizeEvent(event);
+    updateWrapMargin();
 }
 
 /**

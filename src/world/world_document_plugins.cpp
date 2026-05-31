@@ -523,11 +523,15 @@ Plugin* WorldDocument::LoadPlugin(const QString& filepath, QString& errorMsg,
         bool error = pluginPtr->m_ScriptEngine->parseScript(
             pluginPtr->m_strScript, QString("Plugin %1").arg(pluginPtr->m_strName), pluginLang);
         if (error) {
-            // Original: script parse error causes the entire plugin load to fail.
-            // The plugin is not added to the list.
+            // Original xml_load_world.cpp:515-517: script parse error causes the entire
+            // plugin load to fail. Remove the plugin we already inserted into the list
+            // so no dangling entry remains (M14).
             errorMsg = QString("Script error in plugin '%1'").arg(pluginPtr->m_strName);
             qWarning() << errorMsg;
             m_CurrentPlugin = savedPlugin;
+            m_PluginList.erase(std::find_if(
+                m_PluginList.begin(), m_PluginList.end(),
+                [pluginPtr](const std::unique_ptr<Plugin>& p) { return p.get() == pluginPtr; }));
             return nullptr;
         }
 
@@ -654,6 +658,9 @@ bool WorldDocument::UnloadPlugin(const QString& pluginID, bool suppressListChang
     if (!suppressListChanged) {
         PluginListChanged();
     }
+
+    // Mark document as modified (original methods_plugins.cpp:655)
+    setModified(true);
 
     return true;
 }
@@ -896,18 +903,25 @@ bool WorldDocument::SendToFirstPluginCallbacks(const QString& callbackName, cons
         // error (scripting.h:71), so an errored callback fails the post-check and the
         // loop falls through to the next plugin.
         //
-        // KNOWN DEVIATION (worklist L117): we check hasCallback() *before* executing and
-        // return true unconditionally below, so a callback that errors still stops
-        // iteration instead of falling through. Low impact (only when a callback is in an
-        // already-broken error state); not yet fixed.
+        // We mirror this: pre-check skips plugins with no callback, but after executing
+        // we also verify the callback is still valid (not cleared by an error). Only stop
+        // iteration if the callback actually ran without error (H10).
         if (!plugin->hasCallback(callbackName)) {
             continue;
         }
 
         plugin->ExecutePluginScript(callbackName, arg);
+
+        // Callback errored — ExecutePluginScript sets dispid to DISPID_UNKNOWN on error.
+        // Fall through to the next plugin (matches original post-execution isvalid() check).
+        if (!plugin->hasCallback(callbackName)) {
+            m_CurrentPlugin = savedPlugin;
+            continue;
+        }
+
         m_CurrentPlugin = savedPlugin;
         m_bNotesNotWantedNow = false;
-        return true; // Found a plugin with this callback
+        return true; // Found a plugin with this callback (ran without error)
     }
 
     m_CurrentPlugin = savedPlugin;

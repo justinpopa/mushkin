@@ -365,9 +365,11 @@ int main(int argc, char* argv[])
     }
 
     color = getGlobalNumber(L, "color");
-    // Original GDI GetPixel returns CLR_INVALID (0xFFFFFFFF = -1) for OOB
-    if (color != static_cast<double>(0xFFFFFFFF)) {
-        qDebug() << "✗ FAIL: WindowGetPixel out of bounds should return CLR_INVALID, got" << color;
+    // WindowGetPixel is VT_I4 (signed 32-bit) in the original, so CLR_INVALID
+    // (0xFFFFFFFF) marshals to -1 in the Lua-visible value.
+    if (color != -1.0) {
+        qDebug() << "✗ FAIL: WindowGetPixel out of bounds should return CLR_INVALID (-1), got"
+                 << color;
         return 1;
     }
 

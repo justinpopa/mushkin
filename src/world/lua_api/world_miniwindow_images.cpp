@@ -123,7 +123,8 @@ int L_WindowDrawImage(lua_State* L)
     qint32 top = luaL_checkinteger(L, 4);
     qint32 right = luaL_checkinteger(L, 5);
     qint32 bottom = luaL_checkinteger(L, 6);
-    qint16 mode = luaL_checkinteger(L, 7);
+    qint16 mode =
+        luaL_optinteger(L, 7, 1); // defaults to 1 (image_copy); original: my_optnumber(L,7,1)
     qint32 srcLeft = luaL_optinteger(L, 8, 0);
     qint32 srcTop = luaL_optinteger(L, 9, 0);
     qint32 srcRight = luaL_optinteger(L, 10, 0);
@@ -805,6 +806,21 @@ int L_WindowAddHotspot(lua_State* L)
     qint32 cursor = luaL_optinteger(L, 13, 0);
     qint32 flags = luaL_optinteger(L, 14, 0);
 
+    // Validate non-empty callback names as valid Lua script labels
+    // Original: miniwindow.cpp:1719-1728 — CheckLabel(name, bScript=true)
+    // Empty string is allowed (means "no callback"); non-empty must be a valid identifier
+    // (letters, digits, underscores, or dots for module.function syntax).
+    if (!mouseOver.isEmpty() && validateScriptLabel(mouseOver) != eOK)
+        return luaReturnError(L, eInvalidObjectLabel);
+    if (!cancelMouseOver.isEmpty() && validateScriptLabel(cancelMouseOver) != eOK)
+        return luaReturnError(L, eInvalidObjectLabel);
+    if (!mouseDown.isEmpty() && validateScriptLabel(mouseDown) != eOK)
+        return luaReturnError(L, eInvalidObjectLabel);
+    if (!cancelMouseDown.isEmpty() && validateScriptLabel(cancelMouseDown) != eOK)
+        return luaReturnError(L, eInvalidObjectLabel);
+    if (!mouseUp.isEmpty() && validateScriptLabel(mouseUp) != eOK)
+        return luaReturnError(L, eInvalidObjectLabel);
+
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         return luaReturnError(L, eNoSuchWindow);
@@ -816,6 +832,18 @@ int L_WindowAddHotspot(lua_State* L)
         return luaReturnError(L, eHotspotPluginChanged);
     }
     win->callbackPlugin = pluginId;
+
+    // If replacing an existing hotspot, clear any active mouse tracking for it
+    // Original: miniwindow.cpp:1736-1748 — clears m_sMouseOverHotspot/m_sMouseDownHotspot
+    // before deleting and replacing the old hotspot entry.
+    if (win->hotspots.count(hotspotIdStr) > 0) {
+        if (win->mouseOverHotspot == hotspotIdStr) {
+            win->mouseOverHotspot.clear();
+        }
+        if (win->mouseDownHotspot == hotspotIdStr) {
+            win->mouseDownHotspot.clear();
+        }
+    }
 
     // Create or replace hotspot
     auto hotspot = std::make_unique<Hotspot>();

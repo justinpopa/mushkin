@@ -59,6 +59,11 @@ void ConnectionManager::connectToMud()
     }
 
     qCDebug(lcWorld) << "connectToMud: Connecting to" << m_doc.m_server << ":" << m_doc.m_port;
+
+    // Original: doc.cpp:987 — m_bDisconnectOK = false set before socket creation
+    // (InitiateConnection).
+    m_doc.m_bDisconnectOK = false;
+
     m_iConnectPhase = CONNECT_CONNECTING_TO_MUD;
     m_pSocket->connectToHost(m_doc.m_server, m_doc.m_port);
 }
@@ -99,7 +104,8 @@ void ConnectionManager::onConnect(int errorCode)
                          << m_doc.m_server << ":" << m_doc.m_port;
         m_iConnectPhase = CONNECT_CONNECTED_TO_MUD;
         m_tConnectTime = QDateTime::currentDateTime();
-        m_whenWorldStarted = m_tConnectTime;
+        // m_whenWorldStarted is NOT updated on connect — it is set once at document construction
+        // to reflect "when this world was created/opened" (original: doc_construct.cpp:28).
 
         // Reset telnet parser state.
         m_doc.m_telnetParser->reset();
@@ -107,15 +113,16 @@ void ConnectionManager::onConnect(int errorCode)
         m_doc.m_UTF8Sequence.fill(0);
         m_doc.m_iUTF8BytesLeft = 0;
 
-        // Reset session counters (original: doc.cpp ConnectionEstablished)
+        // Reset per-session counters (original: doc.cpp:6570-6576 ConnectionEstablished).
+        // NOTE: m_nBytesIn / m_nBytesOut are lifetime totals initialized at construction
+        //       (original: doc_construct.cpp:63-64) and are NOT reset on each connect.
         m_nTotalLinesSent = 0;
         m_nTotalLinesReceived = 0;
-        m_nBytesIn = 0;
-        m_nBytesOut = 0;
         m_iInputPacketCount = 0;
         m_iOutputPacketCount = 0;
         m_doc.m_automationRegistry->m_iTriggersMatchedThisSessionCount = 0;
         m_doc.m_automationRegistry->m_iAliasesMatchedThisSessionCount = 0;
+        m_doc.m_automationRegistry->m_iTimersFiredThisSessionCount = 0;
 
         // Create initial line if needed.
         if (!m_doc.m_currentLine) {
@@ -138,29 +145,33 @@ void ConnectionManager::onConnect(int errorCode)
             m_doc.MXP_On();
         }
 
-        // Lua callback: OnWorldConnect.
-        onWorldConnect();
-
-        // Notify plugins.
-        m_doc.SendToAllPluginCallbacks(ON_PLUGIN_CONNECT);
-
         // Auto-login: send connect credentials based on connect_method.
         // Matches original MUSHclient doc.cpp:6731-6795 (ConnectionEstablished).
 
-        // Prompt for password if none is stored but one is needed (M196).
+        // Prompt for password if none is stored but one is needed.
         // Original: doc.cpp:6735-6751 — shows CPasswordDialog when password is empty and
         // either (a) connect_now is set with a character name, or (b) connect_text uses %password%.
+        // Original CPasswordDialog validates non-empty/non-whitespace (password.cpp:38-45).
         QString password = m_doc.m_password;
         if (password.isEmpty() &&
             ((m_doc.m_connect_now != eNoAutoConnect && !m_doc.m_name.isEmpty()) ||
              m_doc.m_connect_text.contains(QStringLiteral("%password%")))) {
-            bool ok = false;
-            QString entered =
-                QInputDialog::getText(nullptr, QStringLiteral("Enter Password"),
-                                      QStringLiteral("Password for %1:").arg(m_doc.m_name),
-                                      QLineEdit::Password, QString(), &ok);
-            if (ok)
-                password = entered;
+            // Keep prompting until a non-blank password is entered or the user cancels.
+            while (true) {
+                bool ok = false;
+                QString entered =
+                    QInputDialog::getText(nullptr, QStringLiteral("Enter Password"),
+                                          QStringLiteral("Password for %1:").arg(m_doc.m_name),
+                                          QLineEdit::Password, QString(), &ok);
+                if (!ok)
+                    break; // user cancelled
+                QString trimmed = entered.trimmed();
+                if (!trimmed.isEmpty()) {
+                    password = trimmed;
+                    break;
+                }
+                // blank — loop to re-prompt (matches CPasswordDialog::DoDataExchange pDX->Fail())
+            }
         }
 
         switch (m_doc.m_connect_now) {
@@ -191,8 +202,15 @@ void ConnectionManager::onConnect(int errorCode)
             m_doc.SendMsg(text, false, false, false); // don't display (may contain password)
         }
 
-        // Reset all timers on connect (original: doc.cpp:6799)
+        // Reset all timers on connect (original: doc.cpp:6799).
+        // Lua OnWorldConnect and plugin callbacks fire AFTER ResetAllTimers (original: 6799-6840).
         m_doc.resetAllTimers();
+
+        // Lua callback: OnWorldConnect (original: doc.cpp:6821-6838).
+        onWorldConnect();
+
+        // Notify plugins (original: doc.cpp:6840).
+        m_doc.SendToAllPluginCallbacks(ON_PLUGIN_CONNECT);
 
         // Start remote access server if configured.
         const bool hasAuth =
@@ -259,8 +277,10 @@ void ConnectionManager::onConnectionDisconnect()
     // Notify plugins.
     m_doc.SendToAllPluginCallbacks(ON_PLUGIN_DISCONNECT);
 
-    // Close auto-log on disconnect (original: worldsock.cpp OnClose)
-    if (m_doc.IsLogOpen()) {
+    // Close auto-log on disconnect only if the log was auto-opened.
+    // Original: worldsock.cpp:109 — guards on !m_strAutoLogFileName.IsEmpty(), not IsLogOpen(),
+    // so manually-opened logs are not closed on disconnect.
+    if (!m_doc.m_logging.auto_log_file_name.isEmpty()) {
         m_doc.CloseLog();
     }
 

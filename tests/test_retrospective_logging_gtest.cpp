@@ -258,3 +258,92 @@ TEST_F(RetrospectiveLoggingTest, MixedLineTypesRetrospectiveLogging)
 
     // Note: Don't delete lines - WorldDocument destructor handles them
 }
+
+// Test 6: Retrospective log skips NOTE_OR_COMMAND lines when log_input/log_notes disabled
+// Original: doc.cpp:2944-2945 re-checks m_log_input and m_bLogNotes at review time.
+TEST_F(RetrospectiveLoggingTest, RetrospectiveSkipsDisabledInputNotes)
+{
+    doc->m_logging.log_html = false;
+    doc->m_logging.log_raw = false;
+    doc->m_logging.log_output = true;
+    doc->m_logging.log_notes = false; // notes disabled at review time
+    doc->m_logging.log_input = false; // input disabled at review time
+    doc->m_logging.line_preamble_output = "";
+    doc->m_logging.line_preamble_notes = "";
+    doc->m_logging.line_preamble_input = "";
+    doc->m_logging.line_postamble_output = "";
+    doc->m_logging.line_postamble_notes = "";
+    doc->m_logging.line_postamble_input = "";
+
+    // These NOTE_OR_COMMAND lines were buffered (before log opened), but at review
+    // time log_input and log_notes are disabled — they must be filtered out.
+    doc->m_lineList.push_back(createLine(1, "MUD output line", LOG_LINE));
+    doc->m_lineList.push_back(createLine(2, "a note", COMMENT | NOTE_OR_COMMAND));
+    doc->m_lineList.push_back(createLine(3, "go north", USER_INPUT | NOTE_OR_COMMAND));
+
+    QString logFile = getTempLogFile("test_retro_filter.log");
+    qint32 result = doc->OpenLog(logFile, false);
+    EXPECT_EQ(result, 0) << "OpenLog should succeed";
+    doc->CloseLog();
+
+    QString content = readFile(logFile);
+    EXPECT_TRUE(content.contains("MUD output line")) << "MUD output should be logged";
+    EXPECT_FALSE(content.contains("a note")) << "Note should be filtered (log_notes=false)";
+    EXPECT_FALSE(content.contains("go north")) << "Input should be filtered (log_input=false)";
+}
+
+// Test 7: Retrospective log skips entirely in raw mode
+// Original: doc.cpp:2834-2836 — OnFileLogsession returns early for raw logs,
+// skipping preamble, world name, and retrospective dump entirely.
+TEST_F(RetrospectiveLoggingTest, RetrospectiveSkippedInRawMode)
+{
+    doc->m_logging.log_html = false;
+    doc->m_logging.log_raw = true; // raw mode
+    doc->m_logging.log_output = true;
+    doc->m_logging.line_preamble_output = "[OUT] ";
+    doc->m_logging.line_postamble_output = "";
+
+    doc->m_lineList.push_back(createLine(1, "buffered MUD line", LOG_LINE));
+    doc->m_lineList.push_back(createLine(2, "another buffered line", LOG_LINE));
+
+    QString logFile = getTempLogFile("test_retro_raw.log");
+    qint32 result = doc->OpenLog(logFile, false);
+    EXPECT_EQ(result, 0) << "OpenLog should succeed";
+    doc->CloseLog();
+
+    QString content = readFile(logFile);
+    // In raw mode, retrospective log is skipped entirely.
+    EXPECT_FALSE(content.contains("buffered MUD line"))
+        << "Retrospective lines must not appear in raw-mode log";
+    EXPECT_FALSE(content.contains("another buffered line"))
+        << "Retrospective lines must not appear in raw-mode log";
+}
+
+// Test 8: AutoLogWorld filename FormatTime uses m_logging.log_html (not hardcoded false).
+// Original: doc.cpp:6666 — FormatTime(theTime, m_strAutoLogFileName, m_bLogHTML).
+// Verifies that with log_html=false the world name %N is substituted as plain text
+// (no HTML escaping) and a log file is created at the resulting path.
+TEST_F(RetrospectiveLoggingTest, AutoLogFilenameUsesLogHtmlForFormatTime)
+{
+    // Use an explicit absolute path pattern so we can locate the resulting file.
+    QString logDir = QDir::temp().path();
+    QString pattern = logDir + "/mushkin_autotest_%N.log";
+    QString expectedFile = logDir + "/mushkin_autotest_TestWorld.log";
+
+    doc->m_logging.log_html = false;
+    doc->m_mush_name = "TestWorld";
+    doc->m_logging.auto_log_file_name = pattern;
+    doc->m_logging.log_raw = false;
+
+    QFile::remove(expectedFile);
+
+    // Pass empty filename so OpenLog derives from auto_log_file_name.
+    qint32 result = doc->OpenLog(QString(), true);
+    EXPECT_EQ(result, 0) << "OpenLog with auto-derived name should succeed";
+    if (result == 0) {
+        doc->CloseLog();
+        bool fileExists = QFile::exists(expectedFile);
+        EXPECT_TRUE(fileExists) << "Log file should be created at: " << expectedFile.toStdString();
+        QFile::remove(expectedFile);
+    }
+}

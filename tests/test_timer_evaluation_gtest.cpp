@@ -19,9 +19,11 @@
  * 11. matched, when_fired, m_iTimersFiredCount updated
  */
 
+#include "../src/automation/plugin.h"
 #include "../src/automation/timer.h"
 #include "fixtures/world_fixtures.h"
 #include <QDateTime>
+#include <QTemporaryFile>
 #include <QThread>
 
 // Test fixture for timer evaluation tests
@@ -302,4 +304,52 @@ TEST_F(TimerEvaluationTest, MultipleTimersFireCorrectly)
     EXPECT_EQ(timer1->matched, 1) << "timer1 (past) should have fired";
     EXPECT_EQ(timer2->matched, 1) << "timer2 (past) should have fired";
     EXPECT_EQ(timer3->matched, 0) << "timer3 (future) should not have fired";
+}
+
+// Test: resetAllTimers also resets plugin timers (M8)
+// Original (timers.cpp:357-370): OnGameResetalltimers iterates m_PluginList and calls
+// ResetAllTimers for each enabled plugin, not only the main world timer map.
+TEST_F(TimerEvaluationTest, ResetAllTimersIncludesPluginTimers)
+{
+    // Load a minimal plugin
+    QTemporaryFile pluginFile;
+    pluginFile.setFileTemplate("test-plugin-timer-XXXXXX.xml");
+    pluginFile.open();
+    pluginFile.write(QStringLiteral(R"(<?xml version="1.0"?>
+<!DOCTYPE muclient>
+<muclient>
+<plugin name="TimerPlugin" author="Test" id="{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
+        language="Lua" purpose="Timer reset test" version="1.0" save_state="n" sequence="0">
+<script><![CDATA[]]></script>
+</plugin>
+</muclient>
+)")
+                         .toUtf8());
+    pluginFile.flush();
+
+    QString errMsg;
+    Plugin* plugin = doc->LoadPlugin(pluginFile.fileName(), errMsg);
+    ASSERT_NE(plugin, nullptr) << "Could not load plugin: " << errMsg.toStdString();
+
+    // Add a plugin-owned timer with a fire_time already in the past
+    auto pluginTimer = std::make_unique<Timer>();
+    pluginTimer->enabled = true;
+    pluginTimer->type = Timer::TimerType::Interval;
+    pluginTimer->every_minute = 1;
+    pluginTimer->every_second = 0.0;
+    pluginTimer->fire_time = QDateTime::currentDateTime().addSecs(-60);
+    Timer* rawPluginTimer = pluginTimer.get();
+    plugin->m_TimerMap["plugin_t1"] = std::move(pluginTimer);
+
+    QDateTime before = rawPluginTimer->fire_time;
+
+    // resetAllTimers must reschedule the plugin timer into the future
+    doc->m_automationRegistry->resetAllTimers();
+
+    EXPECT_GT(rawPluginTimer->fire_time, before)
+        << "Plugin timer fire_time should be rescheduled into the future by resetAllTimers";
+    EXPECT_GT(rawPluginTimer->fire_time, QDateTime::currentDateTime())
+        << "Plugin timer fire_time must be in the future after resetAllTimers";
+
+    pluginFile.close();
 }

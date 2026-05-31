@@ -173,7 +173,7 @@ qint32 WorldDocument::OpenLog(const QString& filename, bool append, bool writePr
     if (logName.isEmpty()) {
         // Use auto-generated filename with time substitution
         QDateTime now = QDateTime::currentDateTime();
-        logName = FormatTime(now, m_logging.auto_log_file_name, false);
+        logName = FormatTime(now, m_logging.auto_log_file_name, m_logging.log_html);
     }
 
     // Filename still empty? Error
@@ -258,9 +258,6 @@ qint32 WorldDocument::OpenLog(const QString& filename, bool append, bool writePr
             WriteToLog("\n\n");
         }
     }
-
-    // Initialize flush time
-    m_LastFlushTime = QDateTime::currentDateTime();
 
     // Retrospective Logging — only from interactive/auto-connect path.
     // Original: Lua OpenLog() does NOT trigger retrospective logging.
@@ -730,6 +727,12 @@ void WorldDocument::writeRetrospectiveLog()
         return;
     }
 
+    // Original: doc.cpp:2834-2836 — OnFileLogsession (interactive dialog) returns early
+    // for raw logs, skipping preamble, world name, and retrospective dump entirely.
+    if (m_logging.log_raw) {
+        return;
+    }
+
     qCDebug(lcLogging) << "writeRetrospectiveLog: Writing" << m_lineList.size() << "buffered lines";
 
     int linesWritten = 0;
@@ -745,6 +748,15 @@ void WorldDocument::writeRetrospectiveLog()
         // NOTE_OR_COMMAND (user input/notes added to buffer)
         // Original: doc.cpp:2943 checks both flags
         if (!(line->flags & LOG_LINE) && !(line->flags & NOTE_OR_COMMAND)) {
+            continue;
+        }
+
+        // Re-check current log_input/log_notes settings for NOTE_OR_COMMAND lines.
+        // Original: doc.cpp:2944-2945 — re-filters at review time even for NOTE_OR_COMMAND.
+        if ((line->flags & USER_INPUT) && !m_logging.log_input) {
+            continue;
+        }
+        if ((line->flags & COMMENT) && !m_logging.log_notes) {
             continue;
         }
 

@@ -233,6 +233,32 @@ TEST_F(TriggerMatchingTest, LowercaseWildcardConversion)
     EXPECT_EQ(t7->wildcards[1], "dragon") << "Wildcard should be lowercased to 'dragon'";
 }
 
+// Test: Named wildcards populated for repeat triggers (M3)
+// Original: FixSendText calls GetWildcard(name) on the regexp at substitution time,
+// so named groups are always available regardless of the repeat flag.
+TEST_F(TriggerMatchingTest, NamedWildcardsInRepeatTrigger)
+{
+    auto t = std::make_unique<Trigger>();
+    t->internal_name = "repeat_named";
+    t->label = "repeat_named";
+    t->trigger = "(?P<word>\\w+)";
+    t->use_regexp = true;
+    t->repeat = true;
+    t->enabled = true;
+    t->sequence = 100;
+    t->keep_evaluating = true;
+    Trigger* raw = t.get();
+    doc->addTrigger("repeat_named", std::move(t));
+    doc->rebuildTriggerArray();
+
+    auto line = createTestLine("hello");
+    doc->evaluateTriggers(line.get());
+
+    EXPECT_GE(raw->matched, 1) << "Repeat trigger should match";
+    EXPECT_EQ(raw->namedWildcards.value("word"), "hello")
+        << "Named wildcard 'word' should be populated on repeat trigger";
+}
+
 // Test 8: Disabled Trigger
 TEST_F(TriggerMatchingTest, DisabledTrigger)
 {

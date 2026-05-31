@@ -841,7 +841,7 @@ int L_DatabaseColumnValue(lua_State* L)
  *
  * @param Name (string) Logical database name
  *
- * @return (table) Array of column name strings (1-indexed), or empty table on error
+ * @return (table) Array of column name strings (1-indexed), or nil on error/no columns
  *
  * @example
  * local names = DatabaseColumnNames("mydb")
@@ -859,6 +859,12 @@ int L_DatabaseColumnNames(lua_State* L)
     auto it = pDoc->m_DatabaseMap.find(qName);
     if (it == pDoc->m_DatabaseMap.end() || it->second->db == nullptr ||
         it->second->pStmt == nullptr) {
+        lua_pushnil(L);
+        return 1;
+    }
+
+    // Original returns nil when zero columns (cannot create empty dimension)
+    if (it->second->iColumns == 0) {
         lua_pushnil(L);
         return 1;
     }

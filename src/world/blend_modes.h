@@ -44,7 +44,7 @@
 {
     if (a == 0)
         return 0;
-    int v = 255 - ((static_cast<int>(255 - b) * 255) / a);
+    int v = 255 - static_cast<int>((static_cast<unsigned long>(255 - b) << 8u) / a);
     return static_cast<uint8_t>(v < 0 ? 0 : v);
 }
 

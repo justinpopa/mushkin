@@ -12,7 +12,9 @@
  * 7. error_code table exists
  */
 
+#include "../src/storage/database.h"
 #include "../src/utils/error_codes.h"
+#include "../src/world/accelerator_manager.h"
 #include "fixtures/world_fixtures.h"
 
 class LuaApiTest : public ConnectedWorldTest {};
@@ -259,6 +261,26 @@ TEST_F(LuaApiTest, DisconnectErrorCodes)
         << "Disconnect() should return eWorldClosed (30002) when already disconnecting";
 }
 
+// Test: world.Send/SendImmediate/SendNoEcho/SendPush concatenate all arguments
+// Original lua_methods.cpp:4808 uses concatArgs(L) not just arg[1].
+// Passing multiple args must join them without delimiter, matching the original.
+TEST_F(LuaApiTest, SendConcatenatesAllArgs)
+{
+    doc->m_bPluginProcessingSent = false;
+    doc->m_strLastCommandSent.clear();
+
+    // world.Send with two string args should concatenate both (no delimiter)
+    executeLua("world.Send('cast fireball ', 'dragon')");
+    EXPECT_EQ(doc->m_strLastCommandSent, "cast fireball dragon")
+        << "Send() multi-arg: both arguments must be concatenated without delimiter";
+
+    // world.SendNoEcho with two string args
+    doc->m_strLastCommandSent.clear();
+    executeLua("world.SendNoEcho('north', 'east')");
+    EXPECT_EQ(doc->m_strLastCommandSent, "northeast")
+        << "SendNoEcho() multi-arg: arguments must be concatenated without delimiter";
+}
+
 // Test 16: API-created object names are keyed in lower case, matching the original
 // CMUSHclientDoc::CheckObjectName() which calls MakeLower() after validation. The
 // AutomationRegistry keys triggers directly off the validated name without any further
@@ -290,4 +312,154 @@ TEST_F(LuaApiTest, ObjectNamesKeyedLowerCase)
         << "DeleteTrigger should find and delete the trigger regardless of name case";
     EXPECT_TRUE(triggerMap.find("mytrigger") == triggerMap.end())
         << "Trigger should be gone after case-insensitive delete";
+}
+
+// Test 17: world.GetMappingString() wraps multi-char directions in parentheses
+// regardless of run count — single-occurrence "ne" must produce "(ne) " not "ne ".
+// This matches the original MUSHclient OUTPUT_PREVIOUS_ONE macro (Mapping.cpp:284-287)
+// which wraps strLastDir before checking iCount.
+TEST_F(LuaApiTest, GetMappingStringParenthesisesMultiCharSingle)
+{
+    // Single "ne" — should be wrapped: "(ne) "
+    doc->m_mapList = QStringList{"ne"};
+    executeLua("map_single_ne = world.GetMappingString()");
+    EXPECT_EQ(getGlobalString("map_single_ne"), "(ne) ")
+        << "Single 'ne' should be parenthesized: '(ne) '";
+
+    // Two consecutive "sw" — should be "2(sw) "
+    doc->m_mapList = QStringList{"sw", "sw"};
+    executeLua("map_two_sw = world.GetMappingString()");
+    EXPECT_EQ(getGlobalString("map_two_sw"), "2(sw) ")
+        << "Two 'sw' entries should produce '2(sw) '";
+
+    // Single single-char direction "n" — no parentheses
+    doc->m_mapList = QStringList{"n"};
+    executeLua("map_single_n = world.GetMappingString()");
+    EXPECT_EQ(getGlobalString("map_single_n"), "n ")
+        << "Single 'n' should not be parenthesized: 'n '";
+
+    // Mixed: one "n", one "ne", two "n"
+    doc->m_mapList = QStringList{"n", "ne", "n", "n"};
+    executeLua("map_mixed = world.GetMappingString()");
+    EXPECT_EQ(getGlobalString("map_mixed"), "n (ne) 2n ") << "Mixed run: 'n (ne) 2n '";
+}
+
+// Fixture that extends ConnectedWorldTest with an open preferences database.
+// GetGlobalOption queries the DB, so tests for it need the DB open.
+class LuaApiWithDbTest : public ConnectedWorldTest {
+  protected:
+    void SetUp() override
+    {
+        ConnectedWorldTest::SetUp();
+        ASSERT_TRUE(Database::instance().open().has_value()) << "preferences database must open";
+    }
+
+    void TearDown() override
+    {
+        Database::instance().close();
+        ConnectedWorldTest::TearDown();
+    }
+};
+
+// Test 17: world.GetGlobalOption() returns string defaults when DB key is absent
+// (H13 fix — parity with original PopulateDatabase which pre-populates all
+// AlphaGlobalOptionsTable entries so GetGlobalOption never returns nil for known
+// string options, even on a fresh install before save() has been called).
+TEST_F(LuaApiWithDbTest, GetGlobalOptionStringDefaultNotNil)
+{
+    // Remove the key from the DB so we exercise the "absent" path.
+    Database::instance().execute("DELETE FROM prefs WHERE name = 'DefaultLogFileDirectory'");
+
+    executeLua("gopt_val = world.GetGlobalOption('DefaultLogFileDirectory')");
+
+    lua_getglobal(L, "gopt_val");
+    bool isNil = lua_isnil(L, -1);
+    lua_pop(L, 1);
+
+    EXPECT_FALSE(isNil)
+        << "GetGlobalOption must return the string default, not nil, when the DB has no entry";
+
+    // The default from AlphaGlobalOptionsTable for DefaultLogFileDirectory is ".\\logs\\".
+    // The Mushkin port stores it as "./logs/".
+    const QString val = getGlobalString("gopt_val");
+    EXPECT_EQ(val, "./logs/")
+        << "GetGlobalOption should return the original default for DefaultLogFileDirectory";
+}
+
+// Test 18: world.GetGlobalOption() returns nil for a name that is not a known global option.
+TEST_F(LuaApiWithDbTest, GetGlobalOptionUnknownNameReturnsNil)
+{
+    executeLua("gopt_unknown = world.GetGlobalOption('NoSuchOption_XYZ')");
+
+    lua_getglobal(L, "gopt_unknown");
+    bool isNil = lua_isnil(L, -1);
+    lua_pop(L, 1);
+
+    EXPECT_TRUE(isNil) << "GetGlobalOption must return nil for an unknown option name";
+}
+
+// Test 17: SetBackgroundImage — mode is required (not optional)
+// Original lua_methods.cpp:4943 uses my_checknumber(L, 2) which throws a Lua error if absent.
+TEST_F(LuaApiTest, SetBackgroundImageModeRequired)
+{
+    // Calling without mode argument should cause a Lua error (missing required arg).
+    ASSERT_EQ(luaL_loadstring(L, "world.SetBackgroundImage('')"), 0) << "Code should compile";
+    int result = lua_pcall(L, 0, 0, 0);
+    EXPECT_NE(result, 0) << "SetBackgroundImage with missing mode should raise a Lua error";
+    lua_pop(L, lua_gettop(L)); // clear any error string
+}
+
+// Test 18: SetBackgroundImage — clearing with empty filename does NOT store mode
+// Original methods_output.cpp:505-506: returns eOK on empty filename without setting
+// m_iBackgroundMode (the mode field is only set on successful image load).
+TEST_F(LuaApiTest, SetBackgroundImageClearDoesNotStoreMode)
+{
+    // Pre-set mode to a known value so we can detect if it was overwritten.
+    doc->m_iBackgroundMode = 7;
+
+    executeLua("world.SetBackgroundImage('', 3)");
+
+    EXPECT_EQ(doc->m_iBackgroundMode, 7)
+        << "Clearing the image (empty filename) must not update m_iBackgroundMode";
+    EXPECT_TRUE(doc->m_strBackgroundImageName.isEmpty())
+        << "Background image name should be cleared";
+}
+
+// Test 19: SetBackgroundImage — old image always cleared before validation
+// Original methods_output.cpp:492-497: existing bitmap deleted and name emptied before
+// any filename checks, so an invalid new filename still clears the old image.
+TEST_F(LuaApiTest, SetBackgroundImageOldImageClearedBeforeValidation)
+{
+    // Start with a non-empty image name to simulate a previously loaded image.
+    doc->m_strBackgroundImageName = "/some/previous/image.bmp";
+
+    // Pass a filename that is too short (triggers eBadParameter validation).
+    executeLua("world.SetBackgroundImage('x.bmp', 0)"); // too short to be valid
+
+    // Even though the call failed (bad filename — only 5 chars, missing directory),
+    // the old image name must have been cleared first.
+    EXPECT_TRUE(doc->m_strBackgroundImageName.isEmpty())
+        << "Old background image name must be cleared even when new filename is invalid";
+}
+
+// M65/M66: AcceleratorList returns nil (not {}) when no script/plugin accelerators are
+// registered
+TEST_F(LuaApiTest, AcceleratorListEmptyReturnsNil)
+{
+    // With no accelerators at all, AcceleratorList() must return nil, not an empty table.
+    executeLua("result = world.AcceleratorList()");
+    EXPECT_TRUE(isGlobalNil("result"))
+        << "AcceleratorList should return nil when no accelerators are registered";
+}
+
+TEST_F(LuaApiTest, AcceleratorListWithScriptEntryReturnsTable)
+{
+    // After adding a script accelerator, AcceleratorList() returns a table (not nil).
+    doc->m_acceleratorManager->addAccelerator("Ctrl+F5", "do_something", 10 /*eSendToExecute*/);
+
+    executeLua("result = world.AcceleratorList()");
+    lua_getglobal(L, "result");
+    EXPECT_TRUE(lua_istable(L, -1))
+        << "AcceleratorList should return a table when script accelerators exist";
+    lua_pop(L, 1);
 }

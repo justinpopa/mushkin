@@ -456,6 +456,11 @@ void TelnetParser::Phase_WILL(unsigned char c)
             }
             break;
 
+        case TELOPT_MUD_SPECIFIC: // Aardwolf option 102 — unconditional DO (original
+                                  // telnet_phases.cpp:284-286)
+            Send_IAC_DO(c);
+            break;
+
         default:
             // Query plugins for unknown options
             if (Handle_Telnet_Request(c, "WILL")) {
@@ -1183,18 +1188,27 @@ void TelnetParser::Handle_TELOPT_MSP()
 
 /**
  * sendWindowSizes - Send NAWS (Negotiate About Window Size) to server
+ *
+ * Original (doc.cpp:5541-5579): guards on !m_FontHeight (font not yet initialised),
+ * then computes height = (textRect.height() - pixelOffset) / m_FontHeight.
+ * m_FontHeight is pushed here from OutputView::calculateMetrics() so the guard and
+ * height calculation match the original's intent.
  */
 void TelnetParser::sendWindowSizes(int width)
 {
     // Can't send if not connected or NAWS not negotiated
+    // Also guard on m_FontHeight == 0: font not yet initialised, no valid height.
+    // (Original doc.cpp:5546-5550: same guard list including !m_FontHeight.)
     if (m_doc.m_connectionManager->m_iConnectPhase != eConnectConnectedToMud ||
-        !m_doc.m_connectionManager->m_pSocket || !m_bNAWS_wanted) {
+        !m_doc.m_connectionManager->m_pSocket || !m_bNAWS_wanted || !m_doc.m_FontHeight) {
         return;
     }
 
-    // Original computes height from pixel dimensions: (r.bottom - r.top) / m_FontHeight
-    // TODO(naws): Get actual row count from output view. For now use 24 (standard terminal).
-    quint16 height = 24;
+    // Compute height from pixel dimensions, mirroring original doc.cpp:5568.
+    // m_FontHeight is updated by OutputView::calculateMetrics() each time the
+    // font or widget geometry changes.
+    quint16 height =
+        static_cast<quint16>(m_doc.m_computedTextRectangle.height() / m_doc.m_FontHeight);
 
     // Build NAWS packet: IAC SB TELOPT_NAWS <width> <height> IAC SE
     unsigned char packet[20];

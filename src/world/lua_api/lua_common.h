@@ -234,6 +234,37 @@ inline qint32 validateObjectName(QString& name)
 }
 
 /**
+ * validateScriptLabel - Validate a Lua script callback name
+ *
+ * Mirrors CheckLabel(label, bScript=true) from original doc.cpp:3863.
+ * Same rules as validateObjectName but dots are also permitted, supporting
+ * module.function style Lua identifiers (e.g., "mymod.OnClick").
+ *
+ * @param name Script callback name to validate (not modified)
+ * @return eOK (0) if valid, eInvalidObjectLabel (30008) if invalid
+ */
+inline qint32 validateScriptLabel(const QString& name)
+{
+    if (name.isEmpty()) {
+        return eInvalidObjectLabel;
+    }
+
+    // First character must be a letter
+    if (!name.at(0).isLetter()) {
+        return eInvalidObjectLabel;
+    }
+
+    for (int i = 1; i < name.length(); i++) {
+        QChar ch = name.at(i);
+        if (!ch.isLetterOrNumber() && ch != '_' && ch != '.') {
+            return eInvalidObjectLabel;
+        }
+    }
+
+    return eOK;
+}
+
+/**
  * PushJsonValue - Push QJsonValue onto Lua stack
  *
  * Recursively converts QJsonValue to Lua types:

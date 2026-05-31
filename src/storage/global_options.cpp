@@ -24,7 +24,11 @@ static auto startupWorkingDir() -> const QString&
 
 static auto resolveDirectory(const QString& path) -> QString
 {
-    if (path.isEmpty() || QDir::isAbsolutePath(path))
+    // Match original Make_Absolute_Path (Utilities.cpp:2483-2508): an absolute
+    // path is returned unchanged; an EMPTY path is treated as relative and so
+    // resolves to the working directory (strFileName[0] == '\0' fails the
+    // drive/'\'/'/'  tests, so working_dir is prepended to "").
+    if (QDir::isAbsolutePath(path))
         return path;
     // Normalize Windows backslashes (prefs database may contain paths from Wine/MUSHclient)
     QString cleaned = path;
@@ -33,6 +37,8 @@ static auto resolveDirectory(const QString& path) -> QString
     if (cleaned.startsWith(QStringLiteral("./"))) {
         cleaned = cleaned.mid(2);
     }
+    if (cleaned.isEmpty())
+        return startupWorkingDir();
     return QDir::cleanPath(startupWorkingDir() + cleaned) + "/";
 }
 
@@ -43,6 +49,26 @@ auto GlobalOptions::instance() -> GlobalOptions&
 }
 
 GlobalOptions::GlobalOptions() = default;
+
+auto GlobalOptions::defaultLogFileDirectory() const -> QString
+{
+    return resolveDirectory(m_defaultLogFileDirectory);
+}
+
+auto GlobalOptions::defaultWorldFileDirectory() const -> QString
+{
+    return resolveDirectory(m_defaultWorldFileDirectory);
+}
+
+auto GlobalOptions::pluginsDirectory() const -> QString
+{
+    return resolveDirectory(m_pluginsDirectory);
+}
+
+auto GlobalOptions::stateFilesDirectory() const -> QString
+{
+    return resolveDirectory(m_stateFilesDirectory);
+}
 
 void GlobalOptions::load()
 {
@@ -84,7 +110,11 @@ void GlobalOptions::load()
 
     m_defaultInputFontHeight = db.getPreferenceInt("DefaultInputFontHeight", 9);
     m_defaultInputFontWeight = db.getPreferenceInt("DefaultInputFontWeight", 400);
-    m_defaultInputFontItalic = db.getPreferenceInt("DefaultInputFontItalic", 0);
+    // Key names match the original GlobalOptionsTable verbatim, including the
+    // trailing space on "DefaultInputFontItalic " and the spaces in "Icon Placement"
+    // / "Tray Icon" (globalregistryoptions.cpp:51,54-55). Required for drop-in
+    // compatibility with original MUSHclient preference databases.
+    m_defaultInputFontItalic = db.getPreferenceInt("DefaultInputFontItalic ", 0);
     m_defaultOutputFontHeight = db.getPreferenceInt("DefaultOutputFontHeight", 9);
     m_fixedPitchFontSize = db.getPreferenceInt("FixedPitchFontSize", 9);
     m_notepadBackColour = db.getPreferenceInt("NotepadBackColour", 0);
@@ -97,22 +127,23 @@ void GlobalOptions::load()
     m_activityWindowRefreshInterval = db.getPreferenceInt("ActivityWindowRefreshInterval", 15);
     m_activityWindowRefreshType = db.getPreferenceInt("ActivityWindowRefreshType", 2);
     m_windowTabsStyle = db.getPreferenceInt("WindowTabsStyle", 0);
-    m_iconPlacement = db.getPreferenceInt("IconPlacement", 0);
-    m_trayIcon = db.getPreferenceInt("TrayIcon", 0);
+    m_iconPlacement = db.getPreferenceInt("Icon Placement", 0);
+    m_trayIcon = db.getPreferenceInt("Tray Icon", 0);
     m_themeMode = db.getPreferenceInt("ThemeMode", ThemeSystem);
     m_activityButtonBarStyle = db.getPreferenceInt("ActivityButtonBarStyle", 0);
     m_parenMatchFlags = db.getPreferenceInt("ParenMatchFlags", 0x0061);
     m_notepadFontHeight = db.getPreferenceInt("NotepadFontHeight", 10);
 
+    // Store the RAW directory strings exactly as the original LoadGlobalsFromDatabase
+    // does (no path resolution at load time). Path resolution to an absolute path
+    // happens lazily in the accessors, mirroring the original's Make_Absolute_Path
+    // being applied only at point-of-use. This keeps save() round-tripping the raw
+    // relative defaults (e.g. "./logs/") instead of clobbering them with the
+    // machine-specific absolute path.
     m_defaultLogFileDirectory = db.getPreference("DefaultLogFileDirectory", "./logs/");
     m_defaultWorldFileDirectory = db.getPreference("DefaultWorldFileDirectory", "./worlds/");
     m_pluginsDirectory = db.getPreference("PluginsDirectory", "./worlds/plugins/");
     m_stateFilesDirectory = db.getPreference("StateFilesDirectory", "./worlds/plugins/state/");
-
-    m_defaultLogFileDirectory = resolveDirectory(m_defaultLogFileDirectory);
-    m_defaultWorldFileDirectory = resolveDirectory(m_defaultWorldFileDirectory);
-    m_pluginsDirectory = resolveDirectory(m_pluginsDirectory);
-    m_stateFilesDirectory = resolveDirectory(m_stateFilesDirectory);
 
     m_defaultTriggersFile = db.getPreference("DefaultTriggersFile", "");
     m_defaultAliasesFile = db.getPreference("DefaultAliasesFile", "");
@@ -178,7 +209,9 @@ void GlobalOptions::save()
 
     db.setPreferenceInt("DefaultInputFontHeight", m_defaultInputFontHeight);
     db.setPreferenceInt("DefaultInputFontWeight", m_defaultInputFontWeight);
-    db.setPreferenceInt("DefaultInputFontItalic", m_defaultInputFontItalic);
+    // Key names mirror the original GlobalOptionsTable exactly (trailing space on
+    // "DefaultInputFontItalic ", spaces in "Icon Placement"/"Tray Icon").
+    db.setPreferenceInt("DefaultInputFontItalic ", m_defaultInputFontItalic);
     db.setPreferenceInt("DefaultOutputFontHeight", m_defaultOutputFontHeight);
     db.setPreferenceInt("FixedPitchFontSize", m_fixedPitchFontSize);
     db.setPreferenceInt("NotepadBackColour", m_notepadBackColour);
@@ -191,8 +224,8 @@ void GlobalOptions::save()
     db.setPreferenceInt("ActivityWindowRefreshInterval", m_activityWindowRefreshInterval);
     db.setPreferenceInt("ActivityWindowRefreshType", m_activityWindowRefreshType);
     db.setPreferenceInt("WindowTabsStyle", m_windowTabsStyle);
-    db.setPreferenceInt("IconPlacement", m_iconPlacement);
-    db.setPreferenceInt("TrayIcon", m_trayIcon);
+    db.setPreferenceInt("Icon Placement", m_iconPlacement);
+    db.setPreferenceInt("Tray Icon", m_trayIcon);
     db.setPreferenceInt("ThemeMode", m_themeMode);
     db.setPreferenceInt("ActivityButtonBarStyle", m_activityButtonBarStyle);
     db.setPreferenceInt("ParenMatchFlags", m_parenMatchFlags);
@@ -280,15 +313,11 @@ void GlobalOptions::resetToDefaults()
     m_parenMatchFlags = 0x0061;
     m_notepadFontHeight = 10;
 
+    // Raw (unresolved) directory defaults; accessors resolve to absolute paths.
     m_defaultLogFileDirectory = "./logs/";
     m_defaultWorldFileDirectory = "./worlds/";
     m_pluginsDirectory = "./worlds/plugins/";
     m_stateFilesDirectory = "./worlds/plugins/state/";
-
-    m_defaultLogFileDirectory = resolveDirectory(m_defaultLogFileDirectory);
-    m_defaultWorldFileDirectory = resolveDirectory(m_defaultWorldFileDirectory);
-    m_pluginsDirectory = resolveDirectory(m_pluginsDirectory);
-    m_stateFilesDirectory = resolveDirectory(m_stateFilesDirectory);
 
     m_defaultTriggersFile.clear();
     m_defaultAliasesFile.clear();

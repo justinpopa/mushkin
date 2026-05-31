@@ -245,3 +245,130 @@ end
     // Verify invocation count incremented
     EXPECT_EQ(t->invocation_count, 1) << "Invocation count should be incremented";
 }
+
+// Test: %% produces a single literal percent sign (M3 — original evaluate.cpp:1268-1278)
+TEST_F(TriggerExecutionTest, DoublePercentEscape)
+{
+    QVector<QString> wildcards = {"whole", "val"};
+    QMap<QString, QString> named;
+    QString result = doc->replaceWildcards("100%% done", wildcards, "trig", named);
+    EXPECT_EQ(result, "100% done") << "%% should produce a single %";
+}
+
+// Test: multi-digit %10 is NOT substituted (original MAX_WILDCARDS = 10, single-digit only)
+// (M3 — original: evaluate.cpp:1284 — case '0': ... case '9': only)
+TEST_F(TriggerExecutionTest, MultiDigitWildcardNotSubstituted)
+{
+    QVector<QString> wildcards;
+    for (int i = 0; i <= 10; ++i)
+        wildcards.append(QString("w%1").arg(i));
+    QMap<QString, QString> named;
+    QString result = doc->replaceWildcards("%10 test", wildcards, "trig", named);
+    // %1 should be replaced, then "0 test" remains (not %10 as a unit)
+    EXPECT_EQ(result, "w1" + QString("0 test"))
+        << "%10 should be parsed as %1 followed by literal '0', not a two-digit wildcard";
+}
+
+// Test: lowercase %n is handled (M3 — original evaluate.cpp:1398-1399, case 'N': case 'n':)
+TEST_F(TriggerExecutionTest, LowercasePercentN)
+{
+    QVector<QString> wildcards;
+    QMap<QString, QString> named;
+    QString result = doc->replaceWildcards("name=%n", wildcards, "MyTrigger", named);
+    EXPECT_EQ(result, "name=MyTrigger") << "%n (lowercase) should substitute item name";
+}
+
+// Test: %N (uppercase) also works
+TEST_F(TriggerExecutionTest, UppercasePercentN)
+{
+    QVector<QString> wildcards;
+    QMap<QString, QString> named;
+    QString result = doc->replaceWildcards("name=%N", wildcards, "MyTrigger", named);
+    EXPECT_EQ(result, "name=MyTrigger") << "%N should substitute item name";
+}
+
+// Test: FixWildcard escaping for script destinations (M3 — original evaluate.cpp:277-284)
+// When send_to is eSendToScript, backslashes and double-quotes in wildcard values are escaped.
+TEST_F(TriggerExecutionTest, WildcardScriptEscaping)
+{
+    QVector<QString> wildcards = {"whole", R"(say "hello\nworld")"};
+    QMap<QString, QString> named;
+    // Non-script destination: no escaping
+    QString plain = doc->replaceWildcards("%1", wildcards, "trig", named, eSendToWorld);
+    EXPECT_EQ(plain, R"(say "hello\nworld")") << "Non-script: no escaping";
+
+    // Script destination: backslash → \\, double-quote → \"
+    QString scripted = doc->replaceWildcards("%1", wildcards, "trig", named, eSendToScript);
+    EXPECT_EQ(scripted, R"(say \"hello\\nworld\")") << "Script dest: should escape \\ and \"";
+}
+
+// Test: trigger with non-script send_to still fires Lua callback if procedure is set
+// (M89 — original: ProcessPreviousLine.cpp:1326-1327 adds to triggerList unconditionally)
+TEST_F(TriggerExecutionTest, ScriptCallbackFiredForNonScriptSendTo)
+{
+    QString luaScript = R"(
+callback_was_called = false
+function on_world_trigger(name, line, wildcards, styles)
+    callback_was_called = true
+end
+)";
+    ASSERT_NE(doc->m_ScriptEngine, nullptr);
+    doc->m_ScriptEngine->parseLua(luaScript, "Test script");
+
+    Trigger* t = addTrigger("world_send_trigger", "test line");
+    t->procedure = "on_world_trigger";
+    t->send_to = eSendToWorld; // NOT eSendToScript — callback should still fire
+    t->sequence = 600;
+
+    auto line = createTestLine("test line");
+    doc->evaluateTriggers(line.get());
+
+    lua_State* L = doc->m_ScriptEngine->L;
+    ASSERT_NE(L, nullptr);
+
+    lua_getglobal(L, "callback_was_called");
+    bool called = lua_toboolean(L, -1);
+    lua_pop(L, 1);
+    EXPECT_TRUE(called) << "Lua callback should fire even when send_to != eSendToScript";
+}
+
+// Test: style flags in trigger callback use '& 7' mask, not TEXT_STYLE (M187 LOW)
+// (original: ProcessPreviousLine.cpp:228 — "pStyle->iFlags & 7")
+TEST_F(TriggerExecutionTest, StyleRunsFlagsMaskedToSevenBits)
+{
+    QString luaScript = R"(
+style_flags_received = -1
+function on_style_trigger(name, line, wildcards, styles)
+    if styles and styles[1] then
+        style_flags_received = styles[1].style
+    end
+end
+)";
+    ASSERT_NE(doc->m_ScriptEngine, nullptr);
+    doc->m_ScriptEngine->parseLua(luaScript, "Test script");
+
+    Trigger* t = addTrigger("style_trigger", "styled line");
+    t->procedure = "on_style_trigger";
+    t->send_to = eSendToScript;
+    t->sequence = 700;
+
+    auto line = createTestLine("styled line");
+    // Set INVERSE (0x08) and STRIKEOUT (0x20) flags on the style — these should be stripped
+    ASSERT_FALSE(line->styleList.empty());
+    line->styleList[0]->iFlags = HILITE | INVERSE | STRIKEOUT; // 0x01 | 0x08 | 0x20 = 0x29
+
+    doc->evaluateTriggers(line.get());
+
+    lua_State* L = doc->m_ScriptEngine->L;
+    ASSERT_NE(L, nullptr);
+
+    lua_getglobal(L, "style_flags_received");
+    int flags = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+
+    // Original masks with & 7, so only bits 0-2 (HILITE, UNDERLINE, BLINK) survive
+    EXPECT_EQ(flags, HILITE & 7)
+        << "Style flags should be masked to bits 0-2 only (HILITE|UNDERLINE|BLINK)";
+    EXPECT_EQ(flags & INVERSE, 0) << "INVERSE bit (0x08) should not appear in style runs";
+    EXPECT_EQ(flags & STRIKEOUT, 0) << "STRIKEOUT bit (0x20) should not appear in style runs";
+}

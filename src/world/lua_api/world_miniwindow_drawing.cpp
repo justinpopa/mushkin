@@ -400,12 +400,15 @@ int L_WindowGetPixel(lua_State* L)
 
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
-        lua_pushnumber(L, 0);
+        lua_pushnumber(L, -2);
         return 1;
     }
 
     QRgb color = win->GetPixel(x, y);
-    lua_pushnumber(L, color);
+    // Original CMiniWindow::GetPixel returns long (signed 32-bit). CLR_INVALID=0xFFFFFFFF
+    // becomes -1 when cast to long. Push as signed so Lua scripts see -1 for out-of-bounds,
+    // not 4294967295 (original: miniwindow.cpp:3306-3308).
+    lua_pushnumber(L, static_cast<qint32>(color));
     return 1;
 }
 
@@ -597,7 +600,10 @@ int L_WindowFont(lua_State* L)
  * @param color (number) Text color (BGR format)
  * @param unicode (boolean) true if text is Unicode encoded
  *
- * @return (number) Width of the drawn text in pixels
+ * @return (number) Width of the drawn text in pixels, or:
+ *   - -1: Window not found (or name is empty)
+ *   - -2: Font not found
+ *   - -3: Invalid UTF8 encoding
  *
  * @example
  * -- Simple text drawing
@@ -628,7 +634,9 @@ int L_WindowText(lua_State* L)
 
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
-        return luaReturnError(L, eNoSuchWindow);
+        // Original returns -1 for both empty name and not-found (not an error code).
+        lua_pushnumber(L, -1);
+        return 1;
     }
 
     qint32 result = win->Text(fontId, text, left, top, right, bottom, color, unicode);
@@ -647,7 +655,7 @@ int L_WindowText(lua_State* L)
  * @param text (string) Text to measure
  * @param unicode (boolean) true if text is Unicode encoded
  *
- * @return (number) Width in pixels, or 0 if window/font not found
+ * @return (number) Width in pixels, -1 if window not found, or 0 if font not found
  *
  * @example
  * -- Center text horizontally in a 200px window
@@ -669,7 +677,8 @@ int L_WindowTextWidth(lua_State* L)
 
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
-        lua_pushnumber(L, 0);
+        // Original returns -1 for not-found window.
+        lua_pushnumber(L, -1);
         return 1;
     }
 

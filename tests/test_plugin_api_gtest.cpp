@@ -14,6 +14,7 @@
 #include "../src/automation/plugin.h"
 #include "../src/automation/variable.h"
 #include "../src/storage/global_options.h"
+#include "../src/utils/error_codes.h"
 #include "fixtures/world_fixtures.h"
 #include <QFile>
 #include <QTemporaryDir>
@@ -744,4 +745,73 @@ end
 
     EXPECT_EQ(listChangedCount, 1)
         << "OnPluginListChanged must fire exactly once per ReloadPlugin (was firing twice)";
+}
+
+// Test 25: world.SaveState forces save even when m_bSaveState is false (H122)
+//
+// Original CMUSHclientDoc::SaveState() calls CPlugin::SaveState(bScripted=true),
+// bypassing the m_bSaveState guard so the Lua API always saves. Mushkin previously
+// skipped the save silently when m_bSaveState==false, returning eOK without writing
+// the state file.
+TEST_F(PluginApiTest, SaveState_ForcesWriteWhenSaveStateFlagFalse)
+{
+    // Override plugin1's save_state flag to false.
+    plugin1->m_bSaveState = false;
+
+    // Add a variable so there is something to write.
+    auto var = std::make_unique<Variable>();
+    var->label = "forced_var";
+    var->contents = "forced_value";
+    plugin1->m_VariableMap["forced_var"] = std::move(var);
+
+    lua_State* L1 = plugin1->m_ScriptEngine->L;
+    doc->m_CurrentPlugin = plugin1;
+
+    QString stateFile =
+        tempDir->path() + "/" + doc->m_strWorldID + "-" + plugin1->m_strID + "-state.xml";
+    QFile::remove(stateFile); // ensure clean slate
+
+    lua_getglobal(L1, "world");
+    lua_getfield(L1, -1, "SaveState");
+    lua_call(L1, 0, 1);
+    int result = static_cast<int>(lua_tonumber(L1, -1));
+    lua_pop(L1, 2); // result + world table
+
+    EXPECT_EQ(result, 0) << "SaveState should return eOK";
+    EXPECT_TRUE(QFile::exists(stateFile))
+        << "State file must be written even when m_bSaveState=false (H122 parity)";
+
+    doc->m_CurrentPlugin = nullptr;
+}
+
+// Test 26: world.ReloadPlugin returns eProblemsLoadingPlugin on bad XML (M16)
+//
+// Original distinguishes CFileException (ePluginFileNotFound=30030) from
+// CArchiveException/parse errors (eProblemsLoadingPlugin=30000). All Mushkin
+// load failures previously returned ePluginFileNotFound.
+TEST_F(PluginApiTest, ReloadPlugin_BadXmlReturnsProblemsLoadingPlugin)
+{
+    // Corrupt plugin2's file with invalid XML so reload fails at parse stage.
+    {
+        QFile f(plugin2Path);
+        ASSERT_TRUE(f.open(QIODevice::WriteOnly | QIODevice::Text));
+        f.write("<?xml version=\"1.0\"?>\n<muclient><plugin name=\"bad\" id=\"\">UNCLOSED");
+        f.close();
+    }
+
+    lua_State* L1 = plugin1->m_ScriptEngine->L;
+    doc->m_CurrentPlugin = plugin1;
+
+    lua_getglobal(L1, "world");
+    lua_getfield(L1, -1, "ReloadPlugin");
+    lua_pushstring(L1, plugin2->m_strID.toUtf8().constData());
+    lua_call(L1, 1, 1);
+    int result = static_cast<int>(lua_tonumber(L1, -1));
+    lua_pop(L1, 2);
+    doc->m_CurrentPlugin = nullptr;
+
+    // eProblemsLoadingPlugin = 30000; ePluginFileNotFound = 30030
+    EXPECT_EQ(result, eProblemsLoadingPlugin)
+        << "ReloadPlugin must return eProblemsLoadingPlugin for bad XML, not ePluginFileNotFound "
+           "(M16 parity)";
 }

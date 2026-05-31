@@ -56,13 +56,18 @@ QString WorldDocument::getVariable(const QString& name) const
  * Creates new variable if doesn't exist, updates if it does.
  * Increments update_number for change tracking.
  *
+ * The map key is lowercased for case-insensitive lookup, but the label
+ * preserves the original case as supplied by the caller (matching the
+ * original MUSHclient behaviour where strLabel = VariableName, not the
+ * lower-cased key).
+ *
  * SetVariable()
  *
  * @return 0 (eOK) on success
  */
 qint32 WorldDocument::setVariable(const QString& name, const QString& value)
 {
-    // Case-insensitive storage
+    // Map key is lowercase for case-insensitive lookup
     QString lowerName = name.toLower();
     VariableMap& varMap = getVariableMap();
 
@@ -70,12 +75,13 @@ qint32 WorldDocument::setVariable(const QString& name, const QString& value)
     Variable* var = nullptr;
 
     if (it != varMap.end()) {
-        // Update existing variable
+        // Update existing variable; preserve original case of the new name
         var = it->second.get();
+        var->label = name; // update label to reflect caller-supplied case
     } else {
-        // Create new variable
+        // Create new variable; label preserves original case (key is lowercase)
         auto newVar = std::make_unique<Variable>();
-        newVar->label = lowerName;
+        newVar->label = name; // original case, not lowerName
         var = newVar.get();
         varMap[lowerName] = std::move(newVar);
     }
@@ -141,15 +147,21 @@ QStringList WorldDocument::getVariableList() const
  *   @!variable - Variable without regex escaping (advanced)
  *
  * Variable names: [a-zA-Z0-9_]+ (case-insensitive)
- * If variable not found, @variablename is left as-is.
+ * If the variable name is empty or the variable does not exist, the @reference
+ * is silently dropped (matching original MUSHclient FixSendText behaviour —
+ * "non-existent and empty variables will be silently dropped").
  *
  * FixSendText()
  *
- * @param text Text to expand
- * @param escapeRegex If true, escape regex special chars in variable values
+ * @param text      Text to expand
+ * @param escapeRegex If true, escape special chars in variable values
+ * @param isRegexp  True when the trigger match text is a regexp pattern.
+ *                  When false and escapeRegex is true, asterisks ('*') are
+ *                  dropped from variable values instead of being escaped
+ *                  (original non-regexp trigger match-text behaviour).
  * @return Expanded text
  */
-QString WorldDocument::expandVariables(const QString& text, bool escapeRegex) const
+QString WorldDocument::expandVariables(const QString& text, bool escapeRegex, bool isRegexp) const
 {
     QString result;
     const QChar* pText = text.constData();
@@ -186,11 +198,8 @@ QString WorldDocument::expandVariables(const QString& text, bool escapeRegex) co
             QString varName(pNameStart, pText - pNameStart);
 
             if (varName.isEmpty()) {
-                // @ not followed by valid variable name - leave as-is
-                result.append('@');
-                if (!shouldEscape && escapeRegex) {
-                    result.append('!'); // Add back the ! we skipped
-                }
+                // @ not followed by valid variable name — silently drop
+                // (original: "@ must be followed by a variable name" / silent drop)
             } else {
                 // Look up variable (case-insensitive)
                 QString lowerName = varName.toLower();
@@ -198,7 +207,7 @@ QString WorldDocument::expandVariables(const QString& text, bool escapeRegex) co
                 if (it != varMap.end()) {
                     QString value = it->second->contents;
 
-                    // Escape regex special characters if needed
+                    // Escape / filter variable value characters if needed
                     if (shouldEscape) {
                         QString escaped;
                         for (const QChar& ch : value) {
@@ -206,27 +215,31 @@ QString WorldDocument::expandVariables(const QString& text, bool escapeRegex) co
                             if (ch < ' ')
                                 continue;
 
-                            // Escape regex metacharacters: \ ^ $ . | ? * + ( ) [ ] { }
-                            if (ch == '\\' || ch == '^' || ch == '$' || ch == '.' || ch == '|' ||
-                                ch == '?' || ch == '*' || ch == '+' || ch == '(' || ch == ')' ||
-                                ch == '[' || ch == ']' || ch == '{' || ch == '}') {
-                                escaped.append('\\');
+                            if (isRegexp) {
+                                // Regexp trigger: escape all metacharacters
+                                // so they are treated as literals in the pattern
+                                if (ch == '\\' || ch == '^' || ch == '$' || ch == '.' ||
+                                    ch == '|' || ch == '?' || ch == '*' || ch == '+' || ch == '(' ||
+                                    ch == ')' || ch == '[' || ch == ']' || ch == '{' || ch == '}') {
+                                    escaped.append('\\');
+                                }
+                                escaped.append(ch);
+                            } else {
+                                // Non-regexp trigger: drop asterisks, copy everything else
+                                // (original: "copy all except asterisks")
+                                if (ch != '*')
+                                    escaped.append(ch);
                             }
-                            escaped.append(ch);
                         }
                         result.append(escaped);
                     } else {
                         // No escaping - just copy the value
                         result.append(value);
                     }
-                } else {
-                    // Variable not found - leave @variable as-is
-                    result.append('@');
-                    if (!shouldEscape && escapeRegex) {
-                        result.append('!');
-                    }
-                    result.append(varName);
                 }
+                // else: variable not found — silently drop @variable
+                // (original: "Variable '%s' is not defined" with bThrowExceptions,
+                //  or silent drop when bThrowExceptions=false)
             }
 
             pStart = pText;

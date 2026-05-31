@@ -1,8 +1,23 @@
 #include "app_paths.h"
 #include <QCoreApplication>
+#include <QDateTime>
 #include <QDir>
 
 namespace AppPaths {
+
+namespace {
+double s_appStartTime = 0.0;
+}
+
+void recordAppStartTime()
+{
+    s_appStartTime = static_cast<double>(QDateTime::currentDateTime().toSecsSinceEpoch());
+}
+
+double appStartTime()
+{
+    return s_appStartTime;
+}
 
 QString getAppDirectory()
 {

@@ -246,7 +246,9 @@ void PluginDialog::onAddPlugin()
 
     for (const QString& file : files) {
         QString errorMsg;
-        Plugin* plugin = m_doc->LoadPlugin(file, errorMsg);
+        // Suppress per-plugin notification; fire PluginListChanged() once after the
+        // whole batch, matching original OnAddPlugin (PluginsDlg.cpp:382).
+        Plugin* plugin = m_doc->LoadPlugin(file, errorMsg, /*suppressListChanged=*/true);
 
         if (!plugin) {
             QMessageBox::warning(this, tr("Plugin Error"),
@@ -257,6 +259,7 @@ void PluginDialog::onAddPlugin()
     }
 
     if (anyLoaded) {
+        m_doc->PluginListChanged();
         loadPluginList();
         updateButtonStates();
     }
@@ -285,16 +288,24 @@ void PluginDialog::onRemovePlugin()
     }
 
     // Remove plugins
+    bool anyChanged = false;
     for (Plugin* plugin : pluginsToRemove) {
         QString pluginID = plugin->m_strID;
         QString pluginName = plugin->m_strName;
 
-        if (m_doc->UnloadPlugin(pluginID)) {
+        // Suppress per-plugin notification; fire PluginListChanged() once after the
+        // whole batch, matching original OnDeletePlugin (PluginsDlg.cpp:434).
+        if (m_doc->UnloadPlugin(pluginID, /*suppressListChanged=*/true)) {
             qCDebug(lcPlugin) << "Removed plugin:" << pluginName << "ID:" << pluginID;
+            anyChanged = true;
         } else {
             QMessageBox::warning(this, tr("Remove Error"),
                                  tr("Failed to remove plugin: %1").arg(pluginName));
         }
+    }
+
+    if (anyChanged) {
+        m_doc->PluginListChanged();
     }
 
     loadPluginList();
@@ -330,18 +341,23 @@ void PluginDialog::onReloadPlugin()
         }
     }
 
-    // Reload each plugin
+    // Reload each plugin. Suppress per-plugin notifications on both the unload and
+    // load; fire PluginListChanged() once after the whole batch, matching original
+    // OnReload (PluginsDlg.cpp:543).
+    bool anyChanged = false;
     for (const PluginInfo& info : pluginsToReload) {
         // Unload
-        if (!m_doc->UnloadPlugin(info.id)) {
+        if (!m_doc->UnloadPlugin(info.id, /*suppressListChanged=*/true)) {
             QMessageBox::warning(this, tr("Reload Error"),
                                  tr("Failed to unload plugin: %1").arg(info.name));
             continue;
         }
 
+        anyChanged = true;
+
         // Reload
         QString errorMsg;
-        Plugin* plugin = m_doc->LoadPlugin(info.source, errorMsg);
+        Plugin* plugin = m_doc->LoadPlugin(info.source, errorMsg, /*suppressListChanged=*/true);
 
         if (!plugin) {
             QMessageBox::warning(
@@ -350,6 +366,10 @@ void PluginDialog::onReloadPlugin()
         } else {
             qCDebug(lcPlugin) << "Reinstalled plugin:" << info.name << "ID:" << info.id;
         }
+    }
+
+    if (anyChanged) {
+        m_doc->PluginListChanged();
     }
 
     loadPluginList();
@@ -432,8 +452,12 @@ void PluginDialog::onShowInfo()
         if (nameItem) {
             Plugin* plugin = static_cast<Plugin*>(nameItem->data(Qt::UserRole).value<void*>());
             if (plugin && !plugin->m_strDescription.isEmpty()) {
-                QString title = plugin->m_strName + " Info";
-                m_doc->SendToNotepad(title, plugin->m_strDescription);
+                // Original: AppendToTheNotepad(title, desc, bReplace=true, ...) finds an
+                // existing notepad by title and replaces its contents (creating one if
+                // absent), then ActivateNotepad raises it (PluginsDlg.cpp:251-259).
+                QString title = plugin->m_strName + " description";
+                (void)m_doc->ReplaceNotepad(title, plugin->m_strDescription);
+                (void)m_doc->ActivateNotepad(title);
             }
         }
     }

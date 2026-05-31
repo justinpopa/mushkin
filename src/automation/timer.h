@@ -24,6 +24,10 @@ class Timer {
     Timer(); // Constructor with defaults
     ~Timer() = default;
 
+    // Equality operator for structural duplicate detection during XML load
+    // (original: xml_load_world.cpp:288-317 CTimer::operator==)
+    bool operator==(const Timer& rhs) const;
+
     // ========== Timing Configuration ==========
 
     TimerType type = TimerType::Interval; // Interval or AtTime

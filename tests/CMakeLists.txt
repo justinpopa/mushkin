@@ -532,6 +532,20 @@ gtest_discover_tests(test-tab-completion-gtest
     DISCOVERY_TIMEOUT 30
 )
 
+# Input wrap parity test (M149)
+add_executable(test-input-wrap-gtest
+    test_input_wrap_gtest.cpp
+)
+
+target_link_libraries(test-input-wrap-gtest PRIVATE
+    test_main_gui
+    ui
+)
+
+gtest_discover_tests(test-input-wrap-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
 # Word wrap test
 add_executable(test-word-wrap-gtest
     test_word_wrap_gtest.cpp
@@ -578,6 +592,24 @@ target_link_libraries(test-database-gtest PRIVATE
 )
 
 gtest_discover_tests(test-database-gtest
+    DISCOVERY_TIMEOUT 30
+    PROPERTIES RESOURCE_LOCK database_singleton
+)
+
+# Global options test (preferences round-trip + key-name parity)
+add_executable(test-global-options-gtest
+    test_global_options_gtest.cpp
+)
+
+target_link_libraries(test-global-options-gtest PRIVATE
+    test_main_core
+    Qt6::Gui
+    Qt6::Widgets
+    Qt6::Sql
+    ui
+)
+
+gtest_discover_tests(test-global-options-gtest
     DISCOVERY_TIMEOUT 30
     PROPERTIES RESOURCE_LOCK database_singleton
 )
@@ -646,6 +678,22 @@ gtest_discover_tests(test-world-properties-dialog-gtest
     DISCOVERY_TIMEOUT 30
 )
 
+# Recall search dialog parity test (line-type flags + preamble are per-document)
+add_executable(test-recall-search-dialog-gtest
+    test_recall_search_dialog_gtest.cpp
+)
+
+target_link_libraries(test-recall-search-dialog-gtest PRIVATE
+    test_main_gui
+    Qt6::Gui
+    Qt6::Widgets
+    ui
+)
+
+gtest_discover_tests(test-recall-search-dialog-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
 # XML roundtrip test
 add_executable(test-xml-roundtrip-gtest
     test_xml_roundtrip_gtest.cpp
@@ -676,6 +724,19 @@ gtest_discover_tests(test-miniwindow-loadimage-gtest
     DISCOVERY_TIMEOUT 30
 )
 
+add_executable(test-miniwindow-lifecycle-gtest
+    test_miniwindow_lifecycle_gtest.cpp
+)
+
+target_link_libraries(test-miniwindow-lifecycle-gtest PRIVATE
+    test_main_gui
+    ui
+)
+
+gtest_discover_tests(test-miniwindow-lifecycle-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
 # Miniwindow creation test (non-GoogleTest, uses Qt6::Test)
 add_executable(test-miniwindow-creation
     test_miniwindow_creation.cpp
@@ -687,6 +748,20 @@ target_link_libraries(test-miniwindow-creation PRIVATE
     Qt6::Widgets
     Qt6::Test
     ui
+)
+
+# Miniwindow drawing parity test (GoogleTest)
+add_executable(test-miniwindow-drawing-parity-gtest
+    test_miniwindow_drawing_parity_gtest.cpp
+)
+
+target_link_libraries(test-miniwindow-drawing-parity-gtest PRIVATE
+    test_main_gui
+    ui
+)
+
+gtest_discover_tests(test-miniwindow-drawing-parity-gtest
+    DISCOVERY_TIMEOUT 30
 )
 
 # Miniwindow drawing test (non-GoogleTest, uses Qt6::Test)
@@ -989,6 +1064,23 @@ gtest_discover_tests(test-world-protocol-gtest
     DISCOVERY_TIMEOUT 30
 )
 
+# Accelerator dispatch behavioral parity test
+add_executable(test-accelerator-dispatch-gtest
+    test_accelerator_dispatch_gtest.cpp
+)
+
+target_link_libraries(test-accelerator-dispatch-gtest PRIVATE
+    test_main_core
+    Qt6::Gui
+    Qt6::Widgets
+    Qt6::Test
+    ui
+)
+
+gtest_discover_tests(test-accelerator-dispatch-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
 # World serialization test
 add_executable(test-world-serialization-gtest
     test_world_serialization_gtest.cpp
@@ -1002,5 +1094,51 @@ target_link_libraries(test-world-serialization-gtest PRIVATE
 )
 
 gtest_discover_tests(test-world-serialization-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
+# Accelerator manager behavioral-parity tests (M69, M156)
+add_executable(test-accelerator-manager-gtest
+    test_accelerator_manager_gtest.cpp
+)
+
+target_link_libraries(test-accelerator-manager-gtest PRIVATE
+    test_main_core
+    Qt6::Gui
+    Qt6::Widgets
+    ui
+)
+
+gtest_discover_tests(test-accelerator-manager-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
+# ConnectionManager behavioral parity test
+add_executable(test-connection-manager-gtest
+    test_connection_manager_gtest.cpp
+)
+
+target_link_libraries(test-connection-manager-gtest PRIVATE
+    test_main_core
+    Qt6::Gui
+    Qt6::Widgets
+    ui
+)
+
+gtest_discover_tests(test-connection-manager-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
+# Blend modes parity test (H30)
+add_executable(test-blend-modes-gtest
+    test_blend_modes_gtest.cpp
+)
+
+target_link_libraries(test-blend-modes-gtest PRIVATE
+    test_main_core
+    Qt6::Core
+)
+
+gtest_discover_tests(test-blend-modes-gtest
     DISCOVERY_TIMEOUT 30
 )

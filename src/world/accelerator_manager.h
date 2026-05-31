@@ -192,8 +192,20 @@ class AcceleratorManager : public QObject {
      *
      * @param action The action/script to execute
      * @param sendTo Where to send
+     * @param pluginId Plugin ID if registered by a plugin (empty otherwise)
+     * @param keyString The key string that triggered this accelerator (e.g. "Ctrl+F5", "Num+8")
      */
-    void acceleratorTriggered(const QString& action, int sendTo, const QString& pluginId);
+    void acceleratorTriggered(const QString& action, int sendTo, const QString& pluginId,
+                              const QString& keyString);
+
+    /**
+     * Emitted when a numpad key fires while keypad_enable is false.
+     * The receiver should insert @p literal into the input line at the cursor
+     * (original sendvw.cpp:1099 — GetEditCtrl().ReplaceSel fallback).
+     *
+     * @param literal The character to insert (e.g. "0".."9", ".", "/", "*", "-", "+")
+     */
+    void keypadLiteralInsert(const QString& literal);
 
   private slots:
     void onShortcutActivated();

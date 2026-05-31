@@ -18,6 +18,7 @@
 #include "speedwalk_engine.h" // speedwalk::evaluate/reverse/removeBacktracks
 #include "view_interfaces.h"
 #include "world_socket.h"
+#include "xml_serialization.h" // XmlSerialization::ImportXML + XML_* flags (reloadDefaults)
 #include <QClipboard>
 #include <QColor>
 #include <QCoreApplication>
@@ -171,7 +172,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     // are initialized by initializeColors() called below.
 
     // ========== Initialize auto-say ==========
-    // (defaults provided by AutoSayConfig member initializers)
+    // say_string defaults to "say " (AutoSayConfig member initializer — matches original)
 
     // ========== Initialize Script Variables Collection ==========
     // m_VariableMap is automatically initialized as empty QMap
@@ -333,8 +334,14 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_last_line_with_IAC_GA = 0;
 
     // ========== Timing Variables ==========
-    // m_tConnectTime, m_tsConnectDuration, m_whenWorldStarted,
-    // m_whenWorldStartedHighPrecision: zero-initialized by ConnectionManager ctor.
+    // m_whenWorldStarted: set once at construction to reflect "when this world was created/opened"
+    // (original: doc_construct.cpp:28 — m_whenWorldStarted = CTime::GetCurrentTime()).
+    // m_tConnectTime: also initialized at construction so GetInfo(301) always returns a date before
+    // first connect (original: doc_construct.cpp:305 — m_tConnectTime = CTime::GetCurrentTime()).
+    m_connectionManager->m_whenWorldStarted = QDateTime::currentDateTime();
+    m_connectionManager->m_tConnectTime = QDateTime::currentDateTime();
+    // m_tsConnectDuration, m_whenWorldStartedHighPrecision: zero-initialized by ConnectionManager
+    // ctor.
     m_tLastPlayerInput = QDateTime();
     m_tStatusTime = QDateTime();
     m_lastMousePosition = QPoint(0, 0);
@@ -373,7 +380,9 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     // ========== Logging ==========
     m_logfile.reset(); // ensure closed/null (default-constructed is already null)
     m_logfile_name = QString();
-    m_LastFlushTime = QDateTime();
+    // Original: doc_construct.cpp:207 — m_LastFlushTime initialized at construction time
+    // (always valid), so the first periodic flush fires 120s after startup.
+    m_LastFlushTime = QDateTime::currentDateTime();
 
     // ========== Fonts ==========
     m_FontHeight = 0;
@@ -652,6 +661,68 @@ void WorldDocument::applyGlobalFontDefaults()
     }
 }
 
+namespace {
+// Load one configured default-set file into the document if the file path is
+// non-empty, returning the number of XML items imported (0 on empty path or
+// open failure). Mirrors Load_Set in the original OnFileReloaddefaults.
+int loadDefaultSet(WorldDocument* doc, const QString& path, int flag)
+{
+    if (path.isEmpty())
+        return 0;
+
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+        return 0;
+
+    return XmlSerialization::ImportXML(doc, QString::fromUtf8(file.readAll()), flag);
+}
+} // namespace
+
+int WorldDocument::reloadDefaults()
+{
+    // Original: CMUSHclientDoc::OnFileReloaddefaults (methods_defaults.cpp:115-170).
+    // Each default set is loaded only when the world opted into it
+    // (m_bUseDefault* / use_default_colours) AND a file path is configured.
+    // The flags are NOT modified here.
+    const auto& opts = GlobalOptions::instance();
+
+    int totalImported = 0;
+
+    if (m_colors.use_default_colours)
+        totalImported += loadDefaultSet(this, opts.defaultColoursFile(), XML_COLOURS);
+
+    if (m_bUseDefaultTriggers)
+        totalImported += loadDefaultSet(this, opts.defaultTriggersFile(), XML_TRIGGERS);
+
+    if (m_bUseDefaultAliases)
+        totalImported += loadDefaultSet(this, opts.defaultAliasesFile(), XML_ALIASES);
+
+    if (m_bUseDefaultTimers)
+        totalImported += loadDefaultSet(this, opts.defaultTimersFile(), XML_TIMERS);
+
+    if (m_bUseDefaultMacros)
+        totalImported += loadDefaultSet(this, opts.defaultMacrosFile(), XML_MACROS);
+
+    // Input font override (original: methods_defaults.cpp:137-150).
+    if (m_bUseDefaultInputFont && !opts.defaultInputFont().isEmpty()) {
+        m_input.font_height = opts.defaultInputFontHeight();
+        m_input.font_name = opts.defaultInputFont();
+        m_input.font_italic = opts.defaultInputFontItalic();
+        m_input.font_weight = opts.defaultInputFontWeight();
+        emit inputSettingsChanged();
+    }
+
+    // Output font override (original: methods_defaults.cpp:152-166).
+    if (m_bUseDefaultOutputFont && !opts.defaultOutputFont().isEmpty()) {
+        m_output.font_height = opts.defaultOutputFontHeight();
+        m_output.font_name = opts.defaultOutputFont();
+        m_output.font_weight = 400; // FW_NORMAL
+        emit outputSettingsChanged();
+    }
+
+    return totalImported;
+}
+
 void WorldDocument::initializeColors()
 {
     // Initialize ANSI normal colors
@@ -660,11 +731,28 @@ void WorldDocument::initializeColors()
         m_colors.bold_colour[i] = DEFAULT_BOLD_COLORS[i];
     }
 
-    // Initialize custom colors
+    // Initialize custom colors (original: Utilities.cpp SetDefaultCustomColours)
     for (int i = 0; i < MAX_CUSTOM; i++) {
         m_colors.custom_text[i] = qRgb(255, 255, 255); // White
         m_colors.custom_back[i] = qRgb(0, 0, 0);       // Black
     }
+    // Set default palette for the first 16 custom text slots (original Utilities.cpp:1671-1698)
+    m_colors.custom_text[0] = qRgb(255, 128, 128);
+    m_colors.custom_text[1] = qRgb(255, 255, 128);
+    m_colors.custom_text[2] = qRgb(128, 255, 128);
+    m_colors.custom_text[3] = qRgb(128, 255, 255);
+    m_colors.custom_text[4] = qRgb(0, 128, 255);
+    m_colors.custom_text[5] = qRgb(255, 128, 192);
+    m_colors.custom_text[6] = qRgb(255, 0, 0);
+    m_colors.custom_text[7] = qRgb(0, 128, 192);
+    m_colors.custom_text[8] = qRgb(255, 0, 255);
+    m_colors.custom_text[9] = qRgb(128, 64, 64);
+    m_colors.custom_text[10] = qRgb(255, 128, 64);
+    m_colors.custom_text[11] = qRgb(0, 128, 128);
+    m_colors.custom_text[12] = qRgb(0, 64, 128);
+    m_colors.custom_text[13] = qRgb(255, 0, 128);
+    m_colors.custom_text[14] = qRgb(0, 128, 0);
+    m_colors.custom_text[15] = qRgb(0, 0, 255);
 
     // Initialize custom color names
     for (int i = 0; i < 255; i++) {
@@ -1170,6 +1258,10 @@ bool WorldDocument::sendTextToMud(const QString& text, const QString& preamble,
  */
 void WorldDocument::DoSendMsg(const QString& text, bool bEcho, bool bLog)
 {
+    // Cannot change what we are sending during OnPluginSent (original: doc.cpp:1178)
+    if (m_bPluginProcessingSent)
+        return;
+
     QString str = text;
 
     // ========== Plugin Send Callback ==========
@@ -1394,8 +1486,8 @@ long WorldDocument::Execute(const QString& command, bool allowScriptPrefix, bool
                             const QString& originalCommand)
 {
     // Recursion depth guard — prevents infinite alias loops from crashing.
-    // Original: methods_commands.cpp:254 — MAX_EXECUTION_DEPTH = 100
-    constexpr int MAX_EXECUTION_DEPTH = 100;
+    // Original: doc.h:43 — MAX_EXECUTION_DEPTH = 20
+    constexpr int MAX_EXECUTION_DEPTH = 20;
     if (++m_iExecutionDepth > MAX_EXECUTION_DEPTH) {
         --m_iExecutionDepth;
         // Original (methods_commands.cpp:265) returns eCommandsNestedTooDeeply to Lua caller.
@@ -1449,10 +1541,7 @@ long WorldDocument::Execute(const QString& command, bool allowScriptPrefix, bool
     // Original (evaluate.cpp:39-40) does NOT guard against empty prefix.
     // An empty prefix means ALL input is treated as speedwalk (matches original).
     if (m_speedwalk.enabled && strFixedCommand.startsWith(m_speedwalk.prefix)) {
-        // Check connection before processing speedwalk (original: evaluate.cpp:52-53)
-        if (connectPhase() != eConnectConnectedToMud)
-            return eWorldClosed;
-        // Remove prefix and evaluate speedwalk
+        // Evaluate speedwalk FIRST, then check connection (original: evaluate.cpp:43-52)
         QString speedwalkInput = strFixedCommand.mid(m_speedwalk.prefix.length());
         QString expandedSpeedwalk = speedwalk::evaluate(speedwalkInput, m_speedwalk.filler);
 
@@ -1464,6 +1553,11 @@ long WorldDocument::Execute(const QString& command, bool allowScriptPrefix, bool
                 note(expandedSpeedwalk.mid(1)); // Display error in output window
                 return eOK;
             }
+
+            // Check connection after evaluating speedwalk (original: evaluate.cpp:52)
+            // Use checkConnected() to prompt reconnect, not just a bare phase check
+            if (checkConnected())
+                return eWorldClosed;
 
             // Send expanded speedwalk commands via SendMsg with queue=true
             SendMsg(expandedSpeedwalk, m_display_my_input, true, m_logging.log_input);
@@ -1519,6 +1613,16 @@ long WorldDocument::Execute(const QString& command, bool allowScriptPrefix, bool
             if (!shouldSend) {
                 continue; // Plugin suppressed this sub-command
             }
+        }
+
+        // Empty sub-command: pressing Enter may try to reconnect (original:
+        // methods_commands.cpp:373-387).
+        if (str.isEmpty()) {
+            if (checkConnected()) {
+                return eWorldClosed;
+            }
+            SendMsg(QString(), m_display_my_input, false, m_logging.log_input);
+            continue;
         }
 
         QString processedCommand = str;
@@ -1700,6 +1804,17 @@ QString WorldDocument::PushCommand()
     }
 
     QString command = m_pActiveInputView->inputText();
+
+    // Add to command history with echo suppression temporarily bypassed (original:
+    // methods_commands.cpp:95-103 — saves m_bNoEcho, forces false, calls
+    // AddToCommandHistory, then restores).
+    {
+        bool savedNoEcho = m_telnetParser->m_bNoEcho;
+        m_telnetParser->m_bNoEcho = false;
+        addToCommandHistory(command);
+        m_telnetParser->m_bNoEcho = savedNoEcho;
+    }
+
     m_pActiveInputView->clearInput();
     SendToAllPluginCallbacks(ON_PLUGIN_COMMAND_CHANGED);
     return command;
@@ -1860,7 +1975,8 @@ QString WorldDocument::fixupEscapeSequences(const QString& input) const
     for (int i = 0; i < input.length(); ++i) {
         if (input[i] == '\\' && i + 1 < input.length()) {
             ++i;
-            switch (input[i].toLatin1()) {
+            char c = input[i].toLatin1();
+            switch (c) {
                 case 'a':
                     result += '\a';
                     break;
@@ -1879,13 +1995,50 @@ QString WorldDocument::fixupEscapeSequences(const QString& input) const
                 case 't':
                     result += '\t';
                     break;
+                case 'v':
+                    result += '\v';
+                    break;
+                case '\'':
+                    result += '\'';
+                    break;
+                case '"':
+                    result += '"';
+                    break;
                 case '\\':
                     result += '\\';
                     break;
+                case '?':
+                    result += '\?';
+                    break;
+                case 'x': {
+                    // Hex escape: \xNN — up to 2 hex digits (original: Utilities.cpp:212-223)
+                    unsigned char hexVal = 0;
+                    int digits = 0;
+                    while (i + 1 < input.length() && digits < 2) {
+                        char next = input[i + 1].toLatin1();
+                        if (next >= '0' && next <= '9') {
+                            hexVal = static_cast<unsigned char>((hexVal << 4) + (next - '0'));
+                            ++i;
+                            ++digits;
+                        } else if (next >= 'a' && next <= 'f') {
+                            hexVal = static_cast<unsigned char>((hexVal << 4) + (next - 'a' + 10));
+                            ++i;
+                            ++digits;
+                        } else if (next >= 'A' && next <= 'F') {
+                            hexVal = static_cast<unsigned char>((hexVal << 4) + (next - 'A' + 10));
+                            ++i;
+                            ++digits;
+                        } else {
+                            break;
+                        }
+                    }
+                    result += QChar(hexVal);
+                    break;
+                }
                 default:
-                    result += '\\';
-                    result += input[i];
-                    break; // unknown: keep both
+                    // Unknown escape: collapse to just the character (original: Utilities.cpp:225)
+                    result += QChar(static_cast<unsigned char>(c));
+                    break;
             }
         } else {
             result += input[i];
@@ -2633,19 +2786,70 @@ void WorldDocument::loadScriptFile()
     bool error = m_ScriptEngine->parseLua(scriptCode, "Script file");
 
     if (error) {
-        // Orange error text on black background
-        colourNote(BGR(255, 140, 0), BGR(0, 0, 0),
-                   QString("Script file contains errors: %1").arg(m_scripting.filename));
+        // parseLua already displayed the specific error via colourNote (orangered).
+        // Original lua_scripting.cpp:392-402 shows only the error from parseLua,
+        // no additional note here.
+        qCDebug(lcWorld) << "loadScriptFile: Script parse error in" << m_scripting.filename;
     } else {
         qCDebug(lcWorld) << "loadScriptFile: Script executed successfully";
-        // Optional: notify user
-        // note(QString("Script file loaded: %1").arg(m_scripting.filename));
     }
 
     // Update file modification time for change detection
     QFileInfo fileInfo(m_scripting.filename);
     if (fileInfo.exists()) {
         m_timeScriptFileMod = fileInfo.lastModified();
+    }
+}
+
+/**
+ * reinitializeScripting — reconcile the script engine after the script file
+ * name or enabled state changed (typically from the world-properties dialog).
+ *
+ * Mirrors CMUSHclientDoc::SavePrefsP17 (configuration.cpp:1437-1488):
+ *   - disable the old engine if the filename changed;
+ *   - if scripting is enabled and no engine is active, create one and reload
+ *     the script file;
+ *   - reset cached entry-point DISPIDs so the new file's handlers are found.
+ *
+ * Only Lua is supported, so the original's language-change branch collapses
+ * into the filename check.
+ */
+void WorldDocument::reinitializeScripting(const QString& previousFilename, bool wasEnabled)
+{
+    const bool filenameChanged = previousFilename != m_scripting.filename;
+
+    // Disable the old engine if the script file changed (original: language or
+    // filename changed). Cached entry-point DISPIDs become stale, so clear them.
+    if (filenameChanged && m_ScriptEngine && m_ScriptEngine->isLua()) {
+        m_ScriptEngine->disableScripting();
+    }
+
+    if (filenameChanged || wasEnabled != m_scripting.enabled) {
+        m_dispidWorldOpen = 0;
+        m_dispidWorldClose = 0;
+        m_dispidWorldSave = 0;
+        m_dispidWorldConnect = 0;
+        m_dispidWorldDisconnect = 0;
+        m_dispidWorldGetFocus = 0;
+        m_dispidWorldLoseFocus = 0;
+    }
+
+    // Disable scripting entirely if it was turned off.
+    if (!m_scripting.enabled) {
+        if (m_ScriptEngine && m_ScriptEngine->isLua()) {
+            m_ScriptEngine->disableScripting();
+        }
+        return;
+    }
+
+    // Bring a (new) engine online if scripting is wanted but none is active.
+    if (m_ScriptEngine && !m_ScriptEngine->isLua()) {
+        m_ScriptEngine->createScriptEngine();
+    }
+
+    // Reload the script file so the new file's globals/entry points are defined.
+    if (!m_scripting.filename.isEmpty()) {
+        loadScriptFile();
     }
 }
 
@@ -2968,15 +3172,19 @@ void WorldDocument::showErrorLines(int lineNumber)
     }
     file.close();
 
-    // Calculate range (3 lines before and after)
-    int start = qMax(0, lineNumber - 4); // lineNumber is 1-based, so -4 gives us 3 lines before
-    int end = qMin(lines.count(), lineNumber + 3);
+    // Calculate range (4 lines before and after, matching original: scripting.cpp:517-534)
+    int start = qMax(0, lineNumber - 4); // lineNumber is 1-based
+    int end = qMin(lines.count(), lineNumber + 4);
 
-    // Display context - orange error text on black background
+    // Header line (original: scripting.cpp:519 — ColourNote SCRIPTERRORFORECOLOUR "Error context")
+    // orangered on black
+    colourNote(QColor("orangered").rgb(), BGR(0, 0, 0), QStringLiteral("Error context in script:"));
+
+    // Context lines — burlywood on black (original SCRIPTERRORCONTEXTFORECOLOUR = "burlywood")
     for (int i = start; i < end; i++) {
-        QString prefix = (i + 1 == lineNumber) ? ">>> " : "    ";
-        colourNote(BGR(255, 140, 0), BGR(0, 0, 0),
-                   QString("%1%2: %3").arg(prefix).arg(i + 1).arg(lines[i]));
+        QString marker = (i + 1 == lineNumber) ? QStringLiteral("*") : QStringLiteral(" ");
+        colourNote(QColor("burlywood").rgb(), BGR(0, 0, 0),
+                   QString("%1%2: %3").arg(i + 1, 4).arg(marker).arg(lines[i]));
     }
 }
 
