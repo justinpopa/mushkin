@@ -405,7 +405,10 @@ int L_WindowGetPixel(lua_State* L)
     }
 
     QRgb color = win->GetPixel(x, y);
-    lua_pushnumber(L, color);
+    // Original CMiniWindow::GetPixel returns long (signed 32-bit). CLR_INVALID=0xFFFFFFFF
+    // becomes -1 when cast to long. Push as signed so Lua scripts see -1 for out-of-bounds,
+    // not 4294967295 (original: miniwindow.cpp:3306-3308).
+    lua_pushnumber(L, static_cast<qint32>(color));
     return 1;
 }
 

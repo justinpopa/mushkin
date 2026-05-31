@@ -263,6 +263,10 @@ TEST_F(WindowAddHotspotValidationTest, CallbackWithSpaceRejected)
 // Original: miniwindow.cpp:1736-1748
 // ---------------------------------------------------------------------------
 class WindowAddHotspotReplaceMouseStateTest : public WorldDocumentTest {
+// Parity regressions for f021 deviations
+// ---------------------------------------------------------------------------
+
+class MiniWindowParityTest : public WorldDocumentTest {
   protected:
     void SetUp() override
     {
@@ -318,4 +322,87 @@ TEST_F(WindowAddHotspotReplaceMouseStateTest, ReplaceHotspotClearsMouseDownState
 
     EXPECT_TRUE(win->mouseDownHotspot.isEmpty())
         << "mouseDownHotspot must be cleared when its hotspot is replaced";
+        // Create a 100x100 window
+        win->Resize(100, 100, 0x00000000);
+    }
+    std::unique_ptr<MiniWindow> win;
+};
+
+// H30: BlendImage out-of-range opacity returns eBadParameter (not silently clamped)
+TEST_F(MiniWindowParityTest, BlendImageOpacityOutOfRangeReturnsBadParameter)
+{
+    // Load a small image first
+    QImage img(4, 4, QImage::Format_ARGB32);
+    img.fill(Qt::red);
+    const QTemporaryDir tmp;
+    const QString path = tmp.filePath("src.png");
+    ASSERT_TRUE(img.save(path, "PNG"));
+    ASSERT_EQ(win->LoadImage("src", path), eOK);
+
+    EXPECT_EQ(win->BlendImage("src", 0, 0, 4, 4, 1, -0.1, 0, 0, 0, 0), eBadParameter);
+    EXPECT_EQ(win->BlendImage("src", 0, 0, 4, 4, 1, 1.1, 0, 0, 0, 0), eBadParameter);
+    // Edge values are accepted
+    EXPECT_EQ(win->BlendImage("src", 0, 0, 4, 4, 1, 0.0, 0, 0, 0, 0), eOK);
+    EXPECT_EQ(win->BlendImage("src", 0, 0, 4, 4, 1, 1.0, 0, 0, 0, 0), eOK);
+}
+
+// H75 MEDIUM: Resize must NOT update the stored backgroundColor
+TEST_F(MiniWindowParityTest, ResizeDoesNotUpdateBackgroundColor)
+{
+    win->setBackgroundColor(0x00FF0000); // blue in BGR
+    QRgb savedBg = win->getBackgroundColor();
+
+    // Resize with a different background color argument
+    ASSERT_EQ(win->Resize(50, 50, 0x000000FF), eOK); // red in BGR
+
+    // backgroundColor field must be unchanged
+    EXPECT_EQ(win->getBackgroundColor(), savedBg)
+        << "Resize must not overwrite the stored backgroundColor";
+}
+
+// H75 LOW: Resize with zero dimension coerces to 1 (not eBadParameter)
+TEST_F(MiniWindowParityTest, ResizeZeroDimensionCoercesToOne)
+{
+    EXPECT_EQ(win->Resize(0, 50, 0x00000000), eOK)
+        << "Zero width should be coerced to 1, not rejected";
+    EXPECT_EQ(win->Resize(50, 0, 0x00000000), eOK)
+        << "Zero height should be coerced to 1, not rejected";
+    EXPECT_EQ(win->Resize(0, 0, 0x00000000), eOK)
+        << "Zero width+height should be coerced to 1, not rejected";
+}
+
+// H76 MEDIUM: TextWidth returns -2 when font not found
+TEST_F(MiniWindowParityTest, TextWidthReturnsMinus2WhenFontNotFound)
+{
+    EXPECT_EQ(win->TextWidth("no_such_font", "hello", false), -2);
+}
+
+// H76 LOW: Text returns 0 immediately for empty string (no drawing, no dirty flag)
+TEST_F(MiniWindowParityTest, TextEmptyStringReturnsZeroWithoutDrawing)
+{
+    ASSERT_EQ(win->Font("f1", "Arial", 12.0, false, false, false, false), eOK);
+    win->dirty = false;
+
+    qint32 result = win->Text("f1", "", 0, 0, 100, 100, 0x00FFFFFF, false);
+    EXPECT_EQ(result, 0) << "Empty text should return 0";
+    EXPECT_FALSE(win->dirty) << "Empty text must not set the dirty flag";
+}
+
+// M130: Gradient invalid mode returns eUnknownOption, not eBadParameter
+TEST_F(MiniWindowParityTest, GradientInvalidModeReturnsEUnknownOption)
+{
+    EXPECT_EQ(win->Gradient(0, 0, 50, 50, 0x00FF0000, 0x000000FF, 99), eUnknownOption);
+    EXPECT_EQ(win->Gradient(0, 0, 50, 50, 0x00FF0000, 0x000000FF, 0), eUnknownOption);
+}
+
+// GetPixel out-of-bounds returns 0xFFFFFFFF (CLR_INVALID); Lua side casts to signed -1.
+TEST_F(MiniWindowParityTest, GetPixelOutOfBoundsReturnsCLRInvalid)
+{
+    constexpr QRgb CLR_INVALID = 0xFFFFFFFF;
+    EXPECT_EQ(win->GetPixel(-1, 0), CLR_INVALID);
+    EXPECT_EQ(win->GetPixel(0, -1), CLR_INVALID);
+    EXPECT_EQ(win->GetPixel(200, 0), CLR_INVALID);
+    EXPECT_EQ(win->GetPixel(0, 200), CLR_INVALID);
+    // Cast to signed must be -1 (the Lua API fix)
+    EXPECT_EQ(static_cast<qint32>(win->GetPixel(200, 0)), -1);
 }
