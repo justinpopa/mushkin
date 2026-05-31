@@ -449,6 +449,57 @@ TEST_F(NotepadApiTest, SaveToFileRespectsNoReplace)
     EXPECT_FALSE(notepad->SaveToFile(tmpPath, /*replaceExisting=*/false));
 
     QFile::remove(tmpPath);
+// Test 31: CloseNotepad with querySave=false ignores m_iSaveOnChange and closes immediately
+// (no prompt regardless of save method)
+TEST_F(NotepadApiTest, CloseNotepadNoQuerySaveIgnoresSaveMethod)
+{
+    executeLua("world.SendToNotepad('SaveMethodNever', 'content')");
+    NotepadWidget* notepad = doc->FindNotepad("SaveMethodNever");
+    ASSERT_NE(notepad, nullptr);
+    notepad->m_iSaveOnChange = eNotepadSaveNever;
+
+    // querySave=false — should close without prompt regardless of save method
+    executeLua("result = world.CloseNotepad('SaveMethodNever', false)");
+    EXPECT_TRUE(getGlobalBool("result"));
+    EXPECT_EQ(doc->FindNotepad("SaveMethodNever"), nullptr);
+}
+
+// Test 32: CloseNotepad with eNotepadSaveNever skips the save prompt even when
+// querySave=true and the document is modified (original: TextDocument.cpp:476).
+// In test environment there's no QMessageBox so we verify by direct doc access.
+TEST_F(NotepadApiTest, CloseNotepadSaveMethodNeverSkipsPrompt)
+{
+    executeLua("world.SendToNotepad('NeverSave', 'content')");
+    NotepadWidget* notepad = doc->FindNotepad("NeverSave");
+    ASSERT_NE(notepad, nullptr);
+    // Mark as modified so the default path would normally prompt
+    if (notepad->m_pTextEdit) {
+        notepad->m_pTextEdit->document()->setModified(true);
+    }
+    notepad->m_iSaveOnChange = eNotepadSaveNever;
+
+    // querySave=true but eNotepadSaveNever — must close without prompt (returns true)
+    qint32 result = doc->CloseNotepad("NeverSave", true);
+    EXPECT_EQ(result, eOK);
+    EXPECT_EQ(doc->FindNotepad("NeverSave"), nullptr);
+}
+
+// Test 33: CloseNotepad with eNotepadSaveAlways also skips the interactive prompt
+// (original: TextDocument.cpp:475 — "fall through to save if changed", but in
+// Mushkin there is no file-backed save so it just closes without prompting).
+TEST_F(NotepadApiTest, CloseNotepadSaveMethodAlwaysSkipsPrompt)
+{
+    executeLua("world.SendToNotepad('AlwaysSave', 'content')");
+    NotepadWidget* notepad = doc->FindNotepad("AlwaysSave");
+    ASSERT_NE(notepad, nullptr);
+    if (notepad->m_pTextEdit) {
+        notepad->m_pTextEdit->document()->setModified(true);
+    }
+    notepad->m_iSaveOnChange = eNotepadSaveAlways;
+
+    qint32 result = doc->CloseNotepad("AlwaysSave", true);
+    EXPECT_EQ(result, eOK);
+    EXPECT_EQ(doc->FindNotepad("AlwaysSave"), nullptr);
 }
 
 // Test 30: Functions work correctly when notepad exists
