@@ -260,6 +260,26 @@ TEST_F(LuaApiTest, DisconnectErrorCodes)
         << "Disconnect() should return eWorldClosed (30002) when already disconnecting";
 }
 
+// Test: world.Send/SendImmediate/SendNoEcho/SendPush concatenate all arguments
+// Original lua_methods.cpp:4808 uses concatArgs(L) not just arg[1].
+// Passing multiple args must join them without delimiter, matching the original.
+TEST_F(LuaApiTest, SendConcatenatesAllArgs)
+{
+    doc->m_bPluginProcessingSent = false;
+    doc->m_strLastCommandSent.clear();
+
+    // world.Send with two string args should concatenate both (no delimiter)
+    executeLua("world.Send('cast fireball ', 'dragon')");
+    EXPECT_EQ(doc->m_strLastCommandSent, "cast fireball dragon")
+        << "Send() multi-arg: both arguments must be concatenated without delimiter";
+
+    // world.SendNoEcho with two string args
+    doc->m_strLastCommandSent.clear();
+    executeLua("world.SendNoEcho('north', 'east')");
+    EXPECT_EQ(doc->m_strLastCommandSent, "northeast")
+        << "SendNoEcho() multi-arg: arguments must be concatenated without delimiter";
+}
+
 // Test 16: API-created object names are keyed in lower case, matching the original
 // CMUSHclientDoc::CheckObjectName() which calls MakeLower() after validation. The
 // AutomationRegistry keys triggers directly off the validated name without any further
