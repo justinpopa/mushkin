@@ -158,10 +158,16 @@ void OutputView::calculateMetrics()
                 m_doc->m_computedTextRectangle = rect();
             }
         }
+        // Push font height to WorldDocument so sendWindowSizes (NAWS) can compute
+        // row count from pixel dimensions, mirroring original doc.cpp:3256 / doc.cpp:5568.
+        if (m_doc) {
+            m_doc->m_FontHeight = m_lineHeight;
+        }
     } else {
         m_visibleLines = 1; // Minimum 1 visible line
         if (m_doc) {
             m_doc->m_computedTextRectangle = QRect();
+            m_doc->m_FontHeight = 0;
         }
     }
 

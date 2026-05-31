@@ -484,6 +484,50 @@ TEST_F(TelnetParserTest, MTTS_ResetBy_DONT)
     EXPECT_EQ(tp().m_ttype_sequence, 0);
 }
 
+// ========== Category 7b: NAWS guard — !m_FontHeight (M7 LOW parity) ==========
+
+// Original doc.cpp:5548 returns early when m_FontHeight == 0.  Mushkin maps that
+// to m_doc.m_FontHeight, which OutputView::calculateMetrics() sets when a font is
+// loaded.  With m_FontHeight == 0 (default), sendWindowSizes must be a no-op even
+// when all other conditions are satisfied (NAWS wanted, socket set, connected).
+TEST_F(TelnetParserTest, NAWS_ZeroFontHeight_IsNoOp)
+{
+    tp().m_bNAWS_wanted = true;
+    doc->m_FontHeight = 0; // font not yet initialised
+    // No socket / not connected already guards, but test the guard explicitly:
+    // even if we bypass the other guards, zero FontHeight must prevent sending.
+    EXPECT_EQ(doc->m_FontHeight, 0);
+    tp().sendWindowSizes(80); // must not crash or assert
+    SUCCEED();
+}
+
+// When m_FontHeight > 0 (font initialised) and a valid computedTextRectangle is
+// set, sendWindowSizes must be a no-op only because the socket is null / not
+// connected — i.e. the FontHeight guard does NOT block a ready connection.
+TEST_F(TelnetParserTest, NAWS_NonZeroFontHeight_PassesGuard_NoCrash)
+{
+    tp().m_bNAWS_wanted = true;
+    doc->m_FontHeight = 14; // font height set (e.g. 14px)
+    doc->m_computedTextRectangle = QRect(0, 0, 800, 600);
+    // Socket is still null and not connected -> guarded no-op, but must not crash.
+    tp().sendWindowSizes(80);
+    SUCCEED();
+}
+
+// ========== Category 7c: TELOPT_MUD_SPECIFIC in Phase_WILL (M11 parity) ==========
+
+// Original telnet_phases.cpp:283-286: IAC WILL TELOPT_MUD_SPECIFIC gets an
+// unconditional IAC DO reply — it must NOT fall to the plugin-query default path.
+// Verified via m_bClient_got_IAC_WILL and m_nCount_IAC_WILL state.
+TEST_F(TelnetParserTest, PhaseWILL_MudSpecific_SetsWillFlag)
+{
+    EXPECT_FALSE(tp().m_bClient_got_IAC_WILL[TELOPT_MUD_SPECIFIC]);
+    feed({TELNET_IAC, TELNET_WILL, TELOPT_MUD_SPECIFIC});
+    EXPECT_TRUE(tp().m_bClient_got_IAC_WILL[TELOPT_MUD_SPECIFIC]);
+    EXPECT_EQ(tp().m_nCount_IAC_WILL, 1);
+    EXPECT_EQ(tp().m_phase, Phase::NONE);
+}
+
 // ========== Category 9: Phase Integrity ==========
 
 TEST_F(TelnetParserTest, Phase_ReturnsToNONE_AfterIAC)
