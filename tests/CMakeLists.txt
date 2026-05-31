@@ -582,6 +582,24 @@ gtest_discover_tests(test-database-gtest
     PROPERTIES RESOURCE_LOCK database_singleton
 )
 
+# Global options test (preferences round-trip + key-name parity)
+add_executable(test-global-options-gtest
+    test_global_options_gtest.cpp
+)
+
+target_link_libraries(test-global-options-gtest PRIVATE
+    test_main_core
+    Qt6::Gui
+    Qt6::Widgets
+    Qt6::Sql
+    ui
+)
+
+gtest_discover_tests(test-global-options-gtest
+    DISCOVERY_TIMEOUT 30
+    PROPERTIES RESOURCE_LOCK database_singleton
+)
+
 # Lua Database API test
 add_executable(test-lua-database-gtest
     test_lua_database_gtest.cpp
