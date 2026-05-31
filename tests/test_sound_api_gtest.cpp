@@ -132,3 +132,50 @@ TEST_F(SoundApiTest, PlaySoundWithParameters)
     EXPECT_EQ(result, eFileNotFound)
         << "PlaySound should return eFileNotFound for nonexistent file";
 }
+
+// ---------------------------------------------------------------------------
+// PlaySoundMemory parity tests (behavioral deviations H83 / M50)
+// ---------------------------------------------------------------------------
+
+/**
+ * Test: world.PlaySoundMemory() buffer arg (arg 1) is required — nil raises Lua error.
+ * Original lua_methods.cpp:4517 uses my_checknumber(L,1) which errors on nil.
+ * Mushkin previously used luaL_optinteger(L,1,0) which silently defaulted to 0.
+ */
+TEST_F(SoundApiTest, PlaySoundMemoryBufferArgRequired)
+{
+    const char* code = R"(
+        local ok = pcall(function()
+            world.PlaySoundMemory(nil, "wav", false, 0, 0)
+        end)
+        return not ok  -- should have errored
+    )";
+    ASSERT_EQ(luaL_dostring(L, code), 0) << lua_tostring(L, -1);
+    EXPECT_TRUE(lua_toboolean(L, -1))
+        << "PlaySoundMemory(nil, ...) should raise a Lua type error (arg 1 is required)";
+    lua_pop(L, 1);
+}
+
+/**
+ * Test: world.PlaySoundMemory() with empty data returns eFileNotFound (not eCannotPlaySound).
+ * Original methods_sounds.cpp:200-201 — mmioOpen failure → eFileNotFound.
+ */
+TEST_F(SoundApiTest, PlaySoundMemoryEmptyDataReturnsFileNotFound)
+{
+    // Pass buffer=1, data="" (empty string) — should get eFileNotFound
+    executeLua("result = world.PlaySoundMemory(1, '')");
+    int result = getGlobalInt("result");
+    EXPECT_EQ(result, eFileNotFound)
+        << "PlaySoundMemory with empty data should return eFileNotFound (30051), got " << result;
+}
+
+/**
+ * Test: world.PlaySoundMemory() function exists.
+ */
+TEST_F(SoundApiTest, PlaySoundMemoryExists)
+{
+    executeLua("result = (type(world.PlaySoundMemory) == 'function')");
+    lua_getglobal(L, "result");
+    EXPECT_TRUE(lua_toboolean(L, -1)) << "world.PlaySoundMemory should be a function";
+    lua_pop(L, 1);
+}
