@@ -380,8 +380,9 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     // ========== Logging ==========
     m_logfile.reset(); // ensure closed/null (default-constructed is already null)
     m_logfile_name = QString();
-    m_LastFlushTime =
-        QDateTime::currentDateTime(); // original: doc_construct.cpp:207 — always valid
+    // Original: doc_construct.cpp:207 — m_LastFlushTime initialized at construction time
+    // (always valid), so the first periodic flush fires 120s after startup.
+    m_LastFlushTime = QDateTime::currentDateTime();
 
     // ========== Fonts ==========
     m_FontHeight = 0;
