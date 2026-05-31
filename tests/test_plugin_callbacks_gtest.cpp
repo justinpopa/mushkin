@@ -429,6 +429,98 @@ TEST_F(PluginCallbacksTest, PluginListChanged_BatchedLoad_NotifiesOnce)
                            "once per plugin";
 }
 
+// ===========================================================================
+// SendToFirstPluginCallbacks fall-through on error (H10).
+//
+// Original plugins.cpp:1380: after executing the callback, the loop checks
+// callinfo._dispid_info.isvalid(). If the callback errored, the dispid is
+// set to DISPID_UNKNOWN and isvalid() returns false — the loop falls through
+// to the next plugin instead of stopping. Mushkin mirrors this by re-checking
+// hasCallback() after execution: if the callback cleared its own dispid entry
+// (error path in plugin.cpp:346), iteration continues to the next plugin.
+// ===========================================================================
+
+// Helper: build a plugin XML where OnPluginTrace errors at runtime.
+static QString makeErroringTracePlugin(const QString& id)
+{
+    return QString(R"(<?xml version="1.0"?>
+<!DOCTYPE muclient>
+<muclient>
+<plugin name="ErrorTrace %1" author="Test" id="%2" language="Lua"
+        purpose="erroring trace" version="1.0" save_state="n">
+<script>
+<![CDATA[
+function OnPluginTrace(msg)
+  -- deliberate runtime error: call an undefined global
+  return undefined_function_that_does_not_exist()
+end
+]]>
+</script>
+</plugin>
+</muclient>
+)")
+        .arg(id, id);
+}
+
+// Helper: build a plugin XML where OnPluginTrace succeeds and records the call.
+static QString makeWorkingTracePlugin(const QString& id, const QString& flagGlobal)
+{
+    return QString(R"(<?xml version="1.0"?>
+<!DOCTYPE muclient>
+<muclient>
+<plugin name="WorkTrace %1" author="Test" id="%2" language="Lua"
+        purpose="working trace" version="1.0" save_state="n">
+<script>
+<![CDATA[
+%3 = false
+function OnPluginTrace(msg)
+  %3 = true
+  return true
+end
+]]>
+</script>
+</plugin>
+</muclient>
+)")
+        .arg(id, id, flagGlobal);
+}
+
+// Test 17: SendToFirstPluginCallbacks falls through to the next plugin when
+// the first plugin's callback errors at runtime (H10).
+TEST_F(PluginCallbacksTest, SendToFirstPluginCallbacks_FallsThroughOnCallbackError)
+{
+    // Load a plugin whose OnPluginTrace will error at runtime.
+    Plugin* errorPlugin = loadPluginFromString(
+        doc.get(), makeErroringTracePlugin("{eeeeeeee-0000-0000-0000-000000000001}"),
+        /*suppress=*/true);
+    ASSERT_NE(errorPlugin, nullptr) << "erroring trace plugin failed to load";
+
+    // Load a second plugin whose OnPluginTrace works correctly.
+    Plugin* workPlugin = loadPluginFromString(
+        doc.get(),
+        makeWorkingTracePlugin("{ffffffff-0000-0000-0000-000000000001}", "trace_handled"),
+        /*suppress=*/true);
+    ASSERT_NE(workPlugin, nullptr) << "working trace plugin failed to load";
+    lua_State* workL = workPlugin->m_ScriptEngine->L;
+
+    // Confirm the working plugin's flag starts false.
+    lua_getglobal(workL, "trace_handled");
+    bool handledBefore = lua_toboolean(workL, -1);
+    lua_pop(workL, 1);
+    EXPECT_FALSE(handledBefore);
+
+    // Fire the callback; the first plugin will error, the second should handle it.
+    bool result = doc->SendToFirstPluginCallbacks(ON_PLUGIN_TRACE, "test trace message");
+
+    EXPECT_TRUE(result) << "SendToFirstPluginCallbacks should return true (second plugin handled)";
+
+    lua_getglobal(workL, "trace_handled");
+    bool handledAfter = lua_toboolean(workL, -1);
+    lua_pop(workL, 1);
+    EXPECT_TRUE(handledAfter)
+        << "Second plugin's OnPluginTrace must run when first plugin's callback errors (H10)";
+}
+
 // Test 16: without suppression each load notifies the observer (the deviating
 // behavior). Confirms the suppress flag is what makes batching possible.
 TEST_F(PluginCallbacksTest, PluginListChanged_UnsuppressedLoad_NotifiesPerPlugin)
