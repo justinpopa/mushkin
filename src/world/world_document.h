@@ -1741,8 +1741,8 @@ class WorldDocument : public QObject, public IWorldContext {
                        const QString& value);   // Set variable (create or update)
     qint32 deleteVariable(const QString& name); // Delete variable by name
     QStringList getVariableList() const;        // Get list of all variable names
-    QString expandVariables(const QString& text,
-                            bool escapeRegex = true) const; // Expand @variable references in text
+    QString expandVariables(const QString& text, bool escapeRegex = true,
+                            bool isRegexp = true) const; // Expand @variable references in text
 
     // ========== Array Management (plugin-aware) ==========
     ArraysMap& getArrayMap();                  // Get arrays map (respects plugin context)
