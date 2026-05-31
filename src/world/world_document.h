@@ -811,7 +811,7 @@ class WorldDocument : public QObject, public IWorldContext {
         // Logging flags
         bool log_html = false;          // convert HTML sequences?
         bool log_input = false;         // log player input?
-        bool log_output = false;        // log MUD output?
+        bool log_output = true;         // log MUD output? (original default: true)
         bool log_notes = false;         // log notes?
         bool log_in_colour = false;     // HTML logging in colour?
         bool log_raw = false;           // log raw input from MUD?

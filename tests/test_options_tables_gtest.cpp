@@ -224,6 +224,31 @@ TEST_F(OptionsTableTest, CanFindSpecificNumericOptions)
     }
 }
 
+// ========== Option Default Value Tests ==========
+
+// Test 15: A freshly constructed world logs MUD output by default.
+// Original MUSHclient defaults log_output to true (scriptingoptions.cpp:130).
+// The XML loader leaves absent attributes at their constructor defaults
+// (xml_serialization.cpp:570), so the in-class member initializer is the
+// effective default for new worlds and for saves that omit the attribute.
+TEST_F(OptionsWorldDocumentTest, LogOutputDefaultsToTrue)
+{
+    EXPECT_TRUE(doc->m_logging.log_output)
+        << "New worlds must log MUD output by default (original default: true)";
+
+    // The OptionsTable metadata default must agree with the member initializer.
+    const tConfigurationNumericOption* logOutput = nullptr;
+    for (const tConfigurationNumericOption* opt = OptionsTable; opt->pName != nullptr; opt++) {
+        if (QString(opt->pName) == "log_output") {
+            logOutput = opt;
+            break;
+        }
+    }
+    ASSERT_NE(logOutput, nullptr) << "log_output must exist in OptionsTable";
+    EXPECT_DOUBLE_EQ(logOutput->iDefault, 1.0)
+        << "OptionsTable default for log_output must be true (1.0)";
+}
+
 // Test 14: Can find specific alpha options
 TEST_F(AlphaOptionsTableTest, CanFindSpecificAlphaOptions)
 {
