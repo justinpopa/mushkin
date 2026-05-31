@@ -96,6 +96,14 @@ class WorldPropertiesDialog : public QDialog {
     void saveSettings();
     void applySettings();
 
+    // Pure predicate: is the character-name field valid given the connect method?
+    // Separated from validateSettings() so it can be exercised without a modal box.
+    bool isCharacterNameValid() const;
+
+    // Validate UI fields before applying. Returns false (and shows a message box)
+    // if a required field is invalid; mirrors original DDX/DDV validation.
+    bool validateSettings();
+
     // Member variables
     WorldDocument* m_doc;
     QTabWidget* m_tabWidget;
@@ -108,6 +116,7 @@ class WorldPropertiesDialog : public QDialog {
     QLineEdit* m_passwordEdit;
     QComboBox* m_connectMethodCombo;
     QTextEdit* m_connectTextEdit;
+    QLabel* m_connectLineCountLabel; // "(N lines)" indicator for connect text
 
     // Proxy widgets
     QComboBox* m_proxyTypeCombo;
@@ -140,6 +149,9 @@ class WorldPropertiesDialog : public QDialog {
     // Helper for Output tab
     void updateColorButton(int index);
 
+    // Helper for Connection tab: refresh the "(N lines)" indicator for connect text.
+    void updateConnectLineCount();
+
     // Input tab widgets
     QPushButton* m_inputFontButton;
     QLabel* m_inputFontLabel;
@@ -154,6 +166,11 @@ class WorldPropertiesDialog : public QDialog {
     QSpinBox* m_speedwalkDelaySpin;
     QCheckBox* m_escapeDeletesInputCheck;
     QCheckBox* m_noEchoOffCheck;
+    // Spam prevention (original CPrefsP4: IDC_ENABLE_SPAM_PREVENTION / IDC_SPAM_LINE_COUNT /
+    // IDC_SPAM_FILLER)
+    QCheckBox* m_enableSpamPreventionCheck;
+    QSpinBox* m_spamLineCountSpin;
+    QLineEdit* m_spamMessageEdit;
 
     // Logging tab widgets
     QCheckBox* m_enableLogCheck;
@@ -173,6 +190,10 @@ class WorldPropertiesDialog : public QDialog {
     QLineEdit* m_onWorldGetFocusEdit;
     QLineEdit* m_onWorldLoseFocusEdit;
     QLineEdit* m_onWorldSaveEdit;
+    // Previous script engine state, captured by saveSettings so applySettings can
+    // reconcile the running engine (mirrors original SavePrefsP17 filename/enable check).
+    QString m_prevScriptFilename;
+    bool m_prevScriptEnabled = false;
 
     // Paste to World tab widgets
     QLineEdit* m_pastePreambleEdit;

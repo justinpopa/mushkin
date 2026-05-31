@@ -1594,6 +1594,14 @@ class WorldDocument : public QObject, public IWorldContext {
     void showErrorLines(int lineNumber); // Display error context around line
     void setupScriptFileWatcher();       // Set up file watcher for script file changes
 
+    // Reconcile the scripting engine after m_scripting.{enabled,filename} were
+    // changed (e.g. from the world-properties dialog). Mirrors the original
+    // CMUSHclientDoc::SavePrefsP17 (configuration.cpp:1437-1488): if the script
+    // file name changed, the old engine is torn down; if scripting is enabled
+    // and no engine exists, a new one is created and the script reloaded; cached
+    // entry-point DISPIDs are reset so the new file's handlers are rediscovered.
+    void reinitializeScripting(const QString& previousFilename, bool wasEnabled);
+
     // NOTE: onWorldConnect() and onWorldDisconnect() moved to ConnectionManager (private).
     // They are called from ConnectionManager::onConnect() and onConnectionDisconnect().
 

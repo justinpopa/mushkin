@@ -17,6 +17,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QSpinBox>
 #include <QTabWidget>
@@ -113,7 +114,18 @@ void WorldPropertiesDialog::setupConnectionTab()
     m_connectTextEdit = new QTextEdit();
     m_connectTextEdit->setMaximumHeight(80);
     m_connectTextEdit->setPlaceholderText("Text to send after connecting (optional)");
-    layout->addRow("Connect text:", m_connectTextEdit);
+
+    // Dynamic "(N lines)" indicator mirroring the original CPrefsP21 IDC_LINE_COUNT
+    // control updated by OnUpdateLineCount (prefspropertypages.cpp:8129-8152).
+    QHBoxLayout* connectTextLayout = new QHBoxLayout();
+    connectTextLayout->addWidget(m_connectTextEdit);
+    m_connectLineCountLabel = new QLabel("(0 lines)");
+    m_connectLineCountLabel->setStyleSheet("color: gray;");
+    m_connectLineCountLabel->setAlignment(Qt::AlignTop);
+    connectTextLayout->addWidget(m_connectLineCountLabel);
+    layout->addRow("Connect text:", connectTextLayout);
+    connect(m_connectTextEdit, &QTextEdit::textChanged, this,
+            &WorldPropertiesDialog::updateConnectLineCount);
 
     // Proxy settings
     QGroupBox* proxyGroup = new QGroupBox("Proxy");
@@ -327,6 +339,19 @@ void WorldPropertiesDialog::setupInputTab()
     m_noEchoOffCheck = new QCheckBox("Ignore server echo-off (show passwords)");
     layout->addRow("", m_noEchoOffCheck);
 
+    // Spam prevention (original CPrefsP4: IDC_ENABLE_SPAM_PREVENTION / IDC_SPAM_LINE_COUNT /
+    // IDC_SPAM_FILLER, prefspropertypages.cpp:4685-4688). Backed by m_doc->m_spam.* which
+    // DoSendMsg already consults; the UI was previously absent (M77).
+    layout->addRow("", new QLabel("Spam Prevention:"));
+    m_enableSpamPreventionCheck = new QCheckBox("Enable spam prevention");
+    layout->addRow("", m_enableSpamPreventionCheck);
+    m_spamLineCountSpin = new QSpinBox();
+    m_spamLineCountSpin->setRange(5, 500); // Original: DDV_MinMaxInt 5..500
+    layout->addRow("Repeats before filler:", m_spamLineCountSpin);
+    m_spamMessageEdit = new QLineEdit();
+    m_spamMessageEdit->setPlaceholderText("Filler message sent to break spam (e.g. look)");
+    layout->addRow("Spam filler message:", m_spamMessageEdit);
+
     layout->addRow("", new QWidget()); // Spacer
 
     m_tabWidget->addTab(tab, "Input");
@@ -380,14 +405,27 @@ void WorldPropertiesDialog::setupScriptingTab()
     fileLayout->addWidget(m_scriptFileEdit);
 
     m_scriptFileBrowse = new QPushButton("Browse...");
-    // TODO(ui): Connect Browse button to QFileDialog for file selection.
     fileLayout->addWidget(m_scriptFileBrowse);
+    // Mirror the original CPrefsP17::OnBrowse / ScriptBrowser (prefspropertypages.cpp:7090-7129),
+    // which opens a file dialog and writes the chosen path into the script filename field.
+    connect(m_scriptFileBrowse, &QPushButton::clicked, this, [this]() {
+        QString path =
+            QFileDialog::getOpenFileName(this, "Script source file", m_scriptFileEdit->text(),
+                                         "Lua scripts (*.lua);;All files (*.*)");
+        if (!path.isEmpty()) {
+            m_scriptFileEdit->setText(path);
+        }
+    });
 
     layout->addRow("Script file:", fileLayout);
 
-    // Language
+    // Language — only Lua is supported. The original hides the language selector
+    // entirely (CPrefsP17::OnInitDialog hides m_ctlLanguage since WSH was removed,
+    // prefspropertypages.cpp:7178); we keep a disabled single-entry combo so the
+    // dialog cannot offer non-functional languages that would be ignored on save.
     m_scriptLanguageCombo = new QComboBox();
-    m_scriptLanguageCombo->addItems({"Lua", "YueScript", "MoonScript", "Teal", "Fennel"});
+    m_scriptLanguageCombo->addItem("Lua");
+    m_scriptLanguageCombo->setEnabled(false);
     layout->addRow("Language:", m_scriptLanguageCombo);
 
     // Event handler entry points
@@ -719,6 +757,11 @@ void WorldPropertiesDialog::loadSettings()
     m_escapeDeletesInputCheck->setChecked(m_doc->m_input.escape_deletes_input);
     m_noEchoOffCheck->setChecked(m_doc->m_input.no_echo_off);
 
+    // Spam prevention
+    m_enableSpamPreventionCheck->setChecked(m_doc->m_spam.enabled);
+    m_spamLineCountSpin->setValue(m_doc->m_spam.line_count);
+    m_spamMessageEdit->setText(m_doc->m_spam.message);
+
     // Logging tab
     m_enableLogCheck->setChecked(m_doc->m_logging.log_output);
     m_logFileEdit->setText(m_doc->m_logging.auto_log_file_name);
@@ -852,6 +895,11 @@ void WorldPropertiesDialog::saveSettings()
     m_doc->m_input.escape_deletes_input = m_escapeDeletesInputCheck->isChecked();
     m_doc->m_input.no_echo_off = m_noEchoOffCheck->isChecked();
 
+    // Spam prevention
+    m_doc->m_spam.enabled = m_enableSpamPreventionCheck->isChecked();
+    m_doc->m_spam.line_count = static_cast<quint16>(m_spamLineCountSpin->value());
+    m_doc->m_spam.message = m_spamMessageEdit->text();
+
     // Logging tab
     m_doc->m_logging.log_output = m_enableLogCheck->isChecked();
     m_doc->m_logging.auto_log_file_name = m_logFileEdit->text();
@@ -859,7 +907,11 @@ void WorldPropertiesDialog::saveSettings()
     m_doc->m_logging.log_html = (m_logFormatCombo->currentIndex() == 1);
     m_doc->m_logging.log_raw = (m_logFormatCombo->currentIndex() == 2);
 
-    // Scripting tab
+    // Scripting tab — capture the previous engine-relevant state so applySettings
+    // can reconcile the running script engine (original: SavePrefsP17 disables/recreates
+    // the engine when the filename or enabled flag changes).
+    m_prevScriptFilename = m_doc->m_scripting.filename;
+    m_prevScriptEnabled = m_doc->m_scripting.enabled;
     m_doc->m_scripting.enabled = m_enableScriptCheck->isChecked();
     m_doc->m_scripting.filename = m_scriptFileEdit->text();
     m_doc->m_scripting.on_world_open = m_onWorldOpenEdit->text();
@@ -924,6 +976,11 @@ void WorldPropertiesDialog::applySettings()
     if (m_doc) {
         emit m_doc->outputSettingsChanged();
 
+        // Reconcile the script engine if the script file or enabled flag changed
+        // (original CMUSHclientDoc::SavePrefsP17: disable old engine, recreate if
+        // enabled, reload script, rediscover entry points).
+        m_doc->reinitializeScripting(m_prevScriptFilename, m_prevScriptEnabled);
+
         // Reconfigure script file watcher in case filename or reload option changed
         m_doc->setupScriptFileWatcher();
     }
@@ -932,9 +989,32 @@ void WorldPropertiesDialog::applySettings()
         << "WorldPropertiesDialog::applySettings() - settings saved and signal emitted";
 }
 
+bool WorldPropertiesDialog::isCharacterNameValid() const
+{
+    // Original CPrefsP21::DoDataExchange (prefspropertypages.cpp:8100-8105): a blank
+    // character name is rejected when an auto-connect method is selected, because
+    // auto-login would send "connect <blank> <password>". Index 0 = "No auto-connect".
+    const bool autoConnect = m_connectMethodCombo->currentData().toInt() != eNoAutoConnect;
+    return !(autoConnect && m_nameEdit->text().trimmed().isEmpty());
+}
+
+bool WorldPropertiesDialog::validateSettings()
+{
+    if (!isCharacterNameValid()) {
+        QMessageBox::warning(this, "World Properties",
+                             "Your character name cannot be blank for auto-connect.");
+        m_tabWidget->setCurrentIndex(0); // Connection tab
+        m_nameEdit->setFocus();
+        return false;
+    }
+    return true;
+}
+
 void WorldPropertiesDialog::onOkClicked()
 {
     qCDebug(lcDialog) << "WorldPropertiesDialog: OK clicked";
+    if (!validateSettings())
+        return;
     applySettings();
     accept(); // Close dialog with accepted status
 }
@@ -948,6 +1028,8 @@ void WorldPropertiesDialog::onCancelClicked()
 void WorldPropertiesDialog::onApplyClicked()
 {
     qCDebug(lcDialog) << "WorldPropertiesDialog: Apply clicked";
+    if (!validateSettings())
+        return;
     applySettings();
     // Don't close the dialog
 }
@@ -980,6 +1062,20 @@ void WorldPropertiesDialog::onColorButtonClicked()
         updateColorButton(index);
         qCDebug(lcDialog) << "Color" << index << "changed to:" << color.name();
     }
+}
+
+void WorldPropertiesDialog::updateConnectLineCount()
+{
+    // Mirror original CPrefsP21::OnUpdateLineCount (prefspropertypages.cpp:8129-8152):
+    // count newlines, plus one more for a final line that does not end in a newline.
+    const QString text = m_connectTextEdit->toPlainText();
+    int count = 0;
+    if (!text.isEmpty()) {
+        count = static_cast<int>(text.count(QLatin1Char('\n')));
+        if (!text.endsWith(QLatin1Char('\n')))
+            count++;
+    }
+    m_connectLineCountLabel->setText(QString("(%1 line%2)").arg(count).arg(count == 1 ? "" : "s"));
 }
 
 void WorldPropertiesDialog::updateColorButton(int index)

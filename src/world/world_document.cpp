@@ -2650,6 +2650,58 @@ void WorldDocument::loadScriptFile()
 }
 
 /**
+ * reinitializeScripting — reconcile the script engine after the script file
+ * name or enabled state changed (typically from the world-properties dialog).
+ *
+ * Mirrors CMUSHclientDoc::SavePrefsP17 (configuration.cpp:1437-1488):
+ *   - disable the old engine if the filename changed;
+ *   - if scripting is enabled and no engine is active, create one and reload
+ *     the script file;
+ *   - reset cached entry-point DISPIDs so the new file's handlers are found.
+ *
+ * Only Lua is supported, so the original's language-change branch collapses
+ * into the filename check.
+ */
+void WorldDocument::reinitializeScripting(const QString& previousFilename, bool wasEnabled)
+{
+    const bool filenameChanged = previousFilename != m_scripting.filename;
+
+    // Disable the old engine if the script file changed (original: language or
+    // filename changed). Cached entry-point DISPIDs become stale, so clear them.
+    if (filenameChanged && m_ScriptEngine && m_ScriptEngine->isLua()) {
+        m_ScriptEngine->disableScripting();
+    }
+
+    if (filenameChanged || wasEnabled != m_scripting.enabled) {
+        m_dispidWorldOpen = 0;
+        m_dispidWorldClose = 0;
+        m_dispidWorldSave = 0;
+        m_dispidWorldConnect = 0;
+        m_dispidWorldDisconnect = 0;
+        m_dispidWorldGetFocus = 0;
+        m_dispidWorldLoseFocus = 0;
+    }
+
+    // Disable scripting entirely if it was turned off.
+    if (!m_scripting.enabled) {
+        if (m_ScriptEngine && m_ScriptEngine->isLua()) {
+            m_ScriptEngine->disableScripting();
+        }
+        return;
+    }
+
+    // Bring a (new) engine online if scripting is wanted but none is active.
+    if (m_ScriptEngine && !m_ScriptEngine->isLua()) {
+        m_ScriptEngine->createScriptEngine();
+    }
+
+    // Reload the script file so the new file's globals/entry points are defined.
+    if (!m_scripting.filename.isEmpty()) {
+        loadScriptFile();
+    }
+}
+
+/**
  * onWorldOpen — call the Lua OnWorldOpen handler if registered.
  *
  * Original: CMUSHclientDoc::OpenSession() (doc.cpp:902-913). Fired once after the
