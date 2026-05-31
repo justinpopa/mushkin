@@ -7,6 +7,7 @@
 
 #include "../src/automation/alias.h"
 #include "../src/automation/trigger.h"
+#include "../src/storage/global_options.h"
 #include "../src/world/world_document.h"
 #include "../src/world/xml_serialization.h"
 #include "fixtures/world_fixtures.h"
@@ -466,4 +467,91 @@ TEST_F(XmlSerializationTest, MultipleTriggersAndAliases)
     }
 
     cleanupSaveFiles(filename);
+}
+
+// ============================================================================
+// ReloadDefaults: default files reapplied after world load (parity M26)
+// ============================================================================
+//
+// Original: CMUSHclientDoc::Serialize calls OnFileReloaddefaults after loading a
+// world (serialize.cpp:72), which reapplies each configured default file when the
+// matching m_bUseDefault* flag is set. LoadWorldXML must do the same.
+
+// Writes a minimal default-triggers XML file containing one named trigger and
+// returns its path. The file is removed by cleanupSaveFiles().
+static QString writeDefaultTriggersFile(const QString& triggerName, const QString& pattern)
+{
+    QString path = generateTempFilename("default_triggers");
+    QFile file(path);
+    EXPECT_TRUE(file.open(QIODevice::WriteOnly | QIODevice::Text))
+        << "Failed to write default triggers file";
+    QString xml = QString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                          "<muclient><triggers>"
+                          "<trigger name=\"%1\" match=\"%2\" enabled=\"y\" sequence=\"100\">"
+                          "<send><![CDATA[do something]]></send>"
+                          "</trigger>"
+                          "</triggers></muclient>\n")
+                      .arg(triggerName, pattern);
+    file.write(xml.toUtf8());
+    file.close();
+    return path;
+}
+
+TEST_F(XmlSerializationTest, ReloadDefaultsReappliesDefaultTriggersOnLoad)
+{
+    // Save/restore the global default-triggers path so we don't pollute other tests.
+    auto& opts = GlobalOptions::instance();
+    const QString savedPath = opts.defaultTriggersFile();
+
+    QString defaultsPath = writeDefaultTriggersFile("default_trig", "Default pattern");
+    opts.setDefaultTriggersFile(defaultsPath);
+
+    // World file with use_default_triggers enabled (round-trips via config options).
+    auto doc1 = std::make_unique<WorldDocument>();
+    doc1->m_mush_name = "Reload Defaults Test";
+    doc1->m_bUseDefaultTriggers = true;
+
+    QString filename = generateTempFilename("reload_defaults");
+    ASSERT_TRUE(XmlSerialization::SaveWorldXML(doc1.get(), filename)) << "SaveWorldXML failed";
+
+    // Loading must reapply the default triggers file.
+    auto doc2 = std::make_unique<WorldDocument>();
+    ASSERT_TRUE(XmlSerialization::LoadWorldXML(doc2.get(), filename)) << "LoadWorldXML failed";
+
+    EXPECT_TRUE(doc2->m_bUseDefaultTriggers) << "use_default_triggers should round-trip";
+    Trigger* loaded = doc2->getTrigger("default_trig");
+    ASSERT_NE(loaded, nullptr) << "Default trigger should be reapplied on load";
+    EXPECT_EQ(loaded->trigger, "Default pattern") << "Default trigger pattern should match";
+
+    opts.setDefaultTriggersFile(savedPath);
+    cleanupSaveFiles(filename);
+    QFile::remove(defaultsPath);
+}
+
+TEST_F(XmlSerializationTest, ReloadDefaultsSkippedWhenFlagDisabled)
+{
+    auto& opts = GlobalOptions::instance();
+    const QString savedPath = opts.defaultTriggersFile();
+
+    QString defaultsPath = writeDefaultTriggersFile("default_trig", "Default pattern");
+    opts.setDefaultTriggersFile(defaultsPath);
+
+    // use_default_triggers stays false: defaults must NOT be reapplied.
+    auto doc1 = std::make_unique<WorldDocument>();
+    doc1->m_mush_name = "No Reload Test";
+    doc1->m_bUseDefaultTriggers = false;
+
+    QString filename = generateTempFilename("no_reload_defaults");
+    ASSERT_TRUE(XmlSerialization::SaveWorldXML(doc1.get(), filename)) << "SaveWorldXML failed";
+
+    auto doc2 = std::make_unique<WorldDocument>();
+    ASSERT_TRUE(XmlSerialization::LoadWorldXML(doc2.get(), filename)) << "LoadWorldXML failed";
+
+    EXPECT_FALSE(doc2->m_bUseDefaultTriggers) << "use_default_triggers should remain false";
+    EXPECT_EQ(doc2->getTrigger("default_trig"), nullptr)
+        << "Default trigger must not be applied when flag is off";
+
+    opts.setDefaultTriggersFile(savedPath);
+    cleanupSaveFiles(filename);
+    QFile::remove(defaultsPath);
 }

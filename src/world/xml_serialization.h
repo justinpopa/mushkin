@@ -76,6 +76,18 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename);
 // Returns -1 if XML is invalid or parsing fails
 int ImportXML(WorldDocument* doc, const QString& xmlString, int flags = XML_ALL);
 
+// Reapplies configured default files for any set type whose m_bUseDefault* flag
+// is enabled on the document. Mirrors the original CMUSHclientDoc::OnFileReloaddefaults
+// (scripting/methods/methods_defaults.cpp), which is invoked after loading a world
+// file so that default triggers/aliases/timers/macros overwrite what was loaded.
+//
+// Unlike a user-initiated reload, this does NOT force the flags on: a default file is
+// only reloaded when its corresponding m_bUseDefault* flag was already set (typically
+// from the loaded world file) and the configured path is non-empty.
+//
+// Returns the total number of items imported across all reloaded default files.
+int ReloadDefaults(WorldDocument* doc);
+
 // Exports triggers, aliases, timers, variables to an XML string
 // Only exports sections specified by flags bitmask
 //
