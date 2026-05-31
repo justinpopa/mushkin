@@ -289,6 +289,50 @@ static const tConfigurationNumericOption* findNumericOption(const char* name)
     return nullptr;
 }
 
+// ========== Constructor Default Parity (H58, M92) ==========
+//
+// The original MUSHclient applies scriptingoptions.cpp table defaults via
+// SetAlphaDefaults(false) in doc_construct.cpp:45. Mushkin achieves the same
+// effect through in-class member initializers — so the initializer IS the
+// canonical default and must match the table entry.
+
+// H58 MEDIUM: auto_say_string defaults to "say " in the original
+// (scriptingoptions.cpp:225). A freshly constructed WorldDocument must return
+// "say " for m_auto_say.say_string, not empty string.
+TEST_F(OptionsWorldDocumentTest, AutoSayStringDefaultsToSaySpace)
+{
+    EXPECT_EQ(doc->m_auto_say.say_string, "say ")
+        << "auto_say_string must default to \"say \" (original scriptingoptions.cpp:225)";
+
+    // The AlphaOptionsTable metadata default must agree.
+    const tConfigurationAlphaOption* opt = nullptr;
+    for (const tConfigurationAlphaOption* o = AlphaOptionsTable; o->pName != nullptr; o++) {
+        if (QString(o->pName) == "auto_say_string") {
+            opt = o;
+            break;
+        }
+    }
+    ASSERT_NE(opt, nullptr) << "auto_say_string must exist in AlphaOptionsTable";
+    ASSERT_NE(opt->sDefault, nullptr);
+    EXPECT_STREQ(opt->sDefault, "say ")
+        << "AlphaOptionsTable default for auto_say_string must be \"say \"";
+}
+
+// M92 MEDIUM: show_bold defaults to false in the original
+// (scriptingoptions.cpp:168). A freshly constructed WorldDocument must have
+// m_display.show_bold == false, not true.
+TEST_F(OptionsWorldDocumentTest, ShowBoldDefaultsToFalse)
+{
+    EXPECT_FALSE(doc->m_display.show_bold)
+        << "show_bold must default to false (original scriptingoptions.cpp:168)";
+
+    // The OptionsTable metadata default must agree.
+    const tConfigurationNumericOption* opt = findNumericOption("show_bold");
+    ASSERT_NE(opt, nullptr) << "show_bold must exist in OptionsTable";
+    EXPECT_DOUBLE_EQ(opt->iDefault, 0.0)
+        << "OptionsTable default for show_bold must be false (0.0)";
+}
+
 // MXPMode enumerators carry the exact original numeric values.
 TEST_F(OptionsTableTest, MxpModeEnumValuesMatchOriginal)
 {

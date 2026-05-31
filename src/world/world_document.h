@@ -430,7 +430,7 @@ class WorldDocument : public QObject, public IWorldContext {
         bool keep_commands_on_same_line = false; // keep commands on same line?
 
         // Text style display
-        bool show_bold = true;      // show bold in fonts?
+        bool show_bold = false;     // show bold in fonts? (original default: false)
         bool show_italic = true;    // show italic?
         bool show_underline = true; // show underline?
 
@@ -686,7 +686,7 @@ class WorldDocument : public QObject, public IWorldContext {
 
     // ========== Auto-say Settings ==========
     struct AutoSayConfig {
-        QString say_string;             // string prepended to commands (original default: empty)
+        QString say_string = "say ";    // string prepended to commands (original default: "say ")
         QString override_prefix = "-";  // prefix to bypass auto-say
         bool enabled = false;           // auto-say mode enabled?
         bool exclude_macros = false;    // skip macro/accelerator keys?

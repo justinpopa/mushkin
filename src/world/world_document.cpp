@@ -172,7 +172,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     // are initialized by initializeColors() called below.
 
     // ========== Initialize auto-say ==========
-    // (defaults provided by AutoSayConfig member initializers)
+    // say_string defaults to "say " (AutoSayConfig member initializer — matches original)
 
     // ========== Initialize Script Variables Collection ==========
     // m_VariableMap is automatically initialized as empty QMap
