@@ -69,12 +69,14 @@ void WorldDocument::executeAlias(Alias* alias, const QString& command)
     // Prepare contents (send text)
     QString contents = alias->contents;
 
-    // Replace wildcards (%0-%99, %N, %C, %<name>)
-    contents = replaceWildcards(contents, alias->wildcards, alias->label, alias->namedWildcards);
+    // Replace wildcards (%0-%9, %N, %C, %<name>, %%) — pass send_to for script-escaping
+    contents = replaceWildcards(contents, alias->wildcards, alias->label, alias->namedWildcards,
+                                alias->send_to);
 
-    // Expand variables (@variablename → value)
+    // Expand variables (@variablename → value) without regex-escaping
+    // (original: evaluate.cpp:472-482 — no escaping in the send-text expansion path)
     if (alias->expand_variables) {
-        contents = expandVariables(contents);
+        contents = expandVariables(contents, false);
     }
 
     // Execute action using central SendTo() function

@@ -1694,7 +1694,8 @@ class WorldDocument : public QObject, public IWorldContext {
                               const QString& matchedText); // Execute Lua script callback
     QString replaceWildcards(const QString& text, const QVector<QString>& wildcards,
                              const QString& itemName = {},
-                             const QMap<QString, QString>& namedWildcards = {});
+                             const QMap<QString, QString>& namedWildcards = {},
+                             SendTo sendTo = eSendToWorld);
     void changeLineColors(Trigger* trigger, Line* line); // Change matched line colors
 
     // ========== Alias Matching and Execution ==========

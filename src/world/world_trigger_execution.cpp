@@ -16,6 +16,7 @@
 #include "../automation/trigger.h"
 #include "../text/line.h"
 #include "../text/style.h"
+#include "color_utils.h"
 #include "script_engine.h"
 #include "world_document.h"
 #include <QClipboard>
@@ -34,41 +35,124 @@ extern "C" {
 /**
  * replaceWildcards - Replace wildcard placeholders with captured text
  *
- * Replaces %0, %1, %2, ... %99 with the captured wildcards from pattern matching.
+ * Replaces %0-%9 with the captured wildcards from pattern matching.
  * %0 is the entire match, %1 is first capture group, etc.
+ * %% produces a literal percent sign.
+ * %N (or %n) is the item name. %C (or %c) is the clipboard contents.
+ * %<name> is replaced with named capture groups.
+ *
+ * Original: evaluate.cpp FixSendText / FixupEscapeSequences
  *
  * @param text The text containing wildcard placeholders
- * @param wildcards Vector of captured wildcard strings
+ * @param wildcards Vector of captured wildcard strings (max 10: %0-%9)
+ * @param itemName Name of the trigger/alias/timer (substituted for %N/%n)
+ * @param namedWildcards Named capture groups
+ * @param sendTo Destination: if eSendToScript/eSendToScriptAfterOmit, escape \ and " in values
  * @return Text with wildcards replaced
  */
 QString WorldDocument::replaceWildcards(const QString& text, const QVector<QString>& wildcards,
                                         const QString& itemName,
-                                        const QMap<QString, QString>& namedWildcards)
+                                        const QMap<QString, QString>& namedWildcards, SendTo sendTo)
 {
-    QString result = text;
+    // Build result character-by-character to handle %% and single-digit-only %0-%9
+    // (original: evaluate.cpp:1244-1420, FixSendText)
+    bool scriptDest = (sendTo == eSendToScript || sendTo == eSendToScriptAfterOmit);
 
-    // Replace %0, %1, %2, ... %99
-    // Process in reverse order (99 down to 0) to avoid replacing %1 in %10
-    for (int i = qMin(wildcards.size() - 1, 99); i >= 0; --i) {
-        if (i < wildcards.size()) {
-            QString placeholder = QString("%%1").arg(i);
-            result.replace(placeholder, wildcards[i]);
+    // Helper to escape wildcard values for Lua script consumption
+    // (original: evaluate.cpp:264-287, FixWildcard)
+    auto fixWildcard = [&](const QString& value) -> QString {
+        if (!scriptDest) {
+            return value;
         }
-    }
+        // Escape backslashes first, then double-quotes
+        QString escaped = value;
+        escaped.replace(QStringLiteral("\\"), QStringLiteral("\\\\"));
+        escaped.replace(QStringLiteral("\""), QStringLiteral("\\\""));
+        return escaped;
+    };
 
-    // Replace %<name> with named capture groups (original: FixSendText)
-    for (auto it = namedWildcards.constBegin(); it != namedWildcards.constEnd(); ++it) {
-        result.replace(QStringLiteral("%<") + it.key() + QStringLiteral(">"), it.value());
-    }
+    QString result;
+    result.reserve(text.size());
 
-    // Replace %N with trigger/alias/timer name (original: FixSendText)
-    result.replace(QStringLiteral("%N"), itemName);
+    const QChar* p = text.constData();
+    while (!p->isNull()) {
+        if (*p != '%') {
+            result.append(*p++);
+            continue;
+        }
 
-    // Replace %C with clipboard contents (original: FixSendText)
-    if (result.contains(QStringLiteral("%C"))) {
-        QClipboard* clipboard = QGuiApplication::clipboard();
-        QString clipText = clipboard ? clipboard->text() : QString();
-        result.replace(QStringLiteral("%C"), clipText);
+        // p points at '%'; peek at next char
+        const QChar next = *(p + 1);
+
+        if (next.isNull()) {
+            // Trailing % — copy it literally (original: pText++ and break)
+            result.append('%');
+            p++;
+            continue;
+        }
+
+        if (next == '%') {
+            // %% → single literal %
+            // (original: evaluate.cpp:1268-1278)
+            result.append('%');
+            p += 2;
+            continue;
+        }
+
+        if (next >= '0' && next <= '9') {
+            // %0-%9: single-digit wildcards only (original: MAX_WILDCARDS = 10)
+            // (original: evaluate.cpp:1284-1322)
+            int idx = next.digitValue();
+            if (idx < wildcards.size()) {
+                result.append(fixWildcard(wildcards[idx]));
+            }
+            // If index out of range, nothing is substituted (original behavior)
+            p += 2;
+            continue;
+        }
+
+        if (next == '<') {
+            // %<name> — named capture group
+            // (original: evaluate.cpp:1324-1367)
+            const QChar* nameStart = p + 2;
+            const QChar* q = nameStart;
+            while (!q->isNull() && *q != '>') {
+                ++q;
+            }
+            if (*q == '>') {
+                QString name(nameStart, q - nameStart);
+                auto it = namedWildcards.constFind(name);
+                if (it != namedWildcards.constEnd()) {
+                    result.append(fixWildcard(it.value()));
+                }
+                p = q + 1; // skip past '>'
+            } else {
+                // No closing '>' — copy '%' literally
+                result.append('%');
+                p++;
+            }
+            continue;
+        }
+
+        if (next == 'C' || next == 'c') {
+            // %C or %c — clipboard contents (original: evaluate.cpp:1373-1392, case 'C': case 'c':)
+            QClipboard* clipboard = QGuiApplication::clipboard();
+            QString clipText = clipboard ? clipboard->text() : QString();
+            result.append(fixWildcard(clipText));
+            p += 2;
+            continue;
+        }
+
+        if (next == 'N' || next == 'n') {
+            // %N or %n — item name (original: evaluate.cpp:1398-1412, case 'N': case 'n':)
+            result.append(fixWildcard(itemName));
+            p += 2;
+            continue;
+        }
+
+        // Unknown %X — copy percent literally, leave X for next iteration
+        result.append('%');
+        p++;
     }
 
     return result;
@@ -183,13 +267,15 @@ void WorldDocument::executeTrigger(Trigger* trigger, Line* line, const QString& 
     // Prepare contents (send text)
     QString contents = trigger->contents;
 
-    // Replace wildcards (%0-%99, %N, %C, %<name>)
-    contents =
-        replaceWildcards(contents, trigger->wildcards, trigger->label, trigger->namedWildcards);
+    // Replace wildcards (%0-%9, %N, %C, %<name>, %%) — pass send_to so script destinations get
+    // FixWildcard escaping (original: evaluate.cpp FixSendText calls FixWildcard per wildcard)
+    contents = replaceWildcards(contents, trigger->wildcards, trigger->label,
+                                trigger->namedWildcards, trigger->send_to);
 
-    // Expand variables (@variablename → value)
+    // Expand variables (@variablename → value) without regex-escaping
+    // (original: evaluate.cpp:472-482 passes bExpandVariables but never escapes the send-text path)
     if (trigger->expand_variables) {
-        contents = expandVariables(contents);
+        contents = expandVariables(contents, false);
     }
 
     // Copy wildcard to clipboard
@@ -235,18 +321,24 @@ void WorldDocument::executeTrigger(Trigger* trigger, Line* line, const QString& 
         QString("Trigger: %1")
             .arg(trigger->label.isEmpty() ? trigger->internal_name : trigger->label);
 
+    // Set action source around sendTo so any callbacks see eTriggerFired
+    // (original: ProcessPreviousLine.cpp:1046-1055 — sets before SendTo, restores after)
+    trigger->executing_script = true;
+    m_iCurrentActionSource = ActionSource::eTriggerFired;
     sendTo(trigger->send_to, contents, trigger->omit_from_output, trigger->omit_from_log,
            triggerDescription, trigger->variable, strExtraOutput, trigger->scriptLanguage);
+    m_iCurrentActionSource = ActionSource::eUnknownActionSource;
+    trigger->executing_script = false;
 
     // Display any output that was accumulated
     if (!strExtraOutput.isEmpty()) {
         note(strExtraOutput);
     }
 
-    // Call Lua script if needed (sendTo handles eSendToScript, but for triggers
-    // we also need to call executeTriggerScript for eSendToScriptAfterOmit)
-    if (!trigger->procedure.isEmpty() &&
-        (trigger->send_to == eSendToScript || trigger->send_to == eSendToScriptAfterOmit)) {
+    // Call Lua script callback if the trigger has a procedure name, regardless of send_to
+    // (original: ProcessPreviousLine.cpp:1326-1327 — adds to triggerList unconditionally
+    // whenever strProcedure is non-empty; ExecuteTriggerScript called for all in triggerList)
+    if (!trigger->procedure.isEmpty()) {
         executeTriggerScript(trigger, line, matchedText);
     }
 
@@ -276,10 +368,6 @@ void WorldDocument::executeTriggerScript(Trigger* trigger, Line* line, const QSt
     if (trigger->procedure.isEmpty()) {
         return;
     }
-
-    // Set action source so scripts can query GetInfo(239)
-    // (original: lua_scripting.cpp:621-627 sets eTriggerFired via ExecuteLua)
-    m_iCurrentActionSource = ActionSource::eTriggerFired;
 
     // Determine which script engine to use:
     // - If trigger belongs to a plugin, use the plugin's script engine
@@ -433,7 +521,7 @@ void WorldDocument::executeTriggerScript(Trigger* trigger, Line* line, const QSt
     }
 
     // Argument 4: TriggerStyleRuns table
-    // M187: Build style runs from the matched line (original: lua_scripting.cpp:599-619)
+    // Build style runs from the matched line (original: lua_scripting.cpp:599-619)
     // Each entry is a sub-table with: text, length, textcolour, backcolour, style
     lua_newtable(L);
     if (line) {
@@ -459,33 +547,46 @@ void WorldDocument::executeTriggerScript(Trigger* trigger, Line* line, const QSt
             lua_pushinteger(L, runText.length());
             lua_setfield(L, -2, "length");
 
-            // "textcolour" = foreground colour (BGR format, matching original COLORREF)
-            lua_pushinteger(L, static_cast<lua_Integer>(style->iForeColour & 0x00FFFFFF));
+            // "textcolour" / "backcolour" = resolved RGB (not raw ANSI index)
+            // (original: ProcessPreviousLine.cpp:222-228 calls GetStyleRGB before CPaneStyle)
+            QRgb cText = 0;
+            QRgb cBack = 0;
+            GetStyleRGB(style.get(), cText, cBack);
+            lua_pushinteger(L, static_cast<lua_Integer>(cText & 0x00FFFFFF));
             lua_setfield(L, -2, "textcolour");
-
-            // "backcolour" = background colour (BGR format)
-            lua_pushinteger(L, static_cast<lua_Integer>(style->iBackColour & 0x00FFFFFF));
+            lua_pushinteger(L, static_cast<lua_Integer>(cBack & 0x00FFFFFF));
             lua_setfield(L, -2, "backcolour");
 
-            // "style" = style flags (bold/underline/italic)
-            lua_pushinteger(L, style->iFlags & TEXT_STYLE);
+            // "style" = style flags masked to HILITE|UNDERLINE|BLINK only (original: iFlags & 7)
+            // (original: ProcessPreviousLine.cpp:228 — "pStyle->iFlags & 7")
+            lua_pushinteger(L, style->iFlags & 7);
             lua_setfield(L, -2, "style");
 
             lua_rawseti(L, -2, styleIndex++);
         }
     }
 
-    // Prevent deletion during script execution
-    trigger->executing_script = true;
-
     // M185: Save and reset note style before callback, restore after
     // (original: lua_scripting.cpp:487-488 saves iOldStyle and sets to NORMAL)
     quint16 oldNoteStyle = m_iNoteStyle;
     m_iNoteStyle = 0; // NORMAL
 
+    // Prevent deletion during script execution (original: doc.cpp:2571-2583)
+    trigger->executing_script = true;
+
+    // Set action source for the duration of the Lua callback
+    // (original: lua_scripting.cpp:621-627 — sets iReason before CallLuaWithTraceBack,
+    // restores to eUnknownActionSource immediately after)
+    m_iCurrentActionSource = ActionSource::eTriggerFired;
+
     // Call with traceback error handler for readable stack traces
     // (original: lua_scripting.cpp:624 uses CallLuaWithTraceBack)
     int callResult = callLuaWithTraceBack(L, 4, 0);
+
+    m_iCurrentActionSource = ActionSource::eUnknownActionSource;
+
+    // Allow deletion again
+    trigger->executing_script = false;
 
     // M185: Restore note style after callback
     m_iNoteStyle = oldNoteStyle;
@@ -496,24 +597,43 @@ void WorldDocument::executeTriggerScript(Trigger* trigger, Line* line, const QSt
         const char* errMsg = lua_tostring(L, -1);
         QString errorStr = errMsg ? QString::fromUtf8(errMsg) : "Unknown error";
 
-        // Display error in output window (original: lua_scripting.cpp:636 calls
-        // LuaError→ColourNote)
+        // Display error in output window matching original LuaError() output format
+        // (original: lua_scripting.cpp:394-397 — strEvent, m_strRaisedBy, m_strCalledBy,
+        // m_strDescription all sent to ColourNote with SCRIPTERRORFORECOLOUR = "orangered")
+        constexpr QRgb orangeRed = BGR(255, 69, 0); // SCRIPTERRORFORECOLOUR
+        constexpr QRgb black = BGR(0, 0, 0);        // SCRIPTERRORBACKCOLOUR
+
+        // Line 1: event type ("Run-time error" — original: strEvent)
+        colourNote(orangeRed, black, QString("Run-time error in Lua"));
+
+        // Line 2: raised-by — "World: name" or "Plugin: name (called from world: ...)"
+        // (original: lua_scripting.cpp:349-359 — dlg.m_strRaisedBy)
+        QString strRaisedBy;
+        if (m_CurrentPlugin) {
+            strRaisedBy = QString("Plugin: %1 (called from world: %2)")
+                              .arg(m_CurrentPlugin->m_strName, m_mush_name);
+        } else {
+            strRaisedBy = QString("World: %1").arg(m_mush_name);
+        }
+        colourNote(orangeRed, black, strRaisedBy);
+
+        // Line 3: called-by context ("processing trigger X when matching line Y")
+        // (original: lua_scripting.cpp:396 — dlg.m_strCalledBy)
         QString strReason = QString("processing trigger \"%1\" when matching line: \"%2\"")
                                 .arg(triggerName, matchedText);
-        // Orange error text on black background (BGR format)
-        colourNote(0x00008CFF, 0x00000000, QString("=== Run-time error: %1 ===").arg(triggerName));
-        colourNote(0x00008CFF, 0x00000000, errorStr);
+        colourNote(orangeRed, black, strReason);
+
+        // Line 4: error description
+        // (original: lua_scripting.cpp:397 — dlg.m_strDescription)
+        colourNote(orangeRed, black, errorStr);
 
         lua_pop(L, 1); // Pop error message
     }
 
-    // Allow deletion again
-    trigger->executing_script = false;
-
     // If function failed, mark it as DISPID_UNKNOWN so we don't keep trying
     if (error) {
         trigger->dispid = DISPID_UNKNOWN;
-        qDebug() << "TRIGGER SCRIPT ERROR:" << trigger->procedure;
+        qCDebug(lcWorld) << "Trigger script error:" << trigger->procedure;
     } else {
         // M186: Only increment invocation_count on success
         // (original: lua_scripting.cpp:736 increments after error check)
