@@ -565,3 +565,47 @@ TEST_F(WorldProtocolTest, Newline_WhenMXPInactive_LeavesModeUnchanged)
     EXPECT_EQ(mxp.m_iMXP_mode, eMXP_secure)
         << "with MXP inactive, newline must not touch the MXP mode";
 }
+
+// ========== H17: Default custom text colour palette ==========
+// Original Utilities.cpp:1671-1698 — SetDefaultCustomColours sets specific
+// palette values for the first 16 custom text slots.
+
+TEST_F(WorldProtocolTest, InitializeColors_CustomTextSlot0_IsLightRed)
+{
+    // Slot 0 = RGB(255,128,128) light red
+    EXPECT_EQ(doc->m_colors.custom_text[0], qRgb(255, 128, 128))
+        << "custom_text[0] should be light red RGB(255,128,128) per original "
+           "SetDefaultCustomColours";
+}
+
+TEST_F(WorldProtocolTest, InitializeColors_CustomTextSlot15_IsBlue)
+{
+    // Slot 15 = RGB(0,0,255) blue
+    EXPECT_EQ(doc->m_colors.custom_text[15], qRgb(0, 0, 255))
+        << "custom_text[15] should be blue RGB(0,0,255) per original SetDefaultCustomColours";
+}
+
+TEST_F(WorldProtocolTest, InitializeColors_CustomTextSlot6_IsPureRed)
+{
+    // Slot 6 = RGB(255,0,0)
+    EXPECT_EQ(doc->m_colors.custom_text[6], qRgb(255, 0, 0))
+        << "custom_text[6] should be pure red RGB(255,0,0)";
+}
+
+TEST_F(WorldProtocolTest, InitializeColors_CustomBackSlot0_IsBlack)
+{
+    // custom_back slots all remain black (0,0,0) — the palette only changes custom_text
+    EXPECT_EQ(doc->m_colors.custom_back[0], qRgb(0, 0, 0))
+        << "custom_back[0] should remain black — palette defaults only change custom_text";
+}
+
+// ========== M63: m_LastFlushTime must be valid at construction ==========
+// Original doc_construct.cpp:207 — m_LastFlushTime = CTime::GetCurrentTime()
+// Mushkin previously left it invalid (QDateTime()), causing GetInfo(302) to
+// return nil before the first log flush.
+
+TEST_F(WorldProtocolTest, LastFlushTime_ValidAtConstruction)
+{
+    EXPECT_TRUE(doc->m_LastFlushTime.isValid())
+        << "m_LastFlushTime must be valid at construction (original doc_construct.cpp:207)";
+}

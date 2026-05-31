@@ -241,21 +241,54 @@ TEST_F(CommandExecutionTest, ExecuteReturnsOkForNormalCommand)
 /**
  * Test 9: Execute() returns eCommandsNestedTooDeeply when the recursion guard fires
  *
- * Original (methods_commands.cpp:262-265) returns eCommandsNestedTooDeeply (30041)
- * once m_iExecutionDepth exceeds MAX_EXECUTION_DEPTH (100). Previously Mushkin's
- * Execute() returned void and world.Execute always pushed eOK, masking the guard.
+ * Original doc.h:43 — MAX_EXECUTION_DEPTH = 20.
  */
 TEST_F(CommandExecutionTest, ExecuteReturnsNestedTooDeeplyAtDepthLimit)
 {
-    // Pre-load the depth so the next ++ pushes it over MAX_EXECUTION_DEPTH (100).
-    doc->m_iExecutionDepth = 100;
+    // Pre-load depth to MAX_EXECUTION_DEPTH so next ++ trips the guard.
+    // The original limit is 20 (doc.h:43).
+    doc->m_iExecutionDepth = 20;
 
     EXPECT_EQ(doc->Execute("look", true, false), static_cast<long>(eCommandsNestedTooDeeply))
-        << "Exceeding the execution depth limit should return eCommandsNestedTooDeeply";
+        << "Exceeding MAX_EXECUTION_DEPTH (20) should return eCommandsNestedTooDeeply";
 
     // The guard decrements before returning, restoring the pre-call depth.
-    EXPECT_EQ(doc->m_iExecutionDepth, 100)
+    EXPECT_EQ(doc->m_iExecutionDepth, 20)
         << "Depth guard must decrement back to its pre-call value on the deep path";
 
-    doc->m_iExecutionDepth = 0; // restore for any subsequent tests
+    doc->m_iExecutionDepth = 0; // restore for subsequent tests
+}
+
+/**
+ * H21: MAX_EXECUTION_DEPTH is 20, matching original doc.h:43.
+ */
+TEST_F(CommandExecutionTest, ExecuteAllowsUpToDepth20)
+{
+    // At depth 19 the call should proceed (not trip the guard).
+    doc->m_iExecutionDepth = 19;
+    long result = doc->Execute("look", true, false);
+    // depth was decremented back to 19 by the RAII guard after Execute returned.
+    EXPECT_EQ(doc->m_iExecutionDepth, 19) << "Depth should return to 19 after Execute at depth 19";
+    EXPECT_NE(result, static_cast<long>(eCommandsNestedTooDeeply))
+        << "Depth 19+1=20 should NOT trip the guard (limit is >20, i.e. >MAX_EXECUTION_DEPTH)";
+    doc->m_iExecutionDepth = 0;
+}
+
+/**
+ * M116: DoSendMsg re-entrancy guard — calling DoSendMsg while m_bPluginProcessingSent
+ * is true must be a no-op (original doc.cpp:1178).
+ */
+TEST_F(CommandExecutionTest, DoSendMsgNoOpWhenPluginProcessingSent)
+{
+    // Set the guard flag as if we're inside an ON_PLUGIN_SENT callback.
+    doc->m_bPluginProcessingSent = true;
+
+    // DoSendMsg must return without crashing or modifying state.
+    // We verify by checking that the total lines sent counter does not increase.
+    qint64 linesBefore = doc->m_connectionManager->m_nTotalLinesSent;
+    doc->DoSendMsg(QStringLiteral("test"), true, false);
+    EXPECT_EQ(doc->m_connectionManager->m_nTotalLinesSent, linesBefore)
+        << "DoSendMsg should be a no-op when m_bPluginProcessingSent is true";
+
+    doc->m_bPluginProcessingSent = false;
 }

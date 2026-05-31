@@ -786,8 +786,7 @@ int L_FixupEscapeSequences(lua_State* L)
                     break;
                 }
                 default:
-                    // Unknown escape, keep the backslash
-                    result += '\\';
+                    // Unknown escape: collapse to just the character (original Utilities.cpp:225)
                     result += c;
                     break;
             }
