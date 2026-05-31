@@ -729,6 +729,143 @@ int main(int argc, char* argv[])
 
     qDebug() << "✓ WindowFontList returns correct font list\n";
 
+    // ========== Test 19: WindowCircleOp - invalid brush style (H78) ==========
+    qDebug() << "Test 19: WindowCircleOp - invalid brush style is rejected";
+
+    // Original ValidateBrushStyle accepts only 0-12; anything else returns
+    // eBrushStyleNotValid (30074). Mushkin previously accepted invalid styles silently.
+    if (!executeLua(L, R"(
+        result = world.WindowCircleOp("draw_test",
+                                      miniwin.circle_ellipse,
+                                      10, 60, 50, 100,
+                                      0x00FFFF, miniwin.pen_solid, 1,
+                                      0x000000,
+                                      99,                 -- invalid brush style
+                                      0, 0, 0, 0)
+    )",
+                    "WindowCircleOp invalid brush style")) {
+        return 1;
+    }
+
+    result = getGlobalNumber(L, "result");
+    if (result != static_cast<double>(eBrushStyleNotValid)) {
+        qDebug() << "✗ FAIL: WindowCircleOp should reject invalid brush style with"
+                 << eBrushStyleNotValid << "got" << result;
+        return 1;
+    }
+
+    // A valid brush style (12 = waves-vertical, the upper bound) must still succeed.
+    if (!executeLua(L, R"(
+        result = world.WindowCircleOp("draw_test",
+                                      miniwin.circle_ellipse,
+                                      10, 60, 50, 100,
+                                      0x00FFFF, miniwin.pen_solid, 1,
+                                      0x000000,
+                                      12,                 -- valid (upper bound)
+                                      0, 0, 0, 0)
+    )",
+                    "WindowCircleOp valid brush style 12")) {
+        return 1;
+    }
+
+    result = getGlobalNumber(L, "result");
+    if (result != 0) {
+        qDebug() << "✗ FAIL: WindowCircleOp valid brush style 12 should succeed, got" << result;
+        return 1;
+    }
+
+    qDebug() << "✓ WindowCircleOp validates brush styles (rejects out-of-range, accepts 0-12)\n";
+
+    // ========== Test 20: WindowImageOp - monochrome pattern colour remap (M47) ==========
+    qDebug() << "Test 20: WindowImageOp remaps monochrome pattern colours";
+
+    // Create an 8x8 monochrome pattern that is entirely set bits (all 0xFF rows).
+    // Every pixel is a "1-bit", which GDI paints in the brush colour (text colour).
+    if (!executeLua(L, R"(
+        world.WindowCreateImage("draw_test", "solidpat",
+                                0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF)
+        -- Fill a rectangle using the pattern. brushColor = green (BGR 0x00FF00),
+        -- penColor = red (BGR 0x0000FF). Set bits should appear in brushColor (green).
+        result = world.WindowImageOp("draw_test", 2,          -- 2 = rectangle
+                                     5, 165, 45, 195,         -- left, top, right, bottom
+                                     0x0000FF, miniwin.pen_solid, 1,  -- red pen
+                                     0x00FF00,                -- green brush colour
+                                     "solidpat")
+    )",
+                    "WindowImageOp monochrome remap")) {
+        return 1;
+    }
+
+    result = getGlobalNumber(L, "result");
+    if (result != 0) {
+        qDebug() << "✗ FAIL: WindowImageOp returned" << result;
+        return 1;
+    }
+
+    // The filled interior should now be green (brushColor), not raw white from the pattern.
+    img = (*win->getImage());
+    QRgb patFill = img.pixel(25, 180);
+    if (qGreen(patFill) < 180 || qRed(patFill) > 80 || qBlue(patFill) > 80) {
+        qDebug() << "✗ FAIL: Monochrome pattern not remapped to brush colour; pixel at (25,180) ="
+                 << QString::number(patFill, 16) << "R=" << qRed(patFill) << "G=" << qGreen(patFill)
+                 << "B=" << qBlue(patFill);
+        return 1;
+    }
+
+    qDebug() << "✓ WindowImageOp remaps monochrome 1-bits to brush colour\n";
+
+    // ========== Test 21: WindowArc - ellipse aspect-ratio correction (L88) ==========
+    qDebug() << "Test 21: WindowArc applies ellipse aspect-ratio correction";
+
+    // Use a very flat ellipse: bounding box (0,80)-(200,120), so cx=100, cy=100,
+    // semi-radii a=100, b=20. Endpoints (180,105) and (180,95) straddle the X axis.
+    //  - WITH aspect-ratio correction: Qt span is ~34.7 deg, covering Qt angles
+    //    [-17.35, +17.35] -> the arc reaches out to pixel (~196, ~94) (Qt ~16 deg).
+    //  - WITHOUT correction (the bug): Qt span is only ~7.15 deg, covering
+    //    [-3.58, +3.58]; the arc never leaves the neighbourhood of the right vertex
+    //    (x ~199.8-200), so x=196 is never touched.
+    // Pixel (196, 94) / (196, 106) therefore uniquely distinguishes the corrected
+    // arc from the buggy one. Pen width 3 keeps the stroke tight enough that the
+    // buggy arc cannot bleed out to x=196.
+    if (!executeLua(L, R"(
+        result = world.WindowArc("draw_test",
+                                 0, 80, 200, 120,    -- flat bounding ellipse
+                                 180, 105,           -- start point (below axis)
+                                 180, 95,            -- end point (above axis)
+                                 0x0000FF,           -- red pen (BGR)
+                                 miniwin.pen_solid, 3)
+    )",
+                    "WindowArc ellipse correction")) {
+        return 1;
+    }
+
+    result = getGlobalNumber(L, "result");
+    if (result != 0) {
+        qDebug() << "✗ FAIL: WindowArc returned" << result;
+        return 1;
+    }
+
+    // The buggy (unscaled) arc cannot reach x<=197 here; only the aspect-ratio
+    // corrected arc paints the (196,94)/(196,106) region. Tight +/-1 window.
+    img = (*win->getImage());
+    bool foundArcPixel = false;
+    for (int dy = -1; dy <= 1 && !foundArcPixel; ++dy) {
+        for (int dx = -1; dx <= 1 && !foundArcPixel; ++dx) {
+            QRgb p1 = img.pixel(196 + dx, 94 + dy);
+            QRgb p2 = img.pixel(196 + dx, 106 + dy);
+            if (qRed(p1) > 150 || qRed(p2) > 150)
+                foundArcPixel = true;
+        }
+    }
+
+    if (!foundArcPixel) {
+        qDebug() << "✗ FAIL: WindowArc did not draw through the aspect-ratio-corrected region "
+                    "(~Qt 16 deg, pixel ~196,94); ellipse correction missing";
+        return 1;
+    }
+
+    qDebug() << "✓ WindowArc draws the aspect-ratio-corrected span on a flat ellipse\n";
+
     // ========== All tests passed! ==========
     qDebug() << "\n=== PASS: All tests passed ===\n";
     qDebug() << "Miniwindow Drawing features verified:";
@@ -751,6 +888,9 @@ int main(int argc, char* argv[])
     qDebug() << "  ✓ WindowFontInfo returns correct values";
     qDebug() << "  ✓ Pen and brush style constants available";
     qDebug() << "✓ WindowFontList returns list of fonts";
+    qDebug() << "  ✓ WindowCircleOp rejects invalid brush styles (H78)";
+    qDebug() << "  ✓ WindowImageOp remaps monochrome pattern colours (M47)";
+    qDebug() << "  ✓ WindowArc applies ellipse aspect-ratio correction (L88)";
     qDebug() << "\nFont count:" << win->fonts.size();
 
     return 0;

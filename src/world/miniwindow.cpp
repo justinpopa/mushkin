@@ -139,6 +139,46 @@ static QPen createWindowsPen(const QColor& color, int width, int penStyle)
     return pen;
 }
 
+// CreateImage() stores monochrome (1-bpp) brush patterns as pure white pixels for
+// set bits and pure black pixels for clear bits. The original GDI ImageOp paints
+// such patterns with SetTextColor(BrushColour) for the 1-bits and
+// SetBkColor(PenColour) for the 0-bits (reference: miniwindow.cpp:1905-1907).
+// Returns true if every pixel is pure black or pure white, i.e. the image is a
+// monochrome pattern that must be colour-remapped before being used as a brush.
+static bool isMonochromePattern(const QImage& img)
+{
+    for (int y = 0; y < img.height(); ++y) {
+        for (int x = 0; x < img.width(); ++x) {
+            const QRgb px = img.pixel(x, y);
+            const int r = qRed(px);
+            const int g = qGreen(px);
+            const int b = qBlue(px);
+            const bool isWhite = (r == 255 && g == 255 && b == 255);
+            const bool isBlack = (r == 0 && g == 0 && b == 0);
+            if (!isWhite && !isBlack)
+                return false;
+        }
+    }
+    return true;
+}
+
+// Build a colour-remapped copy of a monochrome pattern: white (set bits) becomes
+// the brush colour (GDI text colour), black (clear bits) becomes the pen colour
+// (GDI background colour). Matches the original ImageOp colour semantics.
+static QImage remapMonochromePattern(const QImage& src, QRgb penColor, QRgb brushColor)
+{
+    const QColor foreground = bgrToColor(brushColor); // 1-bits -> text colour
+    const QColor background = bgrToColor(penColor);   // 0-bits -> background colour
+    QImage out(src.size(), QImage::Format_ARGB32);
+    for (int y = 0; y < src.height(); ++y) {
+        for (int x = 0; x < src.width(); ++x) {
+            const bool set = (qRed(src.pixel(x, y)) == 255);
+            out.setPixel(x, y, (set ? foreground : background).rgb());
+        }
+    }
+    return out;
+}
+
 /**
  * @brief Constructor
  * @param doc Parent WorldDocument
@@ -518,6 +558,12 @@ qint32 MiniWindow::CircleOp(qint16 action, qint32 left, qint32 top, qint32 right
     if (!validatePenStyle(penStyle, penWidth))
         return ePenStyleNotValid;
 
+    // Validate brush style: original ValidateBrushStyle accepts only 0-12
+    // (0=solid, 1=null, 2-12=hatched/pattern). Anything else is rejected.
+    // (reference: miniwindow.cpp:506,541-542 — default branch returns eBrushStyleNotValid)
+    if (brushStyle < 0 || brushStyle > 12)
+        return eBrushStyleNotValid;
+
     // Handle special meaning for right/bottom (from miniwindow.cpp)
     // - right <= 0 means offset from right edge (0 = right edge, -1 = 1px from right)
     // - bottom <= 0 means offset from bottom edge (0 = bottom edge, -1 = 1px from bottom)
@@ -749,13 +795,21 @@ qint32 MiniWindow::Arc(qint32 left, qint32 top, qint32 right, qint32 bottom, qin
     qreal cx = (left + right) / 2.0;
     qreal cy = (top + bottom) / 2.0;
 
+    // Semi-radii of the bounding ellipse. GDI Arc() projects the (x1,y1)/(x2,y2)
+    // rays onto the ellipse to find the arc endpoints, so the point coordinates
+    // must be scaled by the ellipse aspect ratio before converting to an angle.
+    // A point on the ellipse is (cx + a*cos t, cy - b*sin t), giving
+    //   t = atan2(-(y-cy)/b, (x-cx)/a) = atan2(-a*(y-cy), b*(x-cx)).
+    qreal a = (right - left) / 2.0;
+    qreal b = (bottom - top) / 2.0;
+
     // Convert GDI point-based arc to Qt angle-based arc.
     // GDI Arc draws counterclockwise (mathematically) from start to end point.
     // Qt drawArc uses angles in 1/16 degree, counterclockwise from 3 o'clock.
     // In screen coords (Y-down), atan2 gives clockwise angles from east,
     // so negate Y to convert to Qt's counterclockwise convention.
-    qreal startAngle = qAtan2(-(y1 - cy), x1 - cx) * 180.0 / M_PI;
-    qreal endAngle = qAtan2(-(y2 - cy), x2 - cx) * 180.0 / M_PI;
+    qreal startAngle = qAtan2(-a * (y1 - cy), b * (x1 - cx)) * 180.0 / M_PI;
+    qreal endAngle = qAtan2(-a * (y2 - cy), b * (x2 - cx)) * 180.0 / M_PI;
 
     // GDI draws counterclockwise from start to end (positive direction in Qt)
     qreal spanAngle = endAngle - startAngle;
@@ -2099,8 +2153,18 @@ qint32 MiniWindow::ImageOp(qint16 action, qint32 left, qint32 top, qint32 right,
     QPen pen = createWindowsPen(bgrToColor(penColor), penWidth, penStyle);
     painter.setPen(pen);
 
-    // Setup brush with image pattern
-    QBrush brush(*brushImg);
+    // Setup brush with image pattern.
+    // For monochrome patterns (created via CreateImage as white/black), GDI remaps
+    // 1-bits to the brush colour and 0-bits to the pen colour. Apply the same
+    // remapping so brushColor is honoured (reference: miniwindow.cpp:1905-1907).
+    QImage remappedPattern;
+    const QImage* patternToUse = brushImg;
+    if (isMonochromePattern(*brushImg)) {
+        remappedPattern = remapMonochromePattern(*brushImg, penColor, brushColor);
+        patternToUse = &remappedPattern;
+    }
+
+    QBrush brush(*patternToUse);
     brush.setStyle(Qt::TexturePattern);
     painter.setBrush(brush);
 
