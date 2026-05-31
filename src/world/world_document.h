@@ -1402,6 +1402,14 @@ class WorldDocument : public QObject, public IWorldContext {
     // m_mxpEngine->Phase_MXP_*().
     void ProcessIncomingByte(unsigned char c);
 
+    // Send NAWS (Negotiate About Window Size) to the server. Forwards to the
+    // TelnetParser companion. No-op until NAWS has been negotiated and the
+    // world is connected (original: CMUSHclientDoc::SendWindowSizes).
+    void sendWindowSizes(int width)
+    {
+        m_telnetParser->sendWindowSizes(width);
+    }
+
     // MXP phase handler forwarding (called from ProcessIncomingByte, delegate to m_mxpEngine)
     void Phase_MXP_ELEMENT(unsigned char c)
     {

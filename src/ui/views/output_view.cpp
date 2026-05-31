@@ -208,8 +208,14 @@ void OutputView::resizeEvent(QResizeEvent* event)
     calculateMetrics();
     update(); // Trigger repaint
 
-    // Notify plugins of resize
     if (m_doc) {
+        // Notify the server of the new window width via NAWS. calculateMetrics()
+        // may have just updated wrap_column (auto-wrap); the original calls
+        // SendWindowSizes(m_nWrapColumn) on every resize (mushview.cpp:1766,3364).
+        // sendWindowSizes() is a no-op until NAWS is negotiated and connected.
+        m_doc->sendWindowSizes(m_doc->m_display.wrap_column);
+
+        // Notify plugins of resize
         m_doc->SendToAllPluginCallbacks(ON_PLUGIN_WORLD_OUTPUT_RESIZED);
     }
 }

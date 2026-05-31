@@ -428,6 +428,26 @@ TEST_F(TelnetParserTest, NAWS_Width255_NoCrash)
     SUCCEED();
 }
 
+// WorldDocument::sendWindowSizes is the wrapper the output-view resize path uses
+// (parity with original mushview.cpp:1766,3364 which call SendWindowSizes on every
+// resize). It must forward to the TelnetParser and stay a no-op when NAWS has not
+// been negotiated / the world is not connected.
+TEST_F(TelnetParserTest, WrapperForwardsToParser_NotNegotiated_NoCrash)
+{
+    // m_bNAWS_wanted defaults false after reset() in SetUp -> guarded no-op path.
+    EXPECT_FALSE(tp().m_bNAWS_wanted);
+    doc->sendWindowSizes(80);
+    SUCCEED();
+}
+
+TEST_F(TelnetParserTest, WrapperForwardsToParser_Negotiated_NoCrash)
+{
+    // NAWS negotiated but socket null / not connected -> still a guarded no-op.
+    tp().m_bNAWS_wanted = true;
+    doc->sendWindowSizes(132);
+    SUCCEED();
+}
+
 // ========== Category 8: MTTS Terminal Type ==========
 
 TEST_F(TelnetParserTest, MTTS_Sequence_Increments)
