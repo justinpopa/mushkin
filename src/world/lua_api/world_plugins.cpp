@@ -693,7 +693,17 @@ int L_ReloadPlugin(lua_State* L)
         pDoc->PluginListChanged();
         lua_pushnumber(L, eOK);
     } else {
-        lua_pushnumber(L, ePluginFileNotFound);
+        // M16: Original distinguishes CFileException (ePluginFileNotFound) from
+        // CArchiveException/parse errors (eProblemsLoadingPlugin).
+        // Use the errorMsg set by LoadPlugin to determine which applies:
+        // file-not-found errors contain "not found" or "Cannot open"; all other
+        // failures (XML parse, missing elements, duplicate ID) are format errors.
+        if (errorMsg.contains("not found", Qt::CaseInsensitive) ||
+            errorMsg.contains("Cannot open", Qt::CaseInsensitive)) {
+            lua_pushnumber(L, ePluginFileNotFound);
+        } else {
+            lua_pushnumber(L, eProblemsLoadingPlugin);
+        }
     }
 
     return 1;
@@ -744,11 +754,14 @@ int L_UnloadPlugin(lua_State* L)
         return luaReturnError(L, eBadParameter);
     }
 
-    // Unload plugin (use the actual plugin ID, not the input which might be a name)
+    // Unload plugin (use the actual plugin ID, not the input which might be a name).
+    // M16: Original CMUSHclientDoc::UnloadPlugin() returns eNoSuchPlugin, eBadParameter, or eOK —
+    // never a loading-related code. The false path here is the m_bExecutingScript guard
+    // (mushkin safety, not in original). Use eBadParameter rather than eProblemsLoadingPlugin.
     if (pDoc->UnloadPlugin(plugin->m_strID)) {
         lua_pushnumber(L, eOK);
     } else {
-        lua_pushnumber(L, eProblemsLoadingPlugin);
+        lua_pushnumber(L, eBadParameter);
     }
 
     return 1;
@@ -1005,8 +1018,10 @@ int L_SaveState(lua_State* L)
         return luaReturnError(L, ePluginDoesNotSaveState); // 30037, matches original
     }
 
-    // Save state
-    auto result = currentPlugin->SaveState();
+    // Save state with bScripted=true: forces save regardless of m_bSaveState flag.
+    // H122: Original CMUSHclientDoc::SaveState() calls CPlugin::SaveState(true),
+    // bypassing the m_bSaveState check so Lua-initiated saves always run.
+    auto result = currentPlugin->SaveState(/*bScripted=*/true);
 
     if (result.has_value()) {
         lua_pushnumber(L, eOK);

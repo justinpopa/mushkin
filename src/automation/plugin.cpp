@@ -602,10 +602,13 @@ bool Plugin::ExecutePluginScript(const QString& callbackName, qint32 arg1, const
  *
  * @return empty expected on success, error string on failure
  */
-std::expected<void, QString> Plugin::SaveState()
+std::expected<void, QString> Plugin::SaveState(bool bScripted)
 {
-    // Check if state saving is enabled
-    if (!m_bSaveState) {
+    // Check if state saving is enabled.
+    // bScripted=true (called via world.SaveState() Lua API) bypasses this check,
+    // matching original MUSHclient: CMUSHclientDoc::SaveState() passes bScripted=true
+    // to CPlugin::SaveState(), which forces a save regardless of m_bSaveState.
+    if (!m_bSaveState && !bScripted) {
         return {}; // Not saving state — not an error
     }
 

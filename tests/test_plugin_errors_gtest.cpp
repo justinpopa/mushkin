@@ -281,3 +281,50 @@ end
 
     EXPECT_TRUE(saveResult.has_value()) << "SaveState should succeed (recursion prevention works)";
 }
+
+// Test 13: SaveState(bScripted=true) forces write even when m_bSaveState is false (H122)
+//
+// Original CPlugin::SaveState(bScripted=true) bypasses the m_bSaveState guard.
+// Mushkin previously omitted the bScripted parameter so the Lua-facing SaveState
+// silently did nothing when save_state="n" in the plugin XML.
+TEST_F(PluginErrorTest, SaveState_bScriptedBypassesSaveStateFlag)
+{
+    QString pluginPath = tempDir->path() + "/nosave_plugin.xml";
+    {
+        QFile f(pluginPath);
+        ASSERT_TRUE(f.open(QIODevice::WriteOnly | QIODevice::Text));
+        f.write(R"(<?xml version="1.0"?>
+<muclient>
+  <plugin name="NoSavePlugin" id="{66666666-6666-6666-6666-666666666666}" save_state="n">
+  </plugin>
+</muclient>)");
+        f.close();
+    }
+
+    QString errorMsg;
+    Plugin* noSavePlugin = doc->LoadPlugin(pluginPath, errorMsg);
+    ASSERT_NE(noSavePlugin, nullptr) << "LoadPlugin failed: " << errorMsg.toStdString();
+    ASSERT_FALSE(noSavePlugin->m_bSaveState) << "m_bSaveState must be false (save_state=\"n\")";
+
+    // Add a variable so there is something to write.
+    auto var = std::make_unique<Variable>();
+    var->label = "scripted_var";
+    var->contents = "scripted_value";
+    noSavePlugin->m_VariableMap["scripted_var"] = std::move(var);
+
+    QString stateFilePath =
+        tempDir->path() + "/" + doc->m_strWorldID + "-" + noSavePlugin->m_strID + "-state.xml";
+    QFile::remove(stateFilePath);
+
+    // Calling without bScripted (default false): must NOT write the file.
+    auto resultNormal = noSavePlugin->SaveState();
+    EXPECT_TRUE(resultNormal.has_value()) << "SaveState() should succeed (returns empty=ok)";
+    EXPECT_FALSE(QFile::exists(stateFilePath))
+        << "State file must NOT be written when m_bSaveState=false and bScripted=false";
+
+    // Calling with bScripted=true (Lua API path): MUST write the file.
+    auto resultScripted = noSavePlugin->SaveState(/*bScripted=*/true);
+    EXPECT_TRUE(resultScripted.has_value()) << "SaveState(true) should succeed";
+    EXPECT_TRUE(QFile::exists(stateFilePath))
+        << "State file MUST be written when bScripted=true regardless of m_bSaveState (H122)";
+}

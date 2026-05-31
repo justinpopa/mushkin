@@ -277,7 +277,7 @@ class Plugin : public QObject {
      *
      * @return empty expected on success, error string on failure
      */
-    [[nodiscard]] std::expected<void, QString> SaveState();
+    [[nodiscard]] std::expected<void, QString> SaveState(bool bScripted = false);
 
     /**
      * Load plugin state from .state file
