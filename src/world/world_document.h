@@ -150,8 +150,16 @@ enum {
     eConnectTypeMax // must be last
 };
 
-// MXP usage values
-enum class MXPMode : quint16 { eMXP_Off, eMXP_Query, eMXP_On };
+// MXP usage values (see m_iUseMXP). Numeric values MUST match the original
+// MUSHclient enum in doc.h (eOnCommandMXP=0, eQueryMXP=1, eUseMXP=2, eNoMXP=3)
+// so that the "use_mxp" world-file value and Lua GetOption/SetOption stay
+// cross-compatible.
+enum class MXPMode : quint16 {
+    eMXP_On = 0,     // eOnCommandMXP: turn on after IAC SB MXP IAC SE (default)
+    eMXP_Query = 1,  // eQueryMXP: turn on after option query
+    eMXP_Always = 2, // eUseMXP: always on (activated at connect)
+    eMXP_Off = 3,    // eNoMXP: always off
+};
 
 // Connection phase values (doc.h)
 // These are now inline constexpr aliases to connection_manager.h constants.

@@ -270,3 +270,74 @@ TEST_F(AlphaOptionsTableTest, CanFindSpecificAlphaOptions)
         }
     }
 }
+
+// ========== MXP Mode Numeric Parity (H123) ==========
+//
+// The "use_mxp" option stores the raw integer value of m_iUseMXP both in the
+// world file and through Lua GetOption/SetOption. Those integers MUST match the
+// original MUSHclient enum (doc.h:350-355):
+//   eOnCommandMXP = 0, eQueryMXP = 1, eUseMXP = 2, eNoMXP = 3.
+// Any other numbering breaks world-file cross-compatibility and Lua parity.
+
+static const tConfigurationNumericOption* findNumericOption(const char* name)
+{
+    for (const tConfigurationNumericOption* opt = OptionsTable; opt->pName != nullptr; opt++) {
+        if (QString(opt->pName) == name) {
+            return opt;
+        }
+    }
+    return nullptr;
+}
+
+// MXPMode enumerators carry the exact original numeric values.
+TEST_F(OptionsTableTest, MxpModeEnumValuesMatchOriginal)
+{
+    EXPECT_EQ(static_cast<int>(MXPMode::eMXP_On), 0) // eOnCommandMXP
+        << "eMXP_On (on command) must serialize as 0 like eOnCommandMXP";
+    EXPECT_EQ(static_cast<int>(MXPMode::eMXP_Query), 1) // eQueryMXP
+        << "eMXP_Query must serialize as 1 like eQueryMXP";
+    EXPECT_EQ(static_cast<int>(MXPMode::eMXP_Always), 2) // eUseMXP
+        << "eMXP_Always (always on) must serialize as 2 like eUseMXP";
+    EXPECT_EQ(static_cast<int>(MXPMode::eMXP_Off), 3) // eNoMXP
+        << "eMXP_Off must serialize as 3 like eNoMXP";
+}
+
+// use_mxp metadata: default is "on command" (0) with the original 0..3 range.
+TEST_F(OptionsTableTest, UseMxpDefaultAndRangeMatchOriginal)
+{
+    const tConfigurationNumericOption* useMxp = findNumericOption("use_mxp");
+    ASSERT_NE(useMxp, nullptr) << "use_mxp must exist in OptionsTable";
+    EXPECT_DOUBLE_EQ(useMxp->iDefault, 0.0) << "use_mxp default must be eOnCommandMXP (0)";
+    EXPECT_DOUBLE_EQ(useMxp->iMinimum, 0.0);
+    EXPECT_DOUBLE_EQ(useMxp->iMaximum, 3.0)
+        << "use_mxp range must span all four original modes (0..3)";
+}
+
+// The getter/setter round-trip every original integer to the matching MXPMode.
+TEST_F(OptionsWorldDocumentTest, UseMxpGetterSetterRoundTripsOriginalIntegers)
+{
+    const tConfigurationNumericOption* useMxp = findNumericOption("use_mxp");
+    ASSERT_NE(useMxp, nullptr);
+
+    // A freshly constructed world defaults to "on command" (0).
+    EXPECT_EQ(static_cast<int>(doc->m_iUseMXP), 0);
+    EXPECT_DOUBLE_EQ(useMxp->getter(*doc), 0.0);
+
+    struct {
+        int value;
+        MXPMode mode;
+    } cases[] = {
+        {0, MXPMode::eMXP_On},
+        {1, MXPMode::eMXP_Query},
+        {2, MXPMode::eMXP_Always},
+        {3, MXPMode::eMXP_Off},
+    };
+
+    for (const auto& c : cases) {
+        useMxp->setter(*doc, static_cast<double>(c.value));
+        EXPECT_EQ(doc->m_iUseMXP, c.mode)
+            << "use_mxp integer " << c.value << " must map to the matching MXPMode";
+        EXPECT_DOUBLE_EQ(useMxp->getter(*doc), static_cast<double>(c.value))
+            << "GetOption(use_mxp) must report the same integer that was set";
+    }
+}

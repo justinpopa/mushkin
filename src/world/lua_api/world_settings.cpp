@@ -1682,7 +1682,7 @@ int L_SetOption(lua_State* L)
         // (original: scriptingoptions.cpp:577-583)
         if (pDoc->m_iUseMXP == MXPMode::eMXP_Off && pDoc->m_mxpEngine->m_bMXP) {
             pDoc->MXP_Off(true);
-        } else if (pDoc->m_iUseMXP == MXPMode::eMXP_On && !pDoc->m_mxpEngine->m_bMXP) {
+        } else if (pDoc->m_iUseMXP == MXPMode::eMXP_Always && !pDoc->m_mxpEngine->m_bMXP) {
             // Manual toggle: preserve custom elements/entities defined by the server.
             // Original: mxpOnOff.cpp:133-155 — bManual=true skips clearing custom defs.
             pDoc->MXP_On(true);
