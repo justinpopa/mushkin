@@ -286,3 +286,32 @@ TEST_F(CommandColorAPITest, GetUdpPort)
 
     // No C++ side effects to verify (function always returns 0)
 }
+
+// ========== Font Metric GetInfo Tests ==========
+
+// world.GetInfo() font metrics are derived from the active font on demand, not
+// from a 0-initialized member that is never updated. Original returns
+// tm.tmAveCharWidth / tm.tmHeight (doc.cpp:3258/3323/3324); Mushkin computes
+// these from QFontMetrics. These cases require a GUI app (QFontMetrics needs
+// QGuiApplication), which this binary provides via test_main_gui.
+TEST_F(CommandColorAPITest, GetInfoFontMetricsNonZero)
+{
+    executeLua("output_width = world.GetInfo(213)"); // output font width
+    executeLua("input_height = world.GetInfo(214)"); // input font height
+    executeLua("input_width = world.GetInfo(215)");  // input font width
+    executeLua("avg_width = world.GetInfo(240)");    // average char width
+
+    int outputWidth = getGlobalInt("output_width");
+    int inputHeight = getGlobalInt("input_height");
+    int inputWidth = getGlobalInt("input_width");
+    int avgWidth = getGlobalInt("avg_width");
+
+    EXPECT_GT(outputWidth, 0) << "GetInfo(213) output font width must be non-zero";
+    EXPECT_GT(inputHeight, 0) << "GetInfo(214) input font height must be non-zero";
+    EXPECT_GT(inputWidth, 0) << "GetInfo(215) input font width must be non-zero";
+    EXPECT_GT(avgWidth, 0) << "GetInfo(240) average char width must be non-zero";
+
+    // GetInfo(240) average char width mirrors GetInfo(213) output font width.
+    EXPECT_EQ(avgWidth, outputWidth)
+        << "GetInfo(240) must equal GetInfo(213) (both are output tm.tmAveCharWidth)";
+}

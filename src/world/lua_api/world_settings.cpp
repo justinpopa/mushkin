@@ -1003,16 +1003,32 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 213: // Output font width
-            lua_pushinteger(L, pDoc->m_FontWidth);
+            // Original returns m_FontWidth (= tm.tmAveCharWidth, doc.cpp:3258).
+            // Compute on-the-fly from the same font OutputView renders with, since
+            // m_FontWidth is never updated after construction.
+            {
+                QFont outputFont =
+                    createScaledFont(pDoc->m_output.font_name, pDoc->m_output.font_height);
+                lua_pushinteger(L, QFontMetrics(outputFont).averageCharWidth());
+            }
             break;
 
         case 214: // Input font height
-            // Based on: methods_info.cpp
-            lua_pushinteger(L, pDoc->m_InputFontHeight);
+            // Original returns m_InputFontHeight (= tm.tmHeight, doc.cpp:3323).
+            {
+                QFont inputFont =
+                    createScaledFont(pDoc->m_input.font_name, pDoc->m_input.font_height);
+                lua_pushinteger(L, QFontMetrics(inputFont).height());
+            }
             break;
 
         case 215: // Input font width
-            lua_pushinteger(L, pDoc->m_InputFontWidth);
+            // Original returns m_InputFontWidth (= tm.tmAveCharWidth, doc.cpp:3324).
+            {
+                QFont inputFont =
+                    createScaledFont(pDoc->m_input.font_name, pDoc->m_input.font_height);
+                lua_pushinteger(L, QFontMetrics(inputFont).averageCharWidth());
+            }
             break;
 
         case 216: // Bytes received
@@ -1158,7 +1174,13 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 240: // Average character width
-            lua_pushinteger(L, pDoc->m_FontWidth);
+            // Original returns m_FontWidth (= tm.tmAveCharWidth, doc.cpp:3258).
+            // Compute on-the-fly to match GetInfo(213); m_FontWidth is never updated.
+            {
+                QFont outputFont =
+                    createScaledFont(pDoc->m_output.font_name, pDoc->m_output.font_height);
+                lua_pushinteger(L, QFontMetrics(outputFont).averageCharWidth());
+            }
             break;
 
         case 241: // Character height (rendered pixel height, same as GetInfo(212))
