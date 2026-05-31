@@ -168,7 +168,10 @@ QString evaluate(const QString& speedWalkString, const QString& filler)
             } break;
 
             default:
-                return QString("*Invalid direction '%1' in speed walk, must be N, S, E, W, U, D, "
+                // Original: MakeSpeedWalkErrorString(TFormat("*Invalid direction..."))
+                // MakeSpeedWalkErrorString prepends "*", and the format string itself starts
+                // with "*", so the result is "**Invalid direction..."
+                return QString("**Invalid direction '%1' in speed walk, must be N, S, E, W, U, D, "
                                "F, or (something)")
                     .arg(dir);
         }
@@ -310,6 +313,13 @@ QString reverse(const QString& speedWalkString)
                 // (original: methods_speedwalks.cpp:279-283 uses MapDirectionsMap)
                 static QMap<QString, QString> directionReverseMap;
                 if (directionReverseMap.isEmpty()) {
+                    // Mirror original MapDirectionsMap (Mapping.cpp:23-43).
+                    // Abbreviations (n/s/e/w/u/d) share the same CMapDirection as their
+                    // full-name entries, so m_sReverseDirection is always the abbreviation.
+                    // Full names like "north" map to reverse "s" (not "south").
+                    // Only the entries present in the original are included here —
+                    // "northeast/northwest/southeast/southwest" are absent from
+                    // the original MapDirectionsMap and are intentionally omitted.
                     directionReverseMap["n"] = "s";
                     directionReverseMap["s"] = "n";
                     directionReverseMap["e"] = "w";
@@ -320,16 +330,13 @@ QString reverse(const QString& speedWalkString)
                     directionReverseMap["sw"] = "ne";
                     directionReverseMap["nw"] = "se";
                     directionReverseMap["se"] = "nw";
-                    directionReverseMap["north"] = "south";
-                    directionReverseMap["south"] = "north";
-                    directionReverseMap["east"] = "west";
-                    directionReverseMap["west"] = "east";
-                    directionReverseMap["up"] = "down";
-                    directionReverseMap["down"] = "up";
-                    directionReverseMap["northeast"] = "southwest";
-                    directionReverseMap["southwest"] = "northeast";
-                    directionReverseMap["northwest"] = "southeast";
-                    directionReverseMap["southeast"] = "northwest";
+                    // Full names map to abbreviation reverses (same CMapDirection as abbrev)
+                    directionReverseMap["north"] = "s";
+                    directionReverseMap["south"] = "n";
+                    directionReverseMap["east"] = "w";
+                    directionReverseMap["west"] = "e";
+                    directionReverseMap["up"] = "d";
+                    directionReverseMap["down"] = "u";
                 }
 
                 str.clear();
@@ -388,7 +395,11 @@ QString reverse(const QString& speedWalkString)
  */
 QString removeBacktracks(const QString& speedWalkString, const QString& filler)
 {
-    // Initialize direction map with reverses (all entries from MapDirectionsMap)
+    // Initialize direction map with reverses matching original MapDirectionsMap
+    // (Mapping.cpp:23-43). Full names share CMapDirection with abbreviations,
+    // so their m_sReverseDirection is an abbreviation (e.g. "north" -> "s").
+    // "northeast/northwest/southeast/southwest" are absent from the original
+    // and intentionally omitted.
     static QMap<QString, QString> reverseMap;
     if (reverseMap.isEmpty()) {
         reverseMap["n"] = "s";
@@ -401,16 +412,12 @@ QString removeBacktracks(const QString& speedWalkString, const QString& filler)
         reverseMap["sw"] = "ne";
         reverseMap["nw"] = "se";
         reverseMap["se"] = "nw";
-        reverseMap["north"] = "south";
-        reverseMap["south"] = "north";
-        reverseMap["east"] = "west";
-        reverseMap["west"] = "east";
-        reverseMap["up"] = "down";
-        reverseMap["down"] = "up";
-        reverseMap["northeast"] = "southwest";
-        reverseMap["southwest"] = "northeast";
-        reverseMap["northwest"] = "southeast";
-        reverseMap["southeast"] = "northwest";
+        reverseMap["north"] = "s";
+        reverseMap["south"] = "n";
+        reverseMap["east"] = "w";
+        reverseMap["west"] = "e";
+        reverseMap["up"] = "d";
+        reverseMap["down"] = "u";
     }
 
     // First expand the speedwalk
