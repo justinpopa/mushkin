@@ -13,6 +13,7 @@
  * 7. Spot-checks: North, CascadeWindows, Find, MacroF1, ConfigureAliases, AltA
  */
 
+#include "../src/utils/error_codes.h"
 #include "fixtures/world_fixtures.h"
 
 // Test fixture for DoCommand / GetInternalCommandsList tests
@@ -188,7 +189,7 @@ TEST_F(DoCommandTest, DoCommandRejectsUnknownCommand)
     ASSERT_TRUE(lua_isnumber(L, -1)) << "DoCommand() should return a number";
     int error_code = static_cast<int>(lua_tointeger(L, -1));
     lua_pop(L, 1);
-    EXPECT_EQ(error_code, 30054) << "Unknown command should return eNoSuchCommand (30054)";
+    EXPECT_EQ(error_code, eNoSuchCommand) << "Unknown command should return eNoSuchCommand (30054)";
 }
 
 // ========== Spot-checks for newly added commands ==========

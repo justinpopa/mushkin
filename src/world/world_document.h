@@ -20,6 +20,7 @@
 #include <deque>         // For m_recentLines (multi-line triggers)
 #include <expected>      // For std::expected (fallible operations)
 #include <functional>    // For std::function (progress callback)
+#include <list>          // For m_OutstandingLines (deferred note queue)
 #include <memory>        // For std::unique_ptr
 #include <span>          // For std::span (buffer parameters)
 #include <unordered_map> // For std::unordered_map (option snapshots)
@@ -37,6 +38,7 @@
 #include "../automation/sendto.h"          // SendTo enum
 #include "../automation/variable.h"        // ArraysMap type
 #include "../text/style.h" // Style flag bits (HILITE, UNDERLINE, BLINK, INVERSE, STRIKEOUT, COLOUR_*, COLOURTYPE, ACTIONTYPE, STYLE_BITS)
+#include "../utils/error_codes.h"
 
 // Forward declarations
 class WorldSocket;
@@ -138,8 +140,15 @@ inline constexpr quint16 FLAGS2_Custom16isDefaultColour = 0x0008;
 inline constexpr quint16 FLAGS2_LogInColour = 0x0010;
 inline constexpr quint16 FLAGS2_LogRaw = 0x0020;
 
-// Auto-connect values
-enum class AutoConnect : int { eNoAutoConnect, eConnectMUSH, eConnectAndGoIntoGame };
+// Auto-connect values (matches original doc.h:276-283)
+enum {
+    eNoAutoConnect,
+    eConnectMUSH, // send: connect name password
+    eConnectDiku, // send: name\npassword
+    eConnectMXP,  // MXP connect
+
+    eConnectTypeMax // must be last
+};
 
 // MXP usage values
 enum class MXPMode : quint16 { eMXP_Off, eMXP_Query, eMXP_On };
@@ -156,16 +165,21 @@ inline constexpr qint32 eConnectDisconnecting = CONNECT_DISCONNECTING;
 // Action source values (Lua callbacks)
 // These tell scripts what triggered the current code execution
 // Based on doc.h action source enum
+// Values for m_iCurrentActionSource — must match original doc.h:159-172 for GetInfo(239)
 enum class ActionSource : quint32 {
-    eUnknownActionSource = 0, // Unknown/not set
-    eUserAction,              // User typed a command
-    eWorldAction,             // World event (connect, disconnect, open, close)
-    eTriggerAction,           // Trigger fired
-    eAliasAction,             // Alias matched
-    eTimerAction,             // Timer fired
-    ePluginAction,            // Plugin called function
-    eLuaSandbox,              // Sandbox initialization
-    eDontChangeAction = 9999  // Special: don't change m_iCurrentActionSource
+    eUnknownActionSource = 0, // no particular reason
+    eUserTyping = 1,          // user typed command and pressed Enter
+    eUserMacro = 2,           // user typed a macro (e.g., F2)
+    eUserKeypad = 3,          // user used numeric keypad
+    eUserAccelerator = 4,     // user used accelerator key
+    eUserMenuAction = 5,      // item chosen from pop-up menu
+    eTriggerFired = 6,        // trigger fired
+    eTimerFired = 7,          // timer fired
+    eInputFromServer = 8,     // input arrived from MUD
+    eWorldAction = 9,         // world action (connect, disconnect, open, close)
+    eLuaSandbox = 10,         // executing Lua sandbox
+    eHotspotCallback = 11,    // miniwindow hotspot callback
+    eDontChangeAction = 999   // special: leave current action alone (original: 999)
 };
 
 // Command history position status (command history navigation)
@@ -337,6 +351,8 @@ class WorldDocument : public QObject, public IWorldContext {
     explicit WorldDocument(QObject* parent = nullptr);
     ~WorldDocument() override;
 
+    void applyGlobalFontDefaults();
+
     // Public member variables (for direct port compatibility)
 
     // NOTE: m_pSocket is now stored inside m_connectionManager->m_pSocket.
@@ -372,7 +388,7 @@ class WorldDocument : public QObject, public IWorldContext {
     QString m_name;      // player name
     QString m_password;  // player password
     quint16 m_port;      // port number (1-65535)
-    bool m_connect_now;  // auto-connect flag (see enum above)
+    int m_connect_now; // auto-connect method (eNoAutoConnect/eConnectMUSH/eConnectDiku/eConnectMXP)
 
     // ========== Proxy Configuration ==========
     struct ProxyConfig {
@@ -423,7 +439,7 @@ class WorldDocument : public QObject, public IWorldContext {
     struct OutputConfig {
         // Font
         QString font_name = "Courier New"; // output font face name
-        qint32 font_height = 12;           // font size in pixels
+        qint32 font_height = 12;           // font size in points
         qint32 font_weight = 400;          // bold/normal (400=normal, 700=bold)
         quint32 font_charset = 0;          // character set
 
@@ -479,7 +495,7 @@ class WorldDocument : public QObject, public IWorldContext {
         QRgb background_colour = 0xFFFFFFu; // input background color (BGR) — white
 
         // Font
-        qint32 font_height = 12;           // font size in pixels
+        qint32 font_height = 12;           // font size in points
         QString font_name = "Courier New"; // input font face name
         quint8 font_italic = 0;            // italic flag (0=normal, 1=italic)
         qint32 font_weight = 400;          // font weight (400=normal, 700=bold)
@@ -652,11 +668,11 @@ class WorldDocument : public QObject, public IWorldContext {
 
     // ========== Auto-say Settings ==========
     struct AutoSayConfig {
-        QString say_string = "say ";          // string prepended to commands
-        QString override_prefix = "-";        // prefix to bypass auto-say
-        bool enabled = false;                 // auto-say mode enabled?
-        bool exclude_macros = false;          // skip macro/accelerator keys?
-        bool exclude_non_alpha = false;       // skip commands not starting with a letter?
+        QString say_string;             // string prepended to commands (original default: empty)
+        QString override_prefix = "-";  // prefix to bypass auto-say
+        bool enabled = false;           // auto-say mode enabled?
+        bool exclude_macros = false;    // skip macro/accelerator keys?
+        bool exclude_non_alpha = false; // skip commands not starting with a letter?
         bool confirm_before_replacing = true; // confirm before replacing typed text?
         bool re_evaluate = false;             // re-evaluate after alias expansion?
     } m_auto_say;
@@ -913,7 +929,11 @@ class WorldDocument : public QObject, public IWorldContext {
     int m_selectionEndLine;
     int m_selectionEndChar;
 
+    // ========== Utilities ==========
+    QString fixupEscapeSequences(const QString& input) const; // Translate \n \t \\ etc.
+
     // ========== Line Buffer ==========
+    void trimLineBuffer();                         // trim excess lines to m_display.max_lines
     std::vector<std::unique_ptr<Line>> m_lineList; // list of output buffer lines
     std::unique_ptr<Line> m_currentLine;           // the line currently receiving (owns the line)
     QString m_strCurrentLine;                      // current line from MUD (no control codes)
@@ -1098,6 +1118,7 @@ class WorldDocument : public QObject, public IWorldContext {
     bool m_bPluginProcessingCommand;
     bool m_bPluginProcessingSend;
     bool m_bPluginProcessingSent;
+    bool m_bInPlaySoundFilePlugin = false; // Recursion guard for OnPluginPlaySound
     QString m_strLastCommandSent;
     qint32 m_iLastCommandCount;
     qint32 m_iExecutionDepth;
@@ -1153,6 +1174,19 @@ class WorldDocument : public QObject, public IWorldContext {
 
     bool m_bNotesNotWantedNow;
     bool m_bDoingSimulate;
+
+    // ========== Deferred Note Queue ==========
+    // Notes/tells issued during plugin callbacks (OnPluginPacketReceived,
+    // OnPluginLineReceived, etc.) are queued here while m_bNotesNotWantedNow
+    // is true, then replayed via OutputOutstandingLines() after the callback
+    // returns. Matches MUSHclient m_OutstandingLines / OutputOutstandingLines().
+    struct DeferredNote {
+        QString text;
+        QRgb foreColor;
+        QRgb backColor;
+        quint16 style;
+    };
+    std::list<DeferredNote> m_OutstandingLines;
     bool m_bLineOmittedFromOutput;
     bool m_bOmitCurrentLineFromLog; // Trigger omit_from_log flag
     bool m_bScrollBarWanted;
@@ -1380,6 +1414,8 @@ class WorldDocument : public QObject, public IWorldContext {
     // Support methods
     void SendPacket(std::span<const unsigned char> data); // Send raw bytes
     void OutputBadUTF8characters();                       // Fallback for invalid UTF-8
+    void debugPacketData(const char* caption, const char* data, int size,
+                         qint64 packetNum); // Hex dump for packet debug
 
     // ========== ANSI Parser ==========
     void InterpretANSIcode(int code);    // Process ANSI color/style codes
@@ -1394,9 +1430,9 @@ class WorldDocument : public QObject, public IWorldContext {
     // ========== MXP — forwarding wrappers to m_mxpEngine ==========
     // These keep the existing call sites in telnet_parser.cpp and
     // world_protocol.cpp compiling without modification.
-    void MXP_On()
+    void MXP_On(bool manual = false)
     {
-        m_mxpEngine->MXP_On();
+        m_mxpEngine->MXP_On(manual);
     }
     void MXP_Off(bool force = false)
     {
@@ -1464,11 +1500,11 @@ class WorldDocument : public QObject, public IWorldContext {
         }
         switch (result.error().type) {
             case WorldErrorType::NotConnected:
-                return 30002; // eWorldClosed
+                return eWorldClosed;
             case WorldErrorType::ItemInUse:
-                return 30063; // eItemInUse
+                return eItemInUse;
             default:
-                return 30000; // eUnknownError
+                return eBadParameter;
         }
     }
     qint32 DiscardQueue()
@@ -1601,11 +1637,12 @@ class WorldDocument : public QObject, public IWorldContext {
     // ========== Trigger Execution and Actions ==========
     void executeTrigger(Trigger* trigger, Line* line,
                         const QString& matchedText) override; // Execute trigger action
-    void executeTriggerScript(Trigger* trigger,
+    void executeTriggerScript(Trigger* trigger, Line* line,
                               const QString& matchedText); // Execute Lua script callback
-    QString replaceWildcards(const QString& text,
-                             const QVector<QString>& wildcards); // Replace %1, %2, etc.
-    void changeLineColors(Trigger* trigger, Line* line);         // Change matched line colors
+    QString replaceWildcards(const QString& text, const QVector<QString>& wildcards,
+                             const QString& itemName = {},
+                             const QMap<QString, QString>& namedWildcards = {});
+    void changeLineColors(Trigger* trigger, Line* line); // Change matched line colors
 
     // ========== Alias Matching and Execution ==========
     bool evaluateAliases(const QString& command)
@@ -1664,6 +1701,10 @@ class WorldDocument : public QObject, public IWorldContext {
     void loadVariablesFromXml(
         class QXmlStreamReader& xml,
         class Plugin* plugin = nullptr); // Load variables from XML (plugin context)
+
+    // ========== Colour XML Serialization ==========
+    void saveColoursToXml(class QXmlStreamWriter& xml);   // Save ANSI and custom palette colors
+    void loadColoursFromXml(class QXmlStreamReader& xml); // Load ANSI and custom palette colors
 
     // ========== Accelerator XML Serialization ==========
     void saveAcceleratorsToXml(class QXmlStreamWriter& xml);   // Save user accelerators to XML
@@ -1756,12 +1797,14 @@ class WorldDocument : public QObject, public IWorldContext {
                        ProgressCallback progressCallback = nullptr);
 
     // ========== Command Stacking ==========
-    void Execute(const QString& command,
-                 bool allowScriptPrefix = true); // Process command with stacking support
+    void
+    Execute(const QString& command, bool allowScriptPrefix = true, bool addHistory = true,
+            const QString& originalCommand = QString()); // Process command with stacking support
+    bool checkConnected(); // Prompt to reconnect if disconnected (original: doc.cpp:5158)
 
     // ========== Log File Management ==========
-    qint32 OpenLog(const QString& filename, bool append); // Open log file for writing
-    qint32 CloseLog();                                    // Close log file
+    qint32 OpenLog(const QString& filename, bool append, bool writePreamble = true);
+    qint32 CloseLog();                       // Close log file
     void WriteToLog(const QString& text);    // Internal: write text to log (no newline)
     qint32 WriteLog(const QString& message); // API: write message to log (add newline if missing)
     qint32 FlushLog();                       // Flush log to disk
@@ -1777,10 +1820,11 @@ class WorldDocument : public QObject, public IWorldContext {
     Plugin* FindPluginByID(const QString& pluginID);       // Find plugin by GUID
     Plugin* FindPluginByName(const QString& pluginName);   // Find plugin by name
     Plugin* FindPluginByFilePath(const QString& filepath); // Find plugin by source file path
-    Plugin* LoadPlugin(const QString& filepath, QString& errorMsg); // Load plugin from XML file
-    bool UnloadPlugin(const QString& pluginID);                     // Unload and delete plugin
-    bool EnablePlugin(const QString& pluginID, bool enabled);       // Enable/disable plugin
-    void PluginListChanged();                   // Notify plugins that list changed
+    Plugin* LoadPlugin(const QString& filepath, QString& errorMsg,
+                       bool suppressListChanged = false);     // Load plugin from XML file
+    bool UnloadPlugin(const QString& pluginID);               // Unload and delete plugin
+    bool EnablePlugin(const QString& pluginID, bool enabled); // Enable/disable plugin
+    void PluginListChanged();                                 // Notify plugins that list changed
     Plugin* getPlugin(const QString& pluginID); // Get plugin by ID (alias for FindPluginByID)
     Plugin* getCurrentPlugin() const
     {
@@ -1805,6 +1849,9 @@ class WorldDocument : public QObject, public IWorldContext {
                                   bool bStopOnTrue = false); // Call all plugins (int + string)
     bool SendToAllPluginCallbacks(const QString& callbackName, qint32 arg1, qint32 arg2,
                                   const QString& arg3); // Call all plugins (int + int + string)
+
+    // Filter-chain callback (each plugin can modify the string)
+    void SendToAllPluginCallbacksRtn(const QString& callbackName, QString& strResult);
 
     // First-match callbacks (stop on first true response)
     bool SendToFirstPluginCallbacks(const QString& callbackName,
@@ -1925,6 +1972,18 @@ class WorldDocument : public QObject, public IWorldContext {
     }
     bool isConnectedToMud() const override;
     void flushLogIfNeeded() override;
+    bool playSoundsInBackground() const override
+    {
+        return m_sound.play_in_background;
+    }
+    quint16 stopTriggerEvaluation() const override
+    {
+        return m_iStopTriggerEvaluation;
+    }
+    void resetStopTriggerEvaluation() override
+    {
+        m_iStopTriggerEvaluation = 0;
+    }
 
   signals:
     void worldNameChanged(const QString& name);
@@ -1940,6 +1999,7 @@ class WorldDocument : public QObject, public IWorldContext {
     void activateWorldWindow();                  // Emitted to bring world window to front
     void activateClientWindow();                 // Emitted to bring main window to front
     void infoBarChanged();                       // Emitted when info bar text/style changes
+    void tooltipSettingsChanged();               // Emitted when tooltip timing changes
 
   private slots:
     void onScriptFileChanged(const QString& path); // Handle script file change notification
@@ -1947,6 +2007,7 @@ class WorldDocument : public QObject, public IWorldContext {
   private:
     void initializeDefaults();
     void initializeColors();
+    void OutputOutstandingLines();
 
     // Script file monitoring
     // Manually owned (NOT Qt parent-child; created without parent to avoid double-free).

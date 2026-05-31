@@ -1,4 +1,5 @@
 #include "output_view.h"
+#include "../../storage/global_options.h"
 #include "../../text/action.h"
 #include "../../utils/font_utils.h"
 #include "../../world/color_utils.h"
@@ -987,8 +988,16 @@ void OutputView::mouseDoubleClickEvent(QMouseEvent* event)
 
 void OutputView::keyPressEvent(QKeyEvent* event)
 {
+    // AllTypingToCommandWindow: redirect ALL keys to the command input.
+    // Must be first — the original MUSHclient (mushview.cpp OnKeyDown)
+    // redirects every key unconditionally, including Ctrl+C, PageUp/Down, etc.
+    if (GlobalOptions::instance().allTypingToCommandWindow()) {
+        emit keyRedirected(event);
+        event->accept();
+        return;
+    }
+
     if (event->matches(QKeySequence::Copy)) {
-        // Ctrl+C
         copyToClipboard();
         event->accept();
         return;

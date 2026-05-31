@@ -561,6 +561,12 @@ int L_WindowFont(lua_State* L)
     bool italic = lua_toboolean(L, 6);
     bool underline = lua_toboolean(L, 7);
     bool strikeout = lua_toboolean(L, 8);
+    // Charset and PitchAndFamily are optional (original: defaults to 0)
+    // These are Windows-specific and mostly ignored on Qt, but accepted for API compat.
+    qint16 charset = static_cast<qint16>(luaL_optnumber(L, 9, 0));
+    qint16 pitchAndFamily = static_cast<qint16>(luaL_optnumber(L, 10, 0));
+    Q_UNUSED(charset);
+    Q_UNUSED(pitchAndFamily);
 
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {

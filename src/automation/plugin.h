@@ -90,7 +90,7 @@ class Plugin : public QObject {
     bool m_bSaveState;         // Save variables to .state file?
     qint16 m_iSequence;        // Evaluation order (negative = before world, positive = after)
     qint32 m_iLoadOrder;       // Order plugins were loaded (for dependencies)
-    qint64 m_iScriptTimeTaken; // Time spent executing plugin scripts (µs)
+    qint64 m_iScriptTimeTaken; // Time spent executing plugin scripts (nanoseconds)
 
     // ========== Plugin Collections (Isolated from world) ==========
 
@@ -184,6 +184,10 @@ class Plugin : public QObject {
      * @return 1 if function exists, DISPID_UNKNOWN if not
      */
     qint32 GetPluginDispid(const QString& callbackName);
+    bool hasCallback(const QString& callbackName)
+    {
+        return GetPluginDispid(callbackName) != -1;
+    }
 
     /**
      * Execute plugin callback with no parameters
@@ -250,6 +254,18 @@ class Plugin : public QObject {
      */
     bool ExecutePluginScript(const QString& callbackName, qint32 arg1, const QString& arg2,
                              const QString& arg3, const QString& arg4);
+
+    /**
+     * Execute plugin callback that can modify a string (filter chain pattern).
+     *
+     * Calls the plugin's Lua function with strText as argument.
+     * If the function returns a string, strText is replaced with the return value.
+     * Used by OnPluginPacketReceived to allow plugins to modify incoming data.
+     *
+     * @param callbackName Function name
+     * @param strText [in/out] String to filter — modified in place
+     */
+    void ExecutePluginScriptRtn(const QString& callbackName, QString& strText);
 
     /**
      * Save plugin state to .state file

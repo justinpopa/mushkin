@@ -7,7 +7,7 @@
 // Ported from: xml/xml_serialize.cpp (original MUSHclient)
 
 #include "xml_serialization.h"
-#include "../storage/database.h"
+#include "../storage/global_options.h"
 #include "../utils/app_paths.h"
 #include "config_options.h"
 #include "logging.h"
@@ -40,7 +40,8 @@ namespace {
  * 4. Relative to working directory's worlds/plugins/
  * 5. Relative to world file directory (fallback)
  */
-QString resolvePluginPath(const QString& pluginPath, const QString& worldFilePath)
+QString resolvePluginPath(const QString& pluginPath, const QString& worldFilePath,
+                          const QString& pluginSourceDir = {})
 {
     // Convert Windows backslashes to forward slashes for cross-platform compatibility
     QString path = pluginPath;
@@ -51,8 +52,7 @@ QString resolvePluginPath(const QString& pluginPath, const QString& worldFilePat
     QString worldDir = worldFileInfo.absolutePath();
 
     // Get plugins directory
-    auto& db = Database::instance();
-    QString pluginsDir = db.getPreference("PluginsDirectory", "./worlds/plugins/");
+    QString pluginsDir = GlobalOptions::instance().pluginsDirectory();
 
     // Convert Windows backslashes in plugins directory path
     pluginsDir.replace('\\', '/');
@@ -70,6 +70,12 @@ QString resolvePluginPath(const QString& pluginPath, const QString& worldFilePat
     path.replace("$PLUGINSDEFAULTDIR", QDir(pluginsDir).absolutePath());
     path.replace("$WORLDDIR", worldDir);
     path.replace("$PROGRAMDIR", AppPaths::getAppDirectory());
+
+    // $PLUGINDIR — directory of the currently-loading plugin's source file
+    // Original: xml_load_world.cpp:833-835
+    if (!pluginSourceDir.isEmpty()) {
+        path.replace("$PLUGINDIR", pluginSourceDir);
+    }
 
     // If absolute after placeholder replacement, use directly
     if (QDir::isAbsolutePath(path)) {
@@ -125,31 +131,43 @@ bool IsArchiveXML(QFile& file)
         return false;
     }
 
-    // Check for UTF-8 BOM (EF BB BF)
-    if (buffer.size() >= 3 && (unsigned char)buffer[0] == 0xEF &&
-        (unsigned char)buffer[1] == 0xBB && (unsigned char)buffer[2] == 0xBF) {
-        qCDebug(lcWorld) << "Detected UTF-8 BOM";
+    // Skip BOM and convert to char* for prefix matching (original: xml_serialize.cpp:113-124)
+    const char* p = buffer.constData();
+    const char* end = p + buffer.size();
+
+    // Skip UTF-16LE BOM (FF FE) — original converts to UTF-8
+    if (buffer.size() >= 2 && (unsigned char)p[0] == 0xFF && (unsigned char)p[1] == 0xFE) {
+        // Convert from UTF-16LE, skip BOM
+        QString utf16 =
+            QString::fromUtf16(reinterpret_cast<const char16_t*>(p + 2), (buffer.size() - 2) / 2);
+        buffer = utf16.toUtf8();
+        p = buffer.constData();
+        end = p + buffer.size();
+    }
+    // Skip UTF-8 BOM (EF BB BF)
+    else if (buffer.size() >= 3 && (unsigned char)p[0] == 0xEF && (unsigned char)p[1] == 0xBB &&
+             (unsigned char)p[2] == 0xBF) {
+        p += 3;
     }
 
-    // Check for UTF-16LE BOM (FF FE)
-    if (buffer.size() >= 2 && (unsigned char)buffer[0] == 0xFF &&
-        (unsigned char)buffer[1] == 0xFE) {
-        qCDebug(lcWorld) << "Detected UTF-16LE BOM";
-    }
+    // Skip leading whitespace (original: xml_serialize.cpp:129-130)
+    while (p < end && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r'))
+        p++;
 
-    // Convert to string for signature search
-    QString content = QString::fromUtf8(buffer);
+    // Need at least 15 chars for minimum valid XML (original: xml_serialize.cpp:134)
+    if (end - p < 15)
+        return false;
 
-    // Look for XML signatures
-    // Note: Using case-insensitive contains for robustness
-    QStringList signatures = {"<?xml",  "<!--",      "<!DOCTYPE", "<muclient",
-                              "<world", "<triggers", "<aliases",  "<timers"};
+    // Case-sensitive prefix match against signatures (original: xml_serialize.cpp:137-139)
+    static const char* sigs[] = {"<?xml",     "<!--",     "<!DOCTYPE", "<muclient", "<world",
+                                 "<triggers", "<aliases", "<timers",   "<macros",   "<variables",
+                                 "<colours",  "<keypad",  "<printing", "<comment",  "<include",
+                                 "<plugin",   "<script"};
 
-    for (const QString& sig : signatures) {
-        if (content.contains(sig, Qt::CaseInsensitive)) {
-            qCDebug(lcWorld) << "Found XML signature:" << sig;
+    for (const char* sig : sigs) {
+        size_t len = strlen(sig);
+        if (static_cast<size_t>(end - p) >= len && memcmp(p, sig, len) == 0)
             return true;
-        }
     }
 
     return false;
@@ -228,6 +246,13 @@ bool SaveWorldXML(WorldDocument* doc, const QString& filename)
     // This allows plugins to save their state before the world file is written
     doc->SendToAllPluginCallbacks(ON_PLUGIN_WORLD_SAVE);
 
+    // Save all plugin state (original: xml_serialize.cpp:33-36)
+    for (const auto& plugin : doc->m_PluginList) {
+        if (plugin) {
+            (void)plugin->SaveState();
+        }
+    }
+
     // Atomic save: write to temp file, then rename
     // This prevents corruption if app crashes mid-save
     QString tempFilename = filename + ".tmp";
@@ -259,6 +284,12 @@ bool SaveWorldXML(WorldDocument* doc, const QString& filename)
     // world_file_version=15 matches original MUSHclient format version
     writer.writeAttribute("mushkin_version", QCoreApplication::applicationVersion());
     writer.writeAttribute("world_file_version", "15");
+
+    // Write date_saved unless omitted (original: xml_save_world.cpp:31-32)
+    if (!doc->m_bOmitSavedDateFromSaveFiles) {
+        writer.writeAttribute("date_saved",
+                              QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss"));
+    }
 
     // ========================================================================
     // SAVE NUMERIC OPTIONS
@@ -321,10 +352,12 @@ bool SaveWorldXML(WorldDocument* doc, const QString& filename)
         }
 
         // Handle password encoding (base64)
+        // Original: xml_save_world.cpp:279-284 — writes {name}_base64="y" sentinel
         if (opt.iFlags & OPT_PASSWORD) {
             if (!value.isEmpty()) {
                 QByteArray encoded = value.toUtf8().toBase64();
                 value = QString::fromLatin1(encoded);
+                writer.writeAttribute(QString("%1_base64").arg(opt.pName), "y");
             }
         }
 
@@ -362,8 +395,13 @@ bool SaveWorldXML(WorldDocument* doc, const QString& filename)
         writer.writeEndElement();
     }
 
+    // Close world element BEFORE triggers/aliases/etc.
+    // Original structure: <muclient><world>options</world><triggers/><aliases/>...</muclient>
+    // Triggers, aliases, timers, variables, etc. are siblings of <world>, not children.
+    writer.writeEndElement(); // world
+
     // ========================================================================
-    // TRIGGERS AND ALIASES
+    // TRIGGERS AND ALIASES (siblings of <world>, children of <muclient>)
     // ========================================================================
 
     doc->saveTriggersToXml(writer);
@@ -380,6 +418,12 @@ bool SaveWorldXML(WorldDocument* doc, const QString& filename)
     // ========================================================================
 
     doc->saveVariablesToXml(writer);
+
+    // ========================================================================
+    // COLOURS (ANSI palette and custom color entries)
+    // ========================================================================
+
+    doc->saveColoursToXml(writer);
 
     // ========================================================================
     // ACCELERATORS (User-defined keyboard shortcuts)
@@ -406,9 +450,6 @@ bool SaveWorldXML(WorldDocument* doc, const QString& filename)
 
         writer.writeEndElement(); // command_history
     }
-
-    // Close world element
-    writer.writeEndElement(); // world
 
     // Close root element
     writer.writeEndElement(); // muclient
@@ -466,6 +507,15 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
         return false;
     }
 
+    // File size limit (original: 100MB sanity check)
+    constexpr qint64 MAX_XML_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
+    if (file.size() > MAX_XML_FILE_SIZE) {
+        qWarning() << "LoadWorldXML: file too large:" << file.size() << "bytes (max"
+                   << MAX_XML_FILE_SIZE << ")";
+        file.close();
+        return false;
+    }
+
     // Check if file is actually XML
     if (!IsArchiveXML(file)) {
         qWarning() << "LoadWorldXML: file does not appear to be XML:" << filename;
@@ -478,21 +528,30 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
 
     QXmlStreamReader reader(&file);
 
-    // Skip to <muclient> root element
+    // Skip to <muclient> root element, or treat the first element as root.
+    // Original: xml_load_world.cpp:380-383 — if no <muclient>, uses document root.
+    // This allows bare files like <triggers>...</triggers> to be loaded.
     while (!reader.atEnd()) {
         reader.readNext();
-        if (reader.isStartElement() && reader.name() == QLatin1String("muclient")) {
+        if (reader.isStartElement()) {
+            if (reader.name() == QLatin1String("muclient")) {
+                break; // Found <muclient>, proceed to search for children
+            }
+            // No <muclient> wrapper — treat this element as if it's inside <muclient>.
+            // Re-seek to beginning so the child-element loop below can find it.
+            file.seek(0);
+            reader.setDevice(&file);
             break;
         }
     }
 
     if (reader.atEnd() || reader.hasError()) {
-        qWarning() << "LoadWorldXML: no <muclient> root element found";
+        qWarning() << "LoadWorldXML: no XML elements found";
         file.close();
         return false;
     }
 
-    // Read <world> element
+    // Read <world> element and siblings (triggers, aliases, etc.)
     while (!reader.atEnd()) {
         reader.readNext();
 
@@ -555,13 +614,8 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
                         value = opt.iMaximum;
                 }
 
-                // Write value to document
-                // For RGB colors, 0 might mean "use default" in old MUSHclient files
-                if ((opt.iFlags & OPT_RGB_COLOUR) && value == 0.0) {
-                    // Keep the default
-                } else {
-                    opt.setter(*doc, value);
-                }
+                // Write value to document (0 is valid for RGB — it's black)
+                opt.setter(*doc, value);
             }
 
             // ================================================================
@@ -577,9 +631,13 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
 
                 QString value = attrs.value(opt.pName).toString();
 
-                // Handle password decoding (base64)
+                // Handle password decoding — only if _base64 sentinel is present.
+                // Original: xml_load_world.cpp:1068-1080
                 if (opt.iFlags & OPT_PASSWORD) {
-                    if (!value.isEmpty()) {
+                    QString sentinelKey = QString("%1_base64").arg(opt.pName);
+                    bool isEncoded = (attrs.value(sentinelKey).toString().toLower() == "y");
+                    if (isEncoded && !value.isEmpty()) {
+                        value = value.trimmed();
                         QByteArray decoded = QByteArray::fromBase64(value.toLatin1());
                         value = QString::fromUtf8(decoded);
                     }
@@ -625,10 +683,17 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
                         if (attrs.value("plugin").toString().toLower() == "y") {
                             QString pluginPath = attrs.value("name").toString();
                             if (!pluginPath.isEmpty()) {
-                                QString fullPath = resolvePluginPath(pluginPath, filename);
+                                // Pass current plugin's source dir for $PLUGINDIR
+                                QString pluginDir;
+                                if (doc->m_CurrentPlugin) {
+                                    QFileInfo pi(doc->m_CurrentPlugin->m_strSource);
+                                    pluginDir = pi.absolutePath();
+                                }
+                                QString fullPath =
+                                    resolvePluginPath(pluginPath, filename, pluginDir);
 
                                 QString errorMsg;
-                                Plugin* plugin = doc->LoadPlugin(fullPath, errorMsg);
+                                Plugin* plugin = doc->LoadPlugin(fullPath, errorMsg, true);
                                 if (plugin) {
                                     qDebug() << "Loaded plugin:" << plugin->m_strName
                                              << "| Aliases:" << plugin->m_AliasMap.size()
@@ -680,6 +745,12 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
                         continue;
                     }
 
+                    // Load colours (ANSI palette and custom color entries)
+                    if (elementName == "colours") {
+                        doc->loadColoursFromXml(reader);
+                        continue;
+                    }
+
                     // Load accelerators (user-defined keyboard shortcuts)
                     if (elementName == "accelerators") {
                         doc->loadAcceleratorsFromXml(reader);
@@ -708,9 +779,11 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
                                 AlphaOptionsTable[elemIt->second];
                             QString value = reader.readElementText();
 
-                            // Handle password decoding
+                            // Handle password decoding — element-form passwords
+                            // are rare but possible; always base64 if password flag set
                             if (opt.iFlags & OPT_PASSWORD) {
                                 if (!value.isEmpty()) {
+                                    value = value.trimmed();
                                     QByteArray decoded = QByteArray::fromBase64(value.toLatin1());
                                     value = QString::fromUtf8(decoded);
                                 }
@@ -743,16 +816,50 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
                 continue;
             }
 
+            if (elementName == "variables") {
+                doc->loadVariablesFromXml(reader);
+                continue;
+            }
+
+            if (elementName == "colours") {
+                doc->loadColoursFromXml(reader);
+                continue;
+            }
+
+            if (elementName == "accelerators") {
+                doc->loadAcceleratorsFromXml(reader);
+                continue;
+            }
+
+            if (elementName == "command_history") {
+                doc->m_commandHistory.clear();
+                while (!reader.atEnd()) {
+                    reader.readNext();
+                    if (reader.isEndElement() && reader.name() == QLatin1String("command_history"))
+                        break;
+                    if (reader.isStartElement() && reader.name() == QLatin1String("command")) {
+                        doc->m_commandHistory.append(reader.readElementText());
+                    }
+                }
+                doc->m_historyPosition = doc->m_commandHistory.count();
+                continue;
+            }
+
             // Load plugins from <include plugin="y"> elements at muclient level
             if (elementName == "include") {
                 QXmlStreamAttributes includeAttrs = reader.attributes();
                 if (includeAttrs.value("plugin").toString().toLower() == "y") {
                     QString pluginPath = includeAttrs.value("name").toString();
                     if (!pluginPath.isEmpty()) {
-                        QString fullPath = resolvePluginPath(pluginPath, filename);
+                        QString pluginDir2;
+                        if (doc->m_CurrentPlugin) {
+                            QFileInfo pi2(doc->m_CurrentPlugin->m_strSource);
+                            pluginDir2 = pi2.absolutePath();
+                        }
+                        QString fullPath = resolvePluginPath(pluginPath, filename, pluginDir2);
 
                         QString errorMsg;
-                        Plugin* plugin = doc->LoadPlugin(fullPath, errorMsg);
+                        Plugin* plugin = doc->LoadPlugin(fullPath, errorMsg, true);
                         if (plugin) {
                             qDebug() << "Loaded plugin:" << plugin->m_strName
                                      << "| Aliases:" << plugin->m_AliasMap.size()
@@ -800,6 +907,15 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
         qCDebug(lcWorld) << "LoadWorldXML: Sorted" << doc->m_PluginList.size()
                          << "plugins by sequence";
     }
+
+    // Mark as loaded from disk (original: xml_serialize.cpp:51)
+    doc->m_bLoaded = true;
+
+    // Notify all plugins once after batch loading (original: xml_load_world.cpp:473-474)
+    doc->PluginListChanged();
+
+    // Mark world as loaded (original: xml_load_world.cpp sets m_bLoaded)
+    doc->m_bLoaded = true;
 
     qCDebug(lcWorld) << "LoadWorldXML: successfully loaded from" << filename;
     return true;

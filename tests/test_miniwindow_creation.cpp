@@ -248,7 +248,7 @@ int main(int argc, char* argv[])
     }
 
     result = getGlobalNumber(L, "result");
-    if (result != 30073) { // eNoSuchWindow
+    if (result != static_cast<double>(eNoSuchWindow)) { // eNoSuchWindow
         qDebug() << "✗ FAIL: WindowShow nonexistent should return eNoSuchWindow (30073), got"
                  << result;
         return 1;
@@ -434,7 +434,7 @@ int main(int argc, char* argv[])
     }
 
     result = getGlobalNumber(L, "result");
-    if (result != 30073) { // eNoSuchWindow
+    if (result != static_cast<double>(eNoSuchWindow)) { // eNoSuchWindow
         qDebug() << "✗ FAIL: WindowDelete nonexistent should return eNoSuchWindow (30073), got"
                  << result;
         return 1;

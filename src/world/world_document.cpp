@@ -5,9 +5,11 @@
 #include "../automation/trigger.h"
 #include "../automation/variable.h"
 #include "../network/remote_access_server.h"
+#include "../storage/global_options.h"
 #include "../text/action.h"
 #include "../text/line.h"
 #include "../text/style.h"
+#include "../utils/name_generator.h"
 #include "accelerator_manager.h"
 #include "logging.h"
 #include "miniwindow.h" // MiniWindow (complete type for unique_ptr destructor)
@@ -33,6 +35,7 @@
 #include <array>   // for std::array
 #include <cstring> // for memcpy, strlen
 
+#include "../utils/error_codes.h"
 #include "../utils/url_linkifier.h"
 #include "color_utils.h"
 
@@ -97,7 +100,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_name = QString();
     m_password = QString();
     m_port = 4000; // Default MUD port
-    m_connect_now = false;
+    m_connect_now = eNoAutoConnect;
 
     // ========== Initialize display settings ==========
     // m_display uses default member initializers (DisplayConfig)
@@ -217,7 +220,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_iFlags2 = 0;
 
     // ========== Initialize world ID ==========
-    m_strWorldID = QString(); // Will be generated on save
+    m_strWorldID = generateUniqueID(); // Generate immediately (original: doc_construct.cpp:47)
 
     // ========== Initialize more options (version 15+) ==========
     m_bAlwaysRecordCommandHistory = false;
@@ -242,7 +245,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     // (AutomationDefaultsConfig m_automation_defaults uses default member initializers)
 
     // ========== Initialize HTML logging ==========
-    m_bUnpauseOnSend = false;
+    m_bUnpauseOnSend = true;
     // (LoggingConfig m_logging bool flags use default member initializers)
 
     // ========== Initialize tree views ==========
@@ -251,8 +254,8 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_bTreeviewTimers = true;
 
     // ========== Initialize tooltips ==========
-    m_iToolTipVisibleTime = 30000; // 30 seconds
-    m_iToolTipStartTime = 500;     // 0.5 seconds
+    m_iToolTipVisibleTime = 5000; // 5 seconds (matches table default)
+    m_iToolTipStartTime = 400;    // 0.4 seconds (matches table default)
 
     // ========== Initialize save file options ==========
     m_bOmitSavedDateFromSaveFiles = false;
@@ -392,7 +395,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     }
 
     m_bSyntaxErrorOnly = false;
-    m_bDisconnectOK = false;
+    m_bDisconnectOK = true;
     m_bTrace = false;
     m_bInSendToScript = false;
     m_iScriptTimeTaken = 0;
@@ -423,9 +426,9 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_bPluginProcessesSetEntity = false;
     m_bPluginProcessesError = false;
 
-    m_bRecallCommands = false;
-    m_bRecallOutput = false;
-    m_bRecallNotes = false;
+    m_bRecallCommands = true; // original: doc_construct.cpp:345
+    m_bRecallOutput = true;   // original: doc_construct.cpp:346
+    m_bRecallNotes = true;    // original: doc_construct.cpp:347
 
     // ========== Document ID ==========
     m_iUniqueDocumentNumber = 0;
@@ -451,7 +454,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     // ========== Background Image ==========
     m_strBackgroundImageName = QString();
     m_iBackgroundMode = 0;
-    m_iBackgroundColour = qRgb(0, 0, 0);
+    m_iBackgroundColour = 0xFFFFFFFF; // NO_COLOUR — use default background (original: stdafx.h:252)
 
     // ========== Foreground Image ==========
     m_strForegroundImageName = QString();
@@ -487,7 +490,7 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_bDoingSimulate = false;
     m_bLineOmittedFromOutput = false;
     m_bOmitCurrentLineFromLog = false; //
-    m_bScrollBarWanted = false;
+    m_bScrollBarWanted = true;
 
     // ========== IAC Counters ==========
     // Moved to TelnetParser; initialized to 0 by TelnetParser constructor.
@@ -536,6 +539,10 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     // Audio system is lazy-loaded on first use (in m_soundManager->playSound())
     // This avoids creating audio objects in tests and headless environments.
     // m_soundManager itself is already created above.
+
+    // Note: applyGlobalFontDefaults() is NOT called here.
+    // Original MUSHclient only applies default fonts for new worlds (doc_construct.cpp:696-703),
+    // not when loading existing world files. Caller (MainWindow::newWorld) applies defaults.
 }
 
 WorldDocument::~WorldDocument()
@@ -622,6 +629,27 @@ WorldDocument::~WorldDocument()
     // Clear all miniwindows (unique_ptr handles deletion automatically)
     m_MiniWindowMap.clear();
     m_MiniWindowsOrder.clear();
+}
+
+void WorldDocument::applyGlobalFontDefaults()
+{
+    const auto& opts = GlobalOptions::instance();
+
+    const QString outputFont = opts.defaultOutputFont();
+    if (!outputFont.isEmpty()) {
+        m_output.font_name = outputFont;
+        m_output.font_height = opts.defaultOutputFontHeight();
+        m_bUseDefaultOutputFont = 1;
+    }
+
+    const QString inputFont = opts.defaultInputFont();
+    if (!inputFont.isEmpty()) {
+        m_input.font_name = inputFont;
+        m_input.font_height = opts.defaultInputFontHeight();
+        m_input.font_weight = opts.defaultInputFontWeight();
+        m_input.font_italic = opts.defaultInputFontItalic(); // original: doc_construct.cpp:691
+        m_bUseDefaultInputFont = true;
+    }
 }
 
 void WorldDocument::initializeColors()
@@ -736,7 +764,9 @@ void WorldDocument::ReceiveMsg()
     std::array<char, 8192> buffer{};
     auto result = m_connectionManager->m_pSocket->receive(buffer);
     if (!result) {
-        qCDebug(lcWorld) << "ReceiveMsg: Socket read error:" << result.error();
+        // Original: calls OnClose(GetLastError()) on socket error, triggering disconnect
+        qCWarning(lcWorld) << "ReceiveMsg: Socket read error:" << result.error();
+        OnConnectionDisconnect();
         return;
     }
     qint64 nRead = *result;
@@ -748,11 +778,26 @@ void WorldDocument::ReceiveMsg()
     m_connectionManager->m_nBytesIn += nRead;
     m_connectionManager->m_iInputPacketCount++;
 
-    // Notify plugins of raw packet received (for protocol debugging)
-    // Note: Original MUSHclient uses SendToAllPluginCallbacksRtn which can modify the data
-    // For now, we just notify without modification capability
+    // Debug packet display (original: doc.cpp:5464-5538, Debug_Packets)
+    if (m_bDebugIncomingPackets) {
+        debugPacketData("Incoming", buffer.data(), static_cast<int>(nRead),
+                        m_connectionManager->m_iInputPacketCount);
+    }
+
+    // Let plugins modify the raw packet (filter chain pattern).
+    // Original: doc.cpp:1769 — SendToAllPluginCallbacksRtn allows each plugin to
+    // modify the packet string. If a plugin empties it, the packet is discarded.
     QString packetData = QString::fromLatin1(buffer.data(), nRead);
-    SendToAllPluginCallbacks(ON_PLUGIN_PACKET_RECEIVED, packetData, false);
+    SendToAllPluginCallbacksRtn(ON_PLUGIN_PACKET_RECEIVED, packetData);
+    // Replay any notes/tells queued by plugins during the packet callback.
+    OutputOutstandingLines();
+    if (packetData.isEmpty()) {
+        return; // Plugin discarded the packet
+    }
+    // Update buffer with potentially modified data
+    QByteArray modified = packetData.toLatin1();
+    nRead = std::min(static_cast<qint64>(modified.size()), static_cast<qint64>(buffer.size()));
+    std::memcpy(buffer.data(), modified.constData(), static_cast<size_t>(nRead));
 
     // Check if we need to decompress the data
     auto& tp = *m_telnetParser;
@@ -776,6 +821,54 @@ void WorldDocument::ReceiveMsg()
     // Prompts don't have newlines, so they stay in m_currentLine
     if (m_currentLine && m_currentLine->len() > 0) {
         emit incompleteLine();
+    }
+}
+
+/**
+ * debugPacketData - Format and display packet hex dump
+ *
+ * Original: doc.cpp:5464-5538 (Debug_Packets)
+ * Fires ON_PLUGIN_PACKET_DEBUG for each line of the hex dump.
+ * If no plugin handles it, displays in output window.
+ */
+void WorldDocument::debugPacketData(const char* caption, const char* data, int size,
+                                    qint64 packetNum)
+{
+    constexpr int MAX_DEBUG_CHARS = 16;
+
+    // Header line
+    QString timeStr = QDateTime::currentDateTime().toString("dddd, MMMM d, yyyy, h:mm:ss AP");
+    QString header = QString("\n%1 packet: %2 (%3 bytes) at %4\n\n")
+                         .arg(caption)
+                         .arg(packetNum)
+                         .arg(size)
+                         .arg(timeStr);
+
+    if (!SendToFirstPluginCallbacks(ON_PLUGIN_PACKET_DEBUG, header)) {
+        colourNote(BGR(255, 69, 0), BGR(0, 0, 0), header);
+    }
+
+    // Hex dump lines (16 bytes per line)
+    const auto* p = reinterpret_cast<const unsigned char*>(data);
+    while (size > 0) {
+        QString asciiPart;
+        QString hexPart;
+
+        for (int i = 0; size > 0 && i < MAX_DEBUG_CHARS; size--, i++, p++) {
+            asciiPart += (std::isprint(*p) ? QChar(*p) : QChar('.'));
+            hexPart += QString(" %1").arg(*p, 2, 16, QChar('0'));
+        }
+
+        // Pad ASCII part to MAX_DEBUG_CHARS for alignment
+        while (asciiPart.length() < MAX_DEBUG_CHARS) {
+            asciiPart += ' ';
+        }
+
+        QString line = QString("%1  %2\n").arg(asciiPart, hexPart);
+
+        if (!SendToFirstPluginCallbacks(ON_PLUGIN_PACKET_DEBUG, line)) {
+            colourNote(BGR(255, 69, 0), BGR(0, 0, 0), line);
+        }
     }
 }
 
@@ -805,9 +898,9 @@ void WorldDocument::sendToMud(const QString& text)
     // Convert to UTF-8 (or Latin-1 if not UTF-8 mode)
     QByteArray data = m_display.utf8 ? text.toUtf8() : text.toLatin1();
 
-    // Add newline - most MUDs expect \n, some want \r\n
-    // For now, send just \n (Unix style)
-    data.append('\n');
+    // Telnet protocol requires \r\n line terminator (RFC 854)
+    // Original MUSHclient uses ENDLINE = "\r\n" (doc.cpp:1186-1187)
+    data.append("\r\n");
 
     // Send through socket
     SendPacket({reinterpret_cast<const unsigned char*>(data.constData()),
@@ -840,6 +933,17 @@ void WorldDocument::sendToMud(const QString& text)
  */
 void WorldDocument::SendMsg(const QString& text, bool bEcho, bool bQueue, bool bLog)
 {
+    // Cannot change what we are sending during OnPluginSent (original: doc.cpp:1099-1100)
+    if (m_bPluginProcessingSent) {
+        return;
+    }
+
+    // Suppress echo if MUD requested it (password entry)
+    // Must happen before queue encoding (original: doc.cpp:1106-1107)
+    if (m_telnetParser->m_bNoEcho) {
+        bEcho = false;
+    }
+
     QString strText = text;
 
     // Strip trailing \r\n (ENDLINE in original)
@@ -849,15 +953,27 @@ void WorldDocument::SendMsg(const QString& text, bool bEcho, bool bQueue, bool b
         strText.chop(1);
     }
 
+    // Fix up German umlauts (original: doc.cpp:1114-1115, Utilities.cpp:791-805)
+    if (m_bTranslateGerman) {
+        strText.replace(QChar(0xFC), QStringLiteral("ue")); // ü → ue
+        strText.replace(QChar(0xDC), QStringLiteral("Ue")); // Ü → Ue
+        strText.replace(QChar(0xE4), QStringLiteral("ae")); // ä → ae
+        strText.replace(QChar(0xC4), QStringLiteral("Ae")); // Ä → Ae
+        strText.replace(QChar(0xF6), QStringLiteral("oe")); // ö → oe
+        strText.replace(QChar(0xD6), QStringLiteral("Oe")); // Ö → Oe
+        strText.replace(QChar(0xDF), QStringLiteral("ss")); // ß → ss
+    }
+
     // Break into individual lines (split on \r\n or \n)
     // First replace \r\n with \n, then split on \n
     QString normalized = strText;
     normalized.replace("\r\n", "\n");
-    QStringList lines = normalized.split("\n", Qt::SkipEmptyParts);
+    // Keep empty parts — original sends blank lines as ENDLINE (pressing Enter)
+    QStringList lines = normalized.split("\n", Qt::KeepEmptyParts);
 
-    // If no lines after splitting, treat as single empty line
+    // Guarantee at least one entry (original: StringToList always has at least one)
     if (lines.isEmpty()) {
-        lines.append(strText);
+        lines.append(QString());
     }
 
     auto& commandQueue = m_connectionManager->m_CommandQueue;
@@ -865,16 +981,16 @@ void WorldDocument::SendMsg(const QString& text, bool bEcho, bool bQueue, bool b
     for (const QString& line : lines) {
         // Queue if speedwalk delay active OR already items in queue
         if (m_speedwalk.delay > 0 && (bQueue || !commandQueue.isEmpty())) {
-            // Encode echo/log flags in prefix character
-            // Original uses: Q = queue+echo, q = queue+no-echo,
-            //                I = immediate+echo, i = immediate+no-echo
-            // Lowercase prefix = no logging
-            QString prefix;
+            // Encode echo/log flags in prefix character using original's scheme:
+            // E=queue+echo, N=queue+no-echo, I=immediate+echo, W=immediate+no-echo
+            // Lowercase = no logging (e/n/i/w)
+            // (original: doc.h:241-249, doc.cpp:1140-1153)
+            QChar prefix;
 
             if (bQueue) {
-                prefix = bEcho ? "Q" : "q"; // QUEUE_WITH_ECHO / QUEUE_WITHOUT_ECHO
+                prefix = bEcho ? QChar('E') : QChar('N');
             } else {
-                prefix = bEcho ? "I" : "i"; // IMMEDIATE_WITH_ECHO / IMMEDIATE_WITHOUT_ECHO
+                prefix = bEcho ? QChar('I') : QChar('W');
             }
 
             // Lowercase = no logging
@@ -884,6 +1000,12 @@ void WorldDocument::SendMsg(const QString& text, bool bEcho, bool bQueue, bool b
 
             // Queue it
             commandQueue.append(prefix + line);
+
+            // Start the drain timer if not already running
+            if (!m_connectionManager->m_pQueueTimer->isActive()) {
+                m_connectionManager->m_pQueueTimer->setInterval(m_speedwalk.delay);
+                m_connectionManager->m_pQueueTimer->start();
+            }
         } else {
             // Send immediately
             DoSendMsg(line, bEcho, bLog);
@@ -1083,6 +1205,14 @@ void WorldDocument::DoSendMsg(const QString& text, bool bEcho, bool bLog)
         m_iLastCommandCount = 1;
     }
 
+    // ========== Plugin Sent Notification ==========
+    // Original fires ON_PLUGIN_SENT BEFORE echo/log/send (doc.cpp:1230-1234)
+    if (!m_bPluginProcessingSent) {
+        m_bPluginProcessingSent = true;
+        SendToAllPluginCallbacks(ON_PLUGIN_SENT, str, false);
+        m_bPluginProcessingSent = false;
+    }
+
     // ========== Input Echoing ==========
     // Echo sent text to output window if requested
     // Don't echo if m_bNoEcho is set (MUD requested echo suppression for password entry)
@@ -1114,8 +1244,8 @@ void WorldDocument::DoSendMsg(const QString& text, bool bEcho, bool bLog)
             }
         }
 
-        // Send the doubled data + newline
-        doubled.append('\n');
+        // Send the doubled data + \r\n (telnet line terminator)
+        doubled.append("\r\n");
         SendPacket({reinterpret_cast<const unsigned char*>(doubled.constData()),
                     static_cast<std::size_t>(doubled.length())});
     } else {
@@ -1126,14 +1256,6 @@ void WorldDocument::DoSendMsg(const QString& text, bool bEcho, bool bLog)
     // Update statistics
     m_connectionManager->m_nTotalLinesSent++;
     m_tLastPlayerInput = QDateTime::currentDateTime();
-
-    // Notify plugins that send completed
-    // Use recursion guard to prevent infinite loops if plugin calls Send()
-    if (!m_bPluginProcessingSent) {
-        m_bPluginProcessingSent = true;
-        SendToAllPluginCallbacks(ON_PLUGIN_SENT, str, false);
-        m_bPluginProcessingSent = false;
-    }
 
     qCDebug(lcWorld) << "DoSendMsg:" << str << "(echo=" << bEcho << ", log=" << bLog << ")";
 }
@@ -1148,32 +1270,63 @@ void WorldDocument::DoSendMsg(const QString& text, bool bEcho, bool bLog)
  */
 void WorldDocument::logCommand(const QString& text)
 {
-    if (!IsLogOpen()) {
+    // Original: doc.cpp:6093-6160 — LogCommand
+    if (!IsLogOpen() || !m_logging.log_input || m_logging.log_raw) {
         return;
     }
 
-    // Write preamble (if any)
-    if (!m_logging.line_preamble_input.isEmpty()) {
-        QString preamble = FormatTime(QDateTime::currentDateTime(), m_logging.line_preamble_input,
-                                      m_logging.log_html);
-        WriteToLog(preamble);
+    // Strip trailing \r\n and normalize \r\n → \n
+    QString message = text;
+    if (message.endsWith("\r\n")) {
+        message.chop(2);
     }
+    message.replace("\r\n", "\n");
 
-    // Write the command text
+    // Preamble with %n expansion and time formatting
+    QString preamble = m_logging.line_preamble_input;
+    preamble.replace("%n", "\n");
+    if (preamble.contains('%')) {
+        preamble = FormatTime(QDateTime::currentDateTime(), preamble, m_logging.log_html);
+    }
+    WriteToLog(preamble);
+
+    // HTML: escape + optional echo color wrapping
     if (m_logging.log_html) {
-        WriteToLog(FixHTMLString(text));
-    } else {
-        WriteToLog(text);
+        message = FixHTMLString(message);
+
+        // Wrap in echo color if logging in colour and echo_colour is set
+        // Original: doc.cpp:6137-6144 — uses m_echo_colour index into m_customtext
+        // SAMECOLOUR = 65535 (no custom colour)
+        if (m_logging.log_in_colour && m_output.echo_colour != 65535) {
+            // echo_colour is an index into m_colors.custom_text (BGR format)
+            if (m_output.echo_colour >= 0 &&
+                m_output.echo_colour < static_cast<int>(m_colors.custom_text.size())) {
+                QRgb bgr = m_colors.custom_text[m_output.echo_colour];
+                int r = bgr & 0xFF;
+                int g = (bgr >> 8) & 0xFF;
+                int b = (bgr >> 16) & 0xFF;
+                WriteToLog(QString("<font color=\"#%1%2%3\">")
+                               .arg(r, 2, 16, QChar('0'))
+                               .arg(g, 2, 16, QChar('0'))
+                               .arg(b, 2, 16, QChar('0')));
+            }
+        }
     }
 
-    // Write postamble (if any)
-    if (!m_logging.line_postamble_input.isEmpty()) {
-        QString postamble = FormatTime(QDateTime::currentDateTime(), m_logging.line_postamble_input,
-                                       m_logging.log_html);
-        WriteToLog(postamble);
+    WriteToLog(message);
+
+    // Close color tag
+    if (m_logging.log_html && m_logging.log_in_colour && m_output.echo_colour != 65535) {
+        WriteToLog("</font>");
     }
 
-    // Always add newline after command
+    // Postamble with %n expansion and time formatting
+    QString postamble = m_logging.line_postamble_input;
+    postamble.replace("%n", "\n");
+    if (postamble.contains('%')) {
+        postamble = FormatTime(QDateTime::currentDateTime(), postamble, m_logging.log_html);
+    }
+    WriteToLog(postamble);
     WriteToLog("\n");
 }
 
@@ -1197,34 +1350,77 @@ void WorldDocument::logCommand(const QString& text)
  *
  * @param command - User-entered command (may contain multiple commands)
  */
-void WorldDocument::Execute(const QString& command, bool allowScriptPrefix)
+/**
+ * checkConnected - Prompt to reconnect if not connected
+ *
+ * Returns true if NOT connected (caller should abort the send).
+ * Based on original doc.cpp:5158-5197.
+ */
+bool WorldDocument::checkConnected()
 {
+    // No reconnecting while disconnecting
+    if (connectPhase() == eConnectDisconnecting)
+        return true;
+
+    if (connectPhase() != eConnectConnectedToMud) {
+        // Don't prompt for null address
+        if (m_server.isEmpty() || m_server == "0.0.0.0")
+            return true;
+
+        if (connectPhase() != eConnectNotConnected) {
+            // Connection in progress
+            QMessageBox::information(
+                nullptr, QStringLiteral("Mushkin"),
+                QStringLiteral("The connection to %1 is currently being established.")
+                    .arg(m_mush_name));
+        } else {
+            // Not connected — offer to reconnect
+            int result = QMessageBox::question(
+                nullptr, QStringLiteral("Mushkin"),
+                QStringLiteral("The connection to %1 is not open. Attempt to reconnect?")
+                    .arg(m_mush_name),
+                QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+            if (result == QMessageBox::Yes) {
+                m_connectionManager->connectToMud();
+            }
+        }
+        return true;
+    }
+
+    return false;
+}
+
+void WorldDocument::Execute(const QString& command, bool allowScriptPrefix, bool addHistory,
+                            const QString& originalCommand)
+{
+    // Recursion depth guard — prevents infinite alias loops from crashing.
+    // Original: methods_commands.cpp:254 — MAX_EXECUTION_DEPTH = 100
+    constexpr int MAX_EXECUTION_DEPTH = 100;
+    if (++m_iExecutionDepth > MAX_EXECUTION_DEPTH) {
+        --m_iExecutionDepth;
+        return; // Original returns eCommandsNestedTooDeeply to Lua caller
+    }
+    // RAII guard to decrement depth on any return path
+    struct DepthGuard {
+        qint32& depth;
+        ~DepthGuard()
+        {
+            --depth;
+        }
+    } depthGuard{m_iExecutionDepth};
+
+    // Save and restore plugin context across Execute() calls
+    // (original: methods_commands.cpp:258,272,295,379,397)
+    Plugin* savedPlugin = m_CurrentPlugin;
+    m_CurrentPlugin = nullptr;
+    const auto restorePlugin = qScopeGuard([&] { m_CurrentPlugin = savedPlugin; });
+
     QString strFixedCommand = command;
 
-    // ========== Auto-Say Mode ==========
-    // Handle auto-say mode and override prefix
-    // Based on sendvw.cpp
-    // When auto-say is enabled, commands are prepended with "say " unless overridden
-
-    bool bAutoSay = m_auto_say.enabled;
-
-    // Check for override prefix to disable auto-say for this command
-    if (bAutoSay && !m_auto_say.override_prefix.isEmpty() &&
-        strFixedCommand.startsWith(m_auto_say.override_prefix)) {
-        bAutoSay = false;
-        strFixedCommand = strFixedCommand.mid(m_auto_say.override_prefix.length()); // Strip prefix
-    }
-
-    // Exclude auto-say string itself (prevent "say say hello")
-    if (bAutoSay && !m_auto_say.say_string.isEmpty() &&
-        strFixedCommand.startsWith(m_auto_say.say_string)) {
-        bAutoSay = false;
-    }
-
-    // If auto-say is still enabled, prepend the auto-say string
-    if (bAutoSay && !m_auto_say.say_string.isEmpty()) {
-        strFixedCommand = m_auto_say.say_string + strFixedCommand;
-    }
+    // NOTE: Auto-say is NOT applied here. The original MUSHclient explicitly
+    // removed auto-say from Execute() — it only applies in the UI layer
+    // (CSendView::SendCommand / WorldWidget::sendCommand). Lua scripts
+    // calling Execute() should NOT get auto-say prefix prepended.
 
     // ========== Script Prefix ==========
     // Check for script prefix to execute Lua code directly
@@ -1249,8 +1445,12 @@ void WorldDocument::Execute(const QString& command, bool allowScriptPrefix)
     // Check for speedwalk prefix BEFORE command stacking
     // Based on evaluate.cpp
 
-    if (m_speedwalk.enabled && !m_speedwalk.prefix.isEmpty() &&
-        strFixedCommand.startsWith(m_speedwalk.prefix)) {
+    // Original (evaluate.cpp:39-40) does NOT guard against empty prefix.
+    // An empty prefix means ALL input is treated as speedwalk (matches original).
+    if (m_speedwalk.enabled && strFixedCommand.startsWith(m_speedwalk.prefix)) {
+        // Check connection before processing speedwalk (original: evaluate.cpp:52-53)
+        if (connectPhase() != eConnectConnectedToMud)
+            return;
         // Remove prefix and evaluate speedwalk
         QString speedwalkInput = strFixedCommand.mid(m_speedwalk.prefix.length());
         QString expandedSpeedwalk = speedwalk::evaluate(speedwalkInput, m_speedwalk.filler);
@@ -1309,22 +1509,23 @@ void WorldDocument::Execute(const QString& command, bool allowScriptPrefix)
 
     // Process each command individually
     for (const QString& str : strList) {
+        // Fire ON_PLUGIN_COMMAND per stacked sub-command (original: methods_commands.cpp:362).
+        // Plugin can return false to suppress this individual sub-command.
+        if (!m_bPluginProcessingCommand) {
+            m_bPluginProcessingCommand = true;
+            bool shouldSend = SendToAllPluginCallbacks(ON_PLUGIN_COMMAND, str, true);
+            m_bPluginProcessingCommand = false;
+            if (!shouldSend) {
+                continue; // Plugin suppressed this sub-command
+            }
+        }
+
         QString processedCommand = str;
         bool bypassAliases = false;
 
-        // ========== Immediate Prefix ==========
-        // Check for immediate prefix to bypass alias system
-        // Default prefix is "/" - sends command directly to MUD
-        // This allows users to bypass troublesome aliases temporarily
-
-        QString immediatePrefix = "/"; // Default immediate prefix
-        if (!immediatePrefix.isEmpty() && processedCommand.startsWith(immediatePrefix)) {
-            // Remove prefix and set flag to bypass aliases
-            processedCommand = processedCommand.mid(immediatePrefix.length());
-            bypassAliases = true;
-        }
-
         // ========== Alias Evaluation ==========
+        // Reset omit flag before alias evaluation (original: sendvw.cpp:602)
+        m_bOmitFromCommandHistory = false;
         bool aliasHandled = false;
 
         if (m_enable_aliases && !bypassAliases) {
@@ -1338,13 +1539,21 @@ void WorldDocument::Execute(const QString& command, bool allowScriptPrefix)
             bool bQueue = false;
             bool bLog = m_logging.log_input;
 
-            SendMsg(processedCommand, bEcho, bQueue, bLog);
+            // Check for QUIT macro — suppress auto-reconnect on deliberate quit
+            // Original: evaluate.cpp:143 — m_macros[MAC_QUIT] defaults to "QUIT"
+            if (processedCommand.compare(QStringLiteral("QUIT"), Qt::CaseInsensitive) == 0) {
+                m_bDisconnectOK = true;
+            }
 
-            // Add to command history
-            addToCommandHistory(processedCommand);
+            SendMsg(processedCommand, bEcho, bQueue, bLog);
         }
-        // Note: If alias handled, the alias execution already added to history (if
-        // !omit_from_command_history)
+
+        // Add original command to history AFTER alias cycle (original: sendvw.cpp:713-714)
+        // Use the original typed command (before escape processing) if provided
+        // Alias omit_from_command_history flag sets m_bOmitFromCommandHistory during execution
+        if (addHistory && !m_bOmitFromCommandHistory) {
+            addToCommandHistory(originalCommand.isEmpty() ? str : originalCommand);
+        }
     }
 }
 
@@ -1409,7 +1618,7 @@ qint32 WorldDocument::SetCommand(const QString& text)
 
     QString current = m_pActiveInputView->inputText();
     if (!current.isEmpty()) {
-        return 30011; // eCommandNotEmpty
+        return eCommandNotEmpty;
     }
 
     m_pActiveInputView->setInputText(text);
@@ -1506,7 +1715,7 @@ QString WorldDocument::PushCommand()
  * @param whichColour Index of custom color (1-16)
  * @param name Name for the color (1-30 characters)
  * @return eOK (0) on success,
- *         eOptionOutOfRange (30009) if whichColour out of range,
+ *         eOptionOutOfRange (30026) if whichColour out of range,
  *         eNoNameSpecified (30003) if name is empty,
  *         eInvalidObjectLabel (30008) if name too long
  */
@@ -1514,17 +1723,17 @@ qint32 WorldDocument::SetCustomColourName(qint16 whichColour, const QString& nam
 {
     // Validate color index (1-based, matches original which checks against MAX_CUSTOM)
     if (whichColour < 1 || whichColour > MAX_CUSTOM) {
-        return 30009; // eOptionOutOfRange
+        return eOptionOutOfRange;
     }
 
     // Validate name not empty (original uses strlen > 0)
     if (name.length() <= 0) {
-        return 30003; // eNoNameSpecified
+        return eNoNameSpecified;
     }
 
     // Validate name length (max 30 characters)
     if (name.length() > 30) {
-        return 30008; // eInvalidObjectLabel
+        return eInvalidObjectLabel;
     }
 
     // Check if changed and mark document modified (matches original ordering)
@@ -1629,9 +1838,56 @@ void WorldDocument::AddLineToBuffer(std::unique_ptr<Line> line)
     m_lineList.push_back(std::move(line));
 
     // Trim buffer if too large
+    trimLineBuffer();
+}
+
+void WorldDocument::trimLineBuffer()
+{
     while (static_cast<qint32>(m_lineList.size()) > m_display.max_lines) {
-        m_lineList.erase(m_lineList.begin()); // oldest line is deleted automatically
+        m_lineList.erase(m_lineList.begin());
     }
+}
+
+QString WorldDocument::fixupEscapeSequences(const QString& input) const
+{
+    // Translate backslash escape sequences (original: Utilities.cpp FixupEscapeSequences)
+    QString result;
+    result.reserve(input.length());
+    for (int i = 0; i < input.length(); ++i) {
+        if (input[i] == '\\' && i + 1 < input.length()) {
+            ++i;
+            switch (input[i].toLatin1()) {
+                case 'a':
+                    result += '\a';
+                    break;
+                case 'b':
+                    result += '\b';
+                    break;
+                case 'f':
+                    result += '\f';
+                    break;
+                case 'n':
+                    result += '\n';
+                    break;
+                case 'r':
+                    result += '\r';
+                    break;
+                case 't':
+                    result += '\t';
+                    break;
+                case '\\':
+                    result += '\\';
+                    break;
+                default:
+                    result += '\\';
+                    result += input[i];
+                    break; // unknown: keep both
+            }
+        } else {
+            result += input[i];
+        }
+    }
+    return result;
 }
 
 // ========== AddToLine() - Character Accumulation ==========
@@ -1752,9 +2008,22 @@ void WorldDocument::AddToLine(const char* sText, int iLength)
 
     // Check if line needs to wrap (exceeds wrap column)
     // Only wrap if m_display.wrap_column > 0 (0 means no wrapping)
-    if (m_display.wrap_column > 0 &&
-        m_currentLine->len() >= static_cast<qint32>(m_display.wrap_column)) {
-        handleLineWrap();
+    // Original (doc.cpp:1486-1512): in UTF-8 mode, compare character count, not byte count
+    if (m_display.wrap_column > 0) {
+        qint32 lineWidth = m_currentLine->len();
+        if (m_display.utf8) {
+            // Count UTF-8 characters by skipping continuation bytes (10xxxxxx)
+            lineWidth = 0;
+            auto text = m_currentLine->text();
+            for (qint32 i = 0; i < static_cast<qint32>(text.size()); i++) {
+                if ((static_cast<unsigned char>(text[i]) & 0xC0) != 0x80) {
+                    lineWidth++;
+                }
+            }
+        }
+        if (lineWidth >= static_cast<qint32>(m_display.wrap_column)) {
+            handleLineWrap();
+        }
     }
 }
 
@@ -1785,6 +2054,9 @@ void WorldDocument::AddToLine(unsigned char c)
  * 3. Break at the space, carry text after space to new line
  * 4. Otherwise, hard break at the column boundary
  */
+// Forward declaration — defined after adjustStylesForTruncation
+static std::vector<std::unique_ptr<Style>> migrateStylesForWrap(Line* oldLine, int truncateAt);
+
 void WorldDocument::handleLineWrap()
 {
     if (!m_currentLine) {
@@ -1793,27 +2065,49 @@ void WorldDocument::handleLineWrap()
 
     qint32 lineLen = m_currentLine->len();
 
-    // Determine break point
+    // Determine break point by scanning line for split candidates
+    // (original: doc.cpp:1520-1546 — scans for Big5, GB2312, and spaces)
+    // Scan only up to wrap_column since Mushkin adds text in bulk (original adds per-char)
     int breakPoint = -1;
+    int wrapCol = static_cast<int>(m_display.wrap_column);
 
-    // If word-wrap is enabled and we have a valid space position
-    if (m_display.wrap && m_lastSpace >= 0) {
-        // Check that the text after the space isn't too long
-        // (if remaining text is >= wrap column, we'd have to break again immediately)
-        qint32 remainingLen = lineLen - m_lastSpace;
-        if (remainingLen < static_cast<qint32>(m_display.wrap_column)) {
-            breakPoint = m_lastSpace;
+    if (lineLen >= wrapCol && lineLen >= 2) {
+        auto text = m_currentLine->text();
+        int scanLimit = qMin(static_cast<int>(text.size()) - 1, wrapCol);
+        for (int i = 0; i < scanLimit; i++) {
+            auto c1 = static_cast<unsigned char>(text[i]);
+            auto c2 = static_cast<unsigned char>(text[i + 1]);
+            // Big5 double-byte detection (not for UTF-8)
+            if (c1 >= 0x81 && c1 <= 0xFE &&
+                ((c2 >= 0x40 && c2 <= 0x7E) || (c2 >= 0xA1 && c2 <= 0xFE)) && !m_display.utf8) {
+                breakPoint = i++;
+            }
+            // GB2312 double-byte detection (not for UTF-8)
+            else if (c1 >= 0xA1 && c1 <= 0xF7 && c2 >= 0xA1 && c2 <= 0xFE && !m_display.utf8) {
+                breakPoint = i++;
+            }
+            // Space break point (only with word-wrap enabled)
+            else if (c1 == ' ' && m_display.wrap) {
+                breakPoint = i;
+            }
+        }
+        // Allow space at the wrap column boundary (original: doc.cpp:1543-1544)
+        if (wrapCol > 0 && wrapCol <= lineLen &&
+            static_cast<unsigned char>(text[wrapCol - 1]) == ' ' && m_display.wrap) {
+            breakPoint = wrapCol - 1;
         }
     }
 
-    if (breakPoint >= 0) {
-        // Word-wrap: break at the space
-        // Original MUSHclient behavior (doc.cpp:1557-1562):
-        // When m_display.indent_paras is false (normal case), KEEP the space at end of this line
-        // This ensures soft-wrapped lines display correctly when joined
+    // If no break found, or remaining text too long, will hard-break below
+    if (breakPoint >= 0 && (lineLen - breakPoint) >= wrapCol) {
+        breakPoint = -1;
+    }
 
-        // Save the text AFTER the space to carry over to the next line
-        int carryOverStart = breakPoint + 1; // Text starts after the space
+    if (breakPoint >= 0) {
+        // Word-wrap at break point (original: doc.cpp:1552-1633)
+        // Keep space on this line (indent_paras=false default)
+        int truncateAt = breakPoint + 1;
+        int carryOverStart = truncateAt;
         int carryOverLen = lineLen - carryOverStart;
 
         QByteArray carryOver;
@@ -1821,32 +2115,49 @@ void WorldDocument::handleLineWrap()
             carryOver = QByteArray(m_currentLine->text().data() + carryOverStart, carryOverLen);
         }
 
-        // Truncate current line AFTER the space (include the space in this line)
-        // This matches original MUSHclient when m_display.indent_paras is false
-        int truncateAt = breakPoint + 1; // Keep up to and including the space
+        // Truncate old line text
         m_currentLine->textBuffer.resize(truncateAt);
         m_currentLine->textBuffer.push_back('\0');
 
-        // Adjust styles: need to truncate styles to match new line length
-        adjustStylesForTruncation(truncateAt);
+        // Migrate styles from old line BEFORE StartNewLine (original: doc.cpp:1586-1628)
+        auto migratedStyles = migrateStylesForWrap(m_currentLine.get(), truncateAt);
 
-        // Start new line (soft wrap - bNewLine=false)
+        // Start new line (soft wrap)
         StartNewLine(false, 0);
-
-        // Reset last space tracking for new line
         m_lastSpace = -1;
 
-        // Add carried-over text to new line
         if (carryOverLen > 0) {
-            // Temporarily disable wrap checking to avoid recursion
-            quint16 savedWrapColumn = m_display.wrap_column;
-            m_display.wrap_column = 0;
+            // Remove the new line's empty initial style — replace with migrated styles
+            m_currentLine->styleList.clear();
 
-            AddToLine(carryOver.constData(), carryOverLen);
+            // Copy carried-over text directly into new line buffer
+            m_currentLine->textBuffer.resize(carryOverLen);
+            memcpy(m_currentLine->textBuffer.data(), carryOver.constData(), carryOverLen);
+            m_currentLine->textBuffer.push_back('\0');
 
-            m_display.wrap_column = savedWrapColumn;
+            // Install migrated styles on the new line
+            if (!migratedStyles.empty()) {
+                m_currentLine->styleList = std::move(migratedStyles);
+            } else {
+                // No styles migrated — create a default style covering the text
+                auto defaultStyle = std::make_unique<Style>();
+                defaultStyle->iLength = static_cast<quint16>(carryOverLen);
+                defaultStyle->iFlags = m_iFlags;
+                defaultStyle->iForeColour = m_iForeColour;
+                defaultStyle->iBackColour = m_iBackColour;
+                defaultStyle->pAction = m_currentAction;
+                m_currentLine->styleList.push_back(std::move(defaultStyle));
+            }
 
-            // Re-check for wrap (in case carried text is still too long)
+            // Track spaces in carried-over text
+            for (int i = 0; i < carryOverLen; i++) {
+                if (carryOver[i] == ' ' &&
+                    (m_display.wrap_column == 0 || i < static_cast<int>(m_display.wrap_column))) {
+                    m_lastSpace = i;
+                }
+            }
+
+            // Re-check for wrap (carried text may still exceed column)
             if (m_display.wrap_column > 0 &&
                 m_currentLine->len() >= static_cast<qint32>(m_display.wrap_column)) {
                 handleLineWrap();
@@ -1931,6 +2242,62 @@ void WorldDocument::adjustStylesForTruncation(qint32 newLength)
     }
 }
 
+/**
+ * migrateStylesForWrap - Split styles between old and new line at break point
+ *
+ * Original: doc.cpp:1586-1628
+ * Counts styles that extend past the truncation point on the old line,
+ * moves them to the returned vector for the new line, and handles
+ * styles that span the break point by splitting them.
+ *
+ * @param oldLine The line being truncated
+ * @param truncateAt The byte position where the line is being split
+ * @return Vector of styles to prepend to the new line
+ */
+static std::vector<std::unique_ptr<Style>> migrateStylesForWrap(Line* oldLine, int truncateAt)
+{
+    std::vector<std::unique_ptr<Style>> migrated;
+
+    // Count cumulative lengths to find which styles extend past truncateAt
+    int cumLen = 0;
+    int oldCumLen = 0; // cumulative length of styles staying on old line
+    int moveCount = 0;
+
+    for (const auto& s : oldLine->styleList) {
+        cumLen += s->iLength;
+        if (cumLen > truncateAt) {
+            moveCount++;
+        } else {
+            oldCumLen += s->iLength;
+        }
+    }
+
+    // Move styles from tail of old line (going backwards preserves order when prepending)
+    for (int i = 0; i < moveCount && !oldLine->styleList.empty(); i++) {
+        migrated.insert(migrated.begin(), std::move(oldLine->styleList.back()));
+        oldLine->styleList.pop_back();
+    }
+
+    // Handle shared style — if oldCumLen < truncateAt, a style spans the break point
+    if (oldCumLen < truncateAt && !migrated.empty()) {
+        int diff = truncateAt - oldCumLen; // bytes staying on old line from shared style
+
+        // Reduce the migrated style's length (it loses the portion staying on old line)
+        migrated.front()->iLength -= static_cast<quint16>(diff);
+
+        // Create a copy for the old line's tail with the remaining bytes
+        auto tailStyle = std::make_unique<Style>();
+        tailStyle->iLength = static_cast<quint16>(diff);
+        tailStyle->iFlags = migrated.front()->iFlags;
+        tailStyle->iForeColour = migrated.front()->iForeColour;
+        tailStyle->iBackColour = migrated.front()->iBackColour;
+        tailStyle->pAction = migrated.front()->pAction;
+        oldLine->styleList.push_back(std::move(tailStyle));
+    }
+
+    return migrated;
+}
+
 // ========== Lua Function Callbacks ==========
 
 // NOTE: onWorldConnect(), onWorldDisconnect(), OnConnectionDisconnect() implementation
@@ -2004,7 +2371,12 @@ void WorldDocument::StartNewLine(bool bNewLine, unsigned char iFlags)
                 m_recentLines.pop_front();
             }
 
+            // Reset omit flag before trigger evaluation (original: ProcessPreviousLine.cpp:322)
+            m_bLineOmittedFromOutput = false;
+
             evaluateTriggers(m_currentLine.get());
+            // Replay any notes/tells that plugins queued during trigger callbacks.
+            OutputOutstandingLines();
         }
 
         // Line-level logging integration
@@ -2034,8 +2406,15 @@ void WorldDocument::StartNewLine(bool bNewLine, unsigned char iFlags)
             }
         }
 
-        // Add completed line to buffer (ownership transferred via move)
-        AddLineToBuffer(std::move(m_currentLine));
+        // If trigger set omit_from_output, discard the line (original:
+        // ProcessPreviousLine.cpp:605-697) Note: original deletes from line list; we skip adding
+        // entirely
+        if (m_bLineOmittedFromOutput) {
+            m_currentLine.reset(); // discard line, don't add to buffer
+        } else {
+            // Add completed line to buffer (ownership transferred via move)
+            AddLineToBuffer(std::move(m_currentLine));
+        }
     }
 
     // Create new line
@@ -2047,11 +2426,35 @@ void WorldDocument::StartNewLine(bool bNewLine, unsigned char iFlags)
     QRgb initialFore = m_iForeColour;
     QRgb initialBack = m_iBackColour;
 
-    // Special handling for user input and comments (like original)
-    if (iFlags & USER_INPUT) {
-        // TODO(feature): Apply m_output.echo_colour setting to echoed command text.
+    // Apply echo/note colors to new line's initial style (original: doc.cpp:1673-1710)
+    if ((iFlags & USER_INPUT) && m_output.echo_colour != 65535) {
+        // User input with custom echo color: COLOUR_CUSTOM index
+        initialFlags = COLOUR_CUSTOM;
+        initialFore = m_output.echo_colour;
+        initialBack = BLACK;
     } else if (iFlags & COMMENT) {
-        // TODO(feature): Apply m_colors.note_text_colour setting to Note() output text.
+        if (m_bNotesInRGB) {
+            // Note in RGB mode: direct RGB colors
+            initialFlags = COLOUR_RGB | m_iNoteStyle;
+            initialFore = m_iNoteColourFore;
+            initialBack = m_iNoteColourBack;
+        } else if (m_colors.note_text_colour == 65535) {
+            // SAMECOLOUR: use custom_text[15] or default ANSI white/black
+            if (m_bCustom16isDefaultColour) {
+                initialFlags = COLOUR_CUSTOM | m_iNoteStyle;
+                initialFore = 15; // custom text index 15
+                initialBack = 0;  // custom back index 0
+            } else {
+                initialFlags = COLOUR_ANSI | m_iNoteStyle;
+                initialFore = ANSI_WHITE;
+                initialBack = ANSI_BLACK;
+            }
+        } else {
+            // Custom note text colour: COLOUR_CUSTOM index
+            initialFlags = COLOUR_CUSTOM | m_iNoteStyle;
+            initialFore = m_colors.note_text_colour;
+            initialBack = BLACK;
+        }
     }
 
     // Create new Line object
@@ -2101,8 +2504,8 @@ void WorldDocument::StartNewLine(bool bNewLine, unsigned char iFlags)
  */
 void WorldDocument::addToCommandHistory(const QString& command)
 {
-    // Don't add empty commands
-    if (command.trimmed().isEmpty()) {
+    // Don't add empty commands (original: strlen(Message) > 0 — only rejects truly empty)
+    if (command.isEmpty()) {
         return;
     }
 
@@ -2628,20 +3031,55 @@ bool WorldDocument::isConnectedToMud() const
     return m_connectionManager && m_connectionManager->m_iConnectPhase == eConnectConnectedToMud;
 }
 
+/**
+ * OutputOutstandingLines - Replay notes/tells queued during plugin callbacks.
+ *
+ * While m_bNotesNotWantedNow is true (e.g. during OnPluginPacketReceived or
+ * OnPluginLineReceived), colourNote/colourTell push to m_OutstandingLines
+ * instead of writing directly. This function flushes that queue once the
+ * callback returns and normal output is permitted again.
+ *
+ * Matches MUSHclient doc.cpp OutputOutstandingLines().
+ */
+void WorldDocument::OutputOutstandingLines()
+{
+    if (m_OutstandingLines.empty()) {
+        return;
+    }
+
+    // Save current display state so we can restore it afterward.
+    quint16 savedFlags = m_iFlags;
+    QRgb savedFore = m_iForeColour;
+    QRgb savedBack = m_iBackColour;
+    quint16 savedNoteStyle = m_iNoteStyle;
+
+    for (const auto& deferred : m_OutstandingLines) {
+        m_iForeColour = deferred.foreColor;
+        m_iBackColour = deferred.backColor;
+        m_iNoteStyle = deferred.style;
+        m_iFlags = COLOUR_RGB | deferred.style;
+        // Route through colourNote — m_bNotesNotWantedNow is now false so
+        // this outputs immediately and won't re-queue.
+        m_outputFormatter->colourNote(deferred.foreColor, deferred.backColor, deferred.text);
+    }
+
+    m_OutstandingLines.clear();
+
+    // Restore display state.
+    m_iFlags = savedFlags;
+    m_iForeColour = savedFore;
+    m_iBackColour = savedBack;
+    m_iNoteStyle = savedNoteStyle;
+}
+
 void WorldDocument::flushLogIfNeeded()
 {
+    // Original (timers.cpp:272-288) flushes every 120 seconds (2 minutes)
     if (m_logfile && m_logfile->isOpen()) {
         QDateTime now = QDateTime::currentDateTime();
-        qint64 elapsed = m_LastFlushTime.secsTo(now);
-        if (elapsed > 120) {
+        if (m_LastFlushTime.isValid() && m_LastFlushTime.secsTo(now) > 120) {
             m_LastFlushTime = now;
-            QString savedFileName = m_logfile_name;
-            m_logfile->close();
-            QIODevice::OpenMode mode = QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text;
-            if (!m_logfile->open(mode)) {
-                qCDebug(lcLogging)
-                    << "flushLogIfNeeded: Failed to reopen log file" << savedFileName;
-            }
+            m_logfile->flush();
         }
     }
 }

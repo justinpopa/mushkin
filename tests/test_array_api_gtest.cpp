@@ -11,19 +11,10 @@
  * - ArrayExport, ArrayExportKeys, ArrayImport
  */
 
+#include "../src/utils/error_codes.h"
 #include "../src/world/script_engine.h"
 #include "../src/world/world_document.h"
 #include "fixtures/world_fixtures.h"
-
-// Error code constants (from lua_common.h)
-#define eOK 0
-#define eArrayAlreadyExists 30055
-#define eArrayDoesNotExist 30056
-#define eArrayNotEvenNumberOfValues 30057
-#define eImportedWithDuplicates 30058
-#define eBadDelimiter 30059
-#define eSetReplacingExistingValue 30060
-#define eKeyDoesNotExist 30061
 
 // Test fixture for Array API tests
 class ArrayAPITest : public ::testing::Test {
@@ -288,10 +279,10 @@ TEST_F(ArrayAPITest, ArrayListKeys)
     )");
     EXPECT_EQ(getInt("keycount"), 3) << "ArrayListKeys should return 3 keys";
 
-    // Empty result for nonexistent array
+    // Original returns nil for nonexistent array (not empty table)
     runLua("keys = ArrayListKeys('noarray')");
-    runLua("keycount = #keys");
-    EXPECT_EQ(getInt("keycount"), 0) << "ArrayListKeys should return empty for nonexistent array";
+    runLua("is_nil = (keys == nil) and 1 or 0");
+    EXPECT_EQ(getInt("is_nil"), 1) << "ArrayListKeys should return nil for nonexistent array";
 }
 
 // Test ArrayListValues

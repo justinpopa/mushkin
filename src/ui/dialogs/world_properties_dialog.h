@@ -3,6 +3,7 @@
 
 #include <QDialog>
 #include <QFont>
+#include <QTextEdit>
 #include <array>
 
 // Forward declarations
@@ -100,7 +101,8 @@ class WorldPropertiesDialog : public QDialog {
     QSpinBox* m_portSpin;
     QLineEdit* m_nameEdit;
     QLineEdit* m_passwordEdit;
-    QCheckBox* m_autoConnectCheck;
+    QComboBox* m_connectMethodCombo;
+    QTextEdit* m_connectTextEdit;
 
     // Proxy widgets
     QComboBox* m_proxyTypeCombo;
@@ -115,6 +117,19 @@ class WorldPropertiesDialog : public QDialog {
     QFont m_outputFont;
     std::array<QPushButton*, 16> m_colorButtons{}; // 8 normal + 8 bright ANSI colors
     std::array<QRgb, 16> m_ansiColors{};
+    // Display options
+    QCheckBox* m_wrapCheck;
+    QSpinBox* m_wrapColumnSpin;
+    QSpinBox* m_maxLinesSpin;
+    QCheckBox* m_utf8Check;
+    QCheckBox* m_nawsCheck;
+    QLineEdit* m_terminalTypeEdit;
+    QCheckBox* m_indentParasCheck;
+    QCheckBox* m_showBoldCheck;
+    QCheckBox* m_showItalicCheck;
+    QCheckBox* m_showUnderlineCheck;
+    QSpinBox* m_lineSpacingSpin;
+    // Activity
     QCheckBox* m_flashIconCheck;
 
     // Helper for Output tab
@@ -127,6 +142,13 @@ class WorldPropertiesDialog : public QDialog {
     QCheckBox* m_echoInputCheck;
     QComboBox* m_echoColorCombo;
     QSpinBox* m_historySizeSpin; // Command history size (20-5000)
+    QCheckBox* m_enableCommandStackCheck;
+    QLineEdit* m_commandStackCharEdit;
+    QCheckBox* m_enableSpeedwalkCheck;
+    QLineEdit* m_speedwalkPrefixEdit;
+    QSpinBox* m_speedwalkDelaySpin;
+    QCheckBox* m_escapeDeletesInputCheck;
+    QCheckBox* m_noEchoOffCheck;
 
     // Logging tab widgets
     QCheckBox* m_enableLogCheck;
@@ -139,6 +161,13 @@ class WorldPropertiesDialog : public QDialog {
     QLineEdit* m_scriptFileEdit;
     QPushButton* m_scriptFileBrowse;
     QComboBox* m_scriptLanguageCombo;
+    QLineEdit* m_onWorldOpenEdit;
+    QLineEdit* m_onWorldCloseEdit;
+    QLineEdit* m_onWorldConnectEdit;
+    QLineEdit* m_onWorldDisconnectEdit;
+    QLineEdit* m_onWorldGetFocusEdit;
+    QLineEdit* m_onWorldLoseFocusEdit;
+    QLineEdit* m_onWorldSaveEdit;
 
     // Paste to World tab widgets
     QLineEdit* m_pastePreambleEdit;

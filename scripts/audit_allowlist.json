@@ -1,0 +1,84 @@
+{
+  "skip_keys": [
+    "metadata.capture_date",
+    "metadata.client_version",
+    "metadata.client_name",
+    "metadata.world_file_hash",
+    "metadata.plugin_count",
+
+    "getinfo.1",
+    "getinfo.35", "getinfo.36",
+    "getinfo.56", "getinfo.57", "getinfo.58", "getinfo.59",
+    "getinfo.66", "getinfo.67", "getinfo.68", "getinfo.69", "getinfo.70", "getinfo.71",
+
+    "getinfo.106", "getinfo.108", "getinfo.111", "getinfo.118", "getinfo.120",
+
+    "getinfo.201", "getinfo.204", "getinfo.205", "getinfo.206", "getinfo.207",
+    "getinfo.212", "getinfo.213", "getinfo.214", "getinfo.215",
+    "getinfo.216", "getinfo.217", "getinfo.219", "getinfo.221",
+    "getinfo.224",
+    "getinfo.227", "getinfo.228", "getinfo.229", "getinfo.230",
+    "getinfo.231", "getinfo.232", "getinfo.233", "getinfo.234",
+    "getinfo.236", "getinfo.238", "getinfo.239", "getinfo.240", "getinfo.241",
+    "getinfo.244", "getinfo.245", "getinfo.246", "getinfo.247", "getinfo.248",
+    "getinfo.249", "getinfo.250", "getinfo.251", "getinfo.252", "getinfo.253",
+    "getinfo.254", "getinfo.255", "getinfo.256", "getinfo.257", "getinfo.258",
+    "getinfo.259", "getinfo.260", "getinfo.261", "getinfo.262",
+    "getinfo.263", "getinfo.264", "getinfo.265", "getinfo.266",
+    "getinfo.267", "getinfo.268",
+    "getinfo.280", "getinfo.281", "getinfo.283", "getinfo.284",
+    "getinfo.286", "getinfo.287", "getinfo.288",
+    "getinfo.295", "getinfo.296",
+    "getinfo.297", "getinfo.298",
+    "getinfo.299", "getinfo.300",
+    "getinfo.301", "getinfo.302", "getinfo.303", "getinfo.304", "getinfo.305", "getinfo.306",
+    "getinfo.310",
+
+    "getinfo.54", "getinfo.60", "getinfo.61", "getinfo.62", "getinfo.64",
+    "getinfo.72", "getinfo.73", "getinfo.74", "getinfo.76", "getinfo.77",
+    "getinfo.79", "getinfo.80", "getinfo.81", "getinfo.82", "getinfo.83",
+    "getinfo.84", "getinfo.85", "getinfo.87", "getinfo.88",
+
+    "miniwindows",
+    "plugins",
+
+    "lua_environment.has_jit",
+    "lua_environment.lua_version",
+    "lua_environment.package_cpath",
+    "lua_environment.package_path"
+  ],
+  "skip_prefixes": [
+    "options.",
+    "plugins.",
+    "api_availability.",
+    "error_probes.",
+    "miniwindows."
+  ],
+  "skip_key_comments": {
+    "getinfo.106/108/111/118/120": "Session state flags (connected, modified, etc.)",
+    "getinfo.265-268": "OS version info (platform-specific by nature)",
+    "getinfo.286-288": "Session match/fire counters",
+    "getinfo.295-296": "Session redraw/scroll state",
+    "getinfo.297": "Timer frequency (platform-specific)",
+    "getinfo.298": "SQLite version (linked version differs)",
+    "getinfo.299-300": "Code pages (Windows 1252/437 vs UTF-8 65001)",
+    "getinfo.301-306": "Timestamps (session-specific)",
+    "options.*": "World file config differences (different .mcl files, not code bugs)",
+    "plugins.*": "Plugin data differs due to different sessions/paths",
+    "api_availability.*": "Mushkin has intentional extra aliases (NoteColour, BoldColour, etc.)",
+    "miniwindows.*": "Miniwindow state differs per session/display"
+  },
+  "normalize_paths": [
+    "getinfo\\..*",
+    "options\\.alpha\\..*",
+    "plugins\\..*\\.variables\\..*"
+  ],
+  "tolerance": {
+    "miniwindows\\..*\\.1": 5,
+    "miniwindows\\..*\\.2": 5,
+    "miniwindows\\..*\\.10": 10,
+    "miniwindows\\..*\\.11": 10,
+    "miniwindows\\..*\\.12": 10,
+    "miniwindows\\..*\\.13": 10
+  }
+}

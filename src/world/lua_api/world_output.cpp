@@ -9,6 +9,9 @@
 #include "../view_interfaces.h"
 #include "lua_common.h"
 
+// SAMECOLOUR constant - special value meaning "use default color"
+constexpr quint16 SAMECOLOUR = 65535;
+
 /**
  * world.Note(text, ...)
  *
@@ -990,14 +993,36 @@ int L_NoteColourName(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
+    // Resolve palette→RGB before overwriting (original: methods_noting.cpp:236-264)
+    // When switching from palette to RGB mode, we must first convert existing
+    // palette colors to their actual RGB values so SetColour only overwrites
+    // the color(s) the caller specified, preserving the other.
+    if (!pDoc->m_bNotesInRGB) {
+        if (pDoc->m_colors.note_text_colour == SAMECOLOUR) {
+            if (pDoc->m_bCustom16isDefaultColour) {
+                pDoc->m_iNoteColourFore = pDoc->m_colors.custom_text[15];
+                pDoc->m_iNoteColourBack = pDoc->m_colors.custom_back[15];
+            } else {
+                pDoc->m_iNoteColourFore = pDoc->m_colors.normal_colour[ANSI_WHITE];
+                pDoc->m_iNoteColourBack = pDoc->m_colors.normal_colour[ANSI_BLACK];
+            }
+        } else {
+            int idx = pDoc->m_colors.note_text_colour;
+            if (idx >= 0 && idx < MAX_CUSTOM) {
+                pDoc->m_iNoteColourFore = pDoc->m_colors.custom_text[idx];
+                pDoc->m_iNoteColourBack = pDoc->m_colors.custom_back[idx];
+            } else {
+                pDoc->m_iNoteColourFore = qRgb(255, 255, 255);
+                pDoc->m_iNoteColourBack = qRgb(0, 0, 0);
+            }
+        }
+    }
+
     pDoc->m_bNotesInRGB = true;
     pDoc->m_iNoteColourFore = getColor(L, 1, pDoc->m_iNoteColourFore);
     pDoc->m_iNoteColourBack = getColor(L, 2, pDoc->m_iNoteColourBack);
     return 0;
 }
-
-// SAMECOLOUR constant - special value meaning "use default color"
-constexpr quint16 SAMECOLOUR = 65535;
 
 /**
  * world.GetNoteColourFore()

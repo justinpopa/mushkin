@@ -8,6 +8,8 @@
 #include "plugin.h"
 #include "world_document.h"
 
+#include "../../storage/database.h"
+#include "../../storage/global_options.h"
 #include "logging.h"
 #include <QCloseEvent>
 #include <QDesktopServices>
@@ -219,8 +221,10 @@ void PluginDialog::updateButtonStates()
 
 void PluginDialog::onAddPlugin()
 {
-    QSettings settings;
-    QString pluginDir = settings.value("PluginsDirectory", QDir::homePath()).toString();
+    QString pluginDir = GlobalOptions::instance().pluginsDirectory();
+    if (pluginDir.isEmpty()) {
+        pluginDir = QDir::homePath();
+    }
 
     QStringList files = QFileDialog::getOpenFileNames(
         this, tr("Add Plugin"), pluginDir,
@@ -231,9 +235,11 @@ void PluginDialog::onAddPlugin()
     }
 
     // Save directory for next time
-    if (!files.isEmpty()) {
+    {
         QFileInfo fi(files.first());
-        settings.setValue("PluginsDirectory", fi.absolutePath());
+        QString dir = fi.absolutePath();
+        GlobalOptions::instance().setPluginsDirectory(dir);
+        Database::instance().setPreference("PluginsDirectory", dir);
     }
 
     bool anyLoaded = false;
@@ -263,13 +269,7 @@ void PluginDialog::onRemovePlugin()
         return;
     }
 
-    int result = QMessageBox::question(this, tr("Remove Plugin"),
-                                       tr("Remove %n selected plugin(s)?", "", selected.size()),
-                                       QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
-
-    if (result != QMessageBox::Yes) {
-        return;
-    }
+    // Original does not prompt for confirmation before removing plugins
 
     // Collect plugins to remove (don't modify list while iterating)
     QList<Plugin*> pluginsToRemove;
@@ -426,30 +426,14 @@ void PluginDialog::onShowInfo()
         return;
     }
 
-    // Show description for all selected plugins
+    // Show description in a notepad pane (original uses AppendToNotepad, not a popup)
     for (const QModelIndex& index : selected) {
         QTableWidgetItem* nameItem = m_pluginTable->item(index.row(), COL_NAME);
         if (nameItem) {
             Plugin* plugin = static_cast<Plugin*>(nameItem->data(Qt::UserRole).value<void*>());
             if (plugin && !plugin->m_strDescription.isEmpty()) {
-                // Create a simple dialog to show the description
-                QDialog* descDialog = new QDialog(this);
-                descDialog->setWindowTitle(tr("%1 - Description").arg(plugin->m_strName));
-                descDialog->setAttribute(Qt::WA_DeleteOnClose);
-
-                QVBoxLayout* layout = new QVBoxLayout(descDialog);
-
-                QTextEdit* textEdit = new QTextEdit(descDialog);
-                textEdit->setPlainText(plugin->m_strDescription);
-                textEdit->setReadOnly(true);
-                layout->addWidget(textEdit);
-
-                QPushButton* closeBtn = new QPushButton(tr("Close"), descDialog);
-                connect(closeBtn, &QPushButton::clicked, descDialog, &QDialog::accept);
-                layout->addWidget(closeBtn);
-
-                descDialog->resize(600, 400);
-                descDialog->show();
+                QString title = plugin->m_strName + " Info";
+                m_doc->SendToNotepad(title, plugin->m_strDescription);
             }
         }
     }

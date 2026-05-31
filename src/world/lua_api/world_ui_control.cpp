@@ -3,6 +3,7 @@
  * Functions
  */
 
+#include "../../automation/sendto.h"
 #include "../accelerator_manager.h"
 #include "../lua_dialog_callbacks.h"
 #include "../view_interfaces.h"
@@ -32,7 +33,7 @@
  *
  * @return (number) Error code:
  *   - eOK (0): Success
- *   - eBadParameter (30): Invalid key string
+ *   - eBadParameter (30046): Invalid key string
  *
  * @example
  * -- Run a Lua function when F5 is pressed
@@ -53,6 +54,11 @@ int L_AcceleratorTo(lua_State* L)
     QString script = luaCheckQString(L, 2);
     int send_to = luaL_checkinteger(L, 3);
 
+    // Validate send_to range (original: 0 <= send_to < eSendToLast)
+    if (send_to < 0 || send_to >= eSendToLast) {
+        return luaReturnError(L, eOptionOutOfRange);
+    }
+
     // Get current plugin ID if running from a plugin
     QString pluginId;
     if (pDoc->m_CurrentPlugin) {
@@ -70,7 +76,7 @@ int L_AcceleratorTo(lua_State* L)
  * world.Accelerator(key_string, send_string)
  *
  * Registers a keyboard accelerator that executes a command.
- * Convenience wrapper for AcceleratorTo with sendto.execute (12).
+ * Convenience wrapper for AcceleratorTo with sendto.execute (10).
  * The command is executed as if typed by the user.
  *
  * @param key_string (string) Key combination (e.g., "Ctrl+A", "F1", "PageUp")
@@ -78,7 +84,7 @@ int L_AcceleratorTo(lua_State* L)
  *
  * @return (number) Error code:
  *   - eOK (0): Success
- *   - eBadParameter (30): Invalid key string
+ *   - eBadParameter (30046): Invalid key string
  *
  * @example
  * -- Quick direction keys
@@ -109,9 +115,9 @@ int L_Accelerator(lua_State* L)
         pluginId = pDoc->m_CurrentPlugin->id();
     }
 
-    // Register the accelerator with eSendToExecute (12)
+    // Register the accelerator with eSendToExecute (10)
     int result = pDoc->m_acceleratorManager->addAccelerator(key_string, send_string,
-                                                            12, // eSendToExecute
+                                                            10, // eSendToExecute
                                                             pluginId);
 
     lua_pushnumber(L, result);
@@ -149,16 +155,28 @@ int L_AcceleratorList(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
+    // Original only returns script/plugin-registered accelerators (m_AcceleratorToCommandMap),
+    // not user-defined ones from macros/keypad. Filter to Script and Plugin sources.
     QVector<AcceleratorEntry> accelerators = pDoc->m_acceleratorManager->acceleratorList();
 
     lua_newtable(L);
     int index = 1;
 
     for (const AcceleratorEntry& entry : accelerators) {
-        QString str = entry.keyString + " = " + entry.action;
+        // Skip user-defined (macros/keypad) — original doesn't include them
+        if (entry.source == AcceleratorSource::User) {
+            continue;
+        }
+        // Reconstruct key string from key sequence (original: KeyCodeToString)
+        // This produces canonical casing (e.g., "F5" not "f5")
+        QString displayKey = AcceleratorManager::keySequenceToString(entry.keySeq);
+        if (displayKey.isEmpty()) {
+            displayKey = entry.keyString; // fallback to stored
+        }
+        QString str = displayKey + " = " + entry.action;
 
-        // Add sendto suffix if not eSendToExecute (12)
-        if (entry.sendTo != 12) {
+        // Add sendto suffix if not eSendToExecute (10)
+        if (entry.sendTo != 10) {
             str += QString("\t[%1]").arg(entry.sendTo);
         }
 
@@ -790,7 +808,7 @@ int L_SetToolBarPosition(lua_State* L)
 
     // Validate which parameter (1-4: main, game, activity, infobar)
     if (which < 1 || which > 4) {
-        lua_pushinteger(L, 30); // eBadParameter
+        lua_pushinteger(L, eBadParameter);
         return 1;
     }
 

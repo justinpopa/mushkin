@@ -60,22 +60,15 @@ static QString colorToName(QRgb bgr)
 
 // Helper function to parse color name (#RRGGBB) to BGR
 // Returns BGR format for internal storage
+// Forward-declare the color name resolver from world_colors.cpp
+QRgb ColourNameToRGB(const QString& name);
+
 static QRgb nameToColor(const QString& name)
 {
-    if (name.startsWith("#")) {
-        // Hex format: #RRGGBB - parse as RGB then convert to BGR
-        bool ok;
-        unsigned int rgb = name.mid(1).toUInt(&ok, 16);
-        if (ok) {
-            int r = (rgb >> 16) & 0xFF;
-            int g = (rgb >> 8) & 0xFF;
-            int b = rgb & 0xFF;
-            return BGR(r, g, b);
-        }
-    }
-    // Could add named color lookup here (red, blue, etc.)
-    // For now, return black as default
-    return BGR(0, 0, 0);
+    // Delegate to the full color name resolver which handles both
+    // named colors ("red", "darkgreen") and hex format ("#RRGGBB")
+    // (original: mxputils.cpp SetColour handles named + hex)
+    return ColourNameToRGB(name);
 }
 
 void WorldDocument::saveTriggersToXml(QXmlStreamWriter& xml)
@@ -85,8 +78,9 @@ void WorldDocument::saveTriggersToXml(QXmlStreamWriter& xml)
     for (const auto& [name, triggerPtr] : m_automationRegistry->m_TriggerMap) {
         Trigger* trigger = triggerPtr.get();
 
-        // Skip temporary triggers
-        if (trigger->temporary)
+        // Skip temporary and included triggers (included = loaded from include file)
+        // Original: xml_save_world.cpp skips bTemporary and bIncluded
+        if (trigger->temporary || trigger->included)
             continue;
 
         xml.writeStartElement("trigger");
@@ -96,29 +90,43 @@ void WorldDocument::saveTriggersToXml(QXmlStreamWriter& xml)
         xml.writeAttribute("enabled", trigger->enabled ? "y" : "n");
         xml.writeAttribute("match", trigger->trigger);
         xml.writeAttribute("send_to", QString::number(static_cast<quint16>(trigger->send_to)));
-        xml.writeAttribute("sequence", QString::number(trigger->sequence));
+        if (trigger->sequence != 0)
+            xml.writeAttribute("sequence", QString::number(trigger->sequence));
         xml.writeAttribute("script", trigger->procedure);
         xml.writeAttribute("group", trigger->group);
         xml.writeAttribute("variable", trigger->variable);
 
-        // Behavior flags
-        xml.writeAttribute("omit_from_output", trigger->omit_from_output ? "y" : "n");
-        xml.writeAttribute("omit_from_log", trigger->omit_from_log ? "y" : "n");
-        xml.writeAttribute("keep_evaluating", trigger->keep_evaluating ? "y" : "n");
-        xml.writeAttribute("regexp", trigger->use_regexp ? "y" : "n");
-        xml.writeAttribute("ignore_case", trigger->ignore_case ? "y" : "n");
-        xml.writeAttribute("repeat", trigger->repeat ? "y" : "n");
-        xml.writeAttribute("expand_variables", trigger->expand_variables ? "y" : "n");
-        xml.writeAttribute("one_shot", trigger->one_shot ? "y" : "n");
-        xml.writeAttribute("lowercase_wildcard", trigger->lowercase_wildcard ? "y" : "n");
+        // Behavior flags — only written when true (matches original Save_XML_boolean behavior)
+        if (trigger->omit_from_output)
+            xml.writeAttribute("omit_from_output", "y");
+        if (trigger->omit_from_log)
+            xml.writeAttribute("omit_from_log", "y");
+        if (trigger->keep_evaluating)
+            xml.writeAttribute("keep_evaluating", "y");
+        if (trigger->use_regexp)
+            xml.writeAttribute("regexp", "y");
+        if (trigger->ignore_case)
+            xml.writeAttribute("ignore_case", "y");
+        if (trigger->repeat)
+            xml.writeAttribute("repeat", "y");
+        if (trigger->expand_variables)
+            xml.writeAttribute("expand_variables", "y");
+        if (trigger->one_shot)
+            xml.writeAttribute("one_shot", "y");
+        if (trigger->lowercase_wildcard)
+            xml.writeAttribute("lowercase_wildcard", "y");
 
-        // Multi-line matching
-        xml.writeAttribute("multi_line", trigger->multi_line ? "y" : "n");
-        xml.writeAttribute("lines_to_match", QString::number(trigger->lines_to_match));
+        // Multi-line matching — only write when non-default
+        if (trigger->multi_line)
+            xml.writeAttribute("multi_line", "y");
+        if (trigger->lines_to_match != 0)
+            xml.writeAttribute("lines_to_match", QString::number(trigger->lines_to_match));
 
-        // Sound
-        xml.writeAttribute("sound", trigger->sound_to_play);
-        xml.writeAttribute("sound_if_inactive", trigger->sound_if_inactive ? "y" : "n");
+        // Sound — only write when non-empty / true
+        if (!trigger->sound_to_play.isEmpty())
+            xml.writeAttribute("sound", trigger->sound_to_play);
+        if (trigger->sound_if_inactive)
+            xml.writeAttribute("sound_if_inactive", "y");
 
         // Decompose style into individual make_* attributes
         if (trigger->style & HILITE)
@@ -161,8 +169,10 @@ void WorldDocument::saveTriggersToXml(QXmlStreamWriter& xml)
         if (trigger->colour != SAMECOLOUR)
             xml.writeAttribute("custom_colour", QString::number(trigger->colour + 1));
 
-        xml.writeAttribute("colour_change_type",
-                           QString::number(static_cast<quint16>(trigger->colour_change_type)));
+        // colour_change_type — only write when non-zero (matches original Save_XML_number)
+        if (static_cast<quint16>(trigger->colour_change_type) != 0)
+            xml.writeAttribute("colour_change_type",
+                               QString::number(static_cast<quint16>(trigger->colour_change_type)));
 
         // RGB colors as names
         if (trigger->other_foreground != 0)
@@ -175,9 +185,11 @@ void WorldDocument::saveTriggersToXml(QXmlStreamWriter& xml)
             xml.writeAttribute("script_language", scriptLanguageToString(trigger->scriptLanguage));
         }
 
-        // Other options
-        xml.writeAttribute("clipboard_arg", QString::number(trigger->clipboard_arg));
-        xml.writeAttribute("user", QString::number(trigger->user_option));
+        // Other options — only write when non-zero
+        if (trigger->clipboard_arg != 0)
+            xml.writeAttribute("clipboard_arg", QString::number(trigger->clipboard_arg));
+        if (trigger->user_option != 0)
+            xml.writeAttribute("user", QString::number(trigger->user_option));
 
         // Contents as child element with CDATA
         if (!trigger->contents.isEmpty()) {
@@ -228,10 +240,22 @@ void WorldDocument::loadTriggersFromXml(QXmlStreamReader& xml, Plugin* plugin)
                 trigger->internal_name =
                     QString("trigger_%1_%2").arg(triggerCount).arg(qHash(pattern));
             } else {
-                trigger->internal_name = trigger->label;
+                // Original lowercases internal names for case-insensitive lookup
+                // (xml_load_world.cpp:1314). Auto-generated names (*trigger...) stay as-is.
+                trigger->internal_name = trigger->label.toLower();
             }
-            trigger->enabled = attrs.value("enabled").toString() == "y";
+            // Only override enabled if attribute exists; constructor defaults to true
+            if (attrs.hasAttribute("enabled")) {
+                trigger->enabled = attrs.value("enabled").toString() == "y";
+            }
             trigger->trigger = attrs.value("match").toString();
+            // Validate: skip triggers with empty match text
+            // (original: xml_load_world.cpp:1276 ThrowErrorException for empty match)
+            if (trigger->trigger.isEmpty()) {
+                qCWarning(lcWorld) << "Skipping trigger with empty match text:" << trigger->label;
+                xml.skipCurrentElement();
+                continue;
+            }
             trigger->send_to = static_cast<SendTo>(attrs.value("send_to").toInt());
             trigger->sequence = attrs.value("sequence").toInt();
             trigger->procedure = attrs.value("script").toString();
@@ -241,15 +265,13 @@ void WorldDocument::loadTriggersFromXml(QXmlStreamReader& xml, Plugin* plugin)
             // Behavior flags
             trigger->omit_from_output = attrs.value("omit_from_output").toString() == "y";
             trigger->omit_from_log = attrs.value("omit_from_log").toString() == "y";
-            // Only set to false if explicitly "n", otherwise keep default (true)
-            if (attrs.hasAttribute("keep_evaluating")) {
-                trigger->keep_evaluating = attrs.value("keep_evaluating").toString() != "n";
-            }
+            trigger->keep_evaluating = attrs.value("keep_evaluating").toString() == "y";
             trigger->use_regexp = attrs.value("regexp").toString() == "y";
             trigger->ignore_case = attrs.value("ignore_case").toString() == "y";
             trigger->repeat = attrs.value("repeat").toString() == "y";
             trigger->expand_variables = attrs.value("expand_variables").toString() == "y";
             trigger->one_shot = attrs.value("one_shot").toString() == "y";
+            trigger->temporary = attrs.value("temporary").toString() == "y";
             trigger->lowercase_wildcard = attrs.value("lowercase_wildcard").toString() == "y";
 
             // Multi-line matching
@@ -361,10 +383,26 @@ void WorldDocument::loadTriggersFromXml(QXmlStreamReader& xml, Plugin* plugin)
 
                 QString triggerName = trigger->internal_name;
 
-                // Skip duplicates - don't overwrite existing triggers
+                // Skip name-based duplicates
                 if (plugin->m_TriggerMap.find(triggerName) != plugin->m_TriggerMap.end()) {
                     qCDebug(lcWorld) << "Skipping duplicate trigger:" << triggerName;
                     continue;
+                }
+                // Skip structural duplicates for unnamed triggers (original:
+                // xml_load_world.cpp:1372-1389)
+                if (trigger->label.isEmpty()) {
+                    bool isDuplicate = false;
+                    for (const auto& [name, existing] : plugin->m_TriggerMap) {
+                        if (*existing == *trigger) {
+                            isDuplicate = true;
+                            break;
+                        }
+                    }
+                    if (isDuplicate) {
+                        qCDebug(lcWorld)
+                            << "Skipping duplicate unnamed trigger:" << trigger->trigger;
+                        continue;
+                    }
                 }
 
                 trigger->owningPlugin = plugin;
@@ -375,7 +413,23 @@ void WorldDocument::loadTriggersFromXml(QXmlStreamReader& xml, Plugin* plugin)
                 qCDebug(lcWorld) << "Added trigger to plugin:" << rawPtr->internal_name
                                  << "sequence:" << rawPtr->sequence;
             } else {
-                // Add to world's collections (existing behavior)
+                // Duplicate detection for unnamed triggers (original: xml_load_world.cpp:1372-1389)
+                // Check if an unnamed trigger with identical content already exists
+                if (trigger->label.isEmpty()) {
+                    bool isDuplicate = false;
+                    for (const auto& [name, existing] : m_automationRegistry->m_TriggerMap) {
+                        if (*existing == *trigger) {
+                            isDuplicate = true;
+                            break;
+                        }
+                    }
+                    if (isDuplicate) {
+                        qCDebug(lcWorld)
+                            << "Skipping duplicate unnamed trigger:" << trigger->trigger;
+                        continue;
+                    }
+                }
+                // Add to world's collections
                 QString triggerName = trigger->internal_name;
                 (void)addTrigger(triggerName,
                                  std::move(trigger)); // intentional: deserialization load
@@ -392,8 +446,8 @@ void WorldDocument::saveAliasesToXml(QXmlStreamWriter& xml)
     for (const auto& [name, aliasPtr] : m_automationRegistry->m_AliasMap) {
         Alias* alias = aliasPtr.get();
 
-        // Skip temporary aliases
-        if (alias->temporary)
+        // Skip temporary and included aliases
+        if (alias->temporary || alias->included)
             continue;
 
         xml.writeStartElement("alias");
@@ -403,31 +457,42 @@ void WorldDocument::saveAliasesToXml(QXmlStreamWriter& xml)
         xml.writeAttribute("enabled", alias->enabled ? "y" : "n");
         xml.writeAttribute("match", alias->name);
         xml.writeAttribute("send_to", QString::number(static_cast<quint16>(alias->send_to)));
-        xml.writeAttribute("sequence", QString::number(alias->sequence));
+        if (alias->sequence != 0)
+            xml.writeAttribute("sequence", QString::number(alias->sequence));
         xml.writeAttribute("script", alias->procedure);
         xml.writeAttribute("group", alias->group);
         xml.writeAttribute("variable", alias->variable);
 
-        // Behavior flags
-        xml.writeAttribute("omit_from_output", alias->omit_from_output ? "y" : "n");
-        xml.writeAttribute("omit_from_log", alias->omit_from_log ? "y" : "n");
-        xml.writeAttribute("omit_from_command_history",
-                           alias->omit_from_command_history ? "y" : "n");
-        xml.writeAttribute("keep_evaluating", alias->keep_evaluating ? "y" : "n");
-        xml.writeAttribute("regexp", alias->use_regexp ? "y" : "n");
-        xml.writeAttribute("ignore_case", alias->ignore_case ? "y" : "n");
-        xml.writeAttribute("expand_variables", alias->expand_variables ? "y" : "n");
-        xml.writeAttribute("echo_alias", alias->echo_alias ? "y" : "n");
-        xml.writeAttribute("one_shot", alias->one_shot ? "y" : "n");
-        xml.writeAttribute("menu", alias->menu ? "y" : "n");
+        // Behavior flags — only written when true (matches original Save_XML_boolean behavior)
+        if (alias->omit_from_output)
+            xml.writeAttribute("omit_from_output", "y");
+        if (alias->omit_from_log)
+            xml.writeAttribute("omit_from_log", "y");
+        if (alias->omit_from_command_history)
+            xml.writeAttribute("omit_from_command_history", "y");
+        if (alias->keep_evaluating)
+            xml.writeAttribute("keep_evaluating", "y");
+        if (alias->use_regexp)
+            xml.writeAttribute("regexp", "y");
+        if (alias->ignore_case)
+            xml.writeAttribute("ignore_case", "y");
+        if (alias->expand_variables)
+            xml.writeAttribute("expand_variables", "y");
+        if (alias->echo_alias)
+            xml.writeAttribute("echo_alias", "y");
+        if (alias->one_shot)
+            xml.writeAttribute("one_shot", "y");
+        if (alias->menu)
+            xml.writeAttribute("menu", "y");
 
         // Script language (only write if not Lua - the default)
         if (alias->scriptLanguage != ScriptLanguage::Lua) {
             xml.writeAttribute("script_language", scriptLanguageToString(alias->scriptLanguage));
         }
 
-        // Other options
-        xml.writeAttribute("user", QString::number(alias->user_option));
+        // Other options — only write when non-zero
+        if (alias->user_option != 0)
+            xml.writeAttribute("user", QString::number(alias->user_option));
 
         // Contents as child element with CDATA
         if (!alias->contents.isEmpty()) {
@@ -468,12 +533,23 @@ void WorldDocument::loadAliasesFromXml(QXmlStreamReader& xml, Plugin* plugin)
                 }
                 alias->internal_name = QString("alias_%1_%2").arg(aliasCount).arg(qHash(match));
             } else {
-                alias->internal_name = alias->label;
+                // Original lowercases internal names for case-insensitive lookup
+                // (xml_load_world.cpp:1545)
+                alias->internal_name = alias->label.toLower();
             }
 
             aliasCount++;
-            alias->enabled = attrs.value("enabled").toString() == "y";
+            // Only override enabled if attribute exists; constructor defaults to true
+            if (attrs.hasAttribute("enabled")) {
+                alias->enabled = attrs.value("enabled").toString() == "y";
+            }
             alias->name = attrs.value("match").toString();
+            // Validate: skip aliases with empty match text
+            if (alias->name.isEmpty()) {
+                qCWarning(lcWorld) << "Skipping alias with empty match text:" << alias->label;
+                xml.skipCurrentElement();
+                continue;
+            }
             alias->send_to = static_cast<SendTo>(attrs.value("send_to").toInt());
             alias->sequence = attrs.value("sequence").toInt();
             alias->procedure = attrs.value("script").toString();
@@ -485,15 +561,13 @@ void WorldDocument::loadAliasesFromXml(QXmlStreamReader& xml, Plugin* plugin)
             alias->omit_from_log = attrs.value("omit_from_log").toString() == "y";
             alias->omit_from_command_history =
                 attrs.value("omit_from_command_history").toString() == "y";
-            // Only set to false if explicitly "n", otherwise keep default (true)
-            if (attrs.hasAttribute("keep_evaluating")) {
-                alias->keep_evaluating = attrs.value("keep_evaluating").toString() != "n";
-            }
+            alias->keep_evaluating = attrs.value("keep_evaluating").toString() == "y";
             alias->use_regexp = attrs.value("regexp").toString() == "y";
             alias->ignore_case = attrs.value("ignore_case").toString() == "y";
             alias->expand_variables = attrs.value("expand_variables").toString() == "y";
             alias->echo_alias = attrs.value("echo_alias").toString() == "y";
             alias->one_shot = attrs.value("one_shot").toString() == "y";
+            alias->temporary = attrs.value("temporary").toString() == "y";
             alias->menu = attrs.value("menu").toString() == "y";
 
             // Script language (defaults to Lua if not specified)
@@ -583,36 +657,50 @@ void WorldDocument::saveTimersToXml(QXmlStreamWriter& xml)
         bool isAtTime = (timer->type == Timer::TimerType::AtTime);
         xml.writeAttribute("at_time", isAtTime ? "y" : "n");
 
-        // Write hour/minute/second from either at_* or every_* fields based on type
+        // Write hour/minute/second from either at_* or every_* fields based on type.
+        // hour and minute use Save_XML_number semantics (skip if zero);
+        // second uses Save_XML_double semantics (always written — "0.00" is non-empty).
         if (isAtTime) {
-            xml.writeAttribute("hour", QString::number(timer->at_hour));
-            xml.writeAttribute("minute", QString::number(timer->at_minute));
-            xml.writeAttribute("second", QString::number(timer->at_second, 'f', 4));
+            if (timer->at_hour != 0)
+                xml.writeAttribute("hour", QString::number(timer->at_hour));
+            if (timer->at_minute != 0)
+                xml.writeAttribute("minute", QString::number(timer->at_minute));
+            xml.writeAttribute("second", QString::number(timer->at_second, 'f', 2));
         } else {
-            xml.writeAttribute("hour", QString::number(timer->every_hour));
-            xml.writeAttribute("minute", QString::number(timer->every_minute));
-            xml.writeAttribute("second", QString::number(timer->every_second, 'f', 4));
+            if (timer->every_hour != 0)
+                xml.writeAttribute("hour", QString::number(timer->every_hour));
+            if (timer->every_minute != 0)
+                xml.writeAttribute("minute", QString::number(timer->every_minute));
+            xml.writeAttribute("second", QString::number(timer->every_second, 'f', 2));
         }
 
-        // Offset fields (always written)
-        xml.writeAttribute("offset_hour", QString::number(timer->offset_hour));
-        xml.writeAttribute("offset_minute", QString::number(timer->offset_minute));
-        xml.writeAttribute("offset_second", QString::number(timer->offset_second, 'f', 4));
+        // Offset fields: hour/minute use Save_XML_number (skip if zero);
+        // second uses Save_XML_double (always written).
+        if (timer->offset_hour != 0)
+            xml.writeAttribute("offset_hour", QString::number(timer->offset_hour));
+        if (timer->offset_minute != 0)
+            xml.writeAttribute("offset_minute", QString::number(timer->offset_minute));
+        xml.writeAttribute("offset_second", QString::number(timer->offset_second, 'f', 2));
 
-        // Behavior flags
-        xml.writeAttribute("one_shot", timer->one_shot ? "y" : "n");
+        // Behavior flags — only written when true (matches original Save_XML_boolean behavior)
+        if (timer->one_shot)
+            xml.writeAttribute("one_shot", "y");
         // Use active_closed for original MUSHclient compatibility
-        xml.writeAttribute("active_closed", timer->active_when_closed ? "y" : "n");
-        xml.writeAttribute("omit_from_output", timer->omit_from_output ? "y" : "n");
-        xml.writeAttribute("omit_from_log", timer->omit_from_log ? "y" : "n");
+        if (timer->active_when_closed)
+            xml.writeAttribute("active_closed", "y");
+        if (timer->omit_from_output)
+            xml.writeAttribute("omit_from_output", "y");
+        if (timer->omit_from_log)
+            xml.writeAttribute("omit_from_log", "y");
 
         // Script language (only write if not Lua - the default)
         if (timer->scriptLanguage != ScriptLanguage::Lua) {
             xml.writeAttribute("script_language", scriptLanguageToString(timer->scriptLanguage));
         }
 
-        // Other options
-        xml.writeAttribute("user", QString::number(timer->user_option));
+        // Other options — only write when non-zero
+        if (timer->user_option != 0)
+            xml.writeAttribute("user", QString::number(timer->user_option));
 
         // Contents as child element with CDATA
         if (!timer->contents.isEmpty()) {
@@ -657,10 +745,15 @@ void WorldDocument::loadTimersFromXml(QXmlStreamReader& xml, Plugin* plugin)
                 // Use timestamp-based unique name for unlabelled timers
                 internalName = QString("*timer%1").arg(timerCount, 10, 10, QChar('0'));
             } else {
-                internalName = timer->label;
+                // Original lowercases internal names for case-insensitive lookup
+                // (xml_load_world.cpp:1785)
+                internalName = timer->label.toLower();
             }
 
-            timer->enabled = attrs.value("enabled").toString() == "y";
+            // Only override enabled if attribute exists; constructor defaults to true
+            if (attrs.hasAttribute("enabled")) {
+                timer->enabled = attrs.value("enabled").toString() == "y";
+            }
             timer->send_to = static_cast<SendTo>(attrs.value("send_to").toInt());
             timer->procedure = attrs.value("script").toString();
             timer->group = attrs.value("group").toString();
@@ -702,6 +795,15 @@ void WorldDocument::loadTimersFromXml(QXmlStreamReader& xml, Plugin* plugin)
                 timer->every_second = attrs.hasAttribute("every_second")
                                           ? attrs.value("every_second").toDouble()
                                           : second;
+
+                // Reject zero-interval timers (original: xml_load_world.cpp:1717-1718)
+                if (timer->every_hour == 0 && timer->every_minute == 0 &&
+                    timer->every_second <= 0.0) {
+                    qWarning() << "Timer" << timer->label
+                               << "has zero interval — skipping (would fire continuously)";
+                    xml.skipCurrentElement();
+                    continue;
+                }
             }
 
             // Offset fields
@@ -711,6 +813,7 @@ void WorldDocument::loadTimersFromXml(QXmlStreamReader& xml, Plugin* plugin)
 
             // Behavior flags
             timer->one_shot = attrs.value("one_shot").toString() == "y";
+            timer->temporary = attrs.value("temporary").toString() == "y";
             // active_closed is alternate name for active_when_closed
             timer->active_when_closed = (attrs.value("active_when_closed").toString() == "y") ||
                                         (attrs.value("active_closed").toString() == "y");
@@ -810,23 +913,20 @@ void WorldDocument::loadVariablesFromXml(QXmlStreamReader& xml, Plugin* plugin)
 
         if (xml.isStartElement() && xml.name() == QLatin1String("variable")) {
             QString name = xml.attributes().value("name").toString();
+            bool trim = xml.attributes().value("trim").toString() == "y";
             QString contents = xml.readElementText();
 
-            QString varName = name.toLower(); // Ensure lowercase
-
-            // Skip duplicates - don't overwrite existing variables
-            if (plugin) {
-                if (plugin->m_VariableMap.find(varName) != plugin->m_VariableMap.end()) {
-                    qCDebug(lcWorld) << "Skipping duplicate variable:" << varName;
-                    continue;
-                }
-            } else {
-                if (m_VariableMap.find(varName) != m_VariableMap.end()) {
-                    qCDebug(lcWorld) << "Skipping duplicate variable:" << varName;
-                    continue;
-                }
+            // Trim whitespace if requested (original: xml_load_world.cpp:1977-1986)
+            if (trim) {
+                contents = contents.trimmed();
             }
 
+            // Original preserves variable name case (CheckObjectName validates but doesn't
+            // lowercase)
+            QString varName = name;
+
+            // Overwrite existing variables (original: xml_load_world.cpp:1995-2006 deletes old,
+            // inserts new). Previous code skipped duplicates which broke state restore.
             auto var = std::make_unique<Variable>();
             var->label = varName;
             var->contents = contents;
@@ -835,6 +935,138 @@ void WorldDocument::loadVariablesFromXml(QXmlStreamReader& xml, Plugin* plugin)
                 plugin->m_VariableMap[var->label] = std::move(var);
             } else {
                 m_VariableMap[var->label] = std::move(var);
+            }
+        }
+    }
+}
+
+// ========== Colour XML Serialization ==========
+
+/**
+ * saveColoursToXml - Save ANSI and custom palette colors to XML
+ *
+ * Writes <colours> section containing normal/bold ANSI colors (0-7)
+ * and custom palette entries. Matches original MUSHclient format.
+ * Colors are stored as #RRGGBB (RGB order) in the XML, converting
+ * from internal BGR format.
+ *
+ * Based on xml_save_world.cpp:635-684
+ */
+void WorldDocument::saveColoursToXml(QXmlStreamWriter& xml)
+{
+    xml.writeStartElement("colours");
+
+    // ANSI section
+    xml.writeStartElement("ansi");
+
+    // Normal colors (0-7)
+    xml.writeStartElement("normal");
+    for (int i = 0; i < 8; i++) {
+        xml.writeStartElement("colour");
+        xml.writeAttribute("seq", QString::number(i + 1)); // 1-indexed
+        xml.writeAttribute("rgb", colorToName(m_colors.normal_colour[i]));
+        xml.writeEndElement(); // colour
+    }
+    xml.writeEndElement(); // normal
+
+    // Bold colors (0-7)
+    xml.writeStartElement("bold");
+    for (int i = 0; i < 8; i++) {
+        xml.writeStartElement("colour");
+        xml.writeAttribute("seq", QString::number(i + 1)); // 1-indexed
+        xml.writeAttribute("rgb", colorToName(m_colors.bold_colour[i]));
+        xml.writeEndElement(); // colour
+    }
+    xml.writeEndElement(); // bold
+
+    xml.writeEndElement(); // ansi
+
+    // Custom palette section
+    xml.writeStartElement("custom");
+    for (int i = 0; i < MAX_CUSTOM; i++) {
+        xml.writeStartElement("colour");
+        xml.writeAttribute("seq", QString::number(i + 1)); // 1-indexed
+        xml.writeAttribute("name", m_colors.custom_colour_name[i]);
+        xml.writeAttribute("text", colorToName(m_colors.custom_text[i]));
+        xml.writeAttribute("back", colorToName(m_colors.custom_back[i]));
+        xml.writeEndElement(); // colour
+    }
+    xml.writeEndElement(); // custom
+
+    xml.writeEndElement(); // colours
+}
+
+/**
+ * loadColoursFromXml - Load ANSI and custom palette colors from XML
+ *
+ * Reads <colours> section and populates normal_colour, bold_colour,
+ * custom_text, custom_back, and custom_colour_name arrays.
+ * Parses #RRGGBB hex strings and converts to internal BGR format.
+ *
+ * @param xml XML reader positioned at <colours> start element
+ */
+void WorldDocument::loadColoursFromXml(QXmlStreamReader& xml)
+{
+    // xml is positioned at <colours>
+    while (!xml.atEnd()) {
+        xml.readNext();
+        if (xml.isEndElement() && xml.name() == QLatin1String("colours"))
+            break;
+        if (!xml.isStartElement())
+            continue;
+
+        const QString sectionName = xml.name().toString();
+
+        if (sectionName == "ansi") {
+            while (!xml.atEnd()) {
+                xml.readNext();
+                if (xml.isEndElement() && xml.name() == QLatin1String("ansi"))
+                    break;
+                if (!xml.isStartElement())
+                    continue;
+
+                const QString subsection = xml.name().toString();
+                const bool isNormal = (subsection == "normal");
+                const bool isBold = (subsection == "bold");
+
+                if (isNormal || isBold) {
+                    while (!xml.atEnd()) {
+                        xml.readNext();
+                        if (xml.isEndElement() && xml.name() == subsection)
+                            break;
+                        if (!xml.isStartElement() || xml.name() != QLatin1String("colour"))
+                            continue;
+
+                        const QXmlStreamAttributes attrs = xml.attributes();
+                        const int seq = attrs.value("seq").toInt() - 1; // 0-indexed
+                        const QString rgbStr = attrs.value("rgb").toString();
+
+                        if (seq >= 0 && seq < 8) {
+                            const QRgb bgr = nameToColor(rgbStr);
+                            if (isNormal)
+                                m_colors.normal_colour[seq] = bgr;
+                            else
+                                m_colors.bold_colour[seq] = bgr;
+                        }
+                    }
+                }
+            }
+        } else if (sectionName == "custom") {
+            while (!xml.atEnd()) {
+                xml.readNext();
+                if (xml.isEndElement() && xml.name() == QLatin1String("custom"))
+                    break;
+                if (!xml.isStartElement() || xml.name() != QLatin1String("colour"))
+                    continue;
+
+                const QXmlStreamAttributes attrs = xml.attributes();
+                const int seq = attrs.value("seq").toInt() - 1; // 0-indexed
+
+                if (seq >= 0 && seq < MAX_CUSTOM) {
+                    m_colors.custom_colour_name[seq] = attrs.value("name").toString();
+                    m_colors.custom_text[seq] = nameToColor(attrs.value("text").toString());
+                    m_colors.custom_back[seq] = nameToColor(attrs.value("back").toString());
+                }
             }
         }
     }

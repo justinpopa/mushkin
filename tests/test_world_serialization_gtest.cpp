@@ -155,7 +155,7 @@ TEST_F(WorldSerializationTest, VariableRoundtripViaFile)
 }
 
 // Test 4: Variable name is lowercased on load
-TEST_F(WorldSerializationTest, VariableNameLowercasedOnLoad)
+TEST_F(WorldSerializationTest, VariableNamePreservedOnLoad)
 {
     doc1 = std::make_unique<WorldDocument>();
     doc1->m_mush_name = "Variable Case Test";
@@ -176,16 +176,18 @@ TEST_F(WorldSerializationTest, VariableNameLowercasedOnLoad)
     int imported = XmlSerialization::ImportXML(doc2.get(), mixedCaseXml, XML_VARIABLES);
     EXPECT_GE(imported, 0) << "ImportXML failed on mixed-case variable";
 
-    auto it = doc2->m_VariableMap.find("myvar");
+    // Original preserves variable name case (CheckObjectName validates but doesn't lowercase)
+    auto it = doc2->m_VariableMap.find("MyVar");
     EXPECT_NE(it, doc2->m_VariableMap.end())
-        << "Variable key should be lowercased to 'myvar' after import";
+        << "Variable key should preserve original case 'MyVar' after import";
 }
 
 // Test 5: Duplicate variable names on import keep only the first
-TEST_F(WorldSerializationTest, VariableDuplicateSkippedOnImport)
+TEST_F(WorldSerializationTest, VariableDuplicateOverwrittenOnImport)
 {
-    // Build XML manually with two variables sharing the same (lowercased) name
-    // but different contents. The second should be skipped.
+    // Build XML manually with two variables sharing the same name
+    // but different contents. The second should OVERWRITE the first
+    // (original: xml_load_world.cpp:1995-2006 deletes old, inserts new).
     QString xmlStr = R"(<?xml version="1.0" encoding="UTF-8"?>
 <muclient>
 <variables>
@@ -200,8 +202,8 @@ TEST_F(WorldSerializationTest, VariableDuplicateSkippedOnImport)
 
     auto it = doc1->m_VariableMap.find("dupvar");
     ASSERT_NE(it, doc1->m_VariableMap.end()) << "Variable 'dupvar' not found";
-    EXPECT_EQ(it->second->contents, "first_value")
-        << "Duplicate variable should keep first value, not second";
+    EXPECT_EQ(it->second->contents, "second_value")
+        << "Duplicate variable should overwrite with second value";
 }
 
 // =============================================================================

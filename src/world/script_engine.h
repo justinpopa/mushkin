@@ -202,7 +202,8 @@ class ScriptEngine : public QObject {
      */
     bool executeLua(qint32& dispid, const QString& szProcedure, ActionSource iReason,
                     const QString& szType, const QString& szReason, QList<double>& nparams,
-                    QList<QString>& sparams, qint32& invocation_count, bool* result = nullptr);
+                    QList<QString>& sparams, qint32& invocation_count, bool* result = nullptr,
+                    QString* returnString = nullptr);
 
     // Public Lua state (accessed by API functions)
     lua_State* L;

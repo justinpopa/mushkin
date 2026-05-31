@@ -533,6 +533,10 @@ void TelnetParser::Phase_DO(unsigned char c)
             }
             break;
 
+        case TELOPT_MUD_SPECIFIC: // Aardwolf option 102
+            Send_IAC_WILL(c);
+            break;
+
         default:
             if (Handle_Telnet_Request(c, "DO")) {
                 Send_IAC_WILL(c);
@@ -1127,6 +1131,14 @@ void TelnetParser::Handle_TELOPT_MSP()
             loops = param.mid(2).toInt();
         } else if (param.startsWith("U=", Qt::CaseInsensitive)) {
             url = param.mid(2);
+        } else if (param.startsWith("T=", Qt::CaseInsensitive)) {
+            // T= sound type/category (MSP spec). Parsed but not used —
+            // Mushkin doesn't categorize sounds. Logged for debugging.
+            qCDebug(lcWorld) << "MSP T=" << param.mid(2);
+        } else if (param.startsWith("P=", Qt::CaseInsensitive)) {
+            // P= priority (MSP spec). Parsed but not used —
+            // Mushkin doesn't implement sound priority. Logged for debugging.
+            qCDebug(lcWorld) << "MSP P=" << param.mid(2);
         }
     }
 
@@ -1134,14 +1146,33 @@ void TelnetParser::Handle_TELOPT_MSP()
     bool loop = (loops < 0 || loops > 1);
 
     if (command == "SOUND") {
-        qDebug() << "MSP SOUND:" << filename << "volume:" << volume << "loops:" << loops;
-        m_doc.PlayMSPSound(filename, url, loop, volumeApi, 0);
+        // !!SOUND(Off) — stop all sound-effect buffers (leave music buffer alone).
+        // Per MSP spec, "Off" as the filename means stop rather than play.
+        if (filename.compare("Off", Qt::CaseInsensitive) == 0) {
+            qCDebug(lcWorld) << "MSP SOUND(Off): stopping all sound buffers";
+            // Stop every buffer except the dedicated music buffer (1).
+            // Buffer 0 = auto / stop-all, but we want to preserve music; iterate manually.
+            for (qint16 buf = 2; buf <= 10; ++buf)
+                m_doc.StopSound(buf);
+        } else {
+            qCDebug(lcWorld) << "MSP SOUND:" << filename << "volume:" << volume
+                             << "loops:" << loops;
+            m_doc.PlayMSPSound(filename, url, loop, volumeApi, 0);
+        }
     } else if (command == "MUSIC") {
-        qDebug() << "MSP MUSIC:" << filename << "volume:" << volume << "loops:" << loops;
-        bool musicLoop = (loops != 1);
-        m_doc.PlayMSPSound(filename, url, musicLoop, volumeApi, 1);
+        // !!MUSIC(Off) — stop the dedicated music buffer (1).
+        if (filename.compare("Off", Qt::CaseInsensitive) == 0) {
+            qCDebug(lcWorld) << "MSP MUSIC(Off): stopping music buffer";
+            m_doc.StopSound(1);
+        } else {
+            qCDebug(lcWorld) << "MSP MUSIC:" << filename << "volume:" << volume
+                             << "loops:" << loops;
+            bool musicLoop = (loops != 1);
+            m_doc.PlayMSPSound(filename, url, musicLoop, volumeApi, 1);
+        }
     } else if (command == "STOP") {
-        qDebug() << "MSP STOP";
+        // Generic STOP (non-standard): stop all buffers.
+        qCDebug(lcWorld) << "MSP STOP: stopping all buffers";
         m_doc.StopSound(0);
     } else {
         qWarning() << "MSP: Unknown command:" << command;
@@ -1161,7 +1192,9 @@ void TelnetParser::sendWindowSizes(int width)
         return;
     }
 
-    quint16 height = static_cast<quint16>(width);
+    // Original computes height from pixel dimensions: (r.bottom - r.top) / m_FontHeight
+    // TODO(naws): Get actual row count from output view. For now use 24 (standard terminal).
+    quint16 height = 24;
 
     // Build NAWS packet: IAC SB TELOPT_NAWS <width> <height> IAC SE
     unsigned char packet[20];

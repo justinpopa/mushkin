@@ -233,55 +233,74 @@ static QRegularExpression wildcardToRegex(const QString& pattern, bool ignoreCas
 
 // TRIGGER_MATCH_* constants are defined as inline constexpr in trigger.h
 
-static bool matchStyle(Trigger* trigger, Line* line)
+// Check style at the first character of the matched text (original:
+// ProcessPreviousLine.cpp:896-967). The original finds the style run covering iStartCol and
+// compares colors/flags there, handling INVERSE by swapping fore/back. Skipped for multi-line
+// triggers.
+static bool matchStyleAtColumn(Trigger* trigger, Line* line, int column)
 {
     if (trigger->match_type == 0 && trigger->style == 0) {
         return true;
     }
+
+    // Find the style run covering the given column position
+    int currentCol = 0;
+    const Style* foundStyle = nullptr;
     for (const auto& style : line->styleList) {
-        bool matches = true;
-        if (trigger->match_type & TRIGGER_MATCH_TEXT) {
-            if (trigger->other_foreground != 0) {
-                if (style->iForeColour != trigger->other_foreground) {
-                    matches = false;
-                }
-            }
-        }
-        if (trigger->match_type & TRIGGER_MATCH_BACK) {
-            if (trigger->other_background != 0) {
-                if (style->iBackColour != trigger->other_background) {
-                    matches = false;
-                }
-            }
-        }
-        if (trigger->match_type & TRIGGER_MATCH_HILITE) {
-            if (!(style->iFlags & HILITE)) {
-                matches = false;
-            }
-        }
-        if (trigger->match_type & TRIGGER_MATCH_UNDERLINE) {
-            if (!(style->iFlags & UNDERLINE)) {
-                matches = false;
-            }
-        }
-        if (trigger->match_type & TRIGGER_MATCH_BLINK) {
-            if (!(style->iFlags & BLINK)) {
-                matches = false;
-            }
-        }
-        if (trigger->match_type & TRIGGER_MATCH_INVERSE) {
-            if (!(style->iFlags & INVERSE)) {
-                matches = false;
-            }
-        }
-        if (matches) {
-            return true;
+        currentCol += style->iLength;
+        if (currentCol > column) {
+            foundStyle = style.get();
+            break;
         }
     }
-    return false;
+
+    if (!foundStyle) {
+        return false;
+    }
+
+    // Check foreground color with INVERSE handling (original swaps fore/back when inverted)
+    if (trigger->match_type & TRIGGER_MATCH_TEXT) {
+        if (trigger->other_foreground != 0) {
+            QRgb effectiveFore =
+                (foundStyle->iFlags & INVERSE) ? foundStyle->iBackColour : foundStyle->iForeColour;
+            if (effectiveFore != trigger->other_foreground) {
+                return false;
+            }
+        }
+    }
+
+    // Check background color with INVERSE handling
+    if (trigger->match_type & TRIGGER_MATCH_BACK) {
+        if (trigger->other_background != 0) {
+            QRgb effectiveBack =
+                (foundStyle->iFlags & INVERSE) ? foundStyle->iForeColour : foundStyle->iBackColour;
+            if (effectiveBack != trigger->other_background) {
+                return false;
+            }
+        }
+    }
+
+    if (trigger->match_type & TRIGGER_MATCH_HILITE) {
+        if (!(foundStyle->iFlags & HILITE))
+            return false;
+    }
+    if (trigger->match_type & TRIGGER_MATCH_UNDERLINE) {
+        if (!(foundStyle->iFlags & UNDERLINE))
+            return false;
+    }
+    if (trigger->match_type & TRIGGER_MATCH_BLINK) {
+        if (!(foundStyle->iFlags & BLINK))
+            return false;
+    }
+    if (trigger->match_type & TRIGGER_MATCH_INVERSE) {
+        if (!(foundStyle->iFlags & INVERSE))
+            return false;
+    }
+
+    return true;
 }
 
-static bool matchTriggerPattern(Trigger* trigger, const QString& text)
+static bool matchTriggerPattern(Trigger* trigger, const QString& text, int* matchStartOut = nullptr)
 {
     if (trigger->use_regexp) {
         if (!trigger->regexp) {
@@ -292,6 +311,9 @@ static bool matchTriggerPattern(Trigger* trigger, const QString& text)
         QRegularExpressionMatch match = trigger->regexp->match(text);
         if (!match.hasMatch()) {
             return false;
+        }
+        if (matchStartOut) {
+            *matchStartOut = match.capturedStart();
         }
         trigger->wildcards.clear();
         trigger->wildcards.resize(match.lastCapturedIndex() + 1);
@@ -320,6 +342,9 @@ static bool matchTriggerPattern(Trigger* trigger, const QString& text)
         if (!match.hasMatch()) {
             return false;
         }
+        if (matchStartOut) {
+            *matchStartOut = match.capturedStart();
+        }
         trigger->wildcards.clear();
         trigger->wildcards.resize(match.lastCapturedIndex() + 1);
         for (int i = 0; i <= match.lastCapturedIndex(); ++i) {
@@ -336,11 +361,16 @@ static bool matchTriggerPattern(Trigger* trigger, const QString& text)
 static bool matchTriggerWithRepeat(Trigger* trigger, const QString& text, Line* line,
                                    IWorldContext* ctx)
 {
-    if (!matchStyle(trigger, line)) {
-        return false;
-    }
+    // Style check happens AFTER pattern match at the match position
+    // (original: ProcessPreviousLine.cpp:896-967). Multi-line triggers skip style check.
+    bool checkStyle = !trigger->multi_line;
+
     if (!trigger->repeat) {
-        if (matchTriggerPattern(trigger, text)) {
+        int matchStart = 0;
+        if (matchTriggerPattern(trigger, text, &matchStart)) {
+            if (checkStyle && !matchStyleAtColumn(trigger, line, matchStart)) {
+                return false;
+            }
             ctx->executeTrigger(trigger, line, text);
             return true;
         }
@@ -365,6 +395,14 @@ static bool matchTriggerWithRepeat(Trigger* trigger, const QString& text, Line* 
         QRegularExpressionMatch match = re.match(text, offset);
         if (!match.hasMatch()) {
             break;
+        }
+        // Check style at this specific match position
+        if (checkStyle && !matchStyleAtColumn(trigger, line, match.capturedStart())) {
+            offset = match.capturedEnd();
+            if (offset <= match.capturedStart()) {
+                offset++;
+            }
+            continue; // wrong color at this match, try next
         }
         trigger->wildcards.clear();
         trigger->wildcards.resize(match.lastCapturedIndex() + 1);
@@ -426,6 +464,10 @@ static bool evaluateOneTriggerSequence(const QVector<Trigger*>& triggerArray, Li
             if (!trigger->keep_evaluating) {
                 return true;
             }
+            // Check if a script called StopEvaluatingTriggers()
+            if (ctx->stopTriggerEvaluation() > 0) {
+                return true;
+            }
         }
     }
     return false;
@@ -460,6 +502,9 @@ void AutomationRegistry::evaluateTriggers(Line* line)
     m_ctx.setCurrentPlugin(nullptr);
     bool stopEvaluation = false;
 
+    // Reset stop flag at start of trigger evaluation (original: ProcessPreviousLine.cpp)
+    m_ctx.resetStopTriggerEvaluation();
+
     // Phase 1: plugins with negative sequence
     for (const auto& plugin : m_ctx.pluginList()) {
         if (plugin->m_iSequence >= 0) {
@@ -473,6 +518,10 @@ void AutomationRegistry::evaluateTriggers(Line* line)
         }
         m_ctx.setCurrentPlugin(plugin.get());
         m_iTriggersEvaluatedCount += plugin->m_TriggerArray.size();
+        // Reset per-phase flag (value 1 stops only current phase; original resets between plugins)
+        if (m_ctx.stopTriggerEvaluation() == 1) {
+            m_ctx.resetStopTriggerEvaluation();
+        }
         stopEvaluation = evaluateOneTriggerSequence(plugin->m_TriggerArray, line, lineText, &m_ctx,
                                                     this, oneShotToDelete);
         if (stopEvaluation) {
@@ -480,13 +529,26 @@ void AutomationRegistry::evaluateTriggers(Line* line)
                 plugin->m_TriggerMap.erase(oneShotToDelete);
                 plugin->m_triggersNeedSorting = true;
             }
-            m_ctx.setCurrentPlugin(savedPlugin);
-            return;
+            // Value 1 = stop this phase only; value 2 = stop all phases
+            if (m_ctx.stopTriggerEvaluation() >= 2) {
+                m_ctx.setCurrentPlugin(savedPlugin);
+                return;
+            }
+            break; // Stop this phase, continue to next
         }
+    }
+
+    // Check if all-plugins stop was requested
+    if (m_ctx.stopTriggerEvaluation() >= 2) {
+        m_ctx.setCurrentPlugin(savedPlugin);
+        return;
     }
 
     // Phase 2: world triggers
     m_ctx.setCurrentPlugin(nullptr);
+    if (m_ctx.stopTriggerEvaluation() == 1) {
+        m_ctx.resetStopTriggerEvaluation();
+    }
     stopEvaluation =
         evaluateOneTriggerSequence(m_TriggerArray, line, lineText, &m_ctx, this, oneShotToDelete);
     if (stopEvaluation) {
@@ -494,6 +556,14 @@ void AutomationRegistry::evaluateTriggers(Line* line)
             qCDebug(lcWorld) << "Deleting one-shot world trigger:" << oneShotToDelete;
             (void)deleteTrigger(oneShotToDelete);
         }
+        if (m_ctx.stopTriggerEvaluation() >= 2) {
+            m_ctx.setCurrentPlugin(savedPlugin);
+            return;
+        }
+    }
+
+    // Check if all-plugins stop was requested
+    if (m_ctx.stopTriggerEvaluation() >= 2) {
         m_ctx.setCurrentPlugin(savedPlugin);
         return;
     }
@@ -511,6 +581,9 @@ void AutomationRegistry::evaluateTriggers(Line* line)
         }
         m_ctx.setCurrentPlugin(plugin.get());
         m_iTriggersEvaluatedCount += plugin->m_TriggerArray.size();
+        if (m_ctx.stopTriggerEvaluation() == 1) {
+            m_ctx.resetStopTriggerEvaluation();
+        }
         stopEvaluation = evaluateOneTriggerSequence(plugin->m_TriggerArray, line, lineText, &m_ctx,
                                                     this, oneShotToDelete);
         if (stopEvaluation) {
@@ -518,8 +591,11 @@ void AutomationRegistry::evaluateTriggers(Line* line)
                 plugin->m_TriggerMap.erase(oneShotToDelete);
                 plugin->m_triggersNeedSorting = true;
             }
-            m_ctx.setCurrentPlugin(savedPlugin);
-            return;
+            if (m_ctx.stopTriggerEvaluation() >= 2) {
+                m_ctx.setCurrentPlugin(savedPlugin);
+                return;
+            }
+            break;
         }
     }
 

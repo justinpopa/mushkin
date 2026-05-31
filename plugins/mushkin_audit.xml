@@ -1,0 +1,1063 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE muclient>
+<muclient>
+<plugin
+   name="Mushkin_Audit"
+   author="Mushkin Project"
+   id="a0d1700100e5e5e500a0d101"
+   language="Lua"
+   purpose="Behavioral baseline capture for Mushkin vs MUSHclient comparison"
+   save_state="n"
+   date_written="2026-03-22"
+   requires="4.00"
+   version="1.0"
+   sequence="9999"
+>
+<description trim="y">
+Mushkin Audit -- Behavioral baseline capture plugin.
+Type 'audit' to run all tests and capture API behavior to JSON.
+</description>
+</plugin>
+
+<aliases>
+  <alias
+    enabled="y"
+    match="^audit$"
+    name="audit_run"
+    send_to="12"
+    sequence="100"
+    script="run_audit"
+    regexp="y"
+    ignore_case="y"
+    omit_from_output="y"
+    omit_from_log="y"
+  >
+  </alias>
+</aliases>
+
+<script>
+<![CDATA[
+
+-- ============================================================
+-- JSON Encoder
+-- Self-contained, no external dependencies.
+-- Works in Lua 5.1 (MUSHclient) and LuaJIT/5.1-compat (Mushkin).
+-- Keys are sorted at ALL nesting levels for stable diffs.
+-- ============================================================
+
+local function is_array(t)
+  -- A table is an array if all keys are consecutive integers starting at 1.
+  local count = 0
+  for _ in pairs(t) do
+    count = count + 1
+  end
+  if count == 0 then
+    -- Empty table: treat as array (produces [])
+    return true
+  end
+  for i = 1, count do
+    if t[i] == nil then
+      return false
+    end
+  end
+  return true
+end
+
+local function json_encode_inner(value, indent)
+  local vtype = type(value)
+
+  if value == nil then
+    return "null"
+  elseif vtype == "boolean" then
+    return value and "true" or "false"
+  elseif vtype == "number" then
+    if value ~= value then
+      -- NaN
+      return '"NaN"'
+    elseif value == math.huge then
+      return '"Infinity"'
+    elseif value == -math.huge then
+      return '"-Infinity"'
+    else
+      -- Use integer representation when value is a whole number
+      if value == math.floor(value) and math.abs(value) < 1e15 then
+        return string.format("%d", value)
+      else
+        return string.format("%.17g", value)
+      end
+    end
+  elseif vtype == "string" then
+    -- Escape special characters
+    local s = value
+    s = s:gsub('\\', '\\\\')
+    s = s:gsub('"',  '\\"')
+    s = s:gsub('\n', '\\n')
+    s = s:gsub('\r', '\\r')
+    s = s:gsub('\t', '\\t')
+    -- Escape remaining control characters (U+0000-U+001F)
+    s = s:gsub('%c', function(c)
+      return string.format('\\u%04x', c:byte())
+    end)
+    return '"' .. s .. '"'
+  elseif vtype == "table" then
+    local inner_indent = indent .. "  "
+
+    if is_array(value) then
+      -- Array encoding
+      if #value == 0 then
+        return "[]"
+      end
+      local parts = {}
+      for i = 1, #value do
+        parts[i] = inner_indent .. json_encode_inner(value[i], inner_indent)
+      end
+      return "[\n" .. table.concat(parts, ",\n") .. "\n" .. indent .. "]"
+    else
+      -- Object encoding — collect and sort keys
+      local keys = {}
+      for k in pairs(value) do
+        keys[#keys + 1] = k
+      end
+      -- Sort: numbers first (numerically), then strings (lexicographically)
+      table.sort(keys, function(a, b)
+        local ta, tb = type(a), type(b)
+        if ta == tb then
+          return a < b
+        end
+        -- numbers before strings
+        return ta == "number"
+      end)
+
+      if #keys == 0 then
+        return "{}"
+      end
+
+      local parts = {}
+      for _, k in ipairs(keys) do
+        -- Use direct lookup — NOT `val[k] or val[tonumber(k)]`
+        -- which would incorrectly skip false values.
+        local v = value[k]
+        local key_str = json_encode_inner(tostring(k), inner_indent)
+        parts[#parts + 1] = inner_indent .. key_str .. ": " .. json_encode_inner(v, inner_indent)
+      end
+      return "{\n" .. table.concat(parts, ",\n") .. "\n" .. indent .. "}"
+    end
+  else
+    -- Functions, userdata, threads: represent as a quoted type string
+    return '"<' .. vtype .. '>"'
+  end
+end
+
+function json_encode(value)
+  return json_encode_inner(value, "")
+end
+
+
+-- ============================================================
+-- Test Suite
+-- ============================================================
+
+local pass_count = 0
+local fail_count = 0
+
+local function check(label, got, expected)
+  if got == expected then
+    pass_count = pass_count + 1
+    ColourNote("lime", "black", "  PASS  " .. label)
+  else
+    fail_count = fail_count + 1
+    ColourNote("red", "black", "  FAIL  " .. label)
+    ColourNote("red", "black", "    got:      " .. tostring(got))
+    ColourNote("red", "black", "    expected: " .. tostring(expected))
+  end
+end
+
+function test_json()
+  pass_count = 0
+  fail_count = 0
+
+  ColourNote("white", "black", "--- json_encode test suite ---")
+
+  -- Empty table (array)
+  check("empty table",
+    json_encode({}),
+    "[]")
+
+  -- Simple array
+  check("simple array",
+    json_encode({1, 2, 3}),
+    "[\n  1,\n  2,\n  3\n]")
+
+  -- Boolean true
+  check("boolean true",
+    json_encode(true),
+    "true")
+
+  -- Boolean false
+  check("boolean false",
+    json_encode(false),
+    "false")
+
+  -- nil
+  check("nil",
+    json_encode(nil),
+    "null")
+
+  -- Integer number
+  check("integer",
+    json_encode(42),
+    "42")
+
+  -- Float number
+  check("float",
+    json_encode(3.14),
+    string.format("%.17g", 3.14))
+
+  -- NaN
+  check("NaN",
+    json_encode(0/0),
+    '"NaN"')
+
+  -- Positive infinity
+  check("Infinity",
+    json_encode(math.huge),
+    '"Infinity"')
+
+  -- Negative infinity
+  check("-Infinity",
+    json_encode(-math.huge),
+    '"-Infinity"')
+
+  -- Empty string
+  check("empty string",
+    json_encode(""),
+    '""')
+
+  -- String with special chars
+  check("string special chars",
+    json_encode('say "hello"\nworld\t!'),
+    '"say \\"hello\\"\\nworld\\t!"')
+
+  -- String with backslash
+  check("string backslash",
+    json_encode("a\\b"),
+    '"a\\\\b"')
+
+  -- Unicode passthrough (Lua 5.1 strings are byte strings)
+  -- Use decimal escapes (\195\169 = UTF-8 for é) since \xNN is Lua 5.2+
+  local utf8_e_acute = "\195\169"
+  check("unicode passthrough",
+    json_encode(utf8_e_acute),
+    '"' .. utf8_e_acute .. '"')
+
+  -- Simple object with sorted keys
+  check("simple object sorted keys",
+    json_encode({b = 2, a = 1}),
+    '{\n  "a": 1,\n  "b": 2\n}')
+
+  -- Object with false value (must not be skipped)
+  check("object false value",
+    json_encode({flag = false}),
+    '{\n  "flag": false\n}')
+
+  -- Object with nil value (nil keys are invisible in Lua tables, so this
+  -- tests that a key whose value is false isn't confused with nil)
+  local t = {present = false, missing = nil}
+  check("false vs nil in object",
+    json_encode(t),
+    '{\n  "present": false\n}')
+
+  -- Nested tables
+  check("nested object",
+    json_encode({outer = {inner = 1}}),
+    '{\n  "outer": {\n    "inner": 1\n  }\n}')
+
+  -- Mixed nesting: array of objects
+  check("array of objects",
+    json_encode({{a=1},{a=2}}),
+    '[\n  {\n    "a": 1\n  },\n  {\n    "a": 2\n  }\n]')
+
+  -- Mixed integer/string keys — integer keys sort before string keys
+  local mixed = {}
+  mixed[1]   = "one"
+  mixed["x"] = "ex"
+  check("mixed keys order",
+    json_encode(mixed),
+    '{\n  "1": "one",\n  "x": "ex"\n}')
+
+  -- Summary
+  local total = pass_count + fail_count
+  ColourNote("white", "black", string.format(
+    "--- %d/%d passed, %d failed ---", pass_count, total, fail_count))
+end
+
+
+-- ============================================================
+-- Data Collection Functions
+-- ============================================================
+
+function collect_metadata()
+  local t = {}
+
+  -- Capture date
+  t.capture_date = os.date("!%Y-%m-%dT%H:%M:%SZ")
+
+  -- Detect client from Version() string
+  local ok, ver = pcall(Version)
+  if ok then
+    t.client_version = tostring(ver)
+    if ver and ver:lower():find("mushkin") then
+      t.client_name = "Mushkin"
+    else
+      t.client_name = "MUSHclient"
+    end
+  else
+    t.client_version = "__error__: " .. tostring(ver)
+    t.client_name = "unknown"
+  end
+
+  -- World name
+  local ok2, wn = pcall(WorldName)
+  t.world_name = ok2 and tostring(wn) or ("__error__: " .. tostring(wn))
+
+  -- Plugin count
+  local ok3, pl = pcall(GetPluginList)
+  if ok3 and type(pl) == "table" then
+    t.plugin_count = #pl
+  else
+    t.plugin_count = "__error__: " .. tostring(pl)
+  end
+
+  -- World file path via GetInfo(70) and hash
+  local ok4, wf = pcall(GetInfo, 70)
+  if ok4 and type(wf) == "string" and wf ~= "" then
+    local f = io.open(wf, "rb")
+    if f then
+      local contents = f:read("*a")
+      f:close()
+      local ok5, h = pcall(Hash, contents, 3) -- 3 = SHA-256
+      t.world_file_hash = ok5 and tostring(h) or ("__hash_error__: " .. tostring(h))
+    else
+      t.world_file_hash = "__cannot_open_file__"
+    end
+  else
+    t.world_file_hash = "__getinfo70_error__: " .. tostring(wf)
+  end
+
+  return t
+end
+
+
+function collect_getinfo()
+  local t = {}
+  for i = 1, 310 do
+    local ok, val = pcall(GetInfo, i)
+    if ok then
+      local vtype = type(val)
+      if vtype == "string" or vtype == "number" or vtype == "boolean" or val == nil then
+        t[i] = val
+      else
+        t[i] = "<" .. vtype .. ">"
+      end
+    else
+      t[i] = "__error__: " .. tostring(val)
+    end
+  end
+  return t
+end
+
+
+function collect_options()
+  local numeric_names = {
+    "alternative_inverse",
+    "alt_arrow_recalls_partial",
+    "always_record_command_history",
+    "arrows_change_history",
+    "arrow_keys_wrap",
+    "arrow_recalls_partial",
+    "autosay_exclude_macros",
+    "autosay_exclude_non_alpha",
+    "auto_copy_to_clipboard_in_html",
+    "auto_pause",
+    "keep_pause_at_bottom",
+    "auto_repeat",
+    "auto_resize_command_window",
+    "auto_resize_minimum_lines",
+    "auto_resize_maximum_lines",
+    "append_to_log_file",
+    "auto_wrap_window_width",
+    "carriage_return_clears_line",
+    "confirm_before_replacing_typing",
+    "confirm_on_paste",
+    "confirm_on_send",
+    "connect_method",
+    "copy_selection_to_clipboard",
+    "convert_ga_to_newline",
+    "ctrl_n_goes_to_next_command",
+    "ctrl_p_goes_to_previous_command",
+    "ctrl_z_goes_to_end_of_buffer",
+    "ctrl_backspace_deletes_last_word",
+    "custom_16_is_default_colour",
+    "default_trigger_send_to",
+    "default_trigger_sequence",
+    "default_trigger_regexp",
+    "default_trigger_expand_variables",
+    "default_trigger_keep_evaluating",
+    "default_trigger_ignore_case",
+    "default_alias_send_to",
+    "default_alias_sequence",
+    "default_alias_regexp",
+    "default_alias_expand_variables",
+    "default_alias_keep_evaluating",
+    "default_alias_ignore_case",
+    "default_timer_send_to",
+    "detect_pueblo",
+    "do_not_add_macros_to_command_history",
+    "do_not_show_outstanding_lines",
+    "do_not_translate_iac_to_iac_iac",
+    "disable_compression",
+    "display_my_input",
+    "double_click_inserts",
+    "double_click_sends",
+    "echo_colour",
+    "echo_hyperlink_in_output_window",
+    "edit_script_with_notepad",
+    "enable_aliases",
+    "enable_auto_say",
+    "enable_beeps",
+    "enable_command_stack",
+    "enable_scripts",
+    "enable_spam_prevention",
+    "enable_speed_walk",
+    "enable_timers",
+    "enable_triggers",
+    "enable_trigger_sounds",
+    "escape_deletes_input",
+    "fade_output_buffer_after_seconds",
+    "fade_output_opacity_percent",
+    "fade_output_seconds",
+    "flash_taskbar_icon",
+    "history_lines",
+    "hyperlink_adds_to_command_history",
+    "hyperlink_colour",
+    "ignore_mxp_colour_changes",
+    "indent_paras",
+    "input_background_colour",
+    "input_font_height",
+    "input_font_italic",
+    "input_font_weight",
+    "input_font_charset",
+    "input_text_colour",
+    "keep_commands_on_same_line",
+    "keypad_enable",
+    "line_information",
+    "line_spacing",
+    "log_html",
+    "log_input",
+    "log_in_colour",
+    "log_lines",
+    "log_notes",
+    "log_output",
+    "log_raw",
+    "log_script_errors",
+    "lower_case_tab_completion",
+    "map_failure_regexp",
+    "max_output_lines",
+    "mud_can_change_link_colour",
+    "mud_can_remove_underline",
+    "mud_can_change_options",
+    "mxp_debug_level",
+    "naws",
+    "use_msp",
+    "note_text_colour",
+    "no_echo_off",
+    "omit_date_from_save_files",
+    "output_font_height",
+    "output_font_weight",
+    "output_font_charset",
+    "paste_commented_softcode",
+    "paste_delay",
+    "paste_delay_per_lines",
+    "paste_echo",
+    "play_sounds_in_background",
+    "pixel_offset",
+    "port",
+    "proxy_port",
+    "proxy_type",
+    "re_evaluate_auto_say",
+    "save_deleted_command",
+    "save_world_automatically",
+    "script_reload_option",
+    "script_errors_to_output_window",
+    "send_echo",
+    "send_file_commented_softcode",
+    "send_file_delay",
+    "send_file_delay_per_lines",
+    "send_keep_alives",
+    "send_mxp_afk_response",
+    "show_bold",
+    "show_connect_disconnect",
+    "show_italic",
+    "show_underline",
+    "spam_line_count",
+    "speed_walk_delay",
+    "spell_check_on_send",
+    "start_paused",
+    "tab_completion_lines",
+    "tab_completion_space",
+    "timestamp_input_text_colour",
+    "timestamp_notes_text_colour",
+    "timestamp_output_text_colour",
+    "timestamp_input_back_colour",
+    "timestamp_notes_back_colour",
+    "timestamp_output_back_colour",
+    "tool_tip_visible_time",
+    "tool_tip_start_time",
+    "translate_backslash_sequences",
+    "translate_german",
+    "treeview_triggers",
+    "treeview_aliases",
+    "treeview_timers",
+    "underline_hyperlinks",
+    "unpause_on_send",
+    "use_custom_link_colour",
+    "use_default_aliases",
+    "use_default_colours",
+    "use_default_input_font",
+    "use_default_macros",
+    "use_default_output_font",
+    "use_default_timers",
+    "use_default_triggers",
+    "use_mxp",
+    "utf_8",
+    "warn_if_scripting_inactive",
+    "wrap",
+    "wrap_input",
+    "wrap_column",
+    "write_world_name_to_log",
+    "remote_access_enabled",
+    "remote_port",
+    "remote_scrollback_lines",
+    "remote_max_clients",
+  }
+
+  local alpha_names = {
+    "auto_log_file_name",
+    "auto_say_override_prefix",
+    "auto_say_string",
+    "beep_sound",
+    "command_stack_character",
+    "connect_text",
+    "editor_window_name",
+    "filter_aliases",
+    "filter_timers",
+    "filter_triggers",
+    "filter_variables",
+    "id",
+    "input_font_name",
+    "log_file_postamble",
+    "log_file_preamble",
+    "log_line_postamble_input",
+    "log_line_postamble_notes",
+    "log_line_postamble_output",
+    "log_line_preamble_input",
+    "log_line_preamble_notes",
+    "log_line_preamble_output",
+    "mapping_failure",
+    "name",
+    "new_activity_sound",
+    "notes",
+    "on_mxp_close_tag",
+    "on_mxp_error",
+    "on_mxp_open_tag",
+    "on_mxp_set_variable",
+    "on_mxp_start",
+    "on_mxp_stop",
+    "on_world_close",
+    "on_world_save",
+    "on_world_connect",
+    "on_world_disconnect",
+    "on_world_get_focus",
+    "on_world_lose_focus",
+    "on_world_open",
+    "output_font_name",
+    "password",
+    "proxy_password",
+    "proxy_server",
+    "proxy_username",
+    "paste_line_postamble",
+    "paste_line_preamble",
+    "paste_postamble",
+    "paste_preamble",
+    "player",
+    "recall_line_preamble",
+    "script_editor",
+    "script_editor_argument",
+    "script_filename",
+    "script_language",
+    "script_prefix",
+    "send_to_world_file_postamble",
+    "send_to_world_file_preamble",
+    "send_to_world_line_postamble",
+    "send_to_world_line_preamble",
+    "site",
+    "spam_message",
+    "speed_walk_filler",
+    "speed_walk_prefix",
+    "tab_completion_defaults",
+    "terminal_identification",
+    "timestamp_input",
+    "timestamp_notes",
+    "timestamp_output",
+    "remote_password",
+    "remote_authorized_keys",
+  }
+
+  local t = { numeric = {}, alpha = {} }
+
+  for _, name in ipairs(numeric_names) do
+    local ok, val = pcall(GetOption, name)
+    if ok then
+      t.numeric[name] = val
+    else
+      t.numeric[name] = "__error__: " .. tostring(val)
+    end
+  end
+
+  for _, name in ipairs(alpha_names) do
+    local ok, val = pcall(GetAlphaOption, name)
+    if ok then
+      t.alpha[name] = val
+    else
+      t.alpha[name] = "__error__: " .. tostring(val)
+    end
+  end
+
+  return t
+end
+
+
+function collect_plugins()
+  local t = {}
+
+  local ok, ids = pcall(GetPluginList)
+  if not ok then
+    return { __error__ = tostring(ids) }
+  end
+  if type(ids) ~= "table" then
+    return { __error__ = "GetPluginList returned " .. type(ids) }
+  end
+
+  for _, id in ipairs(ids) do
+    local entry = { id = id }
+
+    -- GetPluginInfo fields 1-28
+    entry.info = {}
+    for i = 1, 28 do
+      local ok2, val = pcall(GetPluginInfo, id, i)
+      if ok2 then
+        local vtype = type(val)
+        if vtype == "string" or vtype == "number" or vtype == "boolean" or val == nil then
+          entry.info[i] = val
+        else
+          entry.info[i] = "<" .. vtype .. ">"
+        end
+      else
+        entry.info[i] = "__error__: " .. tostring(val)
+      end
+    end
+
+    -- Variable list for this plugin
+    local ok3, varlist = pcall(GetPluginVariableList, id)
+    entry.variables = {}
+    if ok3 and type(varlist) == "table" then
+      for k, _ in pairs(varlist) do
+        local ok4, v = pcall(GetPluginVariable, id, tostring(k))
+        entry.variables[tostring(k)] = ok4 and v or ("__error__: " .. tostring(v))
+      end
+    elseif ok3 then
+      entry.variables.__type__ = type(varlist)
+    else
+      entry.variables.__error__ = tostring(varlist)
+    end
+
+    t[#t + 1] = entry
+  end
+
+  return t
+end
+
+
+function collect_miniwindows()
+  local t = {}
+
+  local ok, wins = pcall(WindowList)
+  if not ok then
+    return { __error__ = tostring(wins) }
+  end
+  if type(wins) ~= "table" then
+    return { __type__ = type(wins) }
+  end
+
+  for _, win in ipairs(wins) do
+    local entry = { id = win }
+
+    -- WindowInfo fields 1-18
+    entry.info = {}
+    for i = 1, 18 do
+      local ok2, val = pcall(WindowInfo, win, i)
+      if ok2 then
+        local vtype = type(val)
+        if vtype == "string" or vtype == "number" or vtype == "boolean" or val == nil then
+          entry.info[i] = val
+        else
+          entry.info[i] = "<" .. vtype .. ">"
+        end
+      else
+        entry.info[i] = "__error__: " .. tostring(val)
+      end
+    end
+
+    -- Font list for this window
+    local ok3, fonts = pcall(WindowFontList, win)
+    entry.fonts = {}
+    if ok3 and type(fonts) == "table" then
+      for _, fid in ipairs(fonts) do
+        local fentry = {}
+        for j = 1, 20 do
+          local ok4, fv = pcall(WindowFontInfo, win, fid, j)
+          if ok4 then
+            local vtype = type(fv)
+            if vtype == "string" or vtype == "number" or vtype == "boolean" or fv == nil then
+              fentry[j] = fv
+            else
+              fentry[j] = "<" .. vtype .. ">"
+            end
+          else
+            fentry[j] = "__error__: " .. tostring(fv)
+          end
+        end
+        entry.fonts[fid] = fentry
+      end
+    elseif ok3 then
+      entry.fonts.__type__ = type(fonts)
+    else
+      entry.fonts.__error__ = tostring(fonts)
+    end
+
+    t[#t + 1] = entry
+  end
+
+  return t
+end
+
+
+function collect_api_availability()
+  -- Complete list of functions registered in the world table (worldlib)
+  -- plus array functions (world_arrays.cpp) and additional globals.
+  -- Extracted from lua_registration.cpp and world_arrays.cpp.
+  local api_names = {
+    -- Output functions
+    "Note", "Trim", "ColourNote", "ColourTell", "Tell", "ANSI", "AnsiNote",
+    "Hyperlink", "Simulate",
+    -- Text manipulation
+    "DeleteLines", "DeleteOutput", "SetSelection",
+    -- Display/UI
+    "Bookmark", "SetUnseenLines", "ResetStatusTime", "Transparency",
+    -- Info bar
+    "Info", "InfoClear", "InfoColour", "InfoColor", "InfoBackground", "InfoFont", "ShowInfoBar",
+    -- Network
+    "Send", "SendNoEcho", "SendImmediate", "SendPush", "SendSpecial",
+    "Connect", "Disconnect", "IsConnected",
+    -- Variable
+    "GetVariable", "SetVariable", "DeleteVariable", "GetVariableList",
+    -- World info
+    "GetInfo", "GetOption", "SetOption", "GetAlphaOption", "SetAlphaOption",
+    "GetCurrentValue", "GetDefaultValue", "GetLoadedValue",
+    "SetStatus", "Repaint", "TextRectangle", "SetBackgroundImage", "SetScroll",
+    "GetCommand", "SetCommand", "SetCommandSelection", "SetCommandWindowHeight",
+    "GetLineCount", "GetSentBytes", "GetReceivedBytes", "GetConnectDuration",
+    "WorldAddress", "WorldPort", "WorldName", "Version",
+    "GetLinesInBufferCount",
+    "GetSelectionStartLine", "GetSelectionEndLine",
+    "GetSelectionStartColumn", "GetSelectionEndColumn",
+    "GetSysColor", "GetSystemMetrics", "GetDeviceCaps", "GetFrame",
+    "GetAlphaOptionList", "GetOptionList", "GetGlobalOptionList",
+    "Queue", "DiscardQueue", "DoCommand", "GetInternalCommandsList", "Help",
+    -- Color
+    "GetNormalColour", "GetBoldColour", "SetNormalColour", "SetBoldColour",
+    "GetCustomColourText", "GetCustomColourBackground",
+    "SetCustomColourText", "SetCustomColourBackground",
+    "SetCustomColourName", "GetCustomColourName",
+    "PickColour", "AdjustColour",
+    "NormalColour", "BoldColour", "CustomColourText", "CustomColourBackground",
+    "ColourNameToRGB", "RGBColourToName",
+    -- Trace/Echo/Speedwalk
+    "GetTrace", "SetTrace", "GetEchoInput", "SetEchoInput",
+    "GetSpeedWalkDelay", "SetSpeedWalkDelay",
+    "EchoInput", "SpeedWalkDelay",
+    "EvaluateSpeedwalk", "ReverseSpeedwalk", "RemoveBacktracks",
+    -- Triggers
+    "AddTrigger", "DeleteTrigger", "EnableTrigger", "GetTrigger",
+    "GetTriggerInfo", "GetTriggerList", "IsTrigger",
+    "EnableTriggerGroup", "DeleteTriggerGroup", "DeleteTemporaryTriggers",
+    "GetTriggerOption", "SetTriggerOption", "AddTriggerEx", "StopEvaluatingTriggers",
+    -- Aliases
+    "AddAlias", "DeleteAlias", "EnableAlias", "GetAlias",
+    "GetAliasInfo", "GetAliasList", "IsAlias",
+    "EnableAliasGroup", "DeleteAliasGroup", "DeleteTemporaryAliases",
+    "GetAliasOption", "SetAliasOption",
+    -- Timers
+    "AddTimer", "DeleteTimer", "EnableTimer", "GetTimer",
+    "GetTimerInfo", "IsTimer", "GetTimerList",
+    "ResetTimer", "ResetTimers",
+    "DoAfter", "DoAfterNote", "DoAfterSpeedWalk", "DoAfterSpecial",
+    "EnableTimerGroup", "DeleteTimerGroup", "DeleteTemporaryTimers",
+    "GetTimerOption", "SetTimerOption",
+    -- Utility
+    "Hash", "Base64Encode", "Base64Decode",
+    "GenerateName", "ReadNamesFile", "TranslateGerman", "LowercaseWildcard",
+    "GetUniqueNumber", "GetUniqueID", "CreateGUID",
+    "StripANSI", "FixupEscapeSequences", "FixupHTML", "MakeRegularExpression",
+    "Execute", "GetGlobalOption", "SetCursor",
+    "Accelerator", "AcceleratorList", "AcceleratorTo",
+    "Activate", "ActivateClient",
+    "GetWorldID", "GetWorldList", "GetWorldIdList", "GetWorld", "GetWorldById",
+    "Open", "Reset", "EditDistance", "OpenBrowser", "ChangeDir", "TranslateDebug",
+    "GetUdpPort", "UdpSend", "UdpListen", "UdpPortList",
+    "SpellCheck", "SpellCheckDlg", "SpellCheckCommand", "AddSpellCheckWord",
+    "Metaphone", "ResetIP", "ImportXML", "ExportXML",
+    "EnableGroup", "DeleteGroup",
+    "GetClipboard", "SetClipboard",
+    "ErrorDesc", "Replace", "Save",
+    "GetLineInfo", "GetStyleInfo", "GetRecentLines",
+    "Menu",
+    "NoteColour", "NoteColourFore", "NoteColourBack", "NoteColourRGB", "NoteColourName",
+    "GetNoteColour", "GetNoteColourFore", "GetNoteColourBack",
+    "SetNoteColour", "SetNoteColourFore", "SetNoteColourBack",
+    "NoteStyle", "GetNoteStyle", "NoteHr",
+    "PasteCommand", "GetCommandList", "SelectCommand", "GetQueue",
+    "ShiftTabCompleteItem",
+    "GetTriggerWildcard", "GetAliasWildcard",
+    "Trace", "TraceOut", "Debug",
+    -- World notes
+    "GetNotes", "SetNotes",
+    -- Command history
+    "DeleteCommandHistory", "PushCommand",
+    -- Document state
+    "SetChanged",
+    -- Logging
+    "OpenLog", "CloseLog", "WriteLog", "FlushLog", "IsLogOpen", "OmitFromLogFile",
+    "GetLogInput", "SetLogInput", "GetLogNotes", "SetLogNotes",
+    "GetLogOutput", "SetLogOutput",
+    "LogInput", "LogNotes", "LogOutput", "LogSend",
+    -- Random
+    "MtRand", "MtSrand",
+    -- Network info
+    "GetHostAddress", "GetHostName",
+    -- Script timing
+    "GetScriptTime",
+    -- UI Control
+    "FlashIcon", "Redraw", "Pause", "SetTitle", "SetMainTitle",
+    "GetMainWindowPosition", "GetWorldWindowPosition", "GetWorldWindowPositionX",
+    "MoveMainWindow", "MoveWorldWindow", "MoveWorldWindowX",
+    "SetBackgroundColour", "SetOutputFont", "SetInputFont",
+    "SetWorldWindowStatus", "SetForegroundImage", "SetFrameBackgroundColour", "SetToolBarPosition",
+    -- Database
+    "DatabaseOpen", "DatabaseClose", "DatabasePrepare", "DatabaseStep",
+    "DatabaseFinalize", "DatabaseExec", "DatabaseColumns", "DatabaseColumnType",
+    "DatabaseReset", "DatabaseChanges", "DatabaseTotalChanges", "DatabaseError",
+    "DatabaseColumnName", "DatabaseColumnText", "DatabaseColumnValue",
+    "DatabaseColumnNames", "DatabaseColumnValues", "DatabaseGetField",
+    "DatabaseInfo", "DatabaseLastInsertRowid", "DatabaseList",
+    -- Plugin
+    "GetPluginID", "GetPluginName", "GetPluginList", "IsPluginInstalled",
+    "GetPluginInfo", "LoadPlugin", "ReloadPlugin", "UnloadPlugin", "EnablePlugin",
+    "CallPlugin", "PluginSupports", "BroadcastPlugin", "SendPkt", "SaveState",
+    "GetPluginVariable", "GetPluginVariableList",
+    "GetPluginTriggerList", "GetPluginAliasList", "GetPluginTimerList",
+    "GetPluginTriggerInfo", "GetPluginAliasInfo", "GetPluginTimerInfo",
+    "GetPluginTriggerOption", "GetPluginAliasOption", "GetPluginTimerOption",
+    "AddFont",
+    -- Miniwindow
+    "WindowCreate", "WindowShow", "WindowPosition", "WindowSetZOrder",
+    "WindowDelete", "WindowInfo", "WindowResize",
+    -- Miniwindow drawing
+    "WindowRectOp", "WindowCircleOp", "WindowLine", "WindowPolygon",
+    "WindowGradient", "WindowSetPixel", "WindowGetPixel", "WindowArc", "WindowBezier",
+    -- Miniwindow text/fonts
+    "WindowFont", "WindowText", "WindowTextWidth", "WindowFontInfo", "WindowFontList",
+    -- Miniwindow image
+    "WindowLoadImage", "WindowDrawImage", "WindowBlendImage",
+    "WindowImageFromWindow", "WindowImageInfo", "WindowImageList",
+    "WindowWrite", "WindowGetImageAlpha", "WindowDrawImageAlpha",
+    "WindowMergeImageAlpha", "WindowTransformImage", "WindowFilter",
+    -- Pixel helpers
+    "BlendPixel", "FilterPixel",
+    -- Miniwindow hotspots
+    "WindowAddHotspot", "WindowDeleteHotspot", "WindowDeleteAllHotspots",
+    "WindowHotspotTooltip", "WindowDragHandler", "WindowMenu",
+    "WindowHotspotInfo", "WindowMoveHotspot", "WindowScrollwheelHandler",
+    "WindowList", "WindowHotspotList",
+    "WindowCreateImage", "WindowImageOp", "WindowLoadImageMemory",
+    -- Sound
+    "PlaySound", "StopSound", "Sound", "GetSoundStatus", "PlaySoundMemory",
+    -- Notepad
+    "SendToNotepad", "AppendToNotepad", "ReplaceNotepad", "ActivateNotepad",
+    "CloseNotepad", "GetNotepadText", "GetNotepadLength", "GetNotepadList",
+    "SaveNotepad", "NotepadFont", "NotepadColour", "NotepadReadOnly",
+    "NotepadSaveMethod", "MoveNotepadWindow", "GetNotepadWindowPosition",
+    -- MXP/entity
+    "GetEntity", "GetXMLEntity", "SetEntity",
+    -- Mapper
+    "AddToMapper", "AddMapperComment", "DeleteAllMapItems", "DeleteLastMapItem",
+    "EnableMapping", "GetMappingCount", "GetMappingItem", "GetMappingString",
+    "GetMapping", "SetMapping", "GetMapColour", "MapColour", "MapColourList",
+    "GetRemoveMapReverses", "SetRemoveMapReverses",
+    -- Array functions (world_arrays.cpp)
+    "ArrayCreate", "ArrayDelete", "ArrayClear", "ArraySet", "ArrayGet",
+    "ArrayDeleteKey", "ArrayExists", "ArrayKeyExists", "ArrayCount", "ArraySize",
+    "ArrayGetFirstKey", "ArrayGetLastKey", "ArrayList", "ArrayListAll",
+    "ArrayListKeys", "ArrayListValues", "ArrayExport", "ArrayExportKeys", "ArrayImport",
+    -- print override
+    "print",
+  }
+
+  local t = {}
+  for _, name in ipairs(api_names) do
+    t[name] = type(_G[name])
+  end
+  return t
+end
+
+
+function collect_lua_environment()
+  local t = {}
+
+  t._VERSION = _VERSION
+
+  -- JIT
+  t.jit_present = (type(jit) ~= "nil")
+  if type(jit) == "table" then
+    t.jit_version = tostring(jit.version)
+  end
+
+  -- Common libraries
+  t.bit_present   = (type(bit)   ~= "nil")
+  t.bit32_present = (type(bit32) ~= "nil")
+  t.utf8_present  = (type(utf8)  ~= "nil")
+
+  -- Package
+  if type(package) == "table" then
+    t.package_path  = tostring(package.path)
+    t.package_cpath = tostring(package.cpath)
+
+    -- Lua 5.1 uses package.loaders; 5.2+ uses package.searchers
+    if type(package.loaders) ~= "nil" then
+      t.package_loaders_type  = type(package.loaders)
+      local ok, n = pcall(function()
+        local c = 0
+        for _ in pairs(package.loaders) do c = c + 1 end
+        return c
+      end)
+      t.package_loaders_count = ok and n or "__error__"
+    else
+      t.package_loaders_type  = "nil"
+      t.package_loaders_count = 0
+    end
+
+    if type(package.searchers) ~= "nil" then
+      t.package_searchers_type = type(package.searchers)
+    else
+      t.package_searchers_type = "nil"
+    end
+  else
+    t.package_present = false
+  end
+
+  return t
+end
+
+
+function collect_error_probes()
+  local t = {}
+
+  -- Nonexistent numeric option
+  local ok, val = pcall(GetOption, "nonexistent_option_xyzzy")
+  t.getopt_nonexistent = ok and val or ("__error__: " .. tostring(val))
+
+  -- Out-of-range GetInfo
+  local ok2, val2 = pcall(GetInfo, 99999)
+  t.getinfo_99999 = ok2 and val2 or ("__error__: " .. tostring(val2))
+
+  -- Nonexistent variable
+  local ok3, val3 = pcall(GetVariable, "nonexistent_variable_xyzzy")
+  t.getvar_nonexistent = ok3 and val3 or ("__error__: " .. tostring(val3))
+
+  -- Nonexistent miniwindow info
+  local ok4, val4 = pcall(WindowInfo, "nonexistent_window_xyzzy", 1)
+  t.windowinfo_nonexistent = ok4 and val4 or ("__error__: " .. tostring(val4))
+
+  return t
+end
+
+
+function collect_error_codes()
+  local t = {}
+  if type(error_code) == "table" then
+    for k, v in pairs(error_code) do
+      t[tostring(k)] = v
+    end
+  else
+    t.__present__ = false
+    t.__type__    = type(error_code)
+  end
+  return t
+end
+
+
+-- ============================================================
+-- Entry Point
+-- ============================================================
+
+function run_audit()
+  local t0 = os.clock()
+  local data = {
+    metadata        = collect_metadata(),
+    getinfo         = collect_getinfo(),
+    options         = collect_options(),
+    plugins         = collect_plugins(),
+    miniwindows     = collect_miniwindows(),
+    api_availability = collect_api_availability(),
+    lua_environment = collect_lua_environment(),
+    error_probes    = collect_error_probes(),
+    error_codes     = collect_error_codes(),
+  }
+  local json_str = json_encode(data)
+  local path = GetInfo(66) .. "audit_baseline.json"
+  local f, err = io.open(path, "w")
+  if not f then
+    ColourNote("white", "red", "AUDIT ERROR: Cannot write to " .. path .. ": " .. tostring(err))
+    return
+  end
+  f:write(json_str)
+  f:close()
+  local elapsed = os.clock() - t0
+  -- Count top-level items across all sections
+  local count = 0
+  for _, tbl in pairs(data) do
+    if type(tbl) == "table" then
+      for _ in pairs(tbl) do count = count + 1 end
+    end
+  end
+  ColourNote("lime", "black", string.format("AUDIT COMPLETE: %d items captured in %.2fs", count, elapsed))
+  ColourNote("lime", "black", "Written to: " .. path)
+end
+
+-- Print a startup notice when the plugin loads
+ColourNote("white", "black", "Mushkin_Audit loaded. Type 'audit' to run.")
+
+]]>
+</script>
+
+</muclient>

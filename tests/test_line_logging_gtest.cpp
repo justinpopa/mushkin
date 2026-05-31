@@ -454,7 +454,7 @@ TEST_F(LineLoggingTest, HTMLColorLogging)
 
     // Test 2: Span tags for non-black background
     bool hasBlueBackground =
-        content.contains("background:#0000ff") || content.contains("background:#0000FF");
+        content.contains("background: #0000ff") || content.contains("background: #0000FF");
     EXPECT_TRUE(hasBlueBackground) << "Blue background in span tag should be present";
 
     // Test 3: Underline tags

@@ -74,6 +74,10 @@ class RecallDialog : public QDialog {
         return m_filename;
     }
 
+  private slots:
+    void onSave();
+    void onSaveAs();
+
   private:
     void setupUi();
 

@@ -27,14 +27,7 @@
 #include <QFile>
 #include <QTextStream>
 
-// Error codes (defined in lua_methods.cpp)
-enum {
-    eOK = 0,
-    eLogFileAlreadyOpen = 30001,
-    eCouldNotOpenFile = 30002,
-    eLogFileNotOpen = 30003,
-    eLogFileBadWrite = 30004,
-};
+// Error codes from shared header (included via world_document.h -> error_codes.h)
 
 /**
  * FormatTime - Expand time format codes in a string
@@ -140,8 +133,8 @@ QString WorldDocument::FormatTime(const QDateTime& dt, const QString& pattern, b
     result.replace("%B", dt.toString("MMMM")); // Full month
     result.replace("%%", "%");                 // Literal %
 
-    // Restore escaped percents
-    result.replace(escapedPercent, "%%");
+    // Restore escaped percents — single % (the %% → % conversion already happened at line 134)
+    result.replace(escapedPercent, "%");
 
     return result;
 }
@@ -168,7 +161,7 @@ QString WorldDocument::FormatTime(const QDateTime& dt, const QString& pattern, b
  * @param append True to append to existing file, false to overwrite
  * @return Error code (eOK, eLogFileAlreadyOpen, eCouldNotOpenFile)
  */
-qint32 WorldDocument::OpenLog(const QString& filename, bool append)
+qint32 WorldDocument::OpenLog(const QString& filename, bool append, bool writePreamble)
 {
     // Check if already open
     if (m_logfile) {
@@ -186,6 +179,15 @@ qint32 WorldDocument::OpenLog(const QString& filename, bool append)
     // Filename still empty? Error
     if (logName.isEmpty()) {
         return eCouldNotOpenFile;
+    }
+
+    // Normalize path separators — world files from Windows use backslashes
+    logName.replace('\\', '/');
+
+    // Create directories if needed (e.g., "logs/Aardwolf log.txt" needs "logs/" to exist)
+    QFileInfo fi(logName);
+    if (!fi.dir().exists()) {
+        fi.dir().mkpath(".");
     }
 
     // Store resolved filename
@@ -212,8 +214,10 @@ qint32 WorldDocument::OpenLog(const QString& filename, bool append)
 
     qCDebug(lcLogging) << "OpenLog: Successfully opened" << logName << "(append=" << append << ")";
 
-    // Write file preamble if not in raw mode
-    if (!m_logging.file_preamble.isEmpty() && !m_logging.log_raw) {
+    // Write file preamble if not in raw mode.
+    // Original: preamble is only written from interactive/auto-connect path,
+    // NOT from the Lua OpenLog() API (methods_logging.cpp:19-57).
+    if (writePreamble && !m_logging.file_preamble.isEmpty() && !m_logging.log_raw) {
         QDateTime now = QDateTime::currentDateTime();
         QString preamble = m_logging.file_preamble;
 
@@ -228,12 +232,41 @@ qint32 WorldDocument::OpenLog(const QString& filename, bool append)
         WriteToLog("\n");
     }
 
+    // Write world name header if configured
+    // Original: doc.cpp:6691-6726 — writes "WorldName - DayOfWeek, Month DD, YYYY, HH:MM AM/PM"
+    // followed by a line of hyphens
+    if (writePreamble && m_logging.write_world_name) {
+        QDateTime now = QDateTime::currentDateTime();
+        QString header = m_mush_name + " - " + now.toString("dddd, MMMM dd, yyyy, h:mm AP");
+
+        if (m_logging.log_html) {
+            WriteToLog("<br>\n");
+            WriteToLog(FixHTMLString(header));
+            WriteToLog("<br>\n");
+        } else {
+            WriteToLog("\n");
+            WriteToLog(header);
+            WriteToLog("\n");
+        }
+
+        // Line of hyphens matching header length
+        QString hyphens(header.length(), '-');
+        WriteToLog(hyphens);
+        if (m_logging.log_html) {
+            WriteToLog("<br><br>");
+        } else {
+            WriteToLog("\n\n");
+        }
+    }
+
     // Initialize flush time
     m_LastFlushTime = QDateTime::currentDateTime();
 
-    // Retrospective Logging
-    // Write all existing lines with LOG_LINE flag to the log
-    writeRetrospectiveLog();
+    // Retrospective Logging — only from interactive/auto-connect path.
+    // Original: Lua OpenLog() does NOT trigger retrospective logging.
+    if (writePreamble) {
+        writeRetrospectiveLog();
+    }
 
     return eOK;
 }
@@ -314,6 +347,20 @@ void WorldDocument::WriteToLog(const QString& text)
     QTextStream stream(m_logfile.get());
     stream.setEncoding(QStringConverter::Utf8);
     stream << text;
+    stream.flush();
+
+    // Original doc.cpp:3104-3112 — on write error, close log + show message
+    if (stream.status() != QTextStream::Ok || m_logfile->error() != QFileDevice::NoError) {
+        QString msg = QString("An error occurred writing to log file \"%1\"").arg(m_logfile_name);
+        qWarning() << msg;
+        m_logfile->close();
+        m_logfile.reset();
+        // Original shows UMessageBox (modal dialog). We use output note instead
+        // since modal dialogs from the data receive path would block the event loop.
+        if (m_outputFormatter) {
+            m_outputFormatter->colourNote(qRgb(255, 0, 0), qRgb(0, 0, 0), msg);
+        }
+    }
 }
 
 /**
@@ -340,9 +387,11 @@ qint32 WorldDocument::WriteLog(const QString& message)
         return eLogFileNotOpen;
     }
 
-    // Ensure message ends with newline
+    // Append newline — original uses Right(2) != "\n" which always appends
+    // for messages of 2+ chars (even if they already end with \n).
+    // Only a single "\n" message avoids the append.
     QString msg = message;
-    if (!msg.endsWith("\n")) {
+    if (msg.right(2) != QStringLiteral("\n")) {
         msg += "\n";
     }
 
@@ -448,7 +497,7 @@ QString WorldDocument::FixHTMLString(const QString& text)
  *
  * HTML Structure:
  * - <font color="#RRGGBB"> for foreground
- * - <span style="color:#RRGGBB;background:#RRGGBB"> for background (only if not black)
+ * - <span style="color: #RRGGBB; background: #RRGGBB"> for background (only if not black)
  * - <u>...</u> for underline
  * - Newline at end of line
  *
@@ -511,7 +560,7 @@ void WorldDocument::LogLineInHTMLcolour(Line* line)
             // Open span for background color (only if not black)
             if (colour2 != 0) {
                 QColor back = bgrToQColor(colour2);
-                WriteToLog(QString("<span style=\"color:#%1%2%3;background:#%4%5%6\">")
+                WriteToLog(QString("<span style=\"color: #%1%2%3; background: #%4%5%6\">")
                                .arg(fore.red(), 2, 16, QChar('0'))
                                .arg(fore.green(), 2, 16, QChar('0'))
                                .arg(fore.blue(), 2, 16, QChar('0'))
@@ -692,8 +741,10 @@ void WorldDocument::writeRetrospectiveLog()
             continue;
         }
 
-        // Only write lines that have been marked for logging
-        if (!(line->flags & LOG_LINE)) {
+        // Only write lines flagged for logging: LOG_LINE (MUD output) or
+        // NOTE_OR_COMMAND (user input/notes added to buffer)
+        // Original: doc.cpp:2943 checks both flags
+        if (!(line->flags & LOG_LINE) && !(line->flags & NOTE_OR_COMMAND)) {
             continue;
         }
 

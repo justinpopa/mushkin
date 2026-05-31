@@ -65,8 +65,7 @@ inline constexpr int DEFAULT_CHARSET = 1;
 // Line width
 inline constexpr int MAX_LINE_WIDTH = 32000;
 
-// Connect methods (already defined in world_document.h)
-inline constexpr int eConnectTypeMax = 4;
+// Connect method enum constants (eNoAutoConnect, eConnectMUSH, etc.) defined in world_document.h
 
 // SendTo enum now in automation/sendto.h
 
@@ -209,7 +208,7 @@ const tConfigurationNumericOption OptionsTable[] = {
     {"log_in_colour", false, O(m_logging.log_in_colour), 0, 0, 0},
     {"log_lines", 0, O(m_logging.log_lines), 0, 500000, 0},
     {"log_notes", false, O(m_logging.log_notes), 0, 0, 0},
-    {"log_output", false, O(m_logging.log_output), 0, 0, 0},
+    {"log_output", true, O(m_logging.log_output), 0, 0, 0}, // original default: true
     {"log_raw", false, O(m_logging.log_raw), 0, 0, 0},
     {"log_script_errors", false, O(m_logging.log_script_errors), 0, 0, 0},
     {"lower_case_tab_completion", false, O(m_command_window.lower_case_tab_completion), 0, 0, 0},
@@ -252,7 +251,7 @@ const tConfigurationNumericOption OptionsTable[] = {
     {"send_file_delay_per_lines", 1, O(m_paste.file_delay_per_lines), 1, 100000, 0},
     {"send_keep_alives", 0, O(m_bSendKeepAlives), 0, 0, 0},
     {"send_mxp_afk_response", true, O(m_bSendMXP_AFK_Response), 0, 0, 0},
-    {"show_bold", true, O(m_display.show_bold), 0, 0, OPT_UPDATE_VIEWS | OPT_UPDATE_OUTPUT_FONT},
+    {"show_bold", false, O(m_display.show_bold), 0, 0, OPT_UPDATE_VIEWS | OPT_UPDATE_OUTPUT_FONT},
     {"show_connect_disconnect", true, O(m_bShowConnectDisconnect), 0, 0, 0},
     {"show_italic", true, O(m_display.show_italic), 0, 0,
      OPT_UPDATE_VIEWS | OPT_UPDATE_OUTPUT_FONT},
@@ -331,7 +330,8 @@ const tConfigurationAlphaOption AlphaOptionsTable[] = {
     {"filter_triggers", "", A(m_scripting.triggers_filter), OPT_MULTLINE},
     {"filter_variables", "", A(m_scripting.variables_filter), OPT_MULTLINE},
     {"id", "", A(m_strWorldID), OPT_WORLD_ID},
-    {"input_font_name", "FixedSys", A(m_input.font_name), OPT_UPDATE_VIEWS | OPT_UPDATE_INPUT_FONT},
+    {"input_font_name", "Courier New", A(m_input.font_name),
+     OPT_UPDATE_VIEWS | OPT_UPDATE_INPUT_FONT},
     {"log_file_postamble", "", A(m_logging.file_postamble), OPT_MULTLINE},
     {"log_file_preamble", "", A(m_logging.file_preamble), OPT_MULTLINE},
     {"log_line_postamble_input", "", A(m_logging.line_postamble_input), OPT_KEEP_SPACES},
@@ -358,7 +358,7 @@ const tConfigurationAlphaOption AlphaOptionsTable[] = {
     {"on_world_get_focus", "", A(m_scripting.on_world_get_focus)},
     {"on_world_lose_focus", "", A(m_scripting.on_world_lose_focus)},
     {"on_world_open", "", A(m_scripting.on_world_open)},
-    {"output_font_name", "FixedSys", A(m_output.font_name), OPT_UPDATE_OUTPUT_FONT},
+    {"output_font_name", "Courier New", A(m_output.font_name), OPT_UPDATE_OUTPUT_FONT},
     {"password", "", A(m_password), OPT_PASSWORD | OPT_PLUGIN_CANNOT_RW},
     {"proxy_password", "", A(m_proxy.password), OPT_PASSWORD | OPT_PLUGIN_CANNOT_RW},
     {"proxy_server", "", A(m_proxy.server), OPT_PLUGIN_CANNOT_WRITE},
@@ -383,7 +383,7 @@ const tConfigurationAlphaOption AlphaOptionsTable[] = {
     {"speed_walk_filler", "", A(m_speedwalk.filler), OPT_KEEP_SPACES},
     {"speed_walk_prefix", "#", A(m_speedwalk.prefix), OPT_KEEP_SPACES},
     {"tab_completion_defaults", "", A(m_command_window.tab_completion_defaults), OPT_MULTLINE},
-    {"terminal_identification", "mushkin", A(m_strTerminalIdentification)},
+    {"terminal_identification", "mushclient", A(m_strTerminalIdentification)},
     {"timestamp_input", "", A(m_output.preamble_input), OPT_KEEP_SPACES | OPT_UPDATE_VIEWS},
     {"timestamp_notes", "", A(m_output.preamble_notes), OPT_KEEP_SPACES | OPT_UPDATE_VIEWS},
     {"timestamp_output", "", A(m_output.preamble_output), OPT_KEEP_SPACES | OPT_UPDATE_VIEWS},

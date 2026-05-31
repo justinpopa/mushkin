@@ -11,6 +11,7 @@
 #include "world_error.h"
 #include <QColor>
 #include <QMdiSubWindow>
+#include <QMessageBox>
 #include <QString>
 #include <expected>
 
@@ -114,15 +115,9 @@ NotepadWidget* WorldDocument::CreateNotepadWindow(const QString& title, const QS
 std::expected<void, WorldError> WorldDocument::SendToNotepad(const QString& title,
                                                              const QString& contents)
 {
-    NotepadWidget* notepad = FindNotepad(title);
-
-    if (notepad) {
-        // Notepad exists - replace contents
-        notepad->ReplaceText(contents);
-    } else {
-        // Create new notepad
-        notepad = CreateNotepadWindow(title, contents);
-    }
+    // Original always creates a new notepad — does NOT check for existing.
+    // Two notepads with the same title can coexist.
+    NotepadWidget* notepad = CreateNotepadWindow(title, contents);
 
     if (!notepad) {
         return std::unexpected(WorldError{WorldErrorType::NotepadNotFound,
@@ -174,12 +169,18 @@ std::expected<void, WorldError> WorldDocument::ReplaceNotepad(const QString& tit
 {
     NotepadWidget* notepad = FindNotepad(title);
 
-    if (!notepad) {
-        return std::unexpected(WorldError{WorldErrorType::NotepadNotFound,
-                                          QString("Notepad not found: %1").arg(title)});
+    if (notepad) {
+        // Existing notepad — replace contents
+        notepad->ReplaceText(contents);
+    } else {
+        // Original: creates new notepad when not found
+        // (AppendToTheNotepad with bReplace=true calls CreateTextWindow if not found)
+        notepad = CreateNotepadWindow(title, contents);
+        if (!notepad) {
+            return std::unexpected(WorldError{WorldErrorType::NotepadNotFound,
+                                              QString("Failed to create notepad: %1").arg(title)});
+        }
     }
-
-    notepad->ReplaceText(contents);
     return {};
 }
 
@@ -220,7 +221,17 @@ qint32 WorldDocument::CloseNotepad(const QString& title, bool querySave)
         return eNoSuchNotepad;
     }
 
-    // TODO(feature): Prompt to save modified notepad content when querySave=true.
+    // Prompt to save modified content (original: methods_notepad.cpp:250-252)
+    if (querySave && notepad->m_pTextEdit && notepad->m_pTextEdit->document()->isModified()) {
+        QMessageBox::StandardButton reply = QMessageBox::question(
+            notepad, tr("Save Changes"), tr("Save changes to '%1'?").arg(title),
+            QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
+        if (reply == QMessageBox::Cancel) {
+            return eOK; // User cancelled — don't close (original returns false)
+        }
+        // Note: Yes/No both proceed to close. Original's SaveModified handles saving
+        // on Yes, but Mushkin notepads don't have file-backed save, so we just close.
+    }
 
     // Synchronously unregister before deferred deletion so that
     // GetNotepadList (called in the same script) sees the removal immediately.
@@ -317,12 +328,27 @@ qint32 WorldDocument::NotepadColour(const QString& title, const QString& textCol
         return eNoSuchNotepad;
     }
 
-    // Parse colors - QColor handles both names and #RRGGBB format
-    QColor textColor(textColour);
-    QColor backColor(backColour);
+    // Parse colors - QColor handles both names and #RRGGBB format.
+    // Empty string is a no-op for that slot (matches original MUSHclient SetColour behavior).
+    QColor textColor;
+    QColor backColor;
 
-    if (!textColor.isValid() || !backColor.isValid()) {
-        return eInvalidColourName;
+    if (textColour.trimmed().isEmpty()) {
+        textColor = QColor(notepad->m_textColour);
+    } else {
+        textColor = QColor(textColour);
+        if (!textColor.isValid()) {
+            return eInvalidColourName;
+        }
+    }
+
+    if (backColour.trimmed().isEmpty()) {
+        backColor = QColor(notepad->m_backColour);
+    } else {
+        backColor = QColor(backColour);
+        if (!backColor.isValid()) {
+            return eInvalidColourName;
+        }
     }
 
     notepad->SetColours(textColor.rgb(), backColor.rgb());
@@ -361,6 +387,12 @@ qint32 WorldDocument::NotepadSaveMethod(const QString& title, qint32 method)
 
     if (!notepad) {
         return eNoSuchNotepad;
+    }
+
+    // Validate method range (original: methods_notepad.cpp:418-423)
+    // 0=eNotepadSaveDefault, 1=eNotepadSaveAlways, 2=eNotepadSaveNever
+    if (method < 0 || method > 2) {
+        return eBadParameter; // original returns false for bad selector
     }
 
     notepad->m_iSaveOnChange = method;

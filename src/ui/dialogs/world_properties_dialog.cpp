@@ -101,9 +101,19 @@ void WorldPropertiesDialog::setupConnectionTab()
     m_passwordEdit->setPlaceholderText("Optional");
     layout->addRow("Password:", m_passwordEdit);
 
-    // Auto-connect (note: backend support may need to be added)
-    m_autoConnectCheck = new QCheckBox("Connect automatically on startup");
-    layout->addRow("", m_autoConnectCheck);
+    // Auto-connect method (original: configuration.cpp:702-710)
+    m_connectMethodCombo = new QComboBox();
+    m_connectMethodCombo->addItem("No auto-connect", eNoAutoConnect);
+    m_connectMethodCombo->addItem("MUSH (send: connect name password)", eConnectMUSH);
+    m_connectMethodCombo->addItem("Diku (send: name then password)", eConnectDiku);
+    m_connectMethodCombo->addItem("MXP", eConnectMXP);
+    layout->addRow("Connect method:", m_connectMethodCombo);
+
+    // Connect text (multi-line text sent on connection)
+    m_connectTextEdit = new QTextEdit();
+    m_connectTextEdit->setMaximumHeight(80);
+    m_connectTextEdit->setPlaceholderText("Text to send after connecting (optional)");
+    layout->addRow("Connect text:", m_connectTextEdit);
 
     // Proxy settings
     QGroupBox* proxyGroup = new QGroupBox("Proxy");
@@ -195,6 +205,51 @@ void WorldPropertiesDialog::setupOutputTab()
 
     layout->addLayout(colorGrid);
 
+    // Display options section
+    layout->addSpacing(20);
+    layout->addWidget(new QLabel("Display Options:"));
+
+    QFormLayout* displayForm = new QFormLayout();
+
+    m_wrapCheck = new QCheckBox("Enable word wrap");
+    displayForm->addRow(m_wrapCheck);
+
+    m_wrapColumnSpin = new QSpinBox();
+    m_wrapColumnSpin->setRange(20, 500);
+    m_wrapColumnSpin->setSuffix(" chars");
+    displayForm->addRow("Wrap column:", m_wrapColumnSpin);
+
+    m_maxLinesSpin = new QSpinBox();
+    m_maxLinesSpin->setRange(200, 500000);
+    displayForm->addRow("Max output lines:", m_maxLinesSpin);
+
+    m_utf8Check = new QCheckBox("UTF-8 (Unicode) output");
+    displayForm->addRow(m_utf8Check);
+
+    m_nawsCheck = new QCheckBox("NAWS (send window size to server)");
+    displayForm->addRow(m_nawsCheck);
+
+    m_terminalTypeEdit = new QLineEdit();
+    displayForm->addRow("Terminal type:", m_terminalTypeEdit);
+
+    m_indentParasCheck = new QCheckBox("Indent paragraphs on word-wrap");
+    displayForm->addRow(m_indentParasCheck);
+
+    m_showBoldCheck = new QCheckBox("Show bold");
+    displayForm->addRow(m_showBoldCheck);
+
+    m_showItalicCheck = new QCheckBox("Show italic");
+    displayForm->addRow(m_showItalicCheck);
+
+    m_showUnderlineCheck = new QCheckBox("Show underline");
+    displayForm->addRow(m_showUnderlineCheck);
+
+    m_lineSpacingSpin = new QSpinBox();
+    m_lineSpacingSpin->setRange(0, 100);
+    displayForm->addRow("Line spacing:", m_lineSpacingSpin);
+
+    layout->addLayout(displayForm);
+
     // Activity notification section
     layout->addSpacing(20);
     layout->addWidget(new QLabel("Activity:"));
@@ -228,9 +283,12 @@ void WorldPropertiesDialog::setupInputTab()
     m_echoInputCheck = new QCheckBox("Echo my input in output window");
     layout->addRow("", m_echoInputCheck);
 
-    // Echo color
+    // Echo color — index 0 = "Same as output" (SAMECOLOUR=65535), 1-16 = custom color 0-15
     m_echoColorCombo = new QComboBox();
-    m_echoColorCombo->addItems({"Same as output", "Custom color"});
+    m_echoColorCombo->addItem("Same as output");
+    for (int i = 0; i < 16; i++) {
+        m_echoColorCombo->addItem(QString("Custom color %1").arg(i + 1));
+    }
     layout->addRow("Echo color:", m_echoColorCombo);
 
     // Command history size
@@ -241,7 +299,34 @@ void WorldPropertiesDialog::setupInputTab()
     m_historySizeSpin->setSuffix(" commands");
     layout->addRow("Command history size:", m_historySizeSpin);
 
-    // Add some spacing
+    // Command stacking
+    layout->addRow("", new QLabel("Command Stacking:"));
+    m_enableCommandStackCheck = new QCheckBox("Enable command stacking");
+    layout->addRow("", m_enableCommandStackCheck);
+    m_commandStackCharEdit = new QLineEdit();
+    m_commandStackCharEdit->setMaxLength(1);
+    m_commandStackCharEdit->setFixedWidth(40);
+    layout->addRow("Stack character:", m_commandStackCharEdit);
+
+    // Speed walk
+    layout->addRow("", new QLabel("Speed Walking:"));
+    m_enableSpeedwalkCheck = new QCheckBox("Enable speed walking");
+    layout->addRow("", m_enableSpeedwalkCheck);
+    m_speedwalkPrefixEdit = new QLineEdit();
+    m_speedwalkPrefixEdit->setFixedWidth(40);
+    layout->addRow("Prefix:", m_speedwalkPrefixEdit);
+    m_speedwalkDelaySpin = new QSpinBox();
+    m_speedwalkDelaySpin->setRange(0, 30000);
+    m_speedwalkDelaySpin->setSuffix(" ms");
+    layout->addRow("Delay:", m_speedwalkDelaySpin);
+
+    // Spam prevention
+    layout->addRow("", new QLabel("Options:"));
+    m_escapeDeletesInputCheck = new QCheckBox("Escape key clears input");
+    layout->addRow("", m_escapeDeletesInputCheck);
+    m_noEchoOffCheck = new QCheckBox("Ignore server echo-off (show passwords)");
+    layout->addRow("", m_noEchoOffCheck);
+
     layout->addRow("", new QWidget()); // Spacer
 
     m_tabWidget->addTab(tab, "Input");
@@ -305,7 +390,36 @@ void WorldPropertiesDialog::setupScriptingTab()
     m_scriptLanguageCombo->addItems({"Lua", "YueScript", "MoonScript", "Teal", "Fennel"});
     layout->addRow("Language:", m_scriptLanguageCombo);
 
-    // Add some spacing
+    // Event handler entry points
+    layout->addRow("", new QLabel("Event Handlers:"));
+    m_onWorldOpenEdit = new QLineEdit();
+    m_onWorldOpenEdit->setPlaceholderText("e.g., OnWorldOpen");
+    layout->addRow("On world open:", m_onWorldOpenEdit);
+
+    m_onWorldCloseEdit = new QLineEdit();
+    m_onWorldCloseEdit->setPlaceholderText("e.g., OnWorldClose");
+    layout->addRow("On world close:", m_onWorldCloseEdit);
+
+    m_onWorldConnectEdit = new QLineEdit();
+    m_onWorldConnectEdit->setPlaceholderText("e.g., OnWorldConnect");
+    layout->addRow("On connect:", m_onWorldConnectEdit);
+
+    m_onWorldDisconnectEdit = new QLineEdit();
+    m_onWorldDisconnectEdit->setPlaceholderText("e.g., OnWorldDisconnect");
+    layout->addRow("On disconnect:", m_onWorldDisconnectEdit);
+
+    m_onWorldGetFocusEdit = new QLineEdit();
+    m_onWorldGetFocusEdit->setPlaceholderText("e.g., OnWorldGetFocus");
+    layout->addRow("On get focus:", m_onWorldGetFocusEdit);
+
+    m_onWorldLoseFocusEdit = new QLineEdit();
+    m_onWorldLoseFocusEdit->setPlaceholderText("e.g., OnWorldLoseFocus");
+    layout->addRow("On lose focus:", m_onWorldLoseFocusEdit);
+
+    m_onWorldSaveEdit = new QLineEdit();
+    m_onWorldSaveEdit->setPlaceholderText("e.g., OnWorldSave");
+    layout->addRow("On save:", m_onWorldSaveEdit);
+
     layout->addRow("", new QWidget()); // Spacer
 
     m_tabWidget->addTab(tab, "Scripting");
@@ -528,7 +642,10 @@ void WorldPropertiesDialog::loadSettings()
     m_portSpin->setValue(m_doc->m_port);
     m_nameEdit->setText(m_doc->m_mush_name);
     m_passwordEdit->setText(m_doc->m_password);
-    m_autoConnectCheck->setChecked(m_doc->m_connect_now);
+    int connectIdx = m_connectMethodCombo->findData(m_doc->m_connect_now);
+    if (connectIdx >= 0)
+        m_connectMethodCombo->setCurrentIndex(connectIdx);
+    m_connectTextEdit->setPlainText(m_doc->m_connect_text);
 
     // Output tab
     // Reconstruct QFont from WorldDocument font properties
@@ -539,31 +656,32 @@ void WorldPropertiesDialog::loadSettings()
     m_outputFontLabel->setText(
         QString("%1, %2pt").arg(m_outputFont.family()).arg(m_outputFont.pointSize()));
 
-    // TODO(feature): Wire ANSI color picker to WorldDocument m_normalColour/m_boldColour arrays.
-    // WorldDocument has m_colors.normal_colour[8] and m_colors.bold_colour[8] — initialize from
-    // them here. For now, initialize with default colors
-    const std::array<QRgb, 16> defaultColors = {
-        qRgb(0, 0, 0),       // Black
-        qRgb(128, 0, 0),     // Red
-        qRgb(0, 128, 0),     // Green
-        qRgb(128, 128, 0),   // Yellow
-        qRgb(0, 0, 128),     // Blue
-        qRgb(128, 0, 128),   // Magenta
-        qRgb(0, 128, 128),   // Cyan
-        qRgb(192, 192, 192), // White
-        qRgb(128, 128, 128), // Bright Black (Gray)
-        qRgb(255, 0, 0),     // Bright Red
-        qRgb(0, 255, 0),     // Bright Green
-        qRgb(255, 255, 0),   // Bright Yellow
-        qRgb(0, 0, 255),     // Bright Blue
-        qRgb(255, 0, 255),   // Bright Magenta
-        qRgb(0, 255, 255),   // Bright Cyan
-        qRgb(255, 255, 255)  // Bright White
-    };
+    // Load ANSI colors from WorldDocument (BGR format → QRgb for display)
+    // normal_colour[0..7] = colors 0-7, bold_colour[0..7] = colors 8-15
+    for (int i = 0; i < 8; i++) {
+        QRgb bgr = m_doc->m_colors.normal_colour[i];
+        m_ansiColors[i] = qRgb(bgr & 0xFF, (bgr >> 8) & 0xFF, (bgr >> 16) & 0xFF);
+    }
+    for (int i = 0; i < 8; i++) {
+        QRgb bgr = m_doc->m_colors.bold_colour[i];
+        m_ansiColors[i + 8] = qRgb(bgr & 0xFF, (bgr >> 8) & 0xFF, (bgr >> 16) & 0xFF);
+    }
     for (int i = 0; i < 16; i++) {
-        m_ansiColors[i] = defaultColors[i];
         updateColorButton(i);
     }
+
+    // Display options
+    m_wrapCheck->setChecked(m_doc->m_display.wrap);
+    m_wrapColumnSpin->setValue(m_doc->m_display.wrap_column);
+    m_maxLinesSpin->setValue(m_doc->m_display.max_lines);
+    m_utf8Check->setChecked(m_doc->m_display.utf8);
+    m_nawsCheck->setChecked(m_doc->m_bNAWS);
+    m_terminalTypeEdit->setText(m_doc->m_strTerminalIdentification);
+    m_indentParasCheck->setChecked(m_doc->m_display.indent_paras);
+    m_showBoldCheck->setChecked(m_doc->m_display.show_bold);
+    m_showItalicCheck->setChecked(m_doc->m_display.show_italic);
+    m_showUnderlineCheck->setChecked(m_doc->m_display.show_underline);
+    m_lineSpacingSpin->setValue(m_doc->m_display.line_spacing);
 
     // Activity settings
     m_flashIconCheck->setChecked(m_doc->m_display.flash_icon);
@@ -577,11 +695,29 @@ void WorldPropertiesDialog::loadSettings()
         QString("%1, %2pt").arg(m_inputFont.family()).arg(m_inputFont.pointSize()));
 
     m_echoInputCheck->setChecked(m_doc->m_display_my_input);
-    // TODO(feature): Wire echo color combo to WorldDocument m_output.echo_colour (quint16, index
-    // into color table).
+    // echo_colour: 65535 = SAMECOLOUR (combo index 0), 0-15 = custom color (combo index 1-16)
+    if (m_doc->m_output.echo_colour == 65535) {
+        m_echoColorCombo->setCurrentIndex(0);
+    } else {
+        m_echoColorCombo->setCurrentIndex(
+            qBound(1, static_cast<int>(m_doc->m_output.echo_colour) + 1, 16));
+    }
 
     // Command history size
     m_historySizeSpin->setValue(m_doc->m_maxCommandHistory);
+
+    // Command stacking
+    m_enableCommandStackCheck->setChecked(m_doc->m_input.enable_command_stack);
+    m_commandStackCharEdit->setText(m_doc->m_input.command_stack_character);
+
+    // Speed walk
+    m_enableSpeedwalkCheck->setChecked(m_doc->m_speedwalk.enabled);
+    m_speedwalkPrefixEdit->setText(m_doc->m_speedwalk.prefix);
+    m_speedwalkDelaySpin->setValue(m_doc->m_speedwalk.delay);
+
+    // Options
+    m_escapeDeletesInputCheck->setChecked(m_doc->m_input.escape_deletes_input);
+    m_noEchoOffCheck->setChecked(m_doc->m_input.no_echo_off);
 
     // Logging tab
     m_enableLogCheck->setChecked(m_doc->m_logging.log_output);
@@ -597,7 +733,13 @@ void WorldPropertiesDialog::loadSettings()
     // Scripting tab
     m_enableScriptCheck->setChecked(m_doc->m_scripting.enabled);
     m_scriptFileEdit->setText(m_doc->m_scripting.filename);
-    // Not applicable: Script language is always Lua — no multi-language support needed.
+    m_onWorldOpenEdit->setText(m_doc->m_scripting.on_world_open);
+    m_onWorldCloseEdit->setText(m_doc->m_scripting.on_world_close);
+    m_onWorldConnectEdit->setText(m_doc->m_scripting.on_world_connect);
+    m_onWorldDisconnectEdit->setText(m_doc->m_scripting.on_world_disconnect);
+    m_onWorldGetFocusEdit->setText(m_doc->m_scripting.on_world_get_focus);
+    m_onWorldLoseFocusEdit->setText(m_doc->m_scripting.on_world_lose_focus);
+    m_onWorldSaveEdit->setText(m_doc->m_scripting.on_world_save);
 
     // Paste to World tab
     m_pastePreambleEdit->setText(m_doc->m_paste.paste_preamble);
@@ -649,15 +791,37 @@ void WorldPropertiesDialog::saveSettings()
     m_doc->m_port = m_portSpin->value();
     m_doc->m_mush_name = m_nameEdit->text();
     m_doc->m_password = m_passwordEdit->text();
-    m_doc->m_connect_now = m_autoConnectCheck->isChecked();
+    m_doc->m_connect_now = m_connectMethodCombo->currentData().toInt();
+    m_doc->m_connect_text = m_connectTextEdit->toPlainText();
 
     // Output tab
     m_doc->m_output.font_name = m_outputFont.family();
     m_doc->m_output.font_height = m_outputFont.pointSize(); // Store as points
     m_doc->m_output.font_weight = m_outputFont.weight();
-    // TODO(feature): Wire ANSI color picker to WorldDocument m_normalColour/m_boldColour arrays.
-    // WorldDocument has m_colors.normal_colour[8] and m_colors.bold_colour[8] — save m_ansiColors[]
-    // to them here.
+    // Save ANSI colors back to WorldDocument (QRgb → BGR format)
+    for (int i = 0; i < 8; i++) {
+        QRgb rgb = m_ansiColors[i];
+        m_doc->m_colors.normal_colour[i] =
+            static_cast<QRgb>((qRed(rgb)) | (qGreen(rgb) << 8) | (qBlue(rgb) << 16));
+    }
+    for (int i = 0; i < 8; i++) {
+        QRgb rgb = m_ansiColors[i + 8];
+        m_doc->m_colors.bold_colour[i] =
+            static_cast<QRgb>((qRed(rgb)) | (qGreen(rgb) << 8) | (qBlue(rgb) << 16));
+    }
+
+    // Display options
+    m_doc->m_display.wrap = m_wrapCheck->isChecked();
+    m_doc->m_display.wrap_column = static_cast<quint16>(m_wrapColumnSpin->value());
+    m_doc->m_display.max_lines = m_maxLinesSpin->value();
+    m_doc->m_display.utf8 = m_utf8Check->isChecked();
+    m_doc->m_bNAWS = m_nawsCheck->isChecked();
+    m_doc->m_strTerminalIdentification = m_terminalTypeEdit->text();
+    m_doc->m_display.indent_paras = m_indentParasCheck->isChecked();
+    m_doc->m_display.show_bold = m_showBoldCheck->isChecked();
+    m_doc->m_display.show_italic = m_showItalicCheck->isChecked();
+    m_doc->m_display.show_underline = m_showUnderlineCheck->isChecked();
+    m_doc->m_display.line_spacing = static_cast<quint16>(m_lineSpacingSpin->value());
 
     // Activity settings
     m_doc->m_display.flash_icon = m_flashIconCheck->isChecked();
@@ -668,11 +832,25 @@ void WorldPropertiesDialog::saveSettings()
     m_doc->m_input.font_weight = m_inputFont.weight();
     m_doc->m_input.font_italic = m_inputFont.italic() ? 1 : 0;
     m_doc->m_display_my_input = m_echoInputCheck->isChecked();
-    // TODO(feature): Wire echo color combo to WorldDocument m_output.echo_colour (quint16, index
-    // into color table).
+    // echo_colour: combo index 0 = SAMECOLOUR (65535), 1-16 = custom color 0-15
+    int echoIdx = m_echoColorCombo->currentIndex();
+    m_doc->m_output.echo_colour = (echoIdx == 0) ? 65535 : static_cast<quint16>(echoIdx - 1);
 
     // Command history size
     m_doc->m_maxCommandHistory = m_historySizeSpin->value();
+
+    // Command stacking
+    m_doc->m_input.enable_command_stack = m_enableCommandStackCheck->isChecked();
+    m_doc->m_input.command_stack_character = m_commandStackCharEdit->text();
+
+    // Speed walk
+    m_doc->m_speedwalk.enabled = m_enableSpeedwalkCheck->isChecked();
+    m_doc->m_speedwalk.prefix = m_speedwalkPrefixEdit->text();
+    m_doc->m_speedwalk.delay = m_speedwalkDelaySpin->value();
+
+    // Options
+    m_doc->m_input.escape_deletes_input = m_escapeDeletesInputCheck->isChecked();
+    m_doc->m_input.no_echo_off = m_noEchoOffCheck->isChecked();
 
     // Logging tab
     m_doc->m_logging.log_output = m_enableLogCheck->isChecked();
@@ -684,6 +862,13 @@ void WorldPropertiesDialog::saveSettings()
     // Scripting tab
     m_doc->m_scripting.enabled = m_enableScriptCheck->isChecked();
     m_doc->m_scripting.filename = m_scriptFileEdit->text();
+    m_doc->m_scripting.on_world_open = m_onWorldOpenEdit->text();
+    m_doc->m_scripting.on_world_close = m_onWorldCloseEdit->text();
+    m_doc->m_scripting.on_world_connect = m_onWorldConnectEdit->text();
+    m_doc->m_scripting.on_world_disconnect = m_onWorldDisconnectEdit->text();
+    m_doc->m_scripting.on_world_get_focus = m_onWorldGetFocusEdit->text();
+    m_doc->m_scripting.on_world_lose_focus = m_onWorldLoseFocusEdit->text();
+    m_doc->m_scripting.on_world_save = m_onWorldSaveEdit->text();
     // Not applicable: Script language is always Lua — no multi-language support needed.
 
     // Paste to World tab
@@ -723,7 +908,10 @@ void WorldPropertiesDialog::saveSettings()
     m_doc->m_proxy.username = m_proxyUsernameEdit->text();
     m_doc->m_proxy.password = m_proxyPasswordEdit->text();
 
-    m_doc->setModified(true);
+    // Don't unconditionally mark modified — original only sets modified flag
+    // when values actually change (via individual option setters). The document's
+    // existing m_bModified state is preserved; it will be set true by the save-to-XML
+    // comparison if any values differ from what's on disk.
 
     qCDebug(lcDialog) << "WorldPropertiesDialog::saveSettings() - saved to WorldDocument";
 }

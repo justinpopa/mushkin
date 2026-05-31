@@ -146,8 +146,8 @@ int main(int argc, char* argv[])
         result = world.WindowRectOp("draw_test",
                                     miniwin.rect_fill,
                                     60, 10, 100, 50,
-                                    0x000000,        -- pen (unused, BGR)
-                                    0x00FF00)        -- green brush (BGR)
+                                    0x00FF00,        -- green Colour1 (BGR) — fill uses this
+                                    0x000000)        -- Colour2 (unused for fill)
     )",
                     "WindowRectOp fill")) {
         return 1;
@@ -215,7 +215,7 @@ int main(int argc, char* argv[])
     }
 
     result = getGlobalNumber(L, "result");
-    if (result != 30025) { // eUnknownOption
+    if (result != static_cast<double>(eUnknownOption)) { // eUnknownOption
         qDebug() << "✗ FAIL: WindowRectOp should reject invalid action, got" << result;
         return 1;
     }
@@ -278,12 +278,13 @@ int main(int argc, char* argv[])
     }
 
     result = getGlobalNumber(L, "result");
-    if (result != 0) {
-        qDebug() << "✗ FAIL: WindowCircleOp arc returned" << result;
+    // Action 6 (arc) is NOT valid for CircleOp in original MUSHclient — returns eUnknownOption
+    if (result != 30025) { // eUnknownOption
+        qDebug() << "✗ FAIL: WindowCircleOp arc should return eUnknownOption(30025), got" << result;
         return 1;
     }
 
-    qDebug() << "✓ WindowCircleOp arc draws arc with angles\n";
+    qDebug() << "✓ WindowCircleOp arc correctly returns eUnknownOption (use WindowArc instead)\n";
 
     // ========== Test 7: WindowLine ==========
     qDebug() << "Test 7: WindowLine";
@@ -364,12 +365,13 @@ int main(int argc, char* argv[])
     }
 
     color = getGlobalNumber(L, "color");
-    if (color != 0) {
-        qDebug() << "✗ FAIL: WindowGetPixel out of bounds should return 0, got" << color;
+    // Original GDI GetPixel returns CLR_INVALID (0xFFFFFFFF = -1) for OOB
+    if (color != static_cast<double>(0xFFFFFFFF)) {
+        qDebug() << "✗ FAIL: WindowGetPixel out of bounds should return CLR_INVALID, got" << color;
         return 1;
     }
 
-    qDebug() << "✓ WindowGetPixel correctly handles out of bounds\n";
+    qDebug() << "✓ WindowGetPixel correctly returns CLR_INVALID for out of bounds\n";
 
     // ========== Test 10: WindowFont ==========
     qDebug() << "Test 10: WindowFont";

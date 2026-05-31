@@ -63,11 +63,12 @@ void WorldDocument::sendTo(SendTo iWhere, const QString& strSendText, bool omit_
 
     switch (iWhere) {
         // ========== eSendToWorld: Send to MUD ==========
-        // Original: doc.cpp
+        // Original: doc.cpp:6220-6228 — SendMsg with echo/log flags from trigger/alias
         case eSendToWorld:
             if (!strSendText.isEmpty()) {
-                // TODO(feature): Honor omit_from_output and omit_from_log flags from trigger/alias.
-                sendToMud(strSendText);
+                SendMsg(strSendText, omit_from_output ? false : m_display_my_input,
+                        false, // don't queue
+                        omit_from_log ? false : m_logging.log_input);
             }
             break;
 
@@ -80,10 +81,11 @@ void WorldDocument::sendTo(SendTo iWhere, const QString& strSendText, bool omit_
             break;
 
         // ========== eSendToCommandQueue: Add to command queue ==========
-        // Original: doc.cpp
+        // Original: doc.cpp:6231-6236 — SendMsg with queue=true
         case eSendToCommandQueue:
-            // TODO(feature): Command queue not yet implemented — eSendToCommandQueue is a no-op.
-            qCDebug(lcWorld) << "SendTo: eSendToCommandQueue:" << strSendText;
+            SendMsg(strSendText, omit_from_output ? false : m_display_my_input,
+                    true, // queue it
+                    omit_from_log ? false : m_logging.log_input);
             break;
 
         // ========== eSendToStatus: Set status line message ==========
@@ -136,9 +138,12 @@ void WorldDocument::sendTo(SendTo iWhere, const QString& strSendText, bool omit_
         // ========== eSendToLogFile: Write to log file ==========
         // Original: doc.cpp
         case eSendToLogFile:
-            // Write text to log file (if logging is enabled)
-            // WriteToLog checks m_logfile internally and handles all formatting
-            WriteToLog(strSendText);
+            // Write text + newline to log file, but not in raw log mode
+            // (original: doc.cpp:6300-6307)
+            if (m_logfile && !m_logging.log_raw) {
+                WriteToLog(strSendText);
+                WriteToLog(QStringLiteral("\n"));
+            }
             break;
 
         // ========== eSendToVariable: Set a variable ==========
@@ -163,11 +168,19 @@ void WorldDocument::sendTo(SendTo iWhere, const QString& strSendText, bool omit_
             break;
 
         // ========== eSendToSpeedwalk: Expand speedwalk and send to MUD ==========
-        // Original: doc.cpp
+        // Original: doc.cpp:6335-6351 — evaluates, checks for errors, sends via SendMsg
         case eSendToSpeedwalk: {
             QString expanded = speedwalk::evaluate(strSendText, m_speedwalk.filler);
             if (!expanded.isEmpty()) {
-                sendToMud(expanded);
+                if (expanded.at(0) == '*') {
+                    // Error in speedwalk string — show in output (original shows UMessageBox)
+                    note(expanded.mid(1));
+                } else {
+                    // Send with proper echo/log flags through the full pipeline, queued
+                    SendMsg(expanded, omit_from_output ? false : m_display_my_input,
+                            true, // queue it
+                            omit_from_log ? false : m_logging.log_input);
+                }
             }
             break;
         }
@@ -193,11 +206,13 @@ void WorldDocument::sendTo(SendTo iWhere, const QString& strSendText, bool omit_
             break;
 
         // ========== eSendImmediate: Send immediately (bypass queue) ==========
-        // Original: doc.cpp
+        // Original: doc.cpp:6368-6373 — DoSendMsg bypasses the speedwalk queue entirely
         case eSendImmediate:
-            // Sends immediately, bypassing any future command queue — same as eSendToWorld for now.
+            // Sends immediately via DoSendMsg, bypassing SendMsg's queue logic.
+            // Uses same echo/log flags as the original: m_display_my_input and LoggingInput().
             if (!strSendText.isEmpty()) {
-                sendToMud(strSendText);
+                DoSendMsg(strSendText, omit_from_output ? false : m_display_my_input,
+                          omit_from_log ? false : m_logging.log_input);
             }
             break;
 

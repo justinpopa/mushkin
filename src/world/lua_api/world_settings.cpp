@@ -22,12 +22,13 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QFontDatabase>
+#include <QFontMetrics>
 #include <QGuiApplication>
 #include <QHostAddress>
 #include <QHostInfo>
+#include <QImageReader>
 #include <QLocale>
 #include <QRegularExpression>
-#include <QSettings>
 #include <QSysInfo>
 #include <algorithm>
 #include <sqlite3.h>
@@ -40,6 +41,7 @@ extern "C" {
 #include <lualib.h>
 }
 
+#include "../../utils/font_utils.h"
 #include "logging.h"
 #include "lua_common.h"
 
@@ -607,9 +609,12 @@ int L_GetInfo(lua_State* L)
             luaPushQString(L, pDoc->m_strWorldFilePath);
         } break;
 
-        case 55: // Window title (GetTitle)
+        case 55: // World title — MFC GetTitle() returns document name (original:
+                 // methods_info.cpp:469)
         {
-            luaPushQString(L, pDoc->m_strWindowTitle);
+            // Original returns CDocument::GetTitle() which is the world name, not SetTitle value.
+            // SetTitle value is returned by GetInfo(88) instead.
+            luaPushQString(L, pDoc->m_mush_name);
         } break;
 
         case 56: // MUSHclient executable path
@@ -639,8 +644,7 @@ int L_GetInfo(lua_State* L)
         case 60: // Plugins directory (global)
         {
             // Return global plugins directory, resolved to absolute path
-            auto& db = Database::instance();
-            QString pluginsDir = db.getPreference("PluginsDirectory", "./worlds/plugins/");
+            QString pluginsDir = GlobalOptions::instance().pluginsDirectory();
             pluginsDir.replace('\\', '/');
 
             // If relative, resolve against application directory
@@ -801,9 +805,7 @@ int L_GetInfo(lua_State* L)
 
         case 82: // Preferences database name
         {
-            // QSettings uses platform-native storage (plist on macOS, registry on Windows, conf on
-            // Linux). Return the settings file path where available.
-            luaPushQString(L, QSettings().fileName());
+            luaPushQString(L, Database::instance().databasePath());
         } break;
 
         case 83: // SQLite version
@@ -991,8 +993,13 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 212: // Output font height
-            // Based on: methods_info.cpp
-            lua_pushinteger(L, pDoc->m_output.font_height);
+            // Original returns tm.tmHeight (rendered pixel height from TEXTMETRIC).
+            // Use QFontMetrics::height() on the same font that OutputView renders with.
+            {
+                QFont outputFont =
+                    createScaledFont(pDoc->m_output.font_name, pDoc->m_output.font_height);
+                lua_pushinteger(L, QFontMetrics(outputFont).height());
+            }
             break;
 
         case 213: // Output font width
@@ -1088,9 +1095,17 @@ int L_GetInfo(lua_State* L)
             }
             break;
 
-        case 232: // High-resolution timer (seconds since epoch)
-            lua_pushnumber(L, QDateTime::currentMSecsSinceEpoch() / 1000.0);
+        case 232: { // High-resolution timer (seconds since app start)
+            // Original uses QueryPerformanceCounter / frequency (boot-relative).
+            // QElapsedTimer gives monotonic nanoseconds since start — same semantics.
+            static QElapsedTimer s_hiResTimer = []() {
+                QElapsedTimer t;
+                t.start();
+                return t;
+            }();
+            lua_pushnumber(L, s_hiResTimer.nsecsElapsed() / 1e9);
             break;
+        }
 
         case 233: // Time taken doing triggers (seconds)
             lua_pushnumber(L, pDoc->m_automationRegistry->m_trigger_time_elapsed);
@@ -1107,22 +1122,27 @@ int L_GetInfo(lua_State* L)
 
         case 236: // Command selection start column
         {
+            // Original always returns nStartChar + 1 (1-based cursor/start position),
+            // even when there is no selection — it reflects the cursor position.
             auto* inputView = pDoc->activeInputView();
-            if (inputView && inputView->selectionStart() != inputView->selectionEnd()) {
-                lua_pushinteger(L, inputView->selectionStart() + 1); // 1-based
+            if (inputView) {
+                lua_pushinteger(L, inputView->selectionStart() + 1);
             } else {
-                lua_pushinteger(L, 0); // No selection
+                lua_pushinteger(L, 0);
             }
             break;
         }
 
         case 237: // Command selection end column
         {
+            // Original returns nEndChar as-is (0-based end), or 0 if nEndChar <= nStartChar
+            // (no selection). Note: NO +1 here — the end is deliberately asymmetric with
+            // the start, matching the original GetSel() behaviour.
             auto* inputView = pDoc->activeInputView();
-            if (inputView && inputView->selectionStart() != inputView->selectionEnd()) {
-                lua_pushinteger(L, inputView->selectionEnd() + 1); // 1-based
+            if (inputView && inputView->selectionEnd() > inputView->selectionStart()) {
+                lua_pushinteger(L, inputView->selectionEnd());
             } else {
-                lua_pushinteger(L, 0); // No selection
+                lua_pushinteger(L, 0);
             }
             break;
         }
@@ -1141,9 +1161,12 @@ int L_GetInfo(lua_State* L)
             lua_pushinteger(L, pDoc->m_FontWidth);
             break;
 
-        case 241: // Character height
-            lua_pushinteger(L, pDoc->m_output.font_height);
-            break;
+        case 241: // Character height (rendered pixel height, same as GetInfo(212))
+        {
+            QFont outputFont =
+                createScaledFont(pDoc->m_output.font_name, pDoc->m_output.font_height);
+            lua_pushinteger(L, QFontMetrics(outputFont).height());
+        } break;
 
         case 242: // UTF-8 error count
             lua_pushinteger(L, pDoc->m_iUTF8ErrorCount);
@@ -1313,8 +1336,8 @@ int L_GetInfo(lua_State* L)
             lua_pushinteger(L, pDoc->m_iBackgroundMode);
             break;
 
-        case 271: // Background colour
-            lua_pushinteger(L, pDoc->m_iBackgroundColour);
+        case 271: // Background colour (original returns signed COLORREF; NO_COLOUR=0xFFFFFFFF → -1)
+            lua_pushinteger(L, static_cast<qint32>(pDoc->m_iBackgroundColour));
             break;
 
         case 272: // Text rectangle - left
@@ -1464,9 +1487,9 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 297: // High-resolution timer frequency
-            // Original: App.m_iCounterFrequency (QueryPerformanceFrequency).
-            // Qt uses millisecond timers, so frequency is 1000.0.
-            lua_pushnumber(L, 1000.0);
+            // Original: App.m_iCounterFrequency (QueryPerformanceFrequency, ~10MHz).
+            // QElapsedTimer counts in nanoseconds, so frequency is 1e9.
+            lua_pushnumber(L, 1e9);
             break;
 
         case 298: // SQLite3 version number
@@ -1481,52 +1504,58 @@ int L_GetInfo(lua_State* L)
             lua_pushinteger(L, 65001);
             break;
 
-        case 301: // Time connected (DATE \u2014 epoch seconds)
+            // Helper lambda: convert QDateTime to OLE DATE (days since 1899-12-30)
+            // Original returns COleDateTime which uses this format.
+            // Original converts VT_DATE → CTime → GetTime() which returns time_t
+            // (seconds since 1970-01-01). Use toSecsSinceEpoch() for the same result.
+            // (original: lua_methods.cpp:125-142 pushVariant VT_DATE case)
+
+        case 301: // Time connected (Unix timestamp)
         {
             const QDateTime& ct = pDoc->m_connectionManager->m_tConnectTime;
             if (ct.isValid()) {
-                lua_pushnumber(L, static_cast<lua_Number>(ct.toSecsSinceEpoch()));
+                lua_pushnumber(L, static_cast<double>(ct.toSecsSinceEpoch()));
             } else {
                 lua_pushnil(L);
             }
         } break;
 
-        case 302: // Time log file last flushed (DATE \u2014 epoch seconds)
+        case 302: // Time log file last flushed (Unix timestamp)
         {
             if (pDoc->m_LastFlushTime.isValid()) {
-                lua_pushnumber(L,
-                               static_cast<lua_Number>(pDoc->m_LastFlushTime.toSecsSinceEpoch()));
+                lua_pushnumber(L, static_cast<double>(pDoc->m_LastFlushTime.toSecsSinceEpoch()));
             } else {
                 lua_pushnil(L);
             }
         } break;
 
-        case 303: // Script file modification time (DATE \u2014 epoch seconds)
+        case 303: // Script file modification time (Unix timestamp)
         {
             if (pDoc->m_timeScriptFileMod.isValid()) {
-                lua_pushnumber(
-                    L, static_cast<lua_Number>(pDoc->m_timeScriptFileMod.toSecsSinceEpoch()));
+                lua_pushnumber(L,
+                               static_cast<double>(pDoc->m_timeScriptFileMod.toSecsSinceEpoch()));
             } else {
                 lua_pushnil(L);
             }
         } break;
 
-        case 304: // Current time (DATE \u2014 epoch seconds)
-            lua_pushnumber(L, static_cast<lua_Number>(QDateTime::currentSecsSinceEpoch()));
-            break;
-
-        case 305: // Client start time (DATE \u2014 epoch seconds)
+        case 304: // Current time (Unix timestamp)
         {
-            // Approximation: captures time at first call. Negligible drift from true app start.
-            static const qint64 s_appStartSecs = QDateTime::currentSecsSinceEpoch();
-            lua_pushnumber(L, static_cast<lua_Number>(s_appStartSecs));
+            lua_pushnumber(L, static_cast<double>(QDateTime::currentDateTime().toSecsSinceEpoch()));
         } break;
 
-        case 306: // World start time (DATE \u2014 epoch seconds)
+        case 305: // Client start time (Unix timestamp)
+        {
+            static const double s_appStartTime =
+                static_cast<double>(QDateTime::currentDateTime().toSecsSinceEpoch());
+            lua_pushnumber(L, s_appStartTime);
+        } break;
+
+        case 306: // World start time (Unix timestamp)
         {
             const QDateTime& ws = pDoc->m_connectionManager->m_whenWorldStarted;
             if (ws.isValid()) {
-                lua_pushnumber(L, static_cast<lua_Number>(ws.toSecsSinceEpoch()));
+                lua_pushnumber(L, static_cast<double>(ws.toSecsSinceEpoch()));
             } else {
                 lua_pushnil(L);
             }
@@ -1584,15 +1613,87 @@ int L_SetOption(lua_State* L)
 
     const tConfigurationNumericOption& opt = OptionsTable[optionIndex];
 
-    // Clamp value to min/max if specified
-    if (opt.iMinimum != 0 || opt.iMaximum != 0) {
-        if (value < opt.iMinimum)
-            value = opt.iMinimum;
-        if (value > opt.iMaximum)
-            value = opt.iMaximum;
+    // Reject out-of-range values (original: scriptingoptions.cpp:421-426)
+    // When both min and max are 0, it's a boolean — effective range is [0, 1]
+    double effectiveMin = opt.iMinimum;
+    double effectiveMax = opt.iMaximum;
+    if (effectiveMin == 0 && effectiveMax == 0) {
+        effectiveMax = 1; // Boolean: treat as [0, 1]
+    }
+    if (value < effectiveMin || value > effectiveMax) {
+        return luaReturnError(L, eOptionOutOfRange);
     }
 
-    opt.setter(*pDoc, value);
+    // For custom colours, subtract 1 on set (original: scriptingoptions.cpp:428-431)
+    // API uses 0=no-change, 1=colour1, etc.; storage uses -1=no-change, 0=colour1, etc.
+    double storeValue = value;
+    if (opt.iFlags & OPT_CUSTOM_COLOUR) {
+        storeValue = value - 1;
+    }
+
+    // Mark document modified only when the value actually changes
+    // (original: scriptingoptions.cpp:498-499 — SetModifiedFlag() only if bChanged)
+    double oldValue = opt.getter(*pDoc);
+    opt.setter(*pDoc, storeValue);
+    if (opt.getter(*pDoc) != oldValue) {
+        pDoc->setModified(true);
+    }
+
+    // Apply side effects based on option flags (original: scriptingoptions.cpp:513-603)
+    int flags = opt.iFlags;
+
+    if (flags & OPT_FIX_OUTPUT_BUFFER) {
+        // Trim excess lines immediately when max_output_lines is reduced
+        // (original: scriptingoptions.cpp:513-515 calls FixUpOutputBuffer)
+        pDoc->trimLineBuffer();
+    }
+
+    if (flags & OPT_FIX_WRAP_COLUMN) {
+        // Notify server of new window width via NAWS
+        pDoc->m_telnetParser->sendWindowSizes(static_cast<int>(value));
+    }
+
+    if (flags & OPT_UPDATE_OUTPUT_FONT) {
+        emit pDoc->outputSettingsChanged();
+    }
+
+    if (flags & OPT_UPDATE_INPUT_FONT) {
+        emit pDoc->inputSettingsChanged();
+    }
+
+    if (flags & OPT_UPDATE_VIEWS) {
+        emit pDoc->linesAdded(); // triggers view repaint
+    }
+
+    if (flags & OPT_FIX_INPUT_WRAP) {
+        // Notify input view to update its wrap mode
+        // (original: scriptingoptions.cpp:517-518 calls FixInputWrap → CSendView::UpdateWrap)
+        emit pDoc->inputSettingsChanged();
+    }
+
+    if (flags & OPT_FIX_SPEEDWALK_DELAY) {
+        // Apply the new delay to the connection manager's speedwalk timer
+        // (original: scriptingoptions.cpp:544-545 calls SetSpeedWalkDelay(Value))
+        pDoc->m_connectionManager->setSpeedWalkDelay(static_cast<int>(value));
+    }
+
+    if (flags & OPT_USE_MXP) {
+        // Toggle MXP on/off immediately based on the new setting
+        // (original: scriptingoptions.cpp:577-583)
+        if (pDoc->m_iUseMXP == MXPMode::eMXP_Off && pDoc->m_mxpEngine->m_bMXP) {
+            pDoc->MXP_Off(true);
+        } else if (pDoc->m_iUseMXP == MXPMode::eMXP_On && !pDoc->m_mxpEngine->m_bMXP) {
+            // Manual toggle: preserve custom elements/entities defined by the server.
+            // Original: mxpOnOff.cpp:133-155 — bManual=true skips clearing custom defs.
+            pDoc->MXP_On(true);
+        }
+    }
+
+    if (flags & (OPT_FIX_TOOLTIP_VISIBLE | OPT_FIX_TOOLTIP_START)) {
+        // Notify views to update tooltip timing
+        // (original: scriptingoptions.cpp:549-575 sends TTM_SETDELAYTIME to each view)
+        emit pDoc->tooltipSettingsChanged();
+    }
 
     return luaReturnOK(L);
 }
@@ -1620,22 +1721,23 @@ int L_GetOption(lua_State* L)
     {
         auto it = getNumericOptionMap().find(key);
         if (it != getNumericOptionMap().end()) {
-            lua_pushnumber(L, OptionsTable[it->second].getter(*pDoc));
+            double value = OptionsTable[it->second].getter(*pDoc);
+            // For custom colours, add 1 on get (original: scriptingoptions.cpp:655-663)
+            if (OptionsTable[it->second].iFlags & OPT_CUSTOM_COLOUR) {
+                value += 1;
+                if (value == 65536) // -1 stored as 65535, +1 = 65536 → map to 0
+                    value = 0;
+            }
+            lua_pushnumber(L, value);
             return 1;
         }
     }
 
-    // Search alpha (string) options table (O(1))
-    {
-        auto it = getAlphaOptionMap().find(key);
-        if (it != getAlphaOptionMap().end()) {
-            luaPushQString(L, AlphaOptionsTable[it->second].getter(*pDoc));
-            return 1;
-        }
-    }
+    // Original GetOption ONLY searches numeric options — does NOT fall through to alpha.
+    // Use GetAlphaOption for string options. (original: methods_defaults.cpp:27-37)
 
-    // Option not found
-    lua_pushnil(L);
+    // Option not found — return -1 to match original MUSHclient behavior
+    lua_pushnumber(L, -1);
     return 1;
 }
 
@@ -1896,8 +1998,17 @@ int L_SetAlphaOption(lua_State* L)
 
         opt.setter(*pDoc, strValue);
 
-        // TODO(ui): Trigger UI refresh callbacks (view repaint, font reload) when options
-        // change.
+        // Apply side effects (original: scriptingoptions.cpp:856-868)
+        int alphaFlags = opt.iFlags;
+        if (alphaFlags & OPT_UPDATE_OUTPUT_FONT) {
+            emit pDoc->outputSettingsChanged();
+        }
+        if (alphaFlags & OPT_UPDATE_INPUT_FONT) {
+            emit pDoc->inputSettingsChanged();
+        }
+        if (alphaFlags & OPT_UPDATE_VIEWS) {
+            emit pDoc->linesAdded();
+        }
 
         return luaReturnOK(L);
     }
@@ -2021,8 +2132,42 @@ int L_SetBackgroundImage(lua_State* L)
         return luaReturn(L, eBadParameter);
     }
 
+    QString fileName = luaOptQString(L, 1).trimmed();
+
+    // No file name means clear the image
+    if (fileName.isEmpty()) {
+        pDoc->m_strBackgroundImageName.clear();
+        pDoc->m_iBackgroundMode = mode;
+        if (pDoc->m_pActiveOutputView) {
+            pDoc->m_pActiveOutputView->reloadBackgroundImage();
+        }
+        return luaReturn(L, eOK);
+    }
+
+    // Must be long enough to have x.bmp or x.png
+    if (fileName.length() < 5) {
+        return luaReturn(L, eBadParameter);
+    }
+
+    // Must have .bmp or .png extension (case-insensitive)
+    QString ext = fileName.right(4).toLower();
+    if (ext != ".bmp" && ext != ".png") {
+        return luaReturn(L, eBadParameter);
+    }
+
+    // File must exist
+    if (!QFileInfo::exists(fileName)) {
+        return luaReturn(L, eFileNotFound);
+    }
+
+    // Try to open the image to confirm it can be read
+    QImageReader reader(fileName);
+    if (!reader.canRead()) {
+        return luaReturn(L, eCouldNotOpenFile);
+    }
+
     // Store the image path and mode
-    pDoc->m_strBackgroundImageName = luaOptQString(L, 1);
+    pDoc->m_strBackgroundImageName = fileName;
     pDoc->m_iBackgroundMode = mode;
 
     // Tell OutputView to reload the image via interface method
@@ -2174,7 +2319,7 @@ int L_SetCursor(lua_State* L)
  * Based on methods_commands.cpp
  *
  * @param text Text to set in command input
- * @return 0 (eOK) on success, 30011 (eCommandNotEmpty) if input not empty
+ * @return 0 (eOK) on success, eCommandNotEmpty (30020) if input not empty
  */
 int L_SetCommand(lua_State* L)
 {

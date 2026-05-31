@@ -17,113 +17,113 @@ static const QString kNoFiller;
 
 // Test 1: Basic directions
 // Input: "3n2w"
-// Expected: "north\nnorth\nnorth\nwest\nwest\n"
+// Expected: "north\r\nnorth\r\nnorth\r\nwest\r\nwest\r\n"
 TEST(SpeedwalkTest, BasicDirections)
 {
     QString result = speedwalk::evaluate("3n2w", kNoFiller);
 
     // Should expand to 3 norths and 2 wests
     EXPECT_FALSE(result.startsWith("*")) << "Should not return an error";
-    EXPECT_EQ(result, "north\nnorth\nnorth\nwest\nwest\n");
+    EXPECT_EQ(result, "north\r\nnorth\r\nnorth\r\nwest\r\nwest\r\n");
 }
 
 // Test 2: Single direction without count
 // Input: "n"
-// Expected: "north\n"
+// Expected: "north\r\n"
 TEST(SpeedwalkTest, SingleDirection)
 {
     QString result = speedwalk::evaluate("n", kNoFiller);
 
     EXPECT_FALSE(result.startsWith("*")) << "Should not return an error";
-    EXPECT_EQ(result, "north\n");
+    EXPECT_EQ(result, "north\r\n");
 }
 
 // Test 3: All standard directions
 // Input: "nsewud"
-// Expected: "north\nsouth\neast\nwest\nup\ndown\n"
+// Expected: "north\r\nsouth\r\neast\r\nwest\r\nup\r\ndown\r\n"
 TEST(SpeedwalkTest, AllDirections)
 {
     QString result = speedwalk::evaluate("nsewud", kNoFiller);
 
     EXPECT_FALSE(result.startsWith("*")) << "Should not return an error";
-    EXPECT_EQ(result, "north\nsouth\neast\nwest\nup\ndown\n");
+    EXPECT_EQ(result, "north\r\nsouth\r\neast\r\nwest\r\nup\r\ndown\r\n");
 }
 
 // Test 4: Open action
 // Input: "On3e"
-// Expected: "open north\neast\neast\neast\n"
+// Expected: "open north\r\neast\r\neast\r\neast\r\n"
 TEST(SpeedwalkTest, OpenAction)
 {
     QString result = speedwalk::evaluate("On3e", kNoFiller);
 
     EXPECT_FALSE(result.startsWith("*")) << "Should not return an error";
-    EXPECT_EQ(result, "open north\neast\neast\neast\n");
+    EXPECT_EQ(result, "open north\r\neast\r\neast\r\neast\r\n");
 }
 
 // Test 5: Close action
 // Input: "Cw2n"
-// Expected: "close west\nnorth\nnorth\n"
+// Expected: "close west\r\nnorth\r\nnorth\r\n"
 TEST(SpeedwalkTest, CloseAction)
 {
     QString result = speedwalk::evaluate("Cw2n", kNoFiller);
 
     EXPECT_FALSE(result.startsWith("*")) << "Should not return an error";
-    EXPECT_EQ(result, "close west\nnorth\nnorth\n");
+    EXPECT_EQ(result, "close west\r\nnorth\r\nnorth\r\n");
 }
 
 // Test 6: Lock and Unlock actions
 // Input: "LnKs"
-// Expected: "lock north\nunlock south\n"
+// Expected: "lock north\r\nunlock south\r\n"
 TEST(SpeedwalkTest, LockUnlockActions)
 {
     QString result = speedwalk::evaluate("LnKs", kNoFiller);
 
     EXPECT_FALSE(result.startsWith("*")) << "Should not return an error";
-    EXPECT_EQ(result, "lock north\nunlock south\n");
+    EXPECT_EQ(result, "lock north\r\nunlock south\r\n");
 }
 
 // Test 7: Custom direction with slash
 // Input: "2(ne/sw)"
-// Expected: "ne\nne\n"  (only uses part before slash)
+// Expected: "ne\r\nne\r\n"  (only uses part before slash)
 TEST(SpeedwalkTest, CustomDirectionWithSlash)
 {
     QString result = speedwalk::evaluate("2(ne/sw)", kNoFiller);
 
     EXPECT_FALSE(result.startsWith("*")) << "Should not return an error";
-    EXPECT_EQ(result, "ne\nne\n");
+    EXPECT_EQ(result, "ne\r\nne\r\n");
 }
 
 // Test 8: Custom direction without slash
 // Input: "(portal)"
-// Expected: "portal\n"
+// Expected: "portal\r\n"
 TEST(SpeedwalkTest, CustomDirectionNoSlash)
 {
     QString result = speedwalk::evaluate("(portal)", kNoFiller);
 
     EXPECT_FALSE(result.startsWith("*")) << "Should not return an error";
-    EXPECT_EQ(result, "portal\n");
+    EXPECT_EQ(result, "portal\r\n");
 }
 
 // Test 9: Comments ignored
 // Input: "{comment}3n{another}2w"
-// Expected: "north\nnorth\nnorth\nwest\nwest\n"
+// Expected: "north\r\nnorth\r\nnorth\r\nwest\r\nwest\r\n"
 TEST(SpeedwalkTest, CommentsIgnored)
 {
     QString result = speedwalk::evaluate("{comment}3n{another}2w", kNoFiller);
 
     EXPECT_FALSE(result.startsWith("*")) << "Should not return an error";
-    EXPECT_EQ(result, "north\nnorth\nnorth\nwest\nwest\n");
+    EXPECT_EQ(result, "north\r\nnorth\r\nnorth\r\nwest\r\nwest\r\n");
 }
 
 // Test 10: Whitespace handling
 // Input: "  3n  2w  "
-// Expected: "north\nnorth\nnorth\nwest\nwest\n"
+// Expected: "north\r\nnorth\r\nnorth\r\nwest\r\nwest\r\n"
 TEST(SpeedwalkTest, WhitespaceHandling)
 {
     QString result = speedwalk::evaluate("  3n  2w  ", kNoFiller);
 
     EXPECT_FALSE(result.startsWith("*")) << "Should not return an error";
-    EXPECT_EQ(result, "north\nnorth\nnorth\nwest\nwest\n");
+    EXPECT_EQ(result, "north\r\nnorth\r\nnorth\r\nwest\r\nwest\r\n");
 }
 
 // Test 11: Error - counter exceeds 99
@@ -194,24 +194,24 @@ TEST(SpeedwalkTest, ErrorActionNoDirection)
 
 // Test 17: Filler command
 // Input: "2f" (with filler set to "look")
-// Expected: "look\nlook\n"
+// Expected: "look\r\nlook\r\n"
 TEST(SpeedwalkTest, FillerCommand)
 {
     QString result = speedwalk::evaluate("2f", "look");
 
     EXPECT_FALSE(result.startsWith("*")) << "Should not return an error";
-    EXPECT_EQ(result, "look\nlook\n");
+    EXPECT_EQ(result, "look\r\nlook\r\n");
 }
 
 // Test 18: Case insensitivity
 // Input: "3N2W"
-// Expected: "north\nnorth\nnorth\nwest\nwest\n"
+// Expected: "north\r\nnorth\r\nnorth\r\nwest\r\nwest\r\n"
 TEST(SpeedwalkTest, CaseInsensitivity)
 {
     QString result = speedwalk::evaluate("3N2W", kNoFiller);
 
     EXPECT_FALSE(result.startsWith("*")) << "Should not return an error";
-    EXPECT_EQ(result, "north\nnorth\nnorth\nwest\nwest\n");
+    EXPECT_EQ(result, "north\r\nnorth\r\nnorth\r\nwest\r\nwest\r\n");
 }
 
 // Test 19: Empty string
@@ -226,11 +226,11 @@ TEST(SpeedwalkTest, EmptyString)
 
 // Test 20: Integration test - complex speedwalk
 // Input: "On3e{to the forest}Cs2(portal/entrance)u"
-// Expected: "open north\neast\neast\neast\nclose south\nportal\nportal\nup\n"
+// Expected: "open north\r\neast\r\neast\r\neast\r\nclose south\r\nportal\r\nportal\r\nup\r\n"
 TEST(SpeedwalkTest, ComplexSpeedwalk)
 {
     QString result = speedwalk::evaluate("On3e{to the forest}Cs2(portal/entrance)u", kNoFiller);
 
     EXPECT_FALSE(result.startsWith("*")) << "Should not return an error";
-    EXPECT_EQ(result, "open north\neast\neast\neast\nclose south\nportal\nportal\nup\n");
+    EXPECT_EQ(result, "open north\r\neast\r\neast\r\neast\r\nclose south\r\nportal\r\nportal\r\nup\r\n");
 }

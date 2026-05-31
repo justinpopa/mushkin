@@ -51,11 +51,11 @@ extern int callLuaWithTraceBack(lua_State* L, int nArgs, int nResults);
  *
  * @return (number) Error code as first value:
  *   - eOK (0): Success, followed by function return values
- *   - eNoSuchPlugin (30030): Plugin not installed
- *   - ePluginDisabled (30031): Plugin is disabled
- *   - eNoSuchRoutine (30032): Function not found or empty name
- *   - eBadParameter (30001): Cannot pass argument type (tables, functions)
- *   - eErrorCallingPluginRoutine (30033): Runtime error (3rd return has Lua error)
+ *   - eNoSuchPlugin (30034): Plugin not installed
+ *   - ePluginDisabled (30039): Plugin is disabled
+ *   - eNoSuchRoutine (30036): Function not found or empty name
+ *   - eBadParameter (30046): Cannot pass argument type (tables, functions)
+ *   - eErrorCallingPluginRoutine (30040): Runtime error (3rd return has Lua error)
  * @return On error: error message string
  * @return On runtime error: Lua error string as third value
  *
@@ -563,7 +563,8 @@ int L_GetPluginInfo(lua_State* L)
             break;
 
         case 24: // Script time taken (in seconds)
-            lua_pushnumber(L, plugin->m_iScriptTimeTaken / 1000.0);
+            // m_iScriptTimeTaken is in nanoseconds (from QElapsedTimer::nsecsElapsed)
+            lua_pushnumber(L, plugin->m_iScriptTimeTaken / 1e9);
             break;
 
         case 25: // Sequence
@@ -641,9 +642,9 @@ int L_LoadPlugin(lua_State* L)
  *
  * @return (number) Error code:
  *   - eOK (0): Success
- *   - eNoSuchPlugin (30030): Plugin not found
- *   - eBadParameter (30001): Cannot reload self
- *   - ePluginFileNotFound (30034): Original file not found
+ *   - eNoSuchPlugin (30034): Plugin not found
+ *   - eBadParameter (30046): Cannot reload self
+ *   - ePluginFileNotFound (30030): Original file not found
  *
  * @example
  * -- Reload another plugin during development
@@ -657,7 +658,11 @@ int L_ReloadPlugin(lua_State* L)
 
     auto [pluginID] = luaArgs<QString>(L);
 
+    // Original: tries ID first, falls back to name lookup
     Plugin* plugin = pDoc->FindPluginByID(pluginID);
+    if (!plugin) {
+        plugin = pDoc->FindPluginByName(pluginID);
+    }
 
     if (!plugin) {
         return luaReturnError(L, eNoSuchPlugin);
@@ -671,8 +676,8 @@ int L_ReloadPlugin(lua_State* L)
     // Save plugin filepath before unloading
     QString filepath = plugin->m_strSource;
 
-    // Unload plugin
-    if (!pDoc->UnloadPlugin(pluginID)) {
+    // Unload plugin (use actual ID, not input which might be a name)
+    if (!pDoc->UnloadPlugin(plugin->m_strID)) {
         return luaReturnError(L, eProblemsLoadingPlugin);
     }
 
@@ -701,8 +706,8 @@ int L_ReloadPlugin(lua_State* L)
  *
  * @return (number) Error code:
  *   - eOK (0): Success
- *   - eNoSuchPlugin (30030): Plugin not found
- *   - eBadParameter (30001): Cannot unload self
+ *   - eNoSuchPlugin (30034): Plugin not found
+ *   - eBadParameter (30046): Cannot unload self
  *
  * @example
  * -- Unload a plugin
@@ -719,7 +724,11 @@ int L_UnloadPlugin(lua_State* L)
 
     auto [pluginID] = luaArgs<QString>(L);
 
+    // Original: tries ID first, falls back to name lookup
     Plugin* plugin = pDoc->FindPluginByID(pluginID);
+    if (!plugin) {
+        plugin = pDoc->FindPluginByName(pluginID);
+    }
 
     if (!plugin) {
         return luaReturnError(L, eNoSuchPlugin);
@@ -730,8 +739,8 @@ int L_UnloadPlugin(lua_State* L)
         return luaReturnError(L, eBadParameter);
     }
 
-    // Unload plugin
-    if (pDoc->UnloadPlugin(pluginID)) {
+    // Unload plugin (use the actual plugin ID, not the input which might be a name)
+    if (pDoc->UnloadPlugin(plugin->m_strID)) {
         lua_pushnumber(L, eOK);
     } else {
         lua_pushnumber(L, eProblemsLoadingPlugin);
@@ -752,7 +761,7 @@ int L_UnloadPlugin(lua_State* L)
  *
  * @return (number) Error code:
  *   - eOK (0): Success
- *   - eNoSuchPlugin (30030): Plugin not found
+ *   - eNoSuchPlugin (30034): Plugin not found
  *
  * @example
  * -- Disable a plugin temporarily
@@ -795,8 +804,8 @@ int L_EnablePlugin(lua_State* L)
  *
  * @return (number) Error code:
  *   - eOK (0): Function exists
- *   - eNoSuchPlugin (30030): Plugin not found
- *   - eNoSuchRoutine (30032): Function not found
+ *   - eNoSuchPlugin (30034): Plugin not found
+ *   - eNoSuchRoutine (30036): Function not found
  *
  * @example
  * if PluginSupports("abc123...", "OnCustomEvent") == 0 then
@@ -964,7 +973,8 @@ int L_SendPkt(lua_State* L)
  * @return (number) Error code:
  *   - eOK (0): Success
  *   - eNotAPlugin (30036): Not called from a plugin
- *   - ePluginCouldNotSaveState (30037): Save failed (disk error, etc.)
+ *   - ePluginCouldNotSaveState (30037, same as ePluginDoesNotSaveState): Save failed (disk error,
+ * etc.)
  *
  * @example
  * -- Save important data before disconnecting
@@ -986,7 +996,8 @@ int L_SaveState(lua_State* L)
 
     // Check if already saving (prevent recursion)
     if (currentPlugin->m_bSavingStateNow) {
-        return luaReturnError(L, ePluginCouldNotSaveState);
+        // M189: original lua_methods.cpp:6991 maps ePluginCouldNotSaveState to 30037
+        return luaReturnError(L, ePluginDoesNotSaveState); // 30037, matches original
     }
 
     // Save state
@@ -995,7 +1006,8 @@ int L_SaveState(lua_State* L)
     if (result.has_value()) {
         lua_pushnumber(L, eOK);
     } else {
-        lua_pushnumber(L, ePluginCouldNotSaveState);
+        // M189: original lua_methods.cpp:6991 maps ePluginCouldNotSaveState to 30037
+        lua_pushnumber(L, ePluginDoesNotSaveState); // 30037, matches original
     }
 
     return 1;
