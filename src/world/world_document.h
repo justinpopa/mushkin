@@ -1593,6 +1593,7 @@ class WorldDocument : public QObject, public IWorldContext {
     // Original: OpenSession() fires OnWorldOpen (doc.cpp:902-913);
     // CSendView::OnActivateView fires OnWorldGetFocus/OnWorldLoseFocus (sendvw.cpp:941-978).
     void onWorldOpen();      // Fire OnWorldOpen Lua handler after world load
+    void onWorldClose();     // Fire OnWorldClose Lua handler before world close
     void onWorldGetFocus();  // Fire OnWorldGetFocus Lua handler when world gains focus
     void onWorldLoseFocus(); // Fire OnWorldLoseFocus Lua handler when world loses focus
 

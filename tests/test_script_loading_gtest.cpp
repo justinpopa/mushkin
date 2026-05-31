@@ -675,3 +675,52 @@ TEST_F(ScriptLoadingTest, WorldCallbacksNoOpWhenUnregistered)
     lua_State* L = doc->m_ScriptEngine->L;
     EXPECT_EQ(lua_gettop(L), 0) << "Lua stack should be clean after unregistered callbacks";
 }
+
+// Test 35: onWorldClose() invokes the handler named by on_world_close (M75)
+// Original: SaveModified() runs the close script via m_strWorldClose (doc.cpp:4374-4390).
+TEST_F(ScriptLoadingTest, OnWorldCloseInvokesHandler)
+{
+    resetLuaState();
+
+    QString code = R"(
+        world_close_count = 0
+        function OnWorldClose()
+            world_close_count = world_close_count + 1
+        end
+    )";
+    ASSERT_FALSE(doc->m_ScriptEngine->parseLua(code, "OnWorldClose handler"));
+
+    // The handler name is the configurable on_world_close setting (matches original).
+    doc->m_scripting.on_world_close = "OnWorldClose";
+
+    lua_State* L = doc->m_ScriptEngine->L;
+    EXPECT_EQ(readIntGlobal(L, "world_close_count"), 0) << "Handler not yet fired";
+
+    doc->onWorldClose();
+    EXPECT_EQ(readIntGlobal(L, "world_close_count"), 1) << "OnWorldClose should fire exactly once";
+}
+
+// Test 36: onWorldClose() is a no-op when on_world_close is unset (M75)
+// Original: SeeIfHandlerCanExecute("") never reaches a meaningful ExecuteScript.
+TEST_F(ScriptLoadingTest, OnWorldCloseNoOpWhenNameEmpty)
+{
+    resetLuaState();
+
+    QString code = R"(
+        world_close_count = 0
+        function OnWorldClose()
+            world_close_count = world_close_count + 1
+        end
+    )";
+    ASSERT_FALSE(doc->m_ScriptEngine->parseLua(code, "OnWorldClose handler"));
+
+    // No handler name configured — the close callback must not fire.
+    doc->m_scripting.on_world_close = QString();
+    doc->m_dispidWorldClose = 0;
+
+    lua_State* L = doc->m_ScriptEngine->L;
+    EXPECT_NO_THROW(doc->onWorldClose());
+    EXPECT_EQ(readIntGlobal(L, "world_close_count"), 0)
+        << "OnWorldClose must not fire when no handler name is configured";
+    EXPECT_EQ(lua_gettop(L), 0) << "Lua stack should be clean";
+}

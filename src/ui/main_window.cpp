@@ -2311,6 +2311,18 @@ void MainWindow::closeWorld()
         }
     }
 
+    // Fire the OnWorldClose Lua handler before tearing down the document.
+    // Original: SaveModified() runs the close script once the world is confirmed
+    // closing (doc.cpp:4374-4390).
+    {
+        auto* widget = qobject_cast<WorldWidget*>(sub->widget());
+        if (widget) {
+            if (WorldDocument* doc = widget->document()) {
+                doc->onWorldClose();
+            }
+        }
+    }
+
     sub->close();
 }
 

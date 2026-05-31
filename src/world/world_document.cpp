@@ -2685,6 +2685,48 @@ void WorldDocument::onWorldOpen()
 }
 
 /**
+ * onWorldClose — call the Lua OnWorldClose handler if registered.
+ *
+ * Original: CMUSHclientDoc::SaveModified() (doc.cpp:4374-4390). Fired once when
+ * the world is closing, before the document is torn down, so a script can run
+ * cleanup. The handler name is the configurable on_world_close setting
+ * (m_strWorldClose in the original); when unset, no handler fires.
+ */
+void WorldDocument::onWorldClose()
+{
+    if (!m_ScriptEngine) {
+        return;
+    }
+
+    const QString handlerName = m_scripting.on_world_close;
+    if (handlerName.isEmpty()) {
+        return;
+    }
+
+    if (m_dispidWorldClose == 0) {
+        m_dispidWorldClose = m_ScriptEngine->getLuaDispid(handlerName);
+    }
+
+    if (m_dispidWorldClose == DISPID_UNKNOWN) {
+        return;
+    }
+
+    QList<double> nparams;
+    QList<QString> sparams;
+    qint32 invocation_count = 0;
+    bool result = false;
+
+    bool error = m_ScriptEngine->executeLua(m_dispidWorldClose, handlerName,
+                                            ActionSource::eWorldAction, "world", "world close",
+                                            nparams, sparams, invocation_count, &result);
+    if (error) {
+        qCDebug(lcWorld) << "Error calling OnWorldClose callback";
+    } else {
+        qCDebug(lcWorld) << "OnWorldClose callback executed successfully";
+    }
+}
+
+/**
  * onWorldGetFocus — call the Lua OnWorldGetFocus handler if registered.
  *
  * Original: CSendView::OnActivateView() (sendvw.cpp:941-947), fired when the world's
