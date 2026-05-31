@@ -242,6 +242,9 @@ void WorldPropertiesDialog::setupOutputTab()
     displayForm->addRow(m_nawsCheck);
 
     m_terminalTypeEdit = new QLineEdit();
+    // Original enforces DDV_MaxChars(20) on IDC_TERMINAL_TYPE
+    // (prefspropertypages.cpp:5774).
+    m_terminalTypeEdit->setMaxLength(20);
     displayForm->addRow("Terminal type:", m_terminalTypeEdit);
 
     m_indentParasCheck = new QCheckBox("Indent paragraphs on word-wrap");
@@ -259,6 +262,38 @@ void WorldPropertiesDialog::setupOutputTab()
     m_lineSpacingSpin = new QSpinBox();
     m_lineSpacingSpin->setRange(0, 100);
     displayForm->addRow("Line spacing:", m_lineSpacingSpin);
+
+    // Output-page options carried over from the original CPrefsP14 dialog
+    // (prefspropertypages.cpp:5748-5783). All are backed by WorldDocument but
+    // were previously unreachable from the UI.
+    m_enableBeepsCheck = new QCheckBox("Enable beeps (^G)");
+    displayForm->addRow(m_enableBeepsCheck);
+
+    m_lineInformationCheck = new QCheckBox("Show line information");
+    displayForm->addRow(m_lineInformationCheck);
+
+    m_startPausedCheck = new QCheckBox("Start paused (more prompt)");
+    displayForm->addRow(m_startPausedCheck);
+
+    m_unpauseOnSendCheck = new QCheckBox("Unpause on send");
+    displayForm->addRow(m_unpauseOnSendCheck);
+
+    m_autoFreezeCheck = new QCheckBox("Auto-freeze when scrolled back");
+    displayForm->addRow(m_autoFreezeCheck);
+
+    m_disableCompressionCheck = new QCheckBox("Disable MCCP compression");
+    displayForm->addRow(m_disableCompressionCheck);
+
+    m_useDefaultOutputFontCheck = new QCheckBox("Use default output font");
+    displayForm->addRow(m_useDefaultOutputFontCheck);
+
+    m_alternativeInverseCheck = new QCheckBox("Alternative inverse handling");
+    displayForm->addRow(m_alternativeInverseCheck);
+
+    m_pixelOffsetSpin = new QSpinBox();
+    m_pixelOffsetSpin->setRange(0, 20); // Original: DDV_MinMaxInt 0..20
+    m_pixelOffsetSpin->setSuffix(" px");
+    displayForm->addRow("Pixel offset:", m_pixelOffsetSpin);
 
     layout->addLayout(displayForm);
 
@@ -327,6 +362,11 @@ void WorldPropertiesDialog::setupInputTab()
     m_speedwalkPrefixEdit = new QLineEdit();
     m_speedwalkPrefixEdit->setFixedWidth(40);
     layout->addRow("Prefix:", m_speedwalkPrefixEdit);
+    // Speed-walk filler: the 'F' token expansion (original IDC_SPEED_WALK_FILLER,
+    // prefspropertypages.cpp:4675). Backed by m_speedwalk.filler.
+    m_speedwalkFillerEdit = new QLineEdit();
+    m_speedwalkFillerEdit->setPlaceholderText("Command substituted for the 'F' token");
+    layout->addRow("Filler:", m_speedwalkFillerEdit);
     m_speedwalkDelaySpin = new QSpinBox();
     m_speedwalkDelaySpin->setRange(0, 30000);
     m_speedwalkDelaySpin->setSuffix(" ms");
@@ -721,6 +761,17 @@ void WorldPropertiesDialog::loadSettings()
     m_showUnderlineCheck->setChecked(m_doc->m_display.show_underline);
     m_lineSpacingSpin->setValue(m_doc->m_display.line_spacing);
 
+    // Output-page options carried over from original CPrefsP14
+    m_enableBeepsCheck->setChecked(m_doc->m_sound.enable_beeps);
+    m_lineInformationCheck->setChecked(m_doc->m_display.line_information);
+    m_startPausedCheck->setChecked(m_doc->m_bStartPaused);
+    m_unpauseOnSendCheck->setChecked(m_doc->m_bUnpauseOnSend);
+    m_autoFreezeCheck->setChecked(m_doc->m_display.auto_freeze);
+    m_disableCompressionCheck->setChecked(m_doc->m_bDisableCompression);
+    m_useDefaultOutputFontCheck->setChecked(m_doc->m_bUseDefaultOutputFont != 0);
+    m_alternativeInverseCheck->setChecked(m_doc->m_bAlternativeInverse);
+    m_pixelOffsetSpin->setValue(m_doc->m_display.pixel_offset);
+
     // Activity settings
     m_flashIconCheck->setChecked(m_doc->m_display.flash_icon);
 
@@ -751,6 +802,7 @@ void WorldPropertiesDialog::loadSettings()
     // Speed walk
     m_enableSpeedwalkCheck->setChecked(m_doc->m_speedwalk.enabled);
     m_speedwalkPrefixEdit->setText(m_doc->m_speedwalk.prefix);
+    m_speedwalkFillerEdit->setText(m_doc->m_speedwalk.filler);
     m_speedwalkDelaySpin->setValue(m_doc->m_speedwalk.delay);
 
     // Options
@@ -866,6 +918,17 @@ void WorldPropertiesDialog::saveSettings()
     m_doc->m_display.show_underline = m_showUnderlineCheck->isChecked();
     m_doc->m_display.line_spacing = static_cast<quint16>(m_lineSpacingSpin->value());
 
+    // Output-page options carried over from original CPrefsP14
+    m_doc->m_sound.enable_beeps = m_enableBeepsCheck->isChecked();
+    m_doc->m_display.line_information = m_lineInformationCheck->isChecked();
+    m_doc->m_bStartPaused = m_startPausedCheck->isChecked();
+    m_doc->m_bUnpauseOnSend = m_unpauseOnSendCheck->isChecked();
+    m_doc->m_display.auto_freeze = m_autoFreezeCheck->isChecked();
+    m_doc->m_bDisableCompression = m_disableCompressionCheck->isChecked();
+    m_doc->m_bUseDefaultOutputFont = m_useDefaultOutputFontCheck->isChecked() ? 1 : 0;
+    m_doc->m_bAlternativeInverse = m_alternativeInverseCheck->isChecked();
+    m_doc->m_display.pixel_offset = static_cast<quint16>(m_pixelOffsetSpin->value());
+
     // Activity settings
     m_doc->m_display.flash_icon = m_flashIconCheck->isChecked();
 
@@ -885,10 +948,15 @@ void WorldPropertiesDialog::saveSettings()
     // Command stacking
     m_doc->m_input.enable_command_stack = m_enableCommandStackCheck->isChecked();
     m_doc->m_input.command_stack_character = m_commandStackCharEdit->text();
+    // Original CPrefsP9::DoDataExchange (prefspropertypages.cpp:4720-4721): when
+    // stacking is disabled and the character is blank, default it to a space.
+    if (!m_doc->m_input.enable_command_stack && m_doc->m_input.command_stack_character.isEmpty())
+        m_doc->m_input.command_stack_character = " ";
 
     // Speed walk
     m_doc->m_speedwalk.enabled = m_enableSpeedwalkCheck->isChecked();
     m_doc->m_speedwalk.prefix = m_speedwalkPrefixEdit->text();
+    m_doc->m_speedwalk.filler = m_speedwalkFillerEdit->text();
     m_doc->m_speedwalk.delay = m_speedwalkDelaySpin->value();
 
     // Options
@@ -1007,7 +1075,48 @@ bool WorldPropertiesDialog::validateSettings()
         m_nameEdit->setFocus();
         return false;
     }
+
+    // Original CPrefsP9::DoDataExchange (prefspropertypages.cpp:4695-4700) rejects
+    // speed walking enabled with an empty prefix.
+    if (!isSpeedwalkPrefixValid()) {
+        QMessageBox::warning(this, "World Properties", "You must supply a speed-walk prefix.");
+        m_tabWidget->setCurrentIndex(2); // Input tab
+        m_speedwalkPrefixEdit->setFocus();
+        return false;
+    }
+
+    // Original (prefspropertypages.cpp:4703-4715) rejects command stacking enabled
+    // with an empty or non-printable stack character.
+    if (!isCommandStackCharacterValid()) {
+        const QString stackChar = m_commandStackCharEdit->text();
+        QMessageBox::warning(this, "World Properties",
+                             stackChar.isEmpty() ? "You must supply a command stack character."
+                                                 : "The command stack character is invalid.");
+        m_tabWidget->setCurrentIndex(2); // Input tab
+        m_commandStackCharEdit->setFocus();
+        return false;
+    }
+
     return true;
+}
+
+bool WorldPropertiesDialog::isSpeedwalkPrefixValid() const
+{
+    // Mirrors original: only enforced when speed walking is enabled.
+    return !(m_enableSpeedwalkCheck->isChecked() && m_speedwalkPrefixEdit->text().isEmpty());
+}
+
+bool WorldPropertiesDialog::isCommandStackCharacterValid() const
+{
+    // Only enforced when command stacking is enabled.
+    if (!m_enableCommandStackCheck->isChecked())
+        return true;
+    const QString stackChar = m_commandStackCharEdit->text();
+    if (stackChar.isEmpty())
+        return false;
+    // ::isprint over the first character: printable ASCII including space (0x20-0x7E).
+    const ushort code = stackChar.at(0).unicode();
+    return code >= 0x20 && code <= 0x7E;
 }
 
 void WorldPropertiesDialog::onOkClicked()

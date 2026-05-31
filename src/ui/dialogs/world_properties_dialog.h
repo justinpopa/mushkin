@@ -100,6 +100,12 @@ class WorldPropertiesDialog : public QDialog {
     // Separated from validateSettings() so it can be exercised without a modal box.
     bool isCharacterNameValid() const;
 
+    // Non-modal predicates mirroring the original CPrefsP9 DDV validation
+    // (prefspropertypages.cpp:4695-4715). Separated from validateSettings() so
+    // they can be exercised in tests without a modal message box.
+    bool isSpeedwalkPrefixValid() const;
+    bool isCommandStackCharacterValid() const;
+
     // Validate UI fields before applying. Returns false (and shows a message box)
     // if a required field is invalid; mirrors original DDX/DDV validation.
     bool validateSettings();
@@ -143,6 +149,18 @@ class WorldPropertiesDialog : public QDialog {
     QCheckBox* m_showItalicCheck;
     QCheckBox* m_showUnderlineCheck;
     QSpinBox* m_lineSpacingSpin;
+    // Output-page options absent from the redesigned dialog but present in the
+    // original CPrefsP14 (prefspropertypages.cpp:5748-5783) and fully backed by
+    // WorldDocument. Without these controls the settings are unreachable from the UI.
+    QCheckBox* m_enableBeepsCheck;
+    QCheckBox* m_lineInformationCheck;
+    QCheckBox* m_startPausedCheck;
+    QSpinBox* m_pixelOffsetSpin;
+    QCheckBox* m_autoFreezeCheck;
+    QCheckBox* m_disableCompressionCheck;
+    QCheckBox* m_useDefaultOutputFontCheck;
+    QCheckBox* m_unpauseOnSendCheck;
+    QCheckBox* m_alternativeInverseCheck;
     // Activity
     QCheckBox* m_flashIconCheck;
 
@@ -163,6 +181,7 @@ class WorldPropertiesDialog : public QDialog {
     QLineEdit* m_commandStackCharEdit;
     QCheckBox* m_enableSpeedwalkCheck;
     QLineEdit* m_speedwalkPrefixEdit;
+    QLineEdit* m_speedwalkFillerEdit; // 'F' token filler (original IDC_SPEED_WALK_FILLER)
     QSpinBox* m_speedwalkDelaySpin;
     QCheckBox* m_escapeDeletesInputCheck;
     QCheckBox* m_noEchoOffCheck;

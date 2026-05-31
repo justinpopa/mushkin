@@ -107,6 +107,67 @@ class WorldPropertiesDialogParityTest : public ::testing::Test {
     {
         return dlg->isCharacterNameValid();
     }
+
+    // M77: speed-walk filler / prefix accessors and non-modal validation predicates.
+    QString speedwalkFillerText() const
+    {
+        return dlg->m_speedwalkFillerEdit->text();
+    }
+    void setSpeedwalk(bool enabled, const QString& prefix, const QString& filler)
+    {
+        dlg->m_enableSpeedwalkCheck->setChecked(enabled);
+        dlg->m_speedwalkPrefixEdit->setText(prefix);
+        dlg->m_speedwalkFillerEdit->setText(filler);
+    }
+    bool speedwalkPrefixValid() const
+    {
+        return dlg->isSpeedwalkPrefixValid();
+    }
+
+    // M77: command-stacking accessors and non-modal validation predicate.
+    void setCommandStack(bool enabled, const QString& stackChar)
+    {
+        dlg->m_enableCommandStackCheck->setChecked(enabled);
+        dlg->m_commandStackCharEdit->setText(stackChar);
+    }
+    bool commandStackCharValid() const
+    {
+        return dlg->isCommandStackCharacterValid();
+    }
+
+    // M78: terminal type edit max-length.
+    int terminalTypeMaxLength() const
+    {
+        return dlg->m_terminalTypeEdit->maxLength();
+    }
+
+    // M78: output-page option accessors (beeps + the CPrefsP14 carryover fields).
+    void setOutputOptions(bool beeps, bool lineInfo, bool startPaused, bool unpauseOnSend,
+                          bool autoFreeze, bool disableCompression, bool useDefaultFont,
+                          bool altInverse, int pixelOffset)
+    {
+        dlg->m_enableBeepsCheck->setChecked(beeps);
+        dlg->m_lineInformationCheck->setChecked(lineInfo);
+        dlg->m_startPausedCheck->setChecked(startPaused);
+        dlg->m_unpauseOnSendCheck->setChecked(unpauseOnSend);
+        dlg->m_autoFreezeCheck->setChecked(autoFreeze);
+        dlg->m_disableCompressionCheck->setChecked(disableCompression);
+        dlg->m_useDefaultOutputFontCheck->setChecked(useDefaultFont);
+        dlg->m_alternativeInverseCheck->setChecked(altInverse);
+        dlg->m_pixelOffsetSpin->setValue(pixelOffset);
+    }
+    bool beepsChecked() const
+    {
+        return dlg->m_enableBeepsCheck->isChecked();
+    }
+    bool lineInfoChecked() const
+    {
+        return dlg->m_lineInformationCheck->isChecked();
+    }
+    int pixelOffsetValue() const
+    {
+        return dlg->m_pixelOffsetSpin->value();
+    }
 };
 
 // loadSettings() must populate the "Character name" field from m_name (player
@@ -221,4 +282,107 @@ TEST_F(WorldPropertiesDialogParityTest, BlankNameAllowedWithoutAutoConnect)
     setConnectMethodIndex(0);
     setNameFieldText(QString());
     EXPECT_TRUE(validate());
+}
+
+// M77: the speed-walk filler field (IDC_SPEED_WALK_FILLER) round-trips through
+// m_doc->m_speedwalk.filler.
+TEST_F(WorldPropertiesDialogParityTest, SpeedwalkFillerFieldRoundTrips)
+{
+    doc->m_speedwalk.filler = QStringLiteral("look");
+    makeDialog();
+    loadSettings();
+    EXPECT_EQ(speedwalkFillerText(), QStringLiteral("look"));
+
+    setSpeedwalk(true, QStringLiteral("#"), QStringLiteral("scan"));
+    saveSettings();
+    EXPECT_EQ(doc->m_speedwalk.filler, QStringLiteral("scan"));
+}
+
+// M77: speed walking enabled with an empty prefix must fail validation; a
+// non-empty prefix (or disabled speed walking) passes.
+TEST_F(WorldPropertiesDialogParityTest, SpeedwalkPrefixValidation)
+{
+    makeDialog();
+
+    setSpeedwalk(true, QString(), QString());
+    EXPECT_FALSE(speedwalkPrefixValid());
+
+    setSpeedwalk(true, QStringLiteral("#"), QString());
+    EXPECT_TRUE(speedwalkPrefixValid());
+
+    // Disabled => empty prefix is allowed.
+    setSpeedwalk(false, QString(), QString());
+    EXPECT_TRUE(speedwalkPrefixValid());
+}
+
+// M77: command stacking enabled requires a non-empty, printable stack character.
+TEST_F(WorldPropertiesDialogParityTest, CommandStackCharacterValidation)
+{
+    makeDialog();
+
+    setCommandStack(true, QString());
+    EXPECT_FALSE(commandStackCharValid()); // empty
+
+    setCommandStack(true, QStringLiteral("\t"));
+    EXPECT_FALSE(commandStackCharValid()); // non-printable control char
+
+    setCommandStack(true, QStringLiteral(";"));
+    EXPECT_TRUE(commandStackCharValid()); // printable
+
+    // Disabled => no requirement.
+    setCommandStack(false, QString());
+    EXPECT_TRUE(commandStackCharValid());
+}
+
+// M77: when stacking is disabled and the character is blank, saveSettings defaults
+// it to a single space (mirrors original prefspropertypages.cpp:4720-4721).
+TEST_F(WorldPropertiesDialogParityTest, DisabledStackCharacterDefaultsToSpace)
+{
+    makeDialog();
+    setCommandStack(false, QString());
+    saveSettings();
+    EXPECT_EQ(doc->m_input.command_stack_character, QStringLiteral(" "));
+}
+
+// M78: terminal type edit enforces the original DDV_MaxChars(20).
+TEST_F(WorldPropertiesDialogParityTest, TerminalTypeMaxLength)
+{
+    makeDialog();
+    EXPECT_EQ(terminalTypeMaxLength(), 20);
+}
+
+// M78: the output-page options carried over from CPrefsP14 round-trip through
+// their WorldDocument backing fields.
+TEST_F(WorldPropertiesDialogParityTest, OutputOptionsLoad)
+{
+    doc->m_sound.enable_beeps = false;
+    doc->m_display.line_information = false;
+    doc->m_display.pixel_offset = 7;
+
+    makeDialog();
+    loadSettings();
+
+    EXPECT_FALSE(beepsChecked());
+    EXPECT_FALSE(lineInfoChecked());
+    EXPECT_EQ(pixelOffsetValue(), 7);
+}
+
+TEST_F(WorldPropertiesDialogParityTest, OutputOptionsSave)
+{
+    makeDialog();
+    setOutputOptions(/*beeps=*/false, /*lineInfo=*/false, /*startPaused=*/true,
+                     /*unpauseOnSend=*/false, /*autoFreeze=*/false,
+                     /*disableCompression=*/true, /*useDefaultFont=*/true,
+                     /*altInverse=*/true, /*pixelOffset=*/12);
+    saveSettings();
+
+    EXPECT_FALSE(doc->m_sound.enable_beeps);
+    EXPECT_FALSE(doc->m_display.line_information);
+    EXPECT_TRUE(doc->m_bStartPaused);
+    EXPECT_FALSE(doc->m_bUnpauseOnSend);
+    EXPECT_FALSE(doc->m_display.auto_freeze);
+    EXPECT_TRUE(doc->m_bDisableCompression);
+    EXPECT_NE(doc->m_bUseDefaultOutputFont, 0);
+    EXPECT_TRUE(doc->m_bAlternativeInverse);
+    EXPECT_EQ(doc->m_display.pixel_offset, 12);
 }
