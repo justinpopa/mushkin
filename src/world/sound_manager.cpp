@@ -44,9 +44,8 @@
 #include <QSpatialSound>
 #include <QUrl>
 #include <QVector3D>
-#include <algorithm> // for std::clamp
-#include <cmath>     // for pow()
-#include <memory>    // for std::weak_ptr
+#include <cmath>  // for pow()
+#include <memory> // for std::weak_ptr
 
 // ---------------------------------------------------------------------------
 // Construction / destruction
@@ -244,6 +243,61 @@ void SoundManager::releaseInactiveSoundBuffers()
 qint32 SoundManager::playSound(qint16 buffer, const QString& filename, bool loop, double volume,
                                double pan)
 {
+    // ---- Input validation (runs before audio engine init, matches original order) ----
+
+    // Force volume into range — out-of-range resets to 0 (full volume).
+    // Original: methods_sounds.cpp:72-73 — if (Volume > 0 || Volume < (-100.0)) Volume = 0.0;
+    if (volume > 0.0 || volume < -100.0)
+        volume = 0.0;
+
+    // Force pan into range — out-of-range resets to 0 (center).
+    // Original: methods_sounds.cpp:81-82 — if (Pan > 100.0 || Pan < (-100)) Pan = 0;
+    if (pan > 100.0 || pan < -100.0)
+        pan = 0.0;
+
+    // Buffer 0 + empty filename = adjust-path, but original requires buffer >= 1.
+    // Buffer 0 with no filename falls through to the filename-length check, returning
+    // eBadParameter (original: methods_sounds.cpp:91, 117).
+    // We must check for the adjust-path BEFORE auto-selecting a buffer.
+    if (filename.isEmpty()) {
+        // Adjust-path requires a specific buffer (1-10); buffer 0 is not valid here.
+        if (buffer < 1 || buffer > MAX_SOUND_BUFFERS) {
+            // Original: strlen(FileName) < 2 → eBadParameter (methods_sounds.cpp:117)
+            return eBadParameter;
+        }
+        // Adjust-path needs the audio engine (to access spatialSound).
+        if (!m_audioEngine) {
+            initialize();
+            if (!m_audioEngine)
+                return eCannotPlaySound;
+        }
+        // Convert to 0-based for the adjust logic
+        int bufIdx = buffer - 1;
+        SoundBuffer& sbAdj = m_soundBuffers[bufIdx];
+        if (!sbAdj.isPlaying) {
+            return eCannotPlaySound; // Original: buffer not playing → eCannotPlaySound
+        }
+        if (!sbAdj.spatialSound) {
+            return eCannotPlaySound;
+        }
+        // Adjust volume (Qt uses linear 0.0-1.0, convert from dB -100..0)
+        double linearVolumeAdj = std::pow(10.0, volume / 20.0);
+        sbAdj.spatialSound->setVolume(static_cast<float>(linearVolumeAdj));
+        // Adjust looping
+        sbAdj.spatialSound->setLoops(loop ? QSpatialSound::Infinite : 1);
+        sbAdj.isLooping = loop;
+        // Note: Qt Spatial Audio does not support pan adjustment after creation
+        // (original uses DirectSound SetPan). This is a known platform gap (M136).
+        return eOK;
+    }
+
+    // Reject filenames shorter than 2 characters.
+    // Original: methods_sounds.cpp:117 — if (strlen(FileName) < 2) return eBadParameter;
+    if (filename.length() < 2)
+        return eBadParameter;
+
+    // ---- Audio engine needed from here on ----
+
     // Lazy-load audio system on first use
     // This avoids creating audio objects in tests and headless environments
     if (!m_audioEngine) {
@@ -257,12 +311,6 @@ qint32 SoundManager::playSound(qint16 buffer, const QString& filename, bool loop
 
     // Release any inactive buffers first (free up stopped sounds)
     releaseInactiveSoundBuffers();
-
-    // Clamp volume to valid range (-100 to 0)
-    volume = std::clamp(volume, -100.0, 0.0);
-
-    // Clamp pan to valid range (-100 to +100)
-    pan = std::clamp(pan, -100.0, 100.0);
 
     // Buffer 0 = auto-select free buffer (matches original MUSHclient behavior)
     if (buffer == 0) {
@@ -292,23 +340,6 @@ qint32 SoundManager::playSound(qint16 buffer, const QString& filename, bool loop
     if (!sb.spatialSound) {
         qWarning() << "playSound: Buffer not initialized" << (buffer + 1);
         return eCannotPlaySound;
-    }
-
-    // Empty filename with valid buffer = adjust volume/pan/loop of playing sound
-    // Original: methods_sounds.cpp:91-114
-    if (filename.isEmpty()) {
-        if (!sb.isPlaying) {
-            return eCannotPlaySound; // Can't adjust if not playing
-        }
-        // Adjust volume (Qt uses linear 0.0-1.0, convert from dB -100..0)
-        double linearVolume = std::pow(10.0, volume / 20.0); // dB to linear
-        sb.spatialSound->setVolume(static_cast<float>(linearVolume));
-        // Adjust looping
-        sb.spatialSound->setLoops(loop ? QSpatialSound::Infinite : 1);
-        sb.isLooping = loop;
-        // Note: Qt Spatial Audio does not support pan adjustment after creation
-        // (original uses DirectSound SetPan). This is a known platform gap.
-        return eOK;
     }
 
     // Stop current sound in buffer
