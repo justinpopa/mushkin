@@ -737,6 +737,20 @@ target_link_libraries(test-miniwindow-creation PRIVATE
     ui
 )
 
+# Miniwindow drawing parity test (GoogleTest)
+add_executable(test-miniwindow-drawing-parity-gtest
+    test_miniwindow_drawing_parity_gtest.cpp
+)
+
+target_link_libraries(test-miniwindow-drawing-parity-gtest PRIVATE
+    test_main_gui
+    ui
+)
+
+gtest_discover_tests(test-miniwindow-drawing-parity-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
 # Miniwindow drawing test (non-GoogleTest, uses Qt6::Test)
 add_executable(test-miniwindow-drawing
     test_miniwindow_drawing.cpp
