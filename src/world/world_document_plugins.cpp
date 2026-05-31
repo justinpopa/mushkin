@@ -6,6 +6,7 @@
 
 #include "../automation/plugin.h"
 #include "../automation/script_language.h"
+#include "../utils/error_codes.h"
 #include "logging.h"
 #include "miniwindow.h"
 #include "script_engine.h"
@@ -230,7 +231,8 @@ static QString preprocessPluginXml(const QString& content)
     return processed;
 }
 
-Plugin* WorldDocument::LoadPlugin(const QString& filepath, QString& errorMsg)
+Plugin* WorldDocument::LoadPlugin(const QString& filepath, QString& errorMsg,
+                                  bool suppressListChanged)
 {
     errorMsg.clear();
 
@@ -494,6 +496,14 @@ Plugin* WorldDocument::LoadPlugin(const QString& filepath, QString& errorMsg)
     qCDebug(lcPlugin) << "  Script length:" << pluginPtr->m_strScript.length();
     qCDebug(lcPlugin) << "  Script (first 50 chars):" << pluginPtr->m_strScript.left(50);
 
+    // ================================================================
+    // Load plugin state BEFORE executing script body
+    // ================================================================
+    // Plugins may call GetVariable() at the top level of their script body
+    // (e.g., `width = GetVariable("WINDOW_WIDTH") or default`), so saved
+    // variables must be available before parseScript() runs.
+    (void)pluginPtr->LoadState();
+
     if (!pluginPtr->m_strLanguage.isEmpty() && !pluginPtr->m_strScript.isEmpty()) {
         pluginPtr->m_ScriptEngine =
             std::make_unique<ScriptEngine>(this, pluginPtr->m_strLanguage, pluginPtr);
@@ -513,20 +523,17 @@ Plugin* WorldDocument::LoadPlugin(const QString& filepath, QString& errorMsg)
         bool error = pluginPtr->m_ScriptEngine->parseScript(
             pluginPtr->m_strScript, QString("Plugin %1").arg(pluginPtr->m_strName), pluginLang);
         if (error) {
+            // Original: script parse error causes the entire plugin load to fail.
+            // The plugin is not added to the list.
             errorMsg = QString("Script error in plugin '%1'").arg(pluginPtr->m_strName);
             qWarning() << errorMsg;
-            // Don't fail - plugin may still be useful without script
+            m_CurrentPlugin = savedPlugin;
+            return nullptr;
         }
 
         // Restore previous plugin context
         m_CurrentPlugin = savedPlugin;
     }
-
-    // ================================================================
-    // Load plugin state
-    // ================================================================
-
-    (void)pluginPtr->LoadState();
 
     // ================================================================
     // SORT PLUGIN LIST BY SEQUENCE
@@ -558,8 +565,11 @@ Plugin* WorldDocument::LoadPlugin(const QString& filepath, QString& errorMsg)
         qCDebug(lcPlugin) << "  Skipping OnPluginInstall - no script engine";
     }
 
-    // Notify other plugins that plugin list changed
-    PluginListChanged();
+    // Notify other plugins that plugin list changed (unless batch loading)
+    // Original calls PluginListChanged once after ALL plugins loaded (xml_load_world.cpp:473-474)
+    if (!suppressListChanged) {
+        PluginListChanged();
+    }
 
     return pluginPtr;
 }
@@ -741,6 +751,30 @@ bool WorldDocument::SendToAllPluginCallbacks(const QString& callbackName, const 
 }
 
 /**
+ * SendToAllPluginCallbacksRtn - Filter chain: each plugin can modify the string.
+ *
+ * Matches original plugins.cpp:1435-1459 (SendToAllPluginCallbacksRtn).
+ * Used by OnPluginPacketReceived to let plugins modify incoming data.
+ */
+void WorldDocument::SendToAllPluginCallbacksRtn(const QString& callbackName, QString& strResult)
+{
+    Plugin* savedPlugin = m_CurrentPlugin;
+    m_bNotesNotWantedNow = true;
+
+    for (const auto& plugin : m_PluginList) {
+        if (!plugin || !plugin->m_bEnabled) {
+            continue;
+        }
+
+        m_CurrentPlugin = plugin.get();
+        plugin->ExecutePluginScriptRtn(callbackName, strResult);
+        m_CurrentPlugin = savedPlugin;
+    }
+
+    m_bNotesNotWantedNow = false;
+}
+
+/**
  * SendToAllPluginCallbacks - Call all plugins with int + string arguments
  *
  * Plugin Callbacks
@@ -833,6 +867,7 @@ bool WorldDocument::SendToAllPluginCallbacks(const QString& callbackName, qint32
 bool WorldDocument::SendToFirstPluginCallbacks(const QString& callbackName, const QString& arg)
 {
     Plugin* savedPlugin = m_CurrentPlugin;
+    m_bNotesNotWantedNow = true;
 
     for (const auto& plugin : m_PluginList) {
         if (!plugin || !plugin->m_bEnabled) {
@@ -840,16 +875,30 @@ bool WorldDocument::SendToFirstPluginCallbacks(const QString& callbackName, cons
         }
 
         m_CurrentPlugin = plugin.get();
-        bool pluginResult = plugin->ExecutePluginScript(callbackName, arg);
 
-        if (pluginResult) {
-            m_CurrentPlugin = savedPlugin;
-            return true; // First plugin handled it
+        // Original plugins.cpp:1376-1384 — stops on the first plugin whose callback
+        // exists AND runs without error. The original re-checks isvalid() *after*
+        // executing: ExecuteLua sets the dispid reference to DISPID_UNKNOWN on a Lua
+        // error (scripting.h:71), so an errored callback fails the post-check and the
+        // loop falls through to the next plugin.
+        //
+        // KNOWN DEVIATION (worklist L117): we check hasCallback() *before* executing and
+        // return true unconditionally below, so a callback that errors still stops
+        // iteration instead of falling through. Low impact (only when a callback is in an
+        // already-broken error state); not yet fixed.
+        if (!plugin->hasCallback(callbackName)) {
+            continue;
         }
+
+        plugin->ExecutePluginScript(callbackName, arg);
+        m_CurrentPlugin = savedPlugin;
+        m_bNotesNotWantedNow = false;
+        return true; // Found a plugin with this callback
     }
 
     m_CurrentPlugin = savedPlugin;
-    return false; // No plugin handled it
+    m_bNotesNotWantedNow = false;
+    return false; // No plugin has this callback
 }
 
 // ============================================================================
@@ -1074,7 +1123,7 @@ qint32 WorldDocument::WindowFont(const QString& windowName, const QString& fontI
     // Find miniwindow by name
     auto it = m_MiniWindowMap.find(windowName);
     if (it == m_MiniWindowMap.end() || !it->second) {
-        return 30010; // eNoSuchWindow
+        return eNoSuchWindow;
     }
 
     MiniWindow* miniWindow = it->second.get();

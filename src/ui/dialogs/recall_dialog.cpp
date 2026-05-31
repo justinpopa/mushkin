@@ -1,6 +1,8 @@
 #include "recall_dialog.h"
 #include <QDialogButtonBox>
+#include <QFileDialog>
 #include <QFont>
+#include <QMessageBox>
 #include <QPalette>
 #include <QPlainTextEdit>
 #include <QPushButton>
@@ -27,10 +29,19 @@ void RecallDialog::setupUi()
     m_textEdit->setLineWrapMode(QPlainTextEdit::WidgetWidth);
     mainLayout->addWidget(m_textEdit);
 
-    // Close button only (no OK/Cancel)
-    QDialogButtonBox* buttonBox = new QDialogButtonBox(QDialogButtonBox::Close, this);
-    connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::close);
-    mainLayout->addWidget(buttonBox);
+    // Save, Save As, and Close buttons
+    QHBoxLayout* buttonLayout = new QHBoxLayout();
+    QPushButton* saveBtn = new QPushButton(tr("Save"), this);
+    QPushButton* saveAsBtn = new QPushButton(tr("Save As..."), this);
+    QPushButton* closeBtn = new QPushButton(tr("Close"), this);
+    connect(saveBtn, &QPushButton::clicked, this, &RecallDialog::onSave);
+    connect(saveAsBtn, &QPushButton::clicked, this, &RecallDialog::onSaveAs);
+    connect(closeBtn, &QPushButton::clicked, this, &QDialog::close);
+    buttonLayout->addWidget(saveBtn);
+    buttonLayout->addWidget(saveAsBtn);
+    buttonLayout->addStretch();
+    buttonLayout->addWidget(closeBtn);
+    mainLayout->addLayout(buttonLayout);
 
     setLayout(mainLayout);
 }
@@ -68,4 +79,30 @@ void RecallDialog::setColors(const QColor& textColor, const QColor& backgroundCo
 void RecallDialog::setFilename(const QString& filename)
 {
     m_filename = filename;
+}
+
+void RecallDialog::onSave()
+{
+    if (m_filename.isEmpty()) {
+        onSaveAs();
+        return;
+    }
+    QFile file(m_filename);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, tr("Save Error"),
+                             tr("Could not open file for writing:\n%1").arg(m_filename));
+        return;
+    }
+    file.write(m_textEdit->toPlainText().toUtf8());
+}
+
+void RecallDialog::onSaveAs()
+{
+    QString path = QFileDialog::getSaveFileName(this, tr("Save Recalled Text"), m_filename,
+                                                tr("Text files (*.txt);;All files (*)"));
+    if (path.isEmpty()) {
+        return;
+    }
+    m_filename = path;
+    onSave();
 }

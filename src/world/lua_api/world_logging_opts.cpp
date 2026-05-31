@@ -165,6 +165,7 @@ int L_SpeedWalkDelay(lua_State* L)
     if (lua_gettop(L) >= 1) {
         int delay = luaL_checkinteger(L, 1);
         pDoc->m_speedwalk.delay = delay;
+        pDoc->m_connectionManager->setSpeedWalkDelay(delay);
         return 0;
     }
     lua_pushinteger(L, pDoc->m_speedwalk.delay);
@@ -268,8 +269,9 @@ int L_LogSend(lua_State* L)
     // Concatenate all arguments (matches original concatArgs behavior)
     QString text = concatArgs(L);
 
-    // Send the message
-    pDoc->sendToMud(text);
+    // Send through full pipeline then log
+    // Original: methods_sending.cpp:139 calls Send() which calls SendMsg(), then LogCommand()
+    pDoc->SendMsg(text, pDoc->m_display_my_input, false, false);
 
     // Log the command unconditionally (regardless of m_log_input setting)
     if (pDoc->IsLogOpen()) {
@@ -296,7 +298,8 @@ int L_LogSend(lua_State* L)
 int L_GetSpeedWalkDelay(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    lua_pushinteger(L, pDoc->m_speedwalk.delay);
+    // Original returns short via lua_pushnumber (methods_speedwalks.cpp:350-353)
+    lua_pushnumber(L, static_cast<short>(pDoc->m_speedwalk.delay));
     return 1;
 }
 
@@ -327,8 +330,7 @@ int L_SetSpeedWalkDelay(lua_State* L)
     WorldDocument* pDoc = doc(L);
     int delay = luaL_checkinteger(L, 1);
     pDoc->m_speedwalk.delay = delay;
-    // Not applicable: Windows MFC timer list window refresh. Timer changes take effect on next
-    // check.
+    pDoc->m_connectionManager->setSpeedWalkDelay(delay);
     return 0;
 }
 

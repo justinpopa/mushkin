@@ -7,6 +7,20 @@
 #include "../notepad_widget.h"
 #include "../world_document.h"
 #include "lua_common.h"
+#include <QMdiSubWindow>
+
+// Concatenate all Lua string args from position `start` onward (original: concatArgs)
+static QString concatLuaArgs(lua_State* L, int start)
+{
+    QString result;
+    int top = lua_gettop(L);
+    for (int i = start; i <= top; i++) {
+        if (lua_isstring(L, i)) {
+            result += QString::fromUtf8(lua_tostring(L, i));
+        }
+    }
+    return result;
+}
 
 extern "C" {
 #include <lauxlib.h>
@@ -26,7 +40,8 @@ extern "C" {
 int L_SendToNotepad(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    auto [title, contents] = luaArgs<QString, QString>(L);
+    QString title = luaCheckQString(L, 1);
+    QString contents = concatLuaArgs(L, 2); // original: concatArgs(L, "", 2)
     return luaReturn(L, pDoc->SendToNotepad(title, contents).has_value());
 }
 
@@ -42,24 +57,28 @@ int L_SendToNotepad(lua_State* L)
 int L_AppendToNotepad(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    auto [title, contents] = luaArgs<QString, QString>(L);
+    QString title = luaCheckQString(L, 1);
+    QString contents = concatLuaArgs(L, 2); // original: concatArgs(L, "", 2)
     return luaReturn(L, pDoc->AppendToNotepad(title, contents).has_value());
 }
 
 /**
- * world.ReplaceNotepad(title, contents) -> boolean
+ * world.ReplaceNotepad(title, contents) -> nil
  *
  * Replace notepad contents. Only works if notepad already exists.
  *
  * @param title Notepad window title
  * @param contents New text content
- * @return true if notepad found and replaced
+ * @return nil (original pushes boolean but returns 0 results — Lua sees nil)
  */
 int L_ReplaceNotepad(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    auto [title, contents] = luaArgs<QString, QString>(L);
-    return luaReturn(L, pDoc->ReplaceNotepad(title, contents).has_value());
+    QString title = luaCheckQString(L, 1);
+    QString contents = concatLuaArgs(L, 2); // original: concatArgs(L, "", 2)
+    // Original: lua_pushboolean + return 0 — boolean is pushed but discarded; Lua sees nil
+    lua_pushboolean(L, pDoc->ReplaceNotepad(title, contents).has_value() ? 1 : 0);
+    return 0;
 }
 
 /**
@@ -93,7 +112,8 @@ int L_CloseNotepad(lua_State* L)
 
     qint32 result = pDoc->CloseNotepad(luaCheckQString(L, 1), querySave);
 
-    lua_pushnumber(L, result);
+    // Original returns boolean (true=success, false=failure), not error codes
+    lua_pushboolean(L, result == eOK);
     return 1;
 }
 
@@ -112,11 +132,14 @@ int L_GetNotepadText(lua_State* L)
     NotepadWidget* notepad = pDoc->FindNotepad(title);
 
     if (!notepad) {
-        lua_pushnil(L);
-        return 1;
+        // Original returns empty string, not nil (CString initialized empty)
+        return luaReturn(L, QString());
     }
 
-    return luaReturn(L, notepad->GetText());
+    // Original uses CEdit::GetWindowText which returns \r\n line endings
+    QString text = notepad->GetText();
+    text.replace('\n', QStringLiteral("\r\n"));
+    return luaReturn(L, text);
 }
 
 /**
@@ -133,7 +156,13 @@ int L_GetNotepadLength(lua_State* L)
 
     NotepadWidget* notepad = pDoc->FindNotepad(luaCheckQString(L, 1));
 
-    qint32 length = notepad ? notepad->GetLength() : 0;
+    // Original CEdit::GetWindowTextLength counts \r\n as 2 chars per newline.
+    // Qt toPlainText counts \n as 1. Add newline count to match.
+    qint32 length = 0;
+    if (notepad) {
+        QString text = notepad->GetText();
+        length = text.length() + text.count('\n'); // +1 per newline for \r
+    }
     lua_pushnumber(L, length);
 
     return 1;
@@ -173,12 +202,14 @@ int L_GetNotepadList(lua_State* L)
 int L_SaveNotepad(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    bool replaceExisting = lua_isboolean(L, 3) ? lua_toboolean(L, 3) : true;
+    // Original: optboolean(L, 3, 0) — default false (do not overwrite)
+    bool replaceExisting = lua_isboolean(L, 3) ? lua_toboolean(L, 3) : false;
 
     qint32 result =
         pDoc->SaveNotepad(luaCheckQString(L, 1), luaCheckQString(L, 2), replaceExisting);
 
-    lua_pushnumber(L, result);
+    // Original returns boolean (true=success, false=failure)
+    lua_pushboolean(L, result == eOK);
     return 1;
 }
 
@@ -199,12 +230,13 @@ int L_NotepadFont(lua_State* L)
     WorldDocument* pDoc = doc(L);
     qint32 size = luaL_checknumber(L, 3);
     qint32 style = luaL_checknumber(L, 4);
-    qint32 charset = luaL_checknumber(L, 5);
+    qint32 charset = static_cast<qint32>(luaL_optnumber(L, 5, 0)); // optional, default 0
 
     qint32 result =
         pDoc->NotepadFont(luaCheckQString(L, 1), luaCheckQString(L, 2), size, style, charset);
 
-    lua_pushnumber(L, result);
+    // Original returns boolean (true=success, false=failure)
+    lua_pushboolean(L, result == eOK);
     return 1;
 }
 
@@ -226,7 +258,8 @@ int L_NotepadColour(lua_State* L)
     qint32 result =
         pDoc->NotepadColour(luaCheckQString(L, 1), luaCheckQString(L, 2), luaCheckQString(L, 3));
 
-    lua_pushnumber(L, result);
+    // Original returns boolean (true=success, false=failure)
+    lua_pushboolean(L, result == eOK);
     return 1;
 }
 
@@ -242,11 +275,13 @@ int L_NotepadColour(lua_State* L)
 int L_NotepadReadOnly(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    bool readOnly = lua_toboolean(L, 2);
+    // Original: optboolean(L, 2, 1) — default true (make read-only if arg missing)
+    bool readOnly = (lua_gettop(L) >= 2) ? lua_toboolean(L, 2) : true;
 
     qint32 result = pDoc->NotepadReadOnly(luaCheckQString(L, 1), readOnly);
 
-    lua_pushnumber(L, result);
+    // Original returns boolean (true=success, false=failure)
+    lua_pushboolean(L, result == eOK);
     return 1;
 }
 
@@ -266,7 +301,8 @@ int L_NotepadSaveMethod(lua_State* L)
 
     qint32 result = pDoc->NotepadSaveMethod(luaCheckQString(L, 1), method);
 
-    lua_pushnumber(L, result);
+    // Original returns boolean (true=success, false=failure)
+    lua_pushboolean(L, result == eOK);
     return 1;
 }
 
@@ -307,15 +343,24 @@ int L_MoveNotepadWindow(lua_State* L)
 int L_GetNotepadWindowPosition(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
+    NotepadWidget* notepad = pDoc->FindNotepad(luaCheckQString(L, 1));
 
-    QString position = pDoc->GetNotepadWindowPosition(luaCheckQString(L, 1));
-
-    if (position.isEmpty()) {
-        lua_pushnil(L);
-        return 1;
+    if (!notepad || !notepad->m_pMdiSubWindow) {
+        // Original returns nil (no push, return 0) when notepad not found
+        return 0;
     }
 
-    luaPushQString(L, position);
-
+    // Original Lua API returns a table with named keys (not a comma string)
+    // Reference: lua_methods.cpp L_GetNotepadWindowPosition uses lua_newtable + MakeTableItem
+    QRect geometry = notepad->m_pMdiSubWindow->geometry();
+    lua_newtable(L);
+    lua_pushnumber(L, geometry.left());
+    lua_setfield(L, -2, "left");
+    lua_pushnumber(L, geometry.top());
+    lua_setfield(L, -2, "top");
+    lua_pushnumber(L, geometry.width());
+    lua_setfield(L, -2, "width");
+    lua_pushnumber(L, geometry.height());
+    lua_setfield(L, -2, "height");
     return 1;
 }

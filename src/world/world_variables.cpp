@@ -21,7 +21,8 @@
 
 #include "../automation/plugin.h"   // For Plugin (arrays context)
 #include "../automation/variable.h" // For Variable
-#include "logging.h"                // For qCDebug(lcWorld)
+#include "../utils/error_codes.h"
+#include "logging.h" // For qCDebug(lcWorld)
 #include "world_document.h"
 
 // ========== Variable Management ==========
@@ -104,7 +105,7 @@ qint32 WorldDocument::deleteVariable(const QString& name)
 
     auto it = varMap.find(lowerName);
     if (it == varMap.end()) {
-        return 30003; // eVariableNotFound
+        return eVariableNotFound;
     }
 
     varMap.erase(it); // unique_ptr automatically deletes

@@ -1,4 +1,5 @@
 #include "notepad_widget.h"
+#include "../storage/global_options.h"
 #include "world_context.h"
 #include "world_document.h"
 #include <QColor>
@@ -31,8 +32,20 @@ NotepadWidget::NotepadWidget(IWorldContext* ctx, const QString& title, const QSt
         m_iFontSize = doc->m_input.font_height;
         m_iFontWeight = doc->m_input.font_weight;
         m_iFontCharset = doc->m_input.font_charset;
-        m_textColour = doc->m_input.text_colour;
-        m_backColour = doc->m_input.background_colour;
+
+        // Apply global notepad colour preferences if the user has set them.
+        // The original MUSHclient uses App.m_cNotepadTextColour / App.m_cNotepadBackColour,
+        // falling back to the input area colours when both global values are 0 (unset).
+        const auto& opts = GlobalOptions::instance();
+        const QRgb globalText = static_cast<QRgb>(opts.notepadTextColour());
+        const QRgb globalBack = static_cast<QRgb>(opts.notepadBackColour());
+        if (globalText != globalBack) {
+            m_textColour = globalText;
+            m_backColour = globalBack;
+        } else {
+            m_textColour = doc->m_input.text_colour;
+            m_backColour = doc->m_input.background_colour;
+        }
 
         ApplyFont();
         ApplyColours();

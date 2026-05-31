@@ -170,6 +170,22 @@ void AliasEditDialog::setupUi()
     m_omitFromHistoryCheck->setToolTip("Don't add to command recall history");
     optionsLayout->addWidget(m_omitFromHistoryCheck);
 
+    m_ignoreCaseCheck = new QCheckBox("&Ignore case when matching", optionsTab);
+    m_ignoreCaseCheck->setToolTip("Case-insensitive alias matching");
+    optionsLayout->addWidget(m_ignoreCaseCheck);
+
+    m_temporaryCheck = new QCheckBox("&Temporary (not saved to world file)", optionsTab);
+    m_temporaryCheck->setToolTip("Alias is deleted when world closes");
+    optionsLayout->addWidget(m_temporaryCheck);
+
+    m_oneShotCheck = new QCheckBox("One-s&hot (delete after first match)", optionsTab);
+    m_oneShotCheck->setToolTip("Alias fires once then is automatically deleted");
+    optionsLayout->addWidget(m_oneShotCheck);
+
+    m_menuCheck = new QCheckBox("&Menu (create popup menu item)", optionsTab);
+    m_menuCheck->setToolTip("Show this alias as an item in a popup menu");
+    optionsLayout->addWidget(m_menuCheck);
+
     optionsLayout->addStretch();
 
     m_tabWidget->addTab(optionsTab, "&Options");
@@ -232,6 +248,10 @@ void AliasEditDialog::loadAliasData()
     m_omitFromOutputCheck->setChecked(alias->omit_from_output);
     m_omitFromLogCheck->setChecked(alias->omit_from_log);
     m_omitFromHistoryCheck->setChecked(alias->omit_from_command_history);
+    m_ignoreCaseCheck->setChecked(alias->ignore_case);
+    m_temporaryCheck->setChecked(alias->temporary);
+    m_oneShotCheck->setChecked(alias->one_shot);
+    m_menuCheck->setChecked(alias->menu);
 }
 
 bool AliasEditDialog::validateForm()
@@ -291,6 +311,10 @@ bool AliasEditDialog::saveAlias()
         alias->omit_from_output = m_omitFromOutputCheck->isChecked();
         alias->omit_from_log = m_omitFromLogCheck->isChecked();
         alias->omit_from_command_history = m_omitFromHistoryCheck->isChecked();
+        alias->ignore_case = m_ignoreCaseCheck->isChecked();
+        alias->temporary = m_temporaryCheck->isChecked();
+        alias->one_shot = m_oneShotCheck->isChecked();
+        alias->menu = m_menuCheck->isChecked();
 
         // Compile regexp if needed
         if (alias->use_regexp) {
@@ -334,6 +358,10 @@ bool AliasEditDialog::saveAlias()
         newAlias->omit_from_output = m_omitFromOutputCheck->isChecked();
         newAlias->omit_from_log = m_omitFromLogCheck->isChecked();
         newAlias->omit_from_command_history = m_omitFromHistoryCheck->isChecked();
+        newAlias->ignore_case = m_ignoreCaseCheck->isChecked();
+        newAlias->temporary = m_temporaryCheck->isChecked();
+        newAlias->one_shot = m_oneShotCheck->isChecked();
+        newAlias->menu = m_menuCheck->isChecked();
 
         // Compile regexp if needed
         if (newAlias->use_regexp) {

@@ -175,9 +175,9 @@ QString evaluate(const QString& speedWalkString, const QString& filler)
 
         p++; // bypass whatever that character was (or the trailing bracket)
 
-        // Output required number of times
+        // Output required number of times (original uses \r\n — ENDLINE)
         for (int j = 0; j < count; j++)
-            result += str + "\n";
+            result += str + "\r\n";
     }
 
     return result;
@@ -219,7 +219,7 @@ QString reverse(const QString& speedWalkString)
             if (*p == '\r') {
                 // discard carriage returns
             } else if (*p == '\n') {
-                result = "\n" + result;
+                result = "\r\n" + result;
             } else {
                 result = *p + result;
             }
@@ -306,17 +306,30 @@ QString reverse(const QString& speedWalkString)
             case '(': // special string (e.g., (ne/sw))
             {
                 // Static map for diagonal direction reverses (ne<->sw, nw<->se)
-                static QMap<QString, QString> diagonalReverseMap;
-                if (diagonalReverseMap.isEmpty()) {
-                    diagonalReverseMap["ne"] = "sw";
-                    diagonalReverseMap["sw"] = "ne";
-                    diagonalReverseMap["nw"] = "se";
-                    diagonalReverseMap["se"] = "nw";
-                    // Also add the full direction names if needed
-                    diagonalReverseMap["northeast"] = "southwest";
-                    diagonalReverseMap["southwest"] = "northeast";
-                    diagonalReverseMap["northwest"] = "southeast";
-                    diagonalReverseMap["southeast"] = "northwest";
+                // All directions from original MapDirectionsMap
+                // (original: methods_speedwalks.cpp:279-283 uses MapDirectionsMap)
+                static QMap<QString, QString> directionReverseMap;
+                if (directionReverseMap.isEmpty()) {
+                    directionReverseMap["n"] = "s";
+                    directionReverseMap["s"] = "n";
+                    directionReverseMap["e"] = "w";
+                    directionReverseMap["w"] = "e";
+                    directionReverseMap["u"] = "d";
+                    directionReverseMap["d"] = "u";
+                    directionReverseMap["ne"] = "sw";
+                    directionReverseMap["sw"] = "ne";
+                    directionReverseMap["nw"] = "se";
+                    directionReverseMap["se"] = "nw";
+                    directionReverseMap["north"] = "south";
+                    directionReverseMap["south"] = "north";
+                    directionReverseMap["east"] = "west";
+                    directionReverseMap["west"] = "east";
+                    directionReverseMap["up"] = "down";
+                    directionReverseMap["down"] = "up";
+                    directionReverseMap["northeast"] = "southwest";
+                    directionReverseMap["southwest"] = "northeast";
+                    directionReverseMap["northwest"] = "southeast";
+                    directionReverseMap["southeast"] = "northwest";
                 }
 
                 str.clear();
@@ -330,8 +343,8 @@ QString reverse(const QString& speedWalkString)
                 int iSlash = str.indexOf("/");
                 if (iSlash == -1) {
                     // No slash - try to look up reverse (for simple directions like "ne")
-                    if (diagonalReverseMap.contains(str))
-                        str = diagonalReverseMap[str];
+                    if (directionReverseMap.contains(str))
+                        str = directionReverseMap[str];
                     // Otherwise keep as-is
                 } else {
                     // Swap left and right parts
@@ -375,7 +388,7 @@ QString reverse(const QString& speedWalkString)
  */
 QString removeBacktracks(const QString& speedWalkString, const QString& filler)
 {
-    // Initialize direction map with reverses
+    // Initialize direction map with reverses (all entries from MapDirectionsMap)
     static QMap<QString, QString> reverseMap;
     if (reverseMap.isEmpty()) {
         reverseMap["n"] = "s";
@@ -384,12 +397,20 @@ QString removeBacktracks(const QString& speedWalkString, const QString& filler)
         reverseMap["w"] = "e";
         reverseMap["u"] = "d";
         reverseMap["d"] = "u";
+        reverseMap["ne"] = "sw";
+        reverseMap["sw"] = "ne";
+        reverseMap["nw"] = "se";
+        reverseMap["se"] = "nw";
         reverseMap["north"] = "south";
         reverseMap["south"] = "north";
         reverseMap["east"] = "west";
         reverseMap["west"] = "east";
         reverseMap["up"] = "down";
         reverseMap["down"] = "up";
+        reverseMap["northeast"] = "southwest";
+        reverseMap["southwest"] = "northeast";
+        reverseMap["northwest"] = "southeast";
+        reverseMap["southeast"] = "northwest";
     }
 
     // First expand the speedwalk
@@ -399,7 +420,8 @@ QString removeBacktracks(const QString& speedWalkString, const QString& filler)
     if (expanded.isEmpty() || expanded.startsWith('*'))
         return expanded;
 
-    // Split into individual directions
+    // Split into individual directions (normalize \r\n to \n first)
+    expanded.replace("\r\n", "\n");
     QStringList directions = expanded.split('\n', Qt::SkipEmptyParts);
 
     // Use a stack approach - push directions, pop when reverse found
@@ -411,6 +433,7 @@ QString removeBacktracks(const QString& speedWalkString, const QString& filler)
             continue;
 
         // Convert full direction to single letter for comparison
+        // Normalize full direction names to short codes (original: MapDirectionsMap lookup)
         QString normalized = trimmed;
         if (trimmed == "north")
             normalized = "n";
@@ -424,6 +447,14 @@ QString removeBacktracks(const QString& speedWalkString, const QString& filler)
             normalized = "u";
         else if (trimmed == "down")
             normalized = "d";
+        else if (trimmed == "northeast")
+            normalized = "ne";
+        else if (trimmed == "southwest")
+            normalized = "sw";
+        else if (trimmed == "northwest")
+            normalized = "nw";
+        else if (trimmed == "southeast")
+            normalized = "se";
 
         if (stack.isEmpty()) {
             stack.append(normalized);
@@ -479,7 +510,8 @@ QString removeBacktracks(const QString& speedWalkString, const QString& filler)
             result += prev + " ";
     }
 
-    return result.trimmed();
+    // Original preserves trailing space — don't trim
+    return result;
 }
 
 } // namespace speedwalk

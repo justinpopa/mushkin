@@ -46,7 +46,7 @@ class MXPEngine {
     MXPEngine& operator=(MXPEngine&&) = delete;
 
     // ========== Lifecycle ==========
-    void MXP_On();                    // Activate MXP
+    void MXP_On(bool manual = false); // Activate MXP (manual=true preserves custom defs)
     void MXP_Off(bool force = false); // Deactivate or reset MXP
     void MXP_mode_change(int mode);   // Change MXP line security mode
 
@@ -85,8 +85,8 @@ class MXPEngine {
     QRgb MXP_GetColor(const QString& colorSpec); // Resolve color name/#RRGGBB
 
     // ========== Tag Stack ==========
-    void MXP_CloseOpenTags();                  // Close all unclosed tags
-    void MXP_CloseTag(const QString& tagName); // Close specific tag (internal)
+    void MXP_CloseOpenTags(bool closeAll = false); // Close tags (closeAll=true closes secure too)
+    void MXP_CloseTag(const QString& tagName);     // Close specific tag (internal)
 
     // ========== Mode Helpers ==========
     bool MXP_Open() const;   // True if current mode allows open (unsecure) tags
@@ -95,10 +95,10 @@ class MXPEngine {
     // ========== Argument Parsing ==========
     void ParseMXPTag(const QString& tagString, QString& tagName,
                      MXPArgumentList& args); // Parse tag string into name + args
-    QString GetMXPArgument(MXPArgumentList& args,
-                           const QString& name); // Get arg value by name (marks as used)
-    QString MXP_GetArgument(const QString& name,
-                            MXPArgumentList& args); // Convenience wrapper (swapped params)
+    QString GetMXPArgument(MXPArgumentList& args, const QString& name,
+                           int position = 0); // Get arg by name or position (marks as used)
+    QString MXP_GetArgument(const QString& name, MXPArgumentList& args,
+                            int position = 0); // Convenience wrapper (swapped params)
     bool MXP_HasArgument(const QString& name,
                          MXPArgumentList& args); // Check if argument exists (marks as used)
 

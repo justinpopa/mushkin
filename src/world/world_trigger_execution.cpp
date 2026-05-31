@@ -41,7 +41,9 @@ extern "C" {
  * @param wildcards Vector of captured wildcard strings
  * @return Text with wildcards replaced
  */
-QString WorldDocument::replaceWildcards(const QString& text, const QVector<QString>& wildcards)
+QString WorldDocument::replaceWildcards(const QString& text, const QVector<QString>& wildcards,
+                                        const QString& itemName,
+                                        const QMap<QString, QString>& namedWildcards)
 {
     QString result = text;
 
@@ -52,6 +54,21 @@ QString WorldDocument::replaceWildcards(const QString& text, const QVector<QStri
             QString placeholder = QString("%%1").arg(i);
             result.replace(placeholder, wildcards[i]);
         }
+    }
+
+    // Replace %<name> with named capture groups (original: FixSendText)
+    for (auto it = namedWildcards.constBegin(); it != namedWildcards.constEnd(); ++it) {
+        result.replace(QStringLiteral("%<") + it.key() + QStringLiteral(">"), it.value());
+    }
+
+    // Replace %N with trigger/alias/timer name (original: FixSendText)
+    result.replace(QStringLiteral("%N"), itemName);
+
+    // Replace %C with clipboard contents (original: FixSendText)
+    if (result.contains(QStringLiteral("%C"))) {
+        QClipboard* clipboard = QGuiApplication::clipboard();
+        QString clipText = clipboard ? clipboard->text() : QString();
+        result.replace(QStringLiteral("%C"), clipText);
     }
 
     return result;
@@ -166,8 +183,9 @@ void WorldDocument::executeTrigger(Trigger* trigger, Line* line, const QString& 
     // Prepare contents (send text)
     QString contents = trigger->contents;
 
-    // Replace wildcards (%0, %1, %2, etc.)
-    contents = replaceWildcards(contents, trigger->wildcards);
+    // Replace wildcards (%0-%99, %N, %C, %<name>)
+    contents =
+        replaceWildcards(contents, trigger->wildcards, trigger->label, trigger->namedWildcards);
 
     // Expand variables (@variablename → value)
     if (trigger->expand_variables) {
@@ -185,22 +203,21 @@ void WorldDocument::executeTrigger(Trigger* trigger, Line* line, const QString& 
     // Change line colors
     changeLineColors(trigger, line);
 
-    // Omit from output
-    if (trigger->omit_from_output) {
-        // TODO(feature): Set omit flag on Line object for omit-from-output triggers.
-        // line->flags |= OMITTED;
-        qCDebug(lcWorld) << "Trigger omit from output (not yet implemented)";
+    // Omit from output (original: ProcessPreviousLine.cpp:1323-1324)
+    // Sets flag checked by StartNewLine to skip adding line to output buffer
+    if (trigger->omit_from_output && !trigger->multi_line) {
+        m_bLineOmittedFromOutput = true;
     }
 
-    // Omit from log
-    // Mark line to not be logged if trigger has omit_from_log set
-    if (trigger->omit_from_log) {
+    // Omit from log — only for single-line triggers
+    // (original: ProcessPreviousLine.cpp:1320-1321 checks !bMultiLine)
+    if (trigger->omit_from_log && !trigger->multi_line) {
         m_bOmitCurrentLineFromLog = true;
         qCDebug(lcWorld) << "Trigger omit from log: set m_bOmitCurrentLineFromLog flag";
     }
 
-    // Play sound
-    if (!trigger->sound_to_play.isEmpty()) {
+    // Play sound (original: ProcessPreviousLine.cpp:985 checks m_enable_trigger_sounds)
+    if (!trigger->sound_to_play.isEmpty() && m_sound.enable_trigger_sounds) {
         // Check sound_if_inactive flag - only play if window is inactive, or flag is not set
         if (!trigger->sound_if_inactive || !IsWindowActive()) {
             PlaySoundFile(trigger->sound_to_play);
@@ -230,7 +247,7 @@ void WorldDocument::executeTrigger(Trigger* trigger, Line* line, const QString& 
     // we also need to call executeTriggerScript for eSendToScriptAfterOmit)
     if (!trigger->procedure.isEmpty() &&
         (trigger->send_to == eSendToScript || trigger->send_to == eSendToScriptAfterOmit)) {
-        executeTriggerScript(trigger, matchedText);
+        executeTriggerScript(trigger, line, matchedText);
     }
 
     qCDebug(lcWorld) << "Trigger executed:" << trigger->label << "matched:" << trigger->matched
@@ -247,17 +264,22 @@ void WorldDocument::executeTrigger(Trigger* trigger, Line* line, const QString& 
  * 1. Trigger name (string)
  * 2. Matched line (string)
  * 3. Wildcards (table) - indexed 0..N where 0 is full match, 1+ are capture groups
- * 4. TriggerStyleRuns (table) - TODO styled line information
+ * 4. TriggerStyleRuns (table) - styled line information (text, length, colours, style)
  *
  * @param trigger The trigger that matched
+ * @param line The matched line (for style runs, may be nullptr)
  * @param matchedText The text that matched the trigger
  */
-void WorldDocument::executeTriggerScript(Trigger* trigger, const QString& matchedText)
+void WorldDocument::executeTriggerScript(Trigger* trigger, Line* line, const QString& matchedText)
 {
     // Safety check - need a procedure name
     if (trigger->procedure.isEmpty()) {
         return;
     }
+
+    // Set action source so scripts can query GetInfo(239)
+    // (original: lua_scripting.cpp:621-627 sets eTriggerFired via ExecuteLua)
+    m_iCurrentActionSource = ActionSource::eTriggerFired;
 
     // Determine which script engine to use:
     // - If trigger belongs to a plugin, use the plugin's script engine
@@ -303,8 +325,25 @@ void WorldDocument::executeTriggerScript(Trigger* trigger, const QString& matche
     // Save stack top for cleanup
     int stackTop = lua_gettop(L);
 
-    // Push the function onto the stack
-    lua_getglobal(L, trigger->procedure.toUtf8().constData());
+    // Push the function onto the stack — support dotted names like "utils.my_trigger"
+    // (original: lua_scripting.cpp:490 uses GetNestedFunction)
+    QByteArray procName = trigger->procedure.toUtf8();
+    if (trigger->procedure.contains('.')) {
+        // Dotted name: split and traverse tables
+        QStringList parts = trigger->procedure.split('.');
+        lua_getglobal(L, parts[0].toUtf8().constData());
+        for (int i = 1; i < parts.size(); ++i) {
+            if (!lua_istable(L, -1)) {
+                lua_settop(L, stackTop);
+                trigger->dispid = DISPID_UNKNOWN;
+                return;
+            }
+            lua_getfield(L, -1, parts[i].toUtf8().constData());
+            lua_remove(L, -2); // remove parent table
+        }
+    } else {
+        lua_getglobal(L, procName.constData());
+    }
     if (!lua_isfunction(L, -1)) {
         lua_settop(L, stackTop);
         trigger->dispid = DISPID_UNKNOWN;
@@ -393,14 +432,63 @@ void WorldDocument::executeTriggerScript(Trigger* trigger, const QString& matche
         lua_settable(L, -3);
     }
 
-    // Argument 4: TriggerStyleRuns table (empty for now)
+    // Argument 4: TriggerStyleRuns table
+    // M187: Build style runs from the matched line (original: lua_scripting.cpp:599-619)
+    // Each entry is a sub-table with: text, length, textcolour, backcolour, style
     lua_newtable(L);
+    if (line) {
+        int styleIndex = 1;
+        int textOffset = 0;
+        for (const auto& style : line->styleList) {
+            lua_newtable(L);
+
+            // Extract text for this style run
+            int runLen = style->iLength;
+            QString runText;
+            if (textOffset + runLen <= line->len()) {
+                runText = QString::fromUtf8(line->textBuffer.data() + textOffset, runLen);
+            }
+            textOffset += runLen;
+
+            // "text" = the text content of this style run
+            QByteArray textBytes = runText.toUtf8();
+            lua_pushlstring(L, textBytes.constData(), textBytes.length());
+            lua_setfield(L, -2, "text");
+
+            // "length" = length of the text
+            lua_pushinteger(L, runText.length());
+            lua_setfield(L, -2, "length");
+
+            // "textcolour" = foreground colour (BGR format, matching original COLORREF)
+            lua_pushinteger(L, static_cast<lua_Integer>(style->iForeColour & 0x00FFFFFF));
+            lua_setfield(L, -2, "textcolour");
+
+            // "backcolour" = background colour (BGR format)
+            lua_pushinteger(L, static_cast<lua_Integer>(style->iBackColour & 0x00FFFFFF));
+            lua_setfield(L, -2, "backcolour");
+
+            // "style" = style flags (bold/underline/italic)
+            lua_pushinteger(L, style->iFlags & TEXT_STYLE);
+            lua_setfield(L, -2, "style");
+
+            lua_rawseti(L, -2, styleIndex++);
+        }
+    }
 
     // Prevent deletion during script execution
     trigger->executing_script = true;
 
-    // Call the function with 4 arguments, 0 results
-    int callResult = lua_pcall(L, 4, 0, 0);
+    // M185: Save and reset note style before callback, restore after
+    // (original: lua_scripting.cpp:487-488 saves iOldStyle and sets to NORMAL)
+    quint16 oldNoteStyle = m_iNoteStyle;
+    m_iNoteStyle = 0; // NORMAL
+
+    // Call with traceback error handler for readable stack traces
+    // (original: lua_scripting.cpp:624 uses CallLuaWithTraceBack)
+    int callResult = callLuaWithTraceBack(L, 4, 0);
+
+    // M185: Restore note style after callback
+    m_iNoteStyle = oldNoteStyle;
 
     bool error = (callResult != 0);
     if (error) {
@@ -408,20 +496,16 @@ void WorldDocument::executeTriggerScript(Trigger* trigger, const QString& matche
         const char* errMsg = lua_tostring(L, -1);
         QString errorStr = errMsg ? QString::fromUtf8(errMsg) : "Unknown error";
 
-        // Log the error
+        // Display error in output window (original: lua_scripting.cpp:636 calls
+        // LuaError→ColourNote)
         QString strReason = QString("processing trigger \"%1\" when matching line: \"%2\"")
                                 .arg(triggerName, matchedText);
-        qWarning() << "=== Lua Error ===" << "\"Run-time error\"";
-        qWarning() << "  Context:"
-                   << QString("\"Function/Sub: %1 called by trigger\\nReason: %2\"")
-                          .arg(trigger->procedure, strReason);
-        qWarning() << "  Message:" << QString("\"%1\"").arg(errorStr);
+        // Orange error text on black background (BGR format)
+        colourNote(0x00008CFF, 0x00000000, QString("=== Run-time error: %1 ===").arg(triggerName));
+        colourNote(0x00008CFF, 0x00000000, errorStr);
 
         lua_pop(L, 1); // Pop error message
     }
-
-    // Update invocation count
-    trigger->invocation_count++;
 
     // Allow deletion again
     trigger->executing_script = false;
@@ -431,11 +515,9 @@ void WorldDocument::executeTriggerScript(Trigger* trigger, const QString& matche
         trigger->dispid = DISPID_UNKNOWN;
         qDebug() << "TRIGGER SCRIPT ERROR:" << trigger->procedure;
     } else {
-        // DEBUG: Log successful script execution for command_executed
-        if (trigger->procedure == "command_executed") {
-            qDebug() << "command_executed script ran successfully, invocations:"
-                     << trigger->invocation_count;
-        }
+        // M186: Only increment invocation_count on success
+        // (original: lua_scripting.cpp:736 increments after error check)
+        trigger->invocation_count++;
     }
 
     qCDebug(lcWorld) << "Trigger script executed:" << trigger->procedure

@@ -92,6 +92,16 @@ inline constexpr int TAG_MXP = 0x08;      // Tag is MXP-only
 inline constexpr int TAG_NO_RESET = 0x10; // Not closed by <reset> (e.g., <body>)
 inline constexpr int TAG_NOT_IMP = 0x20;  // Not implemented (for <supports> tag)
 
+// ========== LIST MODE CONSTANTS ==========
+// Based on doc.h enum in original MUSHclient (eNoList/eOrderedList/eUnorderedList)
+// Tracks what kind of MXP list (<ul> or <ol>) is currently active.
+
+enum MXPListMode {
+    eNoList = 0,        // Not inside a list
+    eOrderedList = 1,   // Inside <ol>
+    eUnorderedList = 2, // Inside <ul>
+};
+
 // ========== ATOMIC ELEMENT STRUCTURE ==========
 // Based on mxp/mxp.h from original MUSHclient
 // Defines a built-in MXP element

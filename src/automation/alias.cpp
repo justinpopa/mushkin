@@ -48,7 +48,7 @@ void Alias::initializeDefaults()
 
     // Behavior
     enabled = true;
-    keep_evaluating = true; // MUSHclient default: continue evaluating other aliases after match
+    keep_evaluating = false; // original default: stop after first match (OtherTypes.h:474)
 
     // Display
     omit_from_log = false;

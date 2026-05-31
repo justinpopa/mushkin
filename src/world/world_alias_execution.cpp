@@ -11,6 +11,7 @@
 #include "../automation/alias.h"
 #include "../automation/plugin.h"
 #include "../automation/sendto.h"
+#include "../text/line.h"
 #include "script_engine.h"
 #include "world_document.h"
 #include <QDebug>
@@ -43,17 +44,31 @@ extern "C" {
  */
 void WorldDocument::executeAlias(Alias* alias, const QString& command)
 {
+    // Propagate omit_from_command_history flag (original: evaluate.cpp:899)
+    if (alias->omit_from_command_history) {
+        m_bOmitFromCommandHistory = true;
+    }
+
     // Echo the alias/command?
     if (alias->echo_alias) {
-        // Display the command in output
-        note(command);
+        // Insert display-line boundary if current line is MUD output (original:
+        // evaluate.cpp:878-879) Prevents style bleeding from previous MUD output into echoed
+        // command
+        if (m_currentLine && (m_currentLine->flags & NOTE_OR_COMMAND) != COMMENT) {
+            StartNewLine(true, COMMENT);
+        }
+        // Echo as USER_INPUT (original: evaluate.cpp:887-889)
+        QByteArray utf8 = command.toUtf8();
+        AddToLine(utf8.constData(), utf8.length());
+        StartNewLine(true,
+                     static_cast<unsigned char>(USER_INPUT | (m_logging.log_input ? LOG_LINE : 0)));
     }
 
     // Prepare contents (send text)
     QString contents = alias->contents;
 
-    // Replace wildcards (%0, %1, %2, etc.)
-    contents = replaceWildcards(contents, alias->wildcards);
+    // Replace wildcards (%0-%99, %N, %C, %<name>)
+    contents = replaceWildcards(contents, alias->wildcards, alias->label, alias->namedWildcards);
 
     // Expand variables (@variablename → value)
     if (alias->expand_variables) {
@@ -221,15 +236,19 @@ void WorldDocument::executeAliasScript(Alias* alias, const QString& command)
         lua_settable(L, -3);
     }
 
-    // Save old action source
+    // Save old action source and note style
+    // M185: Reset note style before callback (original: lua_scripting.cpp:708-709)
     ActionSource oldActionSource = m_iCurrentActionSource;
-    m_iCurrentActionSource = ActionSource::eAliasAction;
+    m_iCurrentActionSource = ActionSource::eTriggerFired;
+    quint16 oldNoteStyle = m_iNoteStyle;
+    m_iNoteStyle = 0; // NORMAL
 
     // Call function with 3 parameters (name, line, wildcards)
     int error = lua_pcall(L, 3, 0, 0);
 
-    // Restore action source
+    // Restore action source and note style
     m_iCurrentActionSource = oldActionSource;
+    m_iNoteStyle = oldNoteStyle;
 
     if (error) {
         QString errorMsg = QString::fromUtf8(lua_tostring(L, -1));

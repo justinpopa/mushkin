@@ -346,8 +346,13 @@ static int L_ArrayListAll(lua_State* L)
     WorldDocument* pDoc = doc(L);
     const ArraysMap& arrays = pDoc->getArrayMap();
 
-    lua_newtable(L);
+    // Original returns nil (VT_EMPTY via SAFEARRAY) when no arrays exist
+    if (arrays.isEmpty()) {
+        lua_pushnil(L);
+        return 1;
+    }
 
+    lua_newtable(L);
     int index = 1;
     for (auto it = arrays.constBegin(); it != arrays.constEnd(); ++it) {
         luaPushQString(L, it.key());
@@ -372,13 +377,14 @@ static int L_ArrayListKeys(lua_State* L)
     QString arrayName = luaCheckQString(L, 1);
     const ArraysMap& arrays = pDoc->getArrayMap();
 
-    lua_newtable(L);
-
-    if (!arrays.contains(arrayName)) {
-        return 1; // Return empty table
+    // Original returns nil when array not found or empty
+    if (!arrays.contains(arrayName) || arrays[arrayName].isEmpty()) {
+        lua_pushnil(L);
+        return 1;
     }
 
     const QMap<QString, QString>& arr = arrays[arrayName];
+    lua_newtable(L);
     int index = 1;
     for (auto it = arr.constBegin(); it != arr.constEnd(); ++it) {
         luaPushQString(L, it.key());
@@ -403,13 +409,14 @@ static int L_ArrayListValues(lua_State* L)
     QString arrayName = luaCheckQString(L, 1);
     const ArraysMap& arrays = pDoc->getArrayMap();
 
-    lua_newtable(L);
-
-    if (!arrays.contains(arrayName)) {
-        return 1; // Return empty table
+    // Original returns nil when array not found or empty
+    if (!arrays.contains(arrayName) || arrays[arrayName].isEmpty()) {
+        lua_pushnil(L);
+        return 1;
     }
 
     const QMap<QString, QString>& arr = arrays[arrayName];
+    lua_newtable(L);
     int index = 1;
     for (auto it = arr.constBegin(); it != arr.constEnd(); ++it) {
         luaPushQString(L, it.value());
@@ -449,14 +456,9 @@ static int L_ArrayExport(lua_State* L)
     WorldDocument* pDoc = doc(L);
 
     QString arrayName = luaCheckQString(L, 1);
-    QString delimiter = luaCheckQString(L, 2);
+    QString delimiter = luaOptQString(L, 2, ",");
 
-    // Validate delimiter
-    if (delimiter.length() != 1 || delimiter == "\\") {
-        lua_pushnumber(L, eBadDelimiter);
-        return 1;
-    }
-
+    // Original checks array first, then delimiter (methods_arrays.cpp:394-416)
     const ArraysMap& arrays = pDoc->getArrayMap();
 
     if (!arrays.contains(arrayName)) {
@@ -466,9 +468,15 @@ static int L_ArrayExport(lua_State* L)
 
     const QMap<QString, QString>& arr = arrays[arrayName];
 
-    // Empty array returns empty string
+    // Empty array returns empty string (original checks before delimiter: methods_arrays.cpp:403)
     if (arr.isEmpty()) {
         lua_pushstring(L, "");
+        return 1;
+    }
+
+    // Validate delimiter (original: methods_arrays.cpp:410-416)
+    if (delimiter.length() != 1 || delimiter == "\\") {
+        lua_pushnumber(L, eBadDelimiter);
         return 1;
     }
 
@@ -506,14 +514,9 @@ static int L_ArrayExportKeys(lua_State* L)
     WorldDocument* pDoc = doc(L);
 
     QString arrayName = luaCheckQString(L, 1);
-    QString delimiter = luaCheckQString(L, 2);
+    QString delimiter = luaOptQString(L, 2, ",");
 
-    // Validate delimiter
-    if (delimiter.length() != 1 || delimiter == "\\") {
-        lua_pushnumber(L, eBadDelimiter);
-        return 1;
-    }
-
+    // Original checks array first, then delimiter
     const ArraysMap& arrays = pDoc->getArrayMap();
 
     if (!arrays.contains(arrayName)) {
@@ -523,9 +526,15 @@ static int L_ArrayExportKeys(lua_State* L)
 
     const QMap<QString, QString>& arr = arrays[arrayName];
 
-    // Empty array returns empty string
+    // Empty array returns empty string (original checks before delimiter: methods_arrays.cpp:403)
     if (arr.isEmpty()) {
         lua_pushstring(L, "");
+        return 1;
+    }
+
+    // Validate delimiter (original: methods_arrays.cpp:410-416)
+    if (delimiter.length() != 1 || delimiter == "\\") {
+        lua_pushnumber(L, eBadDelimiter);
         return 1;
     }
 
@@ -567,8 +576,41 @@ static int L_ArrayImport(lua_State* L)
     WorldDocument* pDoc = doc(L);
 
     QString arrayName = luaCheckQString(L, 1);
+
+    // Original supports two forms:
+    // 1. ArrayImport(name, table) — import from Lua table
+    // 2. ArrayImport(name, string [, delimiter]) — import from delimited string
+    if (lua_istable(L, 2)) {
+        ArraysMap& arrays = pDoc->getArrayMap();
+        if (!arrays.contains(arrayName)) {
+            lua_pushnumber(L, eArrayDoesNotExist);
+            return 1;
+        }
+        QMap<QString, QString>& arr = arrays[arrayName];
+        int duplicates = 0;
+        lua_pushnil(L);
+        while (lua_next(L, 2) != 0) {
+            if (lua_type(L, -2) != LUA_TSTRING)
+                luaL_error(L, "table must have string keys");
+            QString key = QString::fromUtf8(lua_tostring(L, -2));
+            QString value = QString::fromUtf8(lua_tostring(L, -1));
+            if (arr.contains(key)) {
+                arr[key] = value;
+                duplicates++;
+            } else {
+                arr[key] = value;
+            }
+            lua_pop(L, 1); // pop value, keep key for next iteration
+        }
+        lua_pushnumber(L, duplicates ? eImportedWithDuplicates : eOK);
+        return 1;
+    }
+
     QString valuesStr = luaCheckQString(L, 2);
-    QString delimiter = luaCheckQString(L, 3);
+    // Delimiter is optional, defaults to "," (original: my_optstr(L, 3, ","))
+    QString delimiter = (lua_gettop(L) >= 3 && !lua_isnil(L, 3))
+                            ? QString::fromUtf8(luaL_checkstring(L, 3))
+                            : QStringLiteral(",");
 
     // Validate delimiter
     if (delimiter.length() != 1 || delimiter == "\\") {

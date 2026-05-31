@@ -101,6 +101,17 @@ void WorldWidget::setupUi()
     // Connect input signal (commandEntered emitted when Enter pressed without Shift)
     connect(m_inputView, &InputView::commandEntered, this, &WorldWidget::sendCommand);
 
+    // AllTypingToCommandWindow: redirect keys from output view to input view.
+    // Must be Qt::DirectConnection — the QKeyEvent* is only valid during the
+    // emit (stack-owned by Qt's event dispatch). Queued connection would dangle.
+    connect(
+        m_outputView, &OutputView::keyRedirected, this,
+        [this](QKeyEvent* event) {
+            m_inputView->setFocus();
+            QApplication::sendEvent(m_inputView, event);
+        },
+        Qt::DirectConnection);
+
     // Connect command text changed signal for plugin notification
     // Use a static flag to prevent recursion (matches original sendvw.cpp behavior)
     connect(m_inputView, &InputView::commandTextChanged, this, [this](const QString& text) {
@@ -130,6 +141,12 @@ void WorldWidget::setupUi()
     // Connect info bar signal
     connect(m_document, &WorldDocument::infoBarChanged, this, &WorldWidget::updateInfoBar);
 
+    // Connect tooltip settings signal — apply visible duration to output view
+    // (original: scriptingoptions.cpp:549-575 sends TTM_SETDELAYTIME to each CMUSHView)
+    connect(m_document, &WorldDocument::tooltipSettingsChanged, this, [this]() {
+        m_outputView->setToolTipDuration(static_cast<int>(m_document->m_iToolTipVisibleTime));
+    });
+
     // Connect miniwindow needsRedraw signals to OutputView update
     connect(m_document, &WorldDocument::miniwindowCreated, this, [this](MiniWindow* iwin) {
         // Cast to concrete MiniWindow to access Qt signals
@@ -145,17 +162,34 @@ void WorldWidget::setupUi()
     // Setup accelerator manager - set parent widget and connect signal
     m_document->m_acceleratorManager->setParentWidget(this);
     connect(m_document->m_acceleratorManager, &AcceleratorManager::acceleratorTriggered, this,
-            [this](const QString& action, int sendTo) {
+            [this](const QString& action, int sendTo, const QString& pluginId) {
+                // Suppress auto-say and set action source during accelerator execution
+                // (original: sendvw.cpp:2559-2606)
+                bool savedAutoSay = m_document->m_auto_say.enabled;
+                m_document->m_auto_say.enabled = false;
+                m_document->m_iCurrentActionSource = ActionSource::eUserAccelerator;
+
+                // Set plugin context if registered by a plugin (original: sendvw.cpp:2587-2606)
+                Plugin* savedPlugin = m_document->m_CurrentPlugin;
+                if (!pluginId.isEmpty()) {
+                    m_document->m_CurrentPlugin = m_document->getPlugin(pluginId);
+                } else {
+                    m_document->m_CurrentPlugin = nullptr;
+                }
+
                 // Handle accelerator execution based on sendTo type
-                // eSendToExecute = 12 (normal command execution)
-                if (sendTo == 12) {
+                if (sendTo == eSendToExecute) { // 10: re-parse as command
                     m_document->Execute(action);
                 } else {
                     // For other sendTo types, use sendTo() method
                     QString output;
-                    m_document->sendTo(static_cast<SendTo>(sendTo), action, false, false, QString(),
-                                       QString(), output);
+                    m_document->sendTo(static_cast<SendTo>(sendTo), action, true, true,
+                                       QStringLiteral("Accelerator"), QString(), output);
                 }
+
+                // Restore plugin context and auto-say
+                m_document->m_CurrentPlugin = savedPlugin;
+                m_document->m_auto_say.enabled = savedAutoSay;
             });
 
     // Focus on input
@@ -286,6 +320,39 @@ void WorldWidget::updateInfoBar()
 }
 
 /**
+ * showWelcomeMessage - Display welcome banner in output view
+ *
+ * Matches CMUSHclientDoc::SetUpOutputWindow() welcome notes (doc.cpp:750-772).
+ * Called after the world is fully configured (fonts applied, XML loaded).
+ * Safe to call before the network connection is established.
+ */
+void WorldWidget::showWelcomeMessage()
+{
+    if (!m_document) {
+        return;
+    }
+
+    const QString version = QApplication::applicationVersion();
+    m_document->note(QString());
+    m_document->note(QString("Welcome to Mushkin version %1!").arg(version));
+    m_document->note(QString());
+}
+
+/**
+ * applyStartPaused - Apply m_bStartPaused to the output view freeze state
+ *
+ * Matches CMUSHclientDoc::SetUpOutputWindow() freeze assignment (doc.cpp:789):
+ *   pmyView->m_freeze = m_bStartPaused;
+ * Called after world XML is loaded so m_bStartPaused reflects the saved setting.
+ */
+void WorldWidget::applyStartPaused()
+{
+    if (m_outputView && m_document) {
+        m_outputView->setFrozen(m_document->m_bStartPaused);
+    }
+}
+
+/**
  * Load world from .mcl file
  *
  * Uses XML serialization from
@@ -328,8 +395,13 @@ std::expected<void, QString> WorldWidget::loadFromFile(const QString& filename)
     // This will monitor the script file and reload it based on m_scripting.reload_option
     m_document->setupScriptFileWatcher();
 
-    // Note: Welcome messages will be shown when OutputView is connected to document
-    // Text will appear when StartNewLine() is called from network data
+    // Apply start_paused setting to output view (M192)
+    // Original: doc.cpp:789 — pmyView->m_freeze = m_bStartPaused
+    applyStartPaused();
+
+    // Show welcome message in output view (M191)
+    // Original: doc.cpp:750-772 — SetUpOutputWindow welcome notes
+    showWelcomeMessage();
 
     return {};
 }
@@ -420,12 +492,17 @@ void WorldWidget::sendCommand()
         }
     }
 
-    // 3. Exclude macro commands if configured
+    // 3. Exclude macro commands if configured (original: sendvw.cpp:628-636)
     if (bAutoSay && m_document->m_auto_say.exclude_macros) {
-        // Check if command starts with any configured macro
-        // Note: Macros are stored in m_macros array, checked in original sendvw.cpp
-        // For now, we don't have macro support implemented, so this is a placeholder
-        // TODO(feature): Exclude macro keys from forwarding when macro system is fully implemented.
+        // Check if command starts with text of any REPLACE_COMMAND(0) or SEND_NOW(1) macro
+        for (int i = 0; bAutoSay && i < MACRO_COUNT; i++) {
+            if (m_document->m_macro_type[i] == 0 || m_document->m_macro_type[i] == 1) {
+                if (!m_document->m_macros[i].isEmpty() &&
+                    command.startsWith(m_document->m_macros[i])) {
+                    bAutoSay = false;
+                }
+            }
+        }
     }
 
     // 4. Exclude if command already starts with auto-say string (prevent "say say Hello!")
@@ -485,11 +562,24 @@ void WorldWidget::sendCommand()
         return;
     }
 
+    // ========== Backslash Escape Translation ==========
+    // Apply \n, \t, etc. for typed commands (original: sendvw.cpp:706-707)
+    QString processedCommand = command;
+    if (m_document->m_bTranslateBackslashSequences && !command.isEmpty()) {
+        processedCommand = m_document->fixupEscapeSequences(command);
+    }
+
     // ========== Normal Command Execution ==========
-    // If auto-say is disabled or was disabled by exclusion rules, execute normally
+    // Prompt to reconnect if not connected (original: evaluate.cpp:139, sendvw.cpp:650)
+    if (m_document->checkConnected())
+        return;
+
+    // Reset execution depth for each hand-typed command (original: sendvw.cpp:701)
+    m_document->m_iExecutionDepth = 0;
     // Execute() handles command stacking, alias evaluation, and sending
     // Note: Empty commands are allowed - sends blank line to MUD (matches original MUSHclient)
-    m_document->Execute(command);
+    // Pass original command for history (before escape processing, sendvw.cpp:714)
+    m_document->Execute(processedCommand, true, true, command);
 
     // ========== Clear Input ==========
     // Clear input after sending (configurable)

@@ -7,6 +7,7 @@
  * Based on lua_scripting.cpp and Utilities.cpp from original MUSHclient.
  */
 
+#include "../automation/plugin.h"
 #include "../world/world_document.h"
 #include "script_engine.h"
 #include <QDebug>
@@ -182,13 +183,13 @@ static void luaError(lua_State* L, const QString& event, const QString& procedur
     qWarning() << "  Context:" << context;
     qWarning() << "  Message:" << errorMsg;
 
-    // Display in output window - orange error text on black background
+    // Display in output window — orangered error text on black (SCRIPTERRORFORECOLOUR)
     if (doc) {
-        doc->colourNote(BGR(255, 140, 0), BGR(0, 0, 0), QString("=== %1 ===").arg(event));
+        doc->colourNote(BGR(255, 69, 0), BGR(0, 0, 0), QString("=== %1 ===").arg(event));
         if (!context.isEmpty()) {
-            doc->colourNote(BGR(255, 140, 0), BGR(0, 0, 0), context);
+            doc->colourNote(BGR(255, 69, 0), BGR(0, 0, 0), context);
         }
-        doc->colourNote(BGR(255, 140, 0), BGR(0, 0, 0), errorMsg);
+        doc->colourNote(BGR(255, 69, 0), BGR(0, 0, 0), errorMsg);
     }
 }
 
@@ -221,7 +222,7 @@ static void luaError(lua_State* L, const QString& event, const QString& procedur
 bool ScriptEngine::executeLua(qint32& dispid, const QString& szProcedure, ActionSource iReason,
                               const QString& szType, const QString& szReason,
                               QList<double>& nparams, QList<QString>& sparams,
-                              qint32& invocation_count, bool* result)
+                              qint32& invocation_count, bool* result, QString* returnString)
 {
     // Safety check
     if (!L) {
@@ -236,9 +237,9 @@ bool ScriptEngine::executeLua(qint32& dispid, const QString& szProcedure, Action
     // Clear stack
     lua_settop(L, 0);
 
-    // Trace (skip noisy callbacks)
+    // Trace to output window (original: lua_scripting.cpp:477,698)
     if (szProcedure != "OnPluginDrawOutputWindow" && szProcedure != "OnPluginTick") {
-        qCDebug(lcScript) << QString("Executing %1 script \"%2\"").arg(szType, szProcedure);
+        m_doc->Trace(QString("Executing %1 script \"%2\"").arg(szType, szProcedure));
     }
 
     // Time the call
@@ -293,10 +294,14 @@ bool ScriptEngine::executeLua(qint32& dispid, const QString& szProcedure, Action
 
     invocation_count++; // Count successful calls
 
-    // Update timing statistics
+    // Update timing statistics (world + current plugin)
     if (m_doc) {
         qint64 elapsed = timer.nsecsElapsed();
         m_doc->m_iScriptTimeTaken += elapsed;
+        // Original also tracks per-plugin timing for GetPluginInfo("scripttime")
+        if (m_doc->m_CurrentPlugin) {
+            m_doc->m_CurrentPlugin->m_iScriptTimeTaken += elapsed;
+        }
     }
 
     // Get return value (if wanted)
@@ -310,6 +315,15 @@ bool ScriptEngine::executeLua(qint32& dispid, const QString& szProcedure, Action
                 // Lua treats 0 as true, so check number
                 *result = lua_tonumber(L, 1) != 0;
             }
+        }
+    }
+
+    // Get string return value (for filter-chain callbacks like OnPluginPacketReceived)
+    if (returnString && lua_gettop(L) > 0 && lua_isstring(L, 1)) {
+        size_t len = 0;
+        const char* str = lua_tolstring(L, 1, &len);
+        if (str) {
+            *returnString = QString::fromUtf8(str, static_cast<int>(len));
         }
     }
 

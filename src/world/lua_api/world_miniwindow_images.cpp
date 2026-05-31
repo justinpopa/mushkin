@@ -77,7 +77,7 @@ int L_WindowLoadImage(lua_State* L)
     // Load the image as a QImage
     auto image = std::make_unique<QImage>(qFilename);
     if (image->isNull()) {
-        lua_pushnumber(L, 30051); // eFileNotFound
+        lua_pushnumber(L, eFileNotFound);
         return 1;
     }
 
@@ -824,6 +824,13 @@ int L_WindowAddHotspot(lua_State* L)
         return luaReturnError(L, eNoSuchWindow);
     }
 
+    // Plugin enforcement: can't switch callback plugins (original: miniwindow.cpp:1731-1732)
+    QString pluginId = pDoc->m_CurrentPlugin ? pDoc->m_CurrentPlugin->m_strID : QString();
+    if (!win->callbackPlugin.isEmpty() && win->callbackPlugin != pluginId) {
+        return luaReturnError(L, eHotspotPluginChanged);
+    }
+    win->callbackPlugin = pluginId;
+
     // Create or replace hotspot
     auto hotspot = std::make_unique<Hotspot>();
 
@@ -898,6 +905,21 @@ int L_WindowDeleteHotspot(lua_State* L)
     // Delete the hotspot
     win->hotspots.erase(it);
 
+    // Clear mouse tracking if this hotspot was under the mouse or being pressed
+    // Original: miniwindow.cpp:1792-1796
+    if (win->mouseOverHotspot == hotspotIdStr) {
+        win->mouseOverHotspot.clear();
+    }
+    if (win->mouseDownHotspot == hotspotIdStr) {
+        win->mouseDownHotspot.clear();
+    }
+
+    // Clear callbackPlugin when the last hotspot is deleted
+    // Original: miniwindow.cpp:1798-1799
+    if (win->hotspots.empty()) {
+        win->callbackPlugin.clear();
+    }
+
     return luaReturnOK(L);
 }
 
@@ -928,8 +950,12 @@ int L_WindowDeleteAllHotspots(lua_State* L)
         return luaReturnError(L, eNoSuchWindow);
     }
 
-    // Clear all hotspots
+    // Clear all hotspots and reset all associated tracking state
+    // Original: miniwindow.cpp:1841-1844
     win->hotspots.clear();
+    win->mouseOverHotspot.clear();
+    win->mouseDownHotspot.clear();
+    win->callbackPlugin.clear();
 
     return luaReturnOK(L);
 }
@@ -1020,6 +1046,12 @@ int L_WindowDragHandler(lua_State* L)
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         return luaReturnError(L, eNoSuchWindow);
+    }
+
+    // Plugin enforcement (original: miniwindow.cpp:3780-3781)
+    QString dragPluginId = pDoc->m_CurrentPlugin ? pDoc->m_CurrentPlugin->m_strID : QString();
+    if (!win->callbackPlugin.isEmpty() && win->callbackPlugin != dragPluginId) {
+        return luaReturnError(L, eHotspotPluginChanged);
     }
 
     // Get raw pointer from unique_ptr in map
@@ -1360,10 +1392,14 @@ int L_WindowHotspotInfo(lua_State* L)
             lua_pushinteger(L, hotspot->m_rect.top());
             break;
         case 3: // right
-            lua_pushinteger(L, hotspot->m_rect.right());
+            // Qt QRect::right() is inclusive (x + width - 1); Windows CRect is exclusive.
+            // Add +1 to match MUSHclient's exclusive right coordinate.
+            lua_pushinteger(L, hotspot->m_rect.right() + 1);
             break;
         case 4: // bottom
-            lua_pushinteger(L, hotspot->m_rect.bottom());
+            // Qt QRect::bottom() is inclusive (y + height - 1); Windows CRect is exclusive.
+            // Add +1 to match MUSHclient's exclusive bottom coordinate.
+            lua_pushinteger(L, hotspot->m_rect.bottom() + 1);
             break;
         case 5: // MouseOver callback
             luaPushQString(L, hotspot->m_sMouseOver);
@@ -1447,6 +1483,12 @@ int L_WindowScrollwheelHandler(lua_State* L)
     MiniWindow* win = getMiniWindow(pDoc, windowName);
     if (!win) {
         return luaReturnError(L, eNoSuchWindow);
+    }
+
+    // Plugin enforcement (original: miniwindow.cpp:4091-4092)
+    QString swPluginId = pDoc->m_CurrentPlugin ? pDoc->m_CurrentPlugin->m_strID : QString();
+    if (!win->callbackPlugin.isEmpty() && win->callbackPlugin != swPluginId) {
+        return luaReturnError(L, eHotspotPluginChanged);
     }
 
     // Get raw pointer from unique_ptr in map

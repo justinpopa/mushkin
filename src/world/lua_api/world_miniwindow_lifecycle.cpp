@@ -96,6 +96,15 @@ int L_WindowCreate(lua_State* L)
     winPtr->setFlags(flags);
     winPtr->setBackgroundColor(bgColor);
 
+    // Window is hidden after create (original: miniwindow.cpp:202 — m_bShow = false)
+    winPtr->setShow(false);
+
+    // Clear hotspots unless KEEP_HOTSPOTS flag is set
+    // Original: miniwindow.cpp:205-206
+    if ((flags & MINIWINDOW_KEEP_HOTSPOTS) == 0) {
+        winPtr->hotspots.clear();
+    }
+
     // Create fresh pixmap if dimensions provided (allow 0x0 for initial font setup)
     // Unlike WindowResize, WindowCreate always creates a clean pixmap (no content preservation)
     if (width > 0 && height > 0) {
@@ -405,8 +414,8 @@ int L_WindowInfo(lua_State* L)
             lua_pushboolean(L, win->show);
             break;
 
-        case 6: // Hidden flag (opposite of visible)
-            lua_pushboolean(L, !win->show);
+        case 6: // Temporarily hidden (no room in layout — original: m_bTemporarilyHide)
+            lua_pushboolean(L, win->temporarilyHide);
             break;
 
         case 7: // Layout/position mode
@@ -429,12 +438,13 @@ int L_WindowInfo(lua_State* L)
             lua_pushnumber(L, win->rect.top());
             break;
 
-        case 12: // Rect right
-            lua_pushnumber(L, win->rect.right());
+        case 12: // Rect right (Qt QRect::right() is inclusive; add 1 for Windows CRect
+                 // compatibility)
+            lua_pushnumber(L, win->rect.right() + 1);
             break;
 
-        case 13: // Rect bottom
-            lua_pushnumber(L, win->rect.bottom());
+        case 13: // Rect bottom (same +1 adjustment)
+            lua_pushnumber(L, win->rect.bottom() + 1);
             break;
 
         case 14: // Last mouse X position (miniwindow-relative)
@@ -445,8 +455,8 @@ int L_WindowInfo(lua_State* L)
             lua_pushnumber(L, win->lastMousePosition.y());
             break;
 
-        case 16: // Last mouse update count - TODO: implement update tracking
-            lua_pushnil(L);
+        case 16: // Last mouse update count (original: m_last_mouse_update)
+            lua_pushnumber(L, win->mouseUpdateCount);
             break;
 
         case 17: // Client mouse X position (output-window-relative)
@@ -473,8 +483,24 @@ int L_WindowInfo(lua_State* L)
             }
             break;
 
+        case 21: // Date installed (OLE DATE)
+        {
+            // Original: COleDateTime(m_tDateInstalled.GetTime()) — set in constructor
+            double oleDate = (static_cast<double>(win->dateInstalled) / 86400.0) + 25569.0;
+            lua_pushnumber(L, oleDate);
+            break;
+        }
+
         case 22: // Z-order
             lua_pushnumber(L, win->zOrder);
+            break;
+
+        case 23: // Creating plugin ID (original: m_sCreatingPlugin)
+            if (!win->getCreatingPlugin().isEmpty()) {
+                luaPushQString(L, win->getCreatingPlugin());
+            } else {
+                lua_pushstring(L, "");
+            }
             break;
 
         default:

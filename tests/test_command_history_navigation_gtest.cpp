@@ -177,21 +177,23 @@ TEST_F(CommandHistoryNavigationTest, ClearHistory)
  */
 TEST_F(CommandHistoryNavigationTest, EmptyCommandFiltering)
 {
-    // Try to add empty string
+    // Try to add empty string — rejected (original: strlen(Message) > 0)
     doc->addToCommandHistory("");
     EXPECT_TRUE(doc->m_commandHistory.isEmpty()) << "Empty string should not be added";
 
-    // Try to add whitespace only
+    // Whitespace-only strings ARE accepted by original (strlen > 0 passes)
     doc->addToCommandHistory("   ");
-    EXPECT_TRUE(doc->m_commandHistory.isEmpty()) << "Whitespace-only should not be added";
+    EXPECT_EQ(doc->m_commandHistory.count(), 1)
+        << "Whitespace-only should be added (original accepts)";
 
-    // Try tabs and newlines
+    // Tabs and newlines are also accepted
     doc->addToCommandHistory("\t\n  ");
-    EXPECT_TRUE(doc->m_commandHistory.isEmpty()) << "Tabs/newlines only should not be added";
+    EXPECT_EQ(doc->m_commandHistory.count(), 2)
+        << "Tabs/newlines should be added (original accepts)";
 
     // Add valid command
     doc->addToCommandHistory("north");
-    EXPECT_EQ(doc->m_commandHistory.count(), 1);
+    EXPECT_EQ(doc->m_commandHistory.count(), 3);
 }
 
 /**

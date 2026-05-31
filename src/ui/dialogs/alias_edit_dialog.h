@@ -1,13 +1,13 @@
 #ifndef ALIAS_EDIT_DIALOG_H
 #define ALIAS_EDIT_DIALOG_H
 
+#include <QCheckBox>
+#include <QComboBox>
 #include <QDialog>
 #include <QLineEdit>
-#include <QTextEdit>
-#include <QCheckBox>
 #include <QSpinBox>
-#include <QComboBox>
 #include <QTabWidget>
+#include <QTextEdit>
 
 // Forward declarations
 class WorldDocument;
@@ -27,11 +27,10 @@ class Alias;
  *
  * Based on MUSHclient's alias configuration dialog.
  */
-class AliasEditDialog : public QDialog
-{
+class AliasEditDialog : public QDialog {
     Q_OBJECT
 
-public:
+  public:
     /**
      * Constructor for adding a new alias
      * @param doc WorldDocument to add alias to
@@ -49,7 +48,7 @@ public:
 
     ~AliasEditDialog() override = default;
 
-private slots:
+  private slots:
     /**
      * OK button clicked - validate and save
      */
@@ -60,7 +59,7 @@ private slots:
      */
     void onCancel();
 
-private:
+  private:
     /**
      * Setup UI components
      */
@@ -85,7 +84,7 @@ private:
 
     // Member variables
     WorldDocument* m_doc;
-    QString m_aliasName;  // Empty for new alias, populated for edit
+    QString m_aliasName; // Empty for new alias, populated for edit
     bool m_isEditMode;
 
     // UI Components
@@ -112,6 +111,10 @@ private:
     QCheckBox* m_omitFromOutputCheck;
     QCheckBox* m_omitFromLogCheck;
     QCheckBox* m_omitFromHistoryCheck;
+    QCheckBox* m_ignoreCaseCheck;
+    QCheckBox* m_temporaryCheck;
+    QCheckBox* m_oneShotCheck;
+    QCheckBox* m_menuCheck;
 };
 
 #endif // ALIAS_EDIT_DIALOG_H

@@ -9,6 +9,7 @@
 
 #include "../automation/plugin.h" // ON_PLUGIN_CONNECT, ON_PLUGIN_DISCONNECT
 #include "../network/remote_access_server.h"
+#include "../storage/global_options.h"
 #include "../text/line.h"  // Line (std::make_unique<Line>)
 #include "../text/style.h" // Style
 #include "logging.h"
@@ -17,12 +18,17 @@
 #include "world_socket.h"
 
 #include <QDateTime>
+#include <QInputDialog>
+#include <QLineEdit>
 #include <QList>
 
 // ========== Construction / destruction ==========
 
-ConnectionManager::ConnectionManager(WorldDocument& doc) : m_doc(doc)
+ConnectionManager::ConnectionManager(WorldDocument& doc) : QObject(nullptr), m_doc(doc)
 {
+    m_pQueueTimer = new QTimer(this);
+    m_pQueueTimer->setSingleShot(false);
+    connect(m_pQueueTimer, &QTimer::timeout, this, &ConnectionManager::drainCommandQueue);
 }
 
 ConnectionManager::~ConnectionManager() = default;
@@ -101,6 +107,16 @@ void ConnectionManager::onConnect(int errorCode)
         m_doc.m_UTF8Sequence.fill(0);
         m_doc.m_iUTF8BytesLeft = 0;
 
+        // Reset session counters (original: doc.cpp ConnectionEstablished)
+        m_nTotalLinesSent = 0;
+        m_nTotalLinesReceived = 0;
+        m_nBytesIn = 0;
+        m_nBytesOut = 0;
+        m_iInputPacketCount = 0;
+        m_iOutputPacketCount = 0;
+        m_doc.m_automationRegistry->m_iTriggersMatchedThisSessionCount = 0;
+        m_doc.m_automationRegistry->m_iAliasesMatchedThisSessionCount = 0;
+
         // Create initial line if needed.
         if (!m_doc.m_currentLine) {
             m_doc.m_currentLine = std::make_unique<Line>(1, m_doc.m_display.wrap_column,
@@ -116,11 +132,67 @@ void ConnectionManager::onConnect(int errorCode)
             m_doc.m_currentLine->styleList.push_back(std::move(initial_style));
         }
 
+        // Activate MXP if always-on mode is configured.
+        // Original: doc.cpp:6611-6612 — MXP_On() called at connect when m_iUseMXP == eUseMXP
+        if (m_doc.m_iUseMXP == MXPMode::eMXP_On) {
+            m_doc.MXP_On();
+        }
+
         // Lua callback: OnWorldConnect.
         onWorldConnect();
 
         // Notify plugins.
         m_doc.SendToAllPluginCallbacks(ON_PLUGIN_CONNECT);
+
+        // Auto-login: send connect credentials based on connect_method.
+        // Matches original MUSHclient doc.cpp:6731-6795 (ConnectionEstablished).
+
+        // Prompt for password if none is stored but one is needed (M196).
+        // Original: doc.cpp:6735-6751 — shows CPasswordDialog when password is empty and
+        // either (a) connect_now is set with a character name, or (b) connect_text uses %password%.
+        QString password = m_doc.m_password;
+        if (password.isEmpty() &&
+            ((m_doc.m_connect_now != eNoAutoConnect && !m_doc.m_name.isEmpty()) ||
+             m_doc.m_connect_text.contains(QStringLiteral("%password%")))) {
+            bool ok = false;
+            QString entered =
+                QInputDialog::getText(nullptr, QStringLiteral("Enter Password"),
+                                      QStringLiteral("Password for %1:").arg(m_doc.m_name),
+                                      QLineEdit::Password, QString(), &ok);
+            if (ok)
+                password = entered;
+        }
+
+        switch (m_doc.m_connect_now) {
+            case eConnectMUSH:
+                // Send: connect name password
+                if (!password.isEmpty()) {
+                    QString cmd = QStringLiteral("connect %1 %2").arg(m_doc.m_name, password);
+                    m_doc.SendMsg(cmd, false, false, false); // don't echo password
+                }
+                break;
+            case eConnectDiku:
+                // Send: name\npassword
+                m_doc.SendMsg(m_doc.m_name, m_doc.m_display_my_input, false, false);
+                if (!password.isEmpty()) {
+                    m_doc.SendMsg(password, false, false, false);
+                }
+                break;
+            default:
+                break;
+        }
+
+        // Send connect_text (with %name% and %password% substitution).
+        // Original: doc.cpp:6789-6795
+        if (!m_doc.m_connect_text.isEmpty()) {
+            QString text = m_doc.m_connect_text;
+            text.replace(QStringLiteral("%name%"), m_doc.m_name);
+            text.replace(QStringLiteral("%password%"), password);
+            m_doc.SendMsg(text, false, false, false); // don't display (may contain password)
+        }
+
+        // Reset all timers on connect (original: doc.cpp:6799)
+        m_doc.resetAllTimers();
 
         // Start remote access server if configured.
         const bool hasAuth =
@@ -143,6 +215,14 @@ void ConnectionManager::onConnect(int errorCode)
             }
         } else {
             qCDebug(lcWorld) << "Remote access server not starting (conditions not met)";
+        }
+
+        // Auto-log if world has an auto-log filename configured
+        // Original: doc.cpp:6668 — hardcodes append=true (always append for auto-log)
+        if (!m_doc.m_logging.auto_log_file_name.isEmpty() && !m_doc.IsLogOpen()) {
+            if (m_doc.OpenLog(QString(), true) != 0) {
+                qCWarning(lcWorld) << "Auto-log: could not open log file for" << m_doc.worldName();
+            }
         }
 
         emit m_doc.connectionStateChanged(true);
@@ -170,11 +250,19 @@ void ConnectionManager::onConnectionDisconnect()
         m_doc.m_pRemoteServer->stop();
     }
 
+    // Turn off MXP on disconnect (original: worldsock.cpp OnClose → MXP_Off(true))
+    m_doc.MXP_Off(true);
+
     // Lua callback: OnWorldDisconnect.
     onWorldDisconnect();
 
     // Notify plugins.
     m_doc.SendToAllPluginCallbacks(ON_PLUGIN_DISCONNECT);
+
+    // Close auto-log on disconnect (original: worldsock.cpp OnClose)
+    if (m_doc.IsLogOpen()) {
+        m_doc.CloseLog();
+    }
 
     // Update connection state.
     m_iConnectPhase = CONNECT_NOT_CONNECTED;
@@ -256,7 +344,80 @@ qint32 ConnectionManager::discardQueue()
 {
     qint32 count = m_CommandQueue.size();
     m_CommandQueue.clear();
+    m_pQueueTimer->stop();
     return count;
+}
+
+/**
+ * drainCommandQueue — timer slot: drain one QUEUE command (or all IMMEDIATE commands) per tick.
+ *
+ * Encoding (set by WorldDocument::SendMsg):
+ *   Q = QUEUE with echo+log    q = QUEUE without echo, with log
+ *   I = IMMEDIATE with echo+log  i = IMMEDIATE without echo, with log
+ *   Uppercase = log=true; lowercase = log=false
+ *
+ * Original MUSHclient behaviour: each tick flushes all leading IMMEDIATE entries, then sends
+ * one QUEUE entry and stops. If the queue empties, the timer is stopped.
+ */
+void ConnectionManager::drainCommandQueue()
+{
+    while (!m_CommandQueue.isEmpty()) {
+        const QString encoded = m_CommandQueue.takeFirst();
+        if (encoded.isEmpty()) {
+            continue;
+        }
+
+        const QChar prefix = encoded.at(0);
+        const QString text = encoded.mid(1);
+
+        // Decode echo/log from prefix character
+        // E/e=queue+echo, N/n=queue+no-echo, I/i=immediate+echo, W/w=immediate+no-echo
+        // Uppercase = log, lowercase = no-log (original: doc.h:241-249)
+        const QChar upper = prefix.toUpper();
+        const bool isImmediate = (upper == u'I' || upper == u'W');
+        const bool echo = (upper == u'E' || upper == u'I');
+        const bool log = prefix.isUpper();
+
+        m_doc.DoSendMsg(text, echo, log);
+
+        if (!isImmediate) {
+            // QUEUE entry: send one per tick, then stop
+            break;
+        }
+        // IMMEDIATE entry: continue loop — flush all consecutive immediates
+    }
+
+    if (m_CommandQueue.isEmpty()) {
+        m_pQueueTimer->stop();
+    }
+}
+
+/**
+ * setSpeedWalkDelay — update the queue drain timer interval.
+ *
+ * If delayMs <= 0: flush all remaining queue entries immediately, then stop the timer.
+ * Otherwise: update the timer interval and start it if there are queued commands.
+ */
+void ConnectionManager::setSpeedWalkDelay(int delayMs)
+{
+    // Clamp to 0-30000 range (original: TimerWnd.cpp:74-81)
+    if (delayMs < 0)
+        delayMs = 0;
+    if (delayMs > 30000)
+        delayMs = 30000;
+
+    if (delayMs <= 0) {
+        // Flush all remaining commands immediately
+        m_pQueueTimer->stop();
+        while (!m_CommandQueue.isEmpty()) {
+            drainCommandQueue();
+        }
+    } else {
+        m_pQueueTimer->setInterval(delayMs);
+        if (!m_CommandQueue.isEmpty() && !m_pQueueTimer->isActive()) {
+            m_pQueueTimer->start();
+        }
+    }
 }
 
 // ========== Private — Lua callbacks ==========

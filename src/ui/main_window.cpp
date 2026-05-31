@@ -118,6 +118,17 @@ MainWindow::MainWindow(QWidget* parent)
     // Read saved window geometry
     readSettings();
 
+    // Apply AlwaysOnTop preference (must be after readSettings to avoid flag conflict)
+    if (GlobalOptions::instance().alwaysOnTop()) {
+        setWindowFlags(windowFlags() | Qt::WindowStaysOnTopHint);
+        show(); // Re-show after setWindowFlags hides window
+    }
+
+    // Show activity window if preference is set
+    if (GlobalOptions::instance().openActivityWindow()) {
+        m_activityWindow->show();
+    }
+
     // Update menus initial state
     updateMenus();
 
@@ -466,12 +477,10 @@ void MainWindow::createMenus()
     connect(m_connectToStartupListAction, &QAction::triggered, this,
             &MainWindow::connectToStartupList);
 
-    // Set initial state from database
-    auto& db = Database::instance();
-    bool autoConnect = db.getPreferenceInt("AutoConnectWorlds", 0) != 0;
-    m_autoConnectAction->setChecked(autoConnect);
-    bool reconnectOnDisconnect = db.getPreferenceInt("ReconnectOnDisconnect", 0) != 0;
-    m_reconnectOnDisconnectAction->setChecked(reconnectOnDisconnect);
+    // Set initial state from global options
+    auto& opts = GlobalOptions::instance();
+    m_autoConnectAction->setChecked(opts.autoConnectWorlds());
+    m_reconnectOnDisconnectAction->setChecked(opts.reconnectOnLinkFailure());
 
     // Game Menu (matches original MUSHclient structure)
     m_gameMenu = menuBar()->addMenu("&Game");
@@ -964,7 +973,7 @@ void MainWindow::createMenus()
 
     m_alwaysOnTopAction = m_viewMenu->addAction("Always &On Top");
     m_alwaysOnTopAction->setCheckable(true);
-    m_alwaysOnTopAction->setChecked(false);
+    m_alwaysOnTopAction->setChecked(GlobalOptions::instance().alwaysOnTop());
     m_alwaysOnTopAction->setStatusTip("Keep window above all other windows");
     connect(m_alwaysOnTopAction, &QAction::triggered, this, &MainWindow::toggleAlwaysOnTop);
 
@@ -1265,12 +1274,11 @@ void MainWindow::infoBarSetBackground(const QColor& color)
 
 void MainWindow::applyToolbarPreferences()
 {
-    auto& db = Database::instance();
+    auto& opts = GlobalOptions::instance();
 
     // Apply flat toolbar style
-    bool flatToolbars = db.getPreferenceInt("FlatToolbars", 1) != 0;
     QString toolbarStyle;
-    if (flatToolbars) {
+    if (opts.flatToolbars()) {
         // Flat style - no button borders
         toolbarStyle = "QToolBar { border: none; } "
                        "QToolButton { border: none; padding: 3px; } "
@@ -1285,7 +1293,7 @@ void MainWindow::applyToolbarPreferences()
 
     // Apply activity button bar style
     // Style values: 0-5 correspond to different Qt::ToolButtonStyle options
-    int buttonStyle = db.getPreferenceInt("ActivityButtonBarStyle", 0);
+    int buttonStyle = opts.activityButtonBarStyle();
     Qt::ToolButtonStyle tbStyle;
     switch (buttonStyle) {
         case 1:
@@ -1312,8 +1320,7 @@ void MainWindow::applyToolbarPreferences()
 
 void MainWindow::applyTheme()
 {
-    auto& db = Database::instance();
-    int mode = db.getPreferenceInt("ThemeMode", ThemeSystem);
+    int mode = GlobalOptions::instance().themeMode();
 
     qDebug() << "applyTheme: mode =" << mode << "(0=Light, 1=Dark, 2=System)";
 
@@ -1348,8 +1355,7 @@ QIcon MainWindow::loadThemedIcon(const QString& name)
     file.close();
 
     // Determine icon color based on effective color scheme
-    auto& db = Database::instance();
-    int mode = db.getPreferenceInt("ThemeMode", ThemeSystem);
+    int mode = GlobalOptions::instance().themeMode();
 
     bool useDark = false;
     if (mode == ThemeDark) {
@@ -1508,13 +1514,70 @@ void MainWindow::writeSettings()
 
 void MainWindow::closeEvent(QCloseEvent* event)
 {
+    // Confirm before closing if preference is set and worlds are open
+    // (matches original MUSHclient.cpp SaveAllModified — only if gdoccount > 0)
+    if (GlobalOptions::instance().confirmBeforeClosingMushclient() &&
+        !m_mdiArea->subWindowList().isEmpty()) {
+        auto reply =
+            QMessageBox::information(this, "Mushkin", "This will end your Mushkin session.",
+                                     QMessageBox::Ok | QMessageBox::Cancel, QMessageBox::Ok);
+        if (reply != QMessageBox::Ok) {
+            event->ignore();
+            return;
+        }
+    }
+
+    // Per-world close confirmation for connected worlds
+    // Original: SaveAllModified calls SaveModified per document, showing per-world dialog
+    if (GlobalOptions::instance().confirmBeforeClosingWorld()) {
+        for (QMdiSubWindow* sub : m_mdiArea->subWindowList()) {
+            auto* widget = qobject_cast<WorldWidget*>(sub->widget());
+            if (!widget)
+                continue;
+            WorldDocument* doc = widget->document();
+            if (doc && doc->isConnectedToMud()) {
+                auto reply = QMessageBox::information(
+                    this, "Mushkin",
+                    QString("This will end your %1 session.").arg(doc->worldName()),
+                    QMessageBox::Ok | QMessageBox::Cancel, QMessageBox::Ok);
+                if (reply != QMessageBox::Ok) {
+                    event->ignore();
+                    return;
+                }
+            }
+        }
+    }
+
     // Check if any worlds have unsaved changes
     QList<QMdiSubWindow*> windows = m_mdiArea->subWindowList();
-    QStringList unsavedWorlds;
 
+    // Auto-save worlds with m_bSaveWorldAutomatically set (M194).
+    // Original: SaveModified() calls DoSave silently when m_bSaveWorldAutomatically is true.
+    for (QMdiSubWindow* window : windows) {
+        WorldWidget* worldWidget = qobject_cast<WorldWidget*>(window->widget());
+        if (!worldWidget || !worldWidget->isModified())
+            continue;
+        WorldDocument* doc = worldWidget->document();
+        if (doc && doc->m_bSaveWorldAutomatically) {
+            QString filename = worldWidget->filename();
+            if (!filename.isEmpty()) {
+                if (auto result = worldWidget->saveToFile(filename); !result) {
+                    QMessageBox::critical(
+                        this, "Error",
+                        QString("Failed to auto-save world file:\n%1").arg(result.error()));
+                }
+            }
+        }
+    }
+
+    QStringList unsavedWorlds;
     for (QMdiSubWindow* window : windows) {
         WorldWidget* worldWidget = qobject_cast<WorldWidget*>(window->widget());
         if (worldWidget && worldWidget->isModified()) {
+            WorldDocument* doc = worldWidget->document();
+            // Skip worlds that have auto-save set (already handled above).
+            if (doc && doc->m_bSaveWorldAutomatically)
+                continue;
             unsavedWorlds.append(worldWidget->worldName());
         }
     }
@@ -1578,8 +1641,7 @@ void MainWindow::changeEvent(QEvent* event)
     if (event->type() == QEvent::WindowStateChange) {
         // Check if minimizing and tray is enabled
         if (isMinimized() && m_trayIcon && m_trayIcon->isVisible()) {
-            auto& db = Database::instance();
-            int iconPlacement = db.getPreferenceInt("IconPlacement", 0);
+            int iconPlacement = GlobalOptions::instance().iconPlacement();
 
             // If system tray only (1), hide from taskbar when minimized
             if (iconPlacement == 1) {
@@ -1627,8 +1689,8 @@ void MainWindow::setupSystemTray()
         return;
     }
 
-    auto& db = Database::instance();
-    int iconPlacement = db.getPreferenceInt("IconPlacement", 0);
+    auto& opts = GlobalOptions::instance();
+    int iconPlacement = opts.iconPlacement();
 
     // 0 = taskbar only (no tray icon)
     // 1 = system tray only
@@ -1641,11 +1703,11 @@ void MainWindow::setupSystemTray()
     m_trayIcon = new QSystemTrayIcon(this);
 
     // Set icon - check for custom icon first
-    int trayIconType = db.getPreferenceInt("TrayIcon", 0);
+    int trayIconType = opts.trayIcon();
     QIcon trayIcon;
 
     if (trayIconType == 10) {
-        QString customIconPath = db.getPreference("TrayIconFileName", "");
+        QString customIconPath = opts.trayIconFileName();
         if (!customIconPath.isEmpty() && QFile::exists(customIconPath)) {
             trayIcon = QIcon(customIconPath);
         }
@@ -1804,9 +1866,7 @@ void MainWindow::updateMenus()
     m_autoSayAction->setEnabled(hasActiveWorld);
 
     // Connection menu - startup list action enabled only if startup list exists
-    auto& db = Database::instance();
-    QString startupList = db.getPreference("WorldList", "");
-    m_connectToStartupListAction->setEnabled(!startupList.isEmpty());
+    m_connectToStartupListAction->setEnabled(!GlobalOptions::instance().worldList().isEmpty());
 
     // Update Log Session checked state
     m_logSessionAction->setChecked(isLogOpen);
@@ -1945,14 +2005,11 @@ void MainWindow::openStartupWorlds()
 
     QStringList worldsToOpen;
 
-    // Read WorldList preference (asterisk-separated paths)
+    // Read WorldList preference (already split by GlobalOptions)
     // Matches original MUSHclient.cpp
-    auto& db = Database::instance();
-    QString worldList = db.getPreference("WorldList", "");
+    const QStringList worldListFiles = GlobalOptions::instance().worldList();
 
-    if (!worldList.isEmpty()) {
-        // Split by asterisk delimiter
-        QStringList worldListFiles = worldList.split('*', Qt::SkipEmptyParts);
+    if (!worldListFiles.isEmpty()) {
         for (const QString& path : worldListFiles) {
             QString trimmedPath = path.trimmed();
             if (trimmedPath.isEmpty()) {
@@ -2029,11 +2086,65 @@ void MainWindow::newWorld()
         db.saveWindowGeometry(worldWidget->worldName(), geometry);
     });
 
-    // Show the subwindow
-    subWindow->show();
+    // Apply global font defaults for new worlds only (matches original MUSHclient
+    // doc_construct.cpp:696-703 — NOT applied when loading existing world files).
+    worldWidget->document()->applyGlobalFontDefaults();
 
-    // New worlds get default size (no saved geometry yet)
-    subWindow->resize(800, 600);
+    // Auto-apply default files on new world creation (matches original MUSHclient
+    // doc_construct.cpp:641-684 — only for new worlds, not loaded ones).
+    {
+        const auto& opts = GlobalOptions::instance();
+        // Original doc_construct.cpp:656-663 loads colours FIRST
+        const std::array<std::pair<QString, int>, 5> defaultFiles = {{
+            {opts.defaultColoursFile(), XML_COLOURS},
+            {opts.defaultTriggersFile(), XML_TRIGGERS},
+            {opts.defaultAliasesFile(), XML_ALIASES},
+            {opts.defaultTimersFile(), XML_TIMERS},
+            {opts.defaultMacrosFile(), XML_MACROS},
+        }};
+
+        WorldDocument* doc = worldWidget->document();
+        for (const auto& [path, flag] : defaultFiles) {
+            if (path.isEmpty())
+                continue;
+
+            // Set m_bUseDefault* flag before loading (original: doc_construct.cpp:658-683)
+            switch (flag) {
+                case XML_COLOURS:
+                    // m_bUseDefaultColours not ported — field doesn't exist in Mushkin
+                    break;
+                case XML_TRIGGERS:
+                    doc->m_bUseDefaultTriggers = true;
+                    break;
+                case XML_ALIASES:
+                    doc->m_bUseDefaultAliases = true;
+                    break;
+                case XML_TIMERS:
+                    doc->m_bUseDefaultTimers = true;
+                    break;
+                case XML_MACROS:
+                    doc->m_bUseDefaultMacros = true;
+                    break;
+            }
+
+            QFile file(path);
+            if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+                continue;
+            XmlSerialization::ImportXML(doc, QString::fromUtf8(file.readAll()), flag);
+        }
+    }
+
+    // Show welcome message (M191)
+    // Original: doc_construct.cpp:763 — SetUpOutputWindow() called for new worlds
+    worldWidget->showWelcomeMessage();
+
+    // Show the subwindow
+    if (GlobalOptions::instance().openWorldsMaximized()) {
+        subWindow->showMaximized();
+    } else {
+        subWindow->show();
+        subWindow->resize(800, 600);
+    }
 
     // Update menus
     updateMenus();
@@ -2055,6 +2166,23 @@ void MainWindow::openWorld()
 void MainWindow::openWorld(const QString& filename)
 {
     statusBar()->showMessage(QString("Opening %1...").arg(filename));
+
+    // M193: Check if this file is already open (MFC's OpenDocumentFile does this automatically).
+    // Compare canonical paths so symlinks and relative paths are handled correctly.
+    QString canonicalPath = QFileInfo(filename).canonicalFilePath();
+    if (!canonicalPath.isEmpty()) {
+        for (QMdiSubWindow* sub : m_mdiArea->subWindowList()) {
+            auto* existingWidget = qobject_cast<WorldWidget*>(sub->widget());
+            if (existingWidget &&
+                QFileInfo(existingWidget->filename()).canonicalFilePath() == canonicalPath) {
+                // Already open — activate the existing window instead
+                m_mdiArea->setActiveSubWindow(sub);
+                statusBar()->showMessage(
+                    QString("World already open: %1").arg(existingWidget->worldName()), 3000);
+                return;
+            }
+        }
+    }
 
     // Create world widget
     auto worldWidgetOwner = std::make_unique<WorldWidget>();
@@ -2101,25 +2229,29 @@ void MainWindow::openWorld(const QString& filename)
     });
 
     // Show the subwindow
-    subWindow->show();
-
-    // Try to restore saved window geometry from database
-    // Matches original MUSHclient winplace.cpp behavior
-    auto& db = Database::instance();
-    if (auto geom = db.loadWindowGeometry(worldWidget->worldName())) {
-        subWindow->setGeometry(*geom);
-        qCDebug(lcUI) << "Restored window geometry for" << worldWidget->worldName() << ":" << *geom;
+    if (GlobalOptions::instance().openWorldsMaximized()) {
+        subWindow->showMaximized();
     } else {
-        // No saved geometry - use reasonable default size
-        subWindow->resize(800, 600);
+        subWindow->show();
+
+        // Try to restore saved window geometry from database
+        // Matches original MUSHclient winplace.cpp behavior
+        auto& db = Database::instance();
+        if (auto geom = db.loadWindowGeometry(worldWidget->worldName())) {
+            subWindow->setGeometry(*geom);
+            qCDebug(lcUI) << "Restored window geometry for" << worldWidget->worldName() << ":"
+                          << *geom;
+        } else {
+            // No saved geometry - use reasonable default size
+            subWindow->resize(800, 600);
+        }
     }
 
     // Update menus
     updateMenus();
 
     // Check if auto-connect is enabled (matches original MUSHclient doc.cpp)
-    bool autoConnect = db.getPreferenceInt("AutoConnectWorlds", 0) != 0;
-    if (autoConnect) {
+    if (GlobalOptions::instance().autoConnectWorlds()) {
         worldWidget->connectToMud();
         statusBar()->showMessage(
             QString("Opened %1 - Auto-connecting...").arg(worldWidget->worldName()), 3000);
@@ -2138,9 +2270,48 @@ void MainWindow::openStartupList()
 
 void MainWindow::closeWorld()
 {
-    if (m_mdiArea->activeSubWindow()) {
-        m_mdiArea->activeSubWindow()->close();
+    QMdiSubWindow* sub = m_mdiArea->activeSubWindow();
+    if (!sub) {
+        return;
     }
+
+    // Confirm before closing a connected world (matches original MUSHclient SaveModified).
+    if (GlobalOptions::instance().confirmBeforeClosingWorld()) {
+        auto* widget = qobject_cast<WorldWidget*>(sub->widget());
+        if (widget) {
+            WorldDocument* doc = widget->document();
+            if (doc && doc->isConnectedToMud()) {
+                auto reply = QMessageBox::information(
+                    this, "Mushkin",
+                    QString("This will end your %1 session.").arg(doc->worldName()),
+                    QMessageBox::Ok | QMessageBox::Cancel, QMessageBox::Ok);
+                if (reply != QMessageBox::Ok) {
+                    return;
+                }
+            }
+        }
+    }
+
+    // Auto-save without prompting if m_bSaveWorldAutomatically is set (M194).
+    // Original: SaveModified() calls DoSave silently when m_bSaveWorldAutomatically is true.
+    {
+        auto* widget = qobject_cast<WorldWidget*>(sub->widget());
+        if (widget && widget->isModified()) {
+            WorldDocument* doc = widget->document();
+            if (doc && doc->m_bSaveWorldAutomatically) {
+                QString filename = widget->filename();
+                if (!filename.isEmpty()) {
+                    if (auto result = widget->saveToFile(filename); !result) {
+                        QMessageBox::critical(
+                            this, "Error",
+                            QString("Failed to auto-save world file:\n%1").arg(result.error()));
+                    }
+                }
+            }
+        }
+    }
+
+    sub->close();
 }
 
 void MainWindow::saveWorld()
@@ -2261,11 +2432,11 @@ void MainWindow::reloadDefaults()
     const auto& opts = GlobalOptions::instance();
 
     const std::array<std::pair<QString, int>, 5> defaultFiles = {{
+        {opts.defaultColoursFile(), XML_COLOURS},
         {opts.defaultTriggersFile(), XML_TRIGGERS},
         {opts.defaultAliasesFile(), XML_ALIASES},
         {opts.defaultTimersFile(), XML_TIMERS},
         {opts.defaultMacrosFile(), XML_MACROS},
-        {opts.defaultColoursFile(), XML_COLOURS},
     }};
 
     int totalImported = 0;
@@ -2274,6 +2445,24 @@ void MainWindow::reloadDefaults()
     for (const auto& [path, flag] : defaultFiles) {
         if (path.isEmpty())
             continue;
+
+        // Set m_bUseDefault* flag before loading (original: doc_construct.cpp:658-683)
+        switch (flag) {
+            case XML_TRIGGERS:
+                doc->m_bUseDefaultTriggers = true;
+                break;
+            case XML_ALIASES:
+                doc->m_bUseDefaultAliases = true;
+                break;
+            case XML_TIMERS:
+                doc->m_bUseDefaultTimers = true;
+                break;
+            case XML_MACROS:
+                doc->m_bUseDefaultMacros = true;
+                break;
+            default:
+                break;
+        }
 
         QFile file(path);
         if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
@@ -2310,6 +2499,16 @@ void MainWindow::toggleLogSession()
 
     // Toggle log state
     if (doc->IsLogOpen()) {
+        // Confirm before closing the log file (matches original MUSHclient OnFileLogsession).
+        if (GlobalOptions::instance().confirmLogFileClose()) {
+            auto reply = QMessageBox::question(
+                this, "Confirm Close Log", QString("Close log file %1?").arg(doc->m_logfile_name),
+                QMessageBox::Ok | QMessageBox::Cancel, QMessageBox::Ok);
+            if (reply != QMessageBox::Ok) {
+                return;
+            }
+        }
+
         // Close the log
         qint32 result = doc->CloseLog();
         if (result != 0) {
@@ -2333,8 +2532,8 @@ void MainWindow::toggleLogSession()
             return;
         }
 
-        // Open the log (append = true by default)
-        qint32 result = doc->OpenLog(filename, true);
+        // Open the log (append mode from global preference)
+        qint32 result = doc->OpenLog(filename, GlobalOptions::instance().appendToLogFiles());
         if (result == 0) {
             statusBar()->showMessage(QString("Logging to %1").arg(QFileInfo(filename).fileName()),
                                      3000);
@@ -2596,7 +2795,27 @@ void MainWindow::colourPicker()
 
 void MainWindow::debugPackets()
 {
-    // TODO(feature): Show packet debug window (raw telnet data inspector).
+    // Toggle packet debug mode on the active world (original: Ctrl+Alt+F11)
+    QMdiSubWindow* activeSubWindow = m_mdiArea->activeSubWindow();
+    if (!activeSubWindow)
+        return;
+    WorldWidget* worldWidget = qobject_cast<WorldWidget*>(activeSubWindow->widget());
+    if (!worldWidget)
+        return;
+    WorldDocument* doc = worldWidget->document();
+    if (!doc)
+        return;
+
+    doc->m_bDebugIncomingPackets = !doc->m_bDebugIncomingPackets;
+    // Orangered on black (SCRIPTERRORFORECOLOUR / SCRIPTERRORBACKCOLOUR)
+    constexpr QRgb orangeRed = 0x000045FF; // BGR(255, 69, 0)
+    constexpr QRgb black = 0x00000000;
+    if (doc->m_bDebugIncomingPackets) {
+        doc->colourNote(orangeRed, black,
+                        "Packet debugging enabled — incoming data will be hex-dumped.");
+    } else {
+        doc->colourNote(orangeRed, black, "Packet debugging disabled.");
+    }
 }
 
 void MainWindow::find()
@@ -2935,23 +3154,19 @@ void MainWindow::disconnectFromMud()
 
 void MainWindow::toggleAutoConnect()
 {
-    // Toggle the global AutoConnectWorlds preference
-    auto& db = Database::instance();
-    bool currentValue = db.getPreferenceInt("AutoConnectWorlds", 0) != 0;
-    bool newValue = !currentValue;
-
-    db.setPreferenceInt("AutoConnectWorlds", newValue ? 1 : 0);
+    auto& opts = GlobalOptions::instance();
+    bool newValue = !opts.autoConnectWorlds();
+    opts.setAutoConnectWorlds(newValue);
+    Database::instance().setPreferenceInt("AutoConnectWorlds", newValue ? 1 : 0);
     m_autoConnectAction->setChecked(newValue);
 }
 
 void MainWindow::toggleReconnectOnDisconnect()
 {
-    // Toggle the global ReconnectOnDisconnect preference
-    auto& db = Database::instance();
-    bool currentValue = db.getPreferenceInt("ReconnectOnDisconnect", 0) != 0;
-    bool newValue = !currentValue;
-
-    db.setPreferenceInt("ReconnectOnDisconnect", newValue ? 1 : 0);
+    auto& opts = GlobalOptions::instance();
+    bool newValue = !opts.reconnectOnLinkFailure();
+    opts.setReconnectOnLinkFailure(newValue);
+    Database::instance().setPreferenceInt("ReconnectOnLinkFailure", newValue ? 1 : 0);
     m_reconnectOnDisconnectAction->setChecked(newValue);
 }
 
@@ -3226,7 +3441,7 @@ void MainWindow::sendToAllWorlds()
                 if (echo) {
                     openWorlds[i]->note(QString("> %1").arg(text));
                 }
-                openWorlds[i]->sendToMud(text + "\n");
+                openWorlds[i]->sendToMud(text);
             }
         }
     }
@@ -3809,6 +4024,10 @@ void MainWindow::toggleAlwaysOnTop(bool enabled)
         flags &= ~Qt::WindowStaysOnTopHint;
     }
     setWindowFlags(flags);
+
+    // Persist immediately (matches original mainfrm.cpp OnViewAlwaysontop).
+    GlobalOptions::instance().setAlwaysOnTop(enabled);
+    Database::instance().setPreferenceInt("AlwaysOnTop", enabled ? 1 : 0);
 
     // setWindowFlags hides the window, so we need to show it again
     show();

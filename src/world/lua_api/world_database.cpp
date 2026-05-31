@@ -80,7 +80,8 @@ int L_DatabaseOpen(lua_State* L)
     // Open the database
     int rc = sqlite3_open_v2(filename, &pDatabase->db, flags, nullptr);
 
-    if (rc == SQLITE_OK) {
+    // Original (methods_database.cpp:98) checks both rc AND db pointer
+    if (rc == SQLITE_OK && pDatabase->db != nullptr) {
         // Success - add to map
         pDoc->m_DatabaseMap[qName] = std::move(pDatabase);
     }
@@ -127,10 +128,12 @@ int L_DatabaseClose(lua_State* L)
     // Finalize any outstanding statement
     if (it->second->pStmt) {
         sqlite3_finalize(it->second->pStmt);
+        it->second->pStmt = nullptr; // prevent double-finalize in destructor
     }
 
     // Close the database
     int rc = sqlite3_close(it->second->db);
+    it->second->db = nullptr; // prevent double-close in destructor
 
     // Remove from map (this deletes the LuaDatabase via unique_ptr)
     pDoc->m_DatabaseMap.erase(it);
@@ -626,13 +629,54 @@ int L_DatabaseError(lua_State* L)
     QString qName = luaCheckQString(L, 1);
 
     auto it = pDoc->m_DatabaseMap.find(qName);
-    if (it == pDoc->m_DatabaseMap.end() || it->second->db == nullptr) {
-        lua_pushstring(L, "");
+    if (it == pDoc->m_DatabaseMap.end()) {
+        // Original returns translated string for "database id not found"
+        lua_pushstring(L, "database id not found");
+        return 1;
+    }
+    if (it->second->db == nullptr) {
+        lua_pushstring(L, "database not open");
         return 1;
     }
 
-    const char* errMsg = sqlite3_errmsg(it->second->db);
-    lua_pushstring(L, errMsg ? errMsg : "");
+    // Original (methods_database.cpp:248-289) uses sqlite3_errcode and a switch
+    // to provide human-readable messages for SQLITE_ROW, SQLITE_DONE, and
+    // DATABASE_ERROR_* codes before falling back to sqlite3_errmsg.
+    int errCode = sqlite3_errcode(it->second->db);
+    switch (errCode) {
+        case SQLITE_ROW:
+            lua_pushstring(L, "row ready");
+            break;
+        case SQLITE_DONE:
+            lua_pushstring(L, "finished");
+            break;
+        case to_underlying(DatabaseError::IdNotFound):
+            lua_pushstring(L, "database id not found");
+            break;
+        case to_underlying(DatabaseError::NotOpen):
+            lua_pushstring(L, "database not open");
+            break;
+        case to_underlying(DatabaseError::HavePreparedStatement):
+            lua_pushstring(L, "already have prepared statement");
+            break;
+        case to_underlying(DatabaseError::NoPreparedStatement):
+            lua_pushstring(L, "do not have prepared statement");
+            break;
+        case to_underlying(DatabaseError::NoValidRow):
+            lua_pushstring(L, "do not have a valid row");
+            break;
+        case to_underlying(DatabaseError::DatabaseAlreadyExists):
+            lua_pushstring(L, "database already exists under a different disk name");
+            break;
+        case to_underlying(DatabaseError::ColumnOutOfRange):
+            lua_pushstring(L, "column count out of valid range");
+            break;
+        default: {
+            const char* errMsg = sqlite3_errmsg(it->second->db);
+            lua_pushstring(L, errMsg ? errMsg : "");
+            break;
+        }
+    }
     return 1;
 }
 
@@ -721,7 +765,8 @@ static void pushDatabaseColumnValue(lua_State* L, sqlite3_stmt* pStmt, int colum
     int type = sqlite3_column_type(pStmt, column);
     switch (type) {
         case SQLITE_INTEGER:
-            lua_pushnumber(L, static_cast<lua_Number>(sqlite3_column_int64(pStmt, column)));
+            // Original (methods_database.cpp:392) uses sqlite3_column_int (32-bit)
+            lua_pushnumber(L, sqlite3_column_int(pStmt, column));
             break;
         case SQLITE_FLOAT:
             lua_pushnumber(L, sqlite3_column_double(pStmt, column));
@@ -736,10 +781,11 @@ static void pushDatabaseColumnValue(lua_State* L, sqlite3_stmt* pStmt, int colum
             break;
         }
         case SQLITE_BLOB: {
-            const void* blob = sqlite3_column_blob(pStmt, column);
-            int bytes = sqlite3_column_bytes(pStmt, column);
-            if (blob && bytes > 0) {
-                lua_pushlstring(L, static_cast<const char*>(blob), bytes);
+            // Original (methods_database.cpp:374-383) uses sqlite3_column_text for both
+            // TEXT and BLOB, returning a text representation rather than raw bytes
+            const unsigned char* blobText = sqlite3_column_text(pStmt, column);
+            if (blobText) {
+                lua_pushstring(L, reinterpret_cast<const char*>(blobText));
             } else {
                 lua_pushnil(L);
             }
@@ -810,14 +856,14 @@ int L_DatabaseColumnNames(lua_State* L)
     WorldDocument* pDoc = doc(L);
     QString qName = luaCheckQString(L, 1);
 
-    lua_newtable(L);
-
     auto it = pDoc->m_DatabaseMap.find(qName);
     if (it == pDoc->m_DatabaseMap.end() || it->second->db == nullptr ||
         it->second->pStmt == nullptr) {
-        return 1; // Return empty table
+        lua_pushnil(L);
+        return 1;
     }
 
+    lua_newtable(L);
     for (int i = 0; i < it->second->iColumns; i++) {
         const char* colName = sqlite3_column_name(it->second->pStmt, i);
         lua_pushstring(L, colName ? colName : "");
@@ -850,14 +896,14 @@ int L_DatabaseColumnValues(lua_State* L)
     WorldDocument* pDoc = doc(L);
     QString qName = luaCheckQString(L, 1);
 
-    lua_newtable(L);
-
     auto it = pDoc->m_DatabaseMap.find(qName);
     if (it == pDoc->m_DatabaseMap.end() || it->second->db == nullptr ||
         it->second->pStmt == nullptr || !it->second->bValidRow) {
-        return 1; // Return empty table
+        lua_pushnil(L);
+        return 1;
     }
 
+    lua_newtable(L);
     for (int i = 0; i < it->second->iColumns; i++) {
         pushDatabaseColumnValue(L, it->second->pStmt, i);
         lua_rawseti(L, -2, i + 1);
@@ -905,7 +951,10 @@ int L_DatabaseGetField(lua_State* L)
         return 1;
     }
 
-    // Prepare the statement
+    // Prepare the statement — mirrors DatabasePrepare: reset row state first
+    it->second->bValidRow = false;
+    it->second->iColumns = 0;
+
     sqlite3_stmt* pStmt = nullptr;
     const char* pzTail;
     int rc = sqlite3_prepare_v2(it->second->db, sql, -1, &pStmt, &pzTail);
@@ -918,8 +967,12 @@ int L_DatabaseGetField(lua_State* L)
         return 1;
     }
 
-    // Step to get first row
+    // Record column count now that statement is prepared (mirrors DatabasePrepare)
+    it->second->iColumns = sqlite3_column_count(pStmt);
+
+    // Step to get first row — mirrors DatabaseStep: update bValidRow
     rc = sqlite3_step(pStmt);
+    it->second->bValidRow = (rc == SQLITE_ROW);
 
     if (rc == SQLITE_ROW && sqlite3_column_count(pStmt) > 0) {
         pushDatabaseColumnValue(L, pStmt, 0);
@@ -927,8 +980,10 @@ int L_DatabaseGetField(lua_State* L)
         lua_pushnil(L);
     }
 
-    // Clean up
+    // Finalize — mirrors DatabaseFinalize: clear row state
     sqlite3_finalize(pStmt);
+    it->second->bValidRow = false;
+    it->second->iColumns = 0;
 
     return 1;
 }
@@ -1043,8 +1098,13 @@ int L_DatabaseList(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
 
-    lua_newtable(L);
+    // Original returns nil (VT_EMPTY via SAFEARRAY) when no databases are open
+    if (pDoc->m_DatabaseMap.empty()) {
+        lua_pushnil(L);
+        return 1;
+    }
 
+    lua_newtable(L);
     int index = 1;
     for (const auto& pair : pDoc->m_DatabaseMap) {
         luaPushQString(L, pair.first);

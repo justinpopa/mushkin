@@ -193,7 +193,7 @@ class AcceleratorManager : public QObject {
      * @param action The action/script to execute
      * @param sendTo Where to send
      */
-    void acceleratorTriggered(const QString& action, int sendTo);
+    void acceleratorTriggered(const QString& action, int sendTo, const QString& pluginId);
 
   private slots:
     void onShortcutActivated();

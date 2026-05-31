@@ -19,7 +19,7 @@
  *
  * @return (number) Error code:
  *   - eOK (0): Success
- *   - eLogFileNotOpen (30020): Failed to open file
+ *   - eLogFileNotOpen (30014): Failed to open file
  *
  * @example
  * -- Start logging to a new file
@@ -45,7 +45,9 @@ int L_OpenLog(lua_State* L)
         append = lua_toboolean(L, 2);
     }
 
-    qint32 result = pDoc->OpenLog(filename, append);
+    // Original: Lua OpenLog does NOT write preamble or trigger retrospective logging.
+    // Those are only done from the interactive (menu) and auto-connect paths.
+    qint32 result = pDoc->OpenLog(filename, append, false);
 
     lua_pushnumber(L, result);
     return 1;
@@ -75,15 +77,15 @@ int L_CloseLog(lua_State* L)
 /**
  * world.WriteLog(message)
  *
- * Writes a custom message to the currently open log file. The message is
- * written exactly as provided, without any automatic newlines or formatting.
- * Include "\n" in your message if you want a line break.
+ * Writes a custom message to the currently open log file. A newline is
+ * appended automatically if the message does not already end with one
+ * (matching original MUSHclient behavior).
  *
  * @param message (string) Text to write to the log file
  *
  * @return (number) Error code:
  *   - eOK (0): Success
- *   - eLogFileNotOpen (30020): No log file is open
+ *   - eLogFileNotOpen (30014): No log file is open
  *
  * @example
  * WriteLog("=== Combat Started ===\n")
@@ -107,7 +109,7 @@ int L_WriteLog(lua_State* L)
  *
  * @return (number) Error code:
  *   - eOK (0): Success
- *   - eLogFileNotOpen (30020): No log file is open
+ *   - eLogFileNotOpen (30014): No log file is open
  *
  * @example
  * -- Ensure critical event is saved

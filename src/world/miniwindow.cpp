@@ -1,8 +1,10 @@
 #include "miniwindow.h"
 #include "../utils/font_utils.h"
 #include "../world/world_document.h"
+#include "blend_modes.h"
 #include "color_utils.h"
 #include <QColor>
+#include <QDateTime>
 #include <QDebug>
 #include <QFontMetrics>
 #include <QImage>
@@ -11,21 +13,35 @@
 #include <QRandomGenerator>
 #include <QTransform>
 
-// Error codes (from lua_methods.cpp / lua_common.h)
-enum {
-    eOK = 0,
-    eNoNameSpecified = 30003,
-    eCouldNotOpenFile = 30013,
-    eLogFileBadWrite = 30016,
-    eUnknownOption = 30025,
-    eBadParameter = 30046,
-    eUnableToLoadImage = 30067,
-    eImageNotInstalled = 30068,
-    eInvalidNumberOfPoints = 30069,
-    eInvalidPoint = 30070,
-    eHotspotNotInstalled = 30072,
-    eNoSuchWindow = 30073,
-};
+#include "../utils/error_codes.h"
+
+// Validate pen style flags (original: miniwindow.cpp:353-398)
+static bool validatePenStyle(qint32 penStyle, qint32 penWidth)
+{
+    int linePat = penStyle & 0x0F; // PS_STYLE_MASK
+    switch (linePat) {
+        case 0: // PS_SOLID
+        case 5: // PS_NULL
+        case 6: // PS_INSIDEFRAME
+            break;
+        case 1: // PS_DASH
+        case 2: // PS_DOT
+        case 3: // PS_DASHDOT
+        case 4: // PS_DASHDOTDOT
+            if (penWidth > 1)
+                return false;
+            break;
+        default:
+            return false;
+    }
+    int endCap = (penStyle >> 8) & 0x0F; // PS_ENDCAP_MASK
+    if (endCap > 2) // PS_ENDCAP_ROUND(0), PS_ENDCAP_SQUARE(1), PS_ENDCAP_FLAT(2)
+        return false;
+    int join = (penStyle >> 12) & 0x0F; // PS_JOIN_MASK
+    if (join > 2)                       // PS_JOIN_ROUND(0), PS_JOIN_BEVEL(1), PS_JOIN_MITER(2)
+        return false;
+    return true;
+}
 
 // Helper to create a pen with Windows GDI-compatible dash patterns
 // Windows GDI cosmetic pens (width 0 or 1) render dash patterns as nearly solid
@@ -141,7 +157,8 @@ MiniWindow::MiniWindow(WorldDocument* doc, QObject* parent)
       ,
       show(false) // Hidden by default (must call WindowShow)
       ,
-      temporarilyHide(false), dirty(true), zOrder(0), executingScript(false)
+      temporarilyHide(false), dirty(true), zOrder(0),
+      dateInstalled(QDateTime::currentSecsSinceEpoch()), executingScript(false)
 {
     // Collections are empty by default (unique_ptr members automatically initialize to nullptr)
 }
@@ -184,18 +201,31 @@ qint32 MiniWindow::Resize(qint32 newWidth, qint32 newHeight, QRgb bgColor)
     if (newWidth <= 0 || newHeight <= 0)
         return eBadParameter;
 
+    // No change? Early return (original: miniwindow.cpp:4125-4126)
+    if (newWidth == width && newHeight == height)
+        return eOK;
+
+    // Save old image for content preservation (original: miniwindow.cpp:4140-4157)
+    auto oldImage = std::move(image);
+    qint32 oldWidth = width;
+    qint32 oldHeight = height;
+
     // Update dimensions
     width = newWidth;
     height = newHeight;
     backgroundColor = bgColor;
 
-    // Create new image with ARGB32 format (platform-independent, supports alpha)
-    // Old image is automatically deleted when unique_ptr is reassigned
+    // Create new image
     image = std::make_unique<QImage>(width, height, QImage::Format_ARGB32);
 
-    // Fill with background color - start fresh (no content preservation)
-    // This matches original MUSHclient behavior where WindowCreate/Resize clears the window
+    // Fill with background color
     image->fill(bgrToColor(bgColor));
+
+    // Copy old content back (original: miniwindow.cpp:4157 BitBlt)
+    if (oldImage) {
+        QPainter painter(image.get());
+        painter.drawImage(0, 0, *oldImage, 0, 0, oldWidth, oldHeight);
+    }
 
     // Mark for redraw
     dirty = true;
@@ -299,85 +329,162 @@ qint32 MiniWindow::RectOp(qint16 action, qint32 left, qint32 top, qint32 right, 
             break;
         }
 
-        case 2: { // Fill (solid)
-            // Uses brushColor for fill, but if brushColor is 0 (default), use penColor
-            // This matches MUSHclient behavior where scripts often pass only one color
-            QRgb fillColor = (brushColor != 0) ? brushColor : penColor;
-            painter.setPen(Qt::NoPen);
-            painter.setBrush(bgrToColor(fillColor));
-            painter.fillRect(rect, QBrush(bgrToColor(fillColor)));
+        case 2: { // Fill (solid) — always uses Colour1 (penColor)
+            // (original: miniwindow.cpp:283-286 creates brush from Colour1)
+            painter.fillRect(rect, bgrToColor(penColor));
             break;
         }
 
-        case 3: // Invert (XOR)
+        case 3: { // InvertRect — inverts all pixels (original: miniwindow.cpp:289-293)
+            // Win32 InvertRect does a bitwise NOT, equivalent to XOR with white
             painter.setCompositionMode(QPainter::RasterOp_SourceXorDestination);
-            painter.fillRect(rect, bgrToColor(penColor));
+            painter.fillRect(rect, Qt::white);
             break;
+        }
 
-        case 5: { // 3D rectangle (DrawEdge style)
-            // penColor is actually the edge type flags, not a color
-            // Lower byte = inner edge: 0=none, 1=raised, 2=sunken
-            // Upper byte = outer edge: 0=none, 1=raised, 2=sunken
-            int innerEdge = penColor & 0xFF;
-            int outerEdge = (penColor >> 8) & 0xFF;
+        case 5: { // DrawEdge (original: miniwindow.cpp:301-321)
+            // penColor = nEdge (Win32 EDGE_* constant): must be 5, 6, 9, or 10
+            // brushColor = ugrfFlags (Win32 BF_* flags): lower byte <= 0x1F
+            constexpr int EDGE_RAISED = 5;  // BDR_RAISEDOUTER(1) | BDR_RAISEDINNER(4)
+            constexpr int EDGE_ETCHED = 6;  // BDR_SUNKENOUTER(2) | BDR_RAISEDINNER(4)
+            constexpr int EDGE_BUMP = 9;    // BDR_RAISEDOUTER(1) | BDR_SUNKENINNER(8)
+            constexpr int EDGE_SUNKEN = 10; // BDR_SUNKENOUTER(2) | BDR_SUNKENINNER(8)
 
-            // Fill the rectangle first with brushColor
-            painter.setPen(Qt::NoPen);
-            painter.fillRect(rect, bgrToColor(brushColor));
-
-            // Define colors for 3D effect (Windows standard 3D colors)
-            QColor highlight(255, 255, 255);   // White - top/left outer highlight
-            QColor lightShadow(192, 192, 192); // Light gray - top/left inner
-            QColor darkShadow(64, 64, 64);     // Dark gray - bottom/right outer shadow
-            QColor shadow(128, 128, 128);      // Medium gray - bottom/right inner
-
-            // Draw outer edge
-            if (outerEdge == 1) { // Raised outer
-                // Top and left = highlight
-                painter.setPen(highlight);
-                painter.drawLine(rect.left(), rect.top(), rect.right(), rect.top());
-                painter.drawLine(rect.left(), rect.top(), rect.left(), rect.bottom());
-                // Bottom and right = dark shadow
-                painter.setPen(darkShadow);
-                painter.drawLine(rect.left(), rect.bottom(), rect.right(), rect.bottom());
-                painter.drawLine(rect.right(), rect.top(), rect.right(), rect.bottom());
-            } else if (outerEdge == 2) { // Sunken outer
-                // Top and left = dark shadow
-                painter.setPen(darkShadow);
-                painter.drawLine(rect.left(), rect.top(), rect.right(), rect.top());
-                painter.drawLine(rect.left(), rect.top(), rect.left(), rect.bottom());
-                // Bottom and right = highlight
-                painter.setPen(highlight);
-                painter.drawLine(rect.left(), rect.bottom(), rect.right(), rect.bottom());
-                painter.drawLine(rect.right(), rect.top(), rect.right(), rect.bottom());
+            if (penColor != EDGE_RAISED && penColor != EDGE_ETCHED && penColor != EDGE_BUMP &&
+                penColor != EDGE_SUNKEN) {
+                return eBadParameter;
             }
+            if ((brushColor & 0xFF) > 0x1F) {
+                return eBadParameter;
+            }
+
+            // BF_* border flags
+            constexpr int BF_LEFT = 0x0001;
+            constexpr int BF_TOP = 0x0002;
+            constexpr int BF_RIGHT = 0x0004;
+            constexpr int BF_BOTTOM = 0x0008;
+            constexpr int BF_MIDDLE = 0x0800;
+            int flags = static_cast<int>(brushColor);
+
+            // Decompose nEdge into outer/inner edge type
+            // BDR_RAISEDOUTER=1, BDR_SUNKENOUTER=2, BDR_RAISEDINNER=4, BDR_SUNKENINNER=8
+            bool outerRaised = (penColor & 0x01) != 0;
+            bool innerRaised = (penColor & 0x04) != 0;
+
+            // Windows 3D colors
+            QColor highlight(255, 255, 255);
+            QColor lightShadow(192, 192, 192);
+            QColor darkShadow(64, 64, 64);
+            QColor shadow(128, 128, 128);
+
+            // Determine outer edge colors (top-left / bottom-right)
+            QColor outerTL = outerRaised ? highlight : darkShadow;
+            QColor outerBR = outerRaised ? darkShadow : highlight;
+            // Determine inner edge colors
+            QColor innerTL = innerRaised ? lightShadow : shadow;
+            QColor innerBR = innerRaised ? shadow : lightShadow;
+
+            // Fill middle if BF_MIDDLE set
+            if (flags & BF_MIDDLE) {
+                painter.setPen(Qt::NoPen);
+                painter.fillRect(rect, lightShadow);
+            }
+
+            // Draw outer edge (respecting BF_* side flags)
+            painter.setPen(outerTL);
+            if (flags & BF_TOP)
+                painter.drawLine(rect.left(), rect.top(), rect.right(), rect.top());
+            if (flags & BF_LEFT)
+                painter.drawLine(rect.left(), rect.top(), rect.left(), rect.bottom());
+            painter.setPen(outerBR);
+            if (flags & BF_BOTTOM)
+                painter.drawLine(rect.left(), rect.bottom(), rect.right(), rect.bottom());
+            if (flags & BF_RIGHT)
+                painter.drawLine(rect.right(), rect.top(), rect.right(), rect.bottom());
 
             // Draw inner edge (1 pixel inset)
-            QRect innerRect = rect.adjusted(1, 1, -1, -1);
-            if (innerEdge == 1) { // Raised inner
-                painter.setPen(lightShadow);
-                painter.drawLine(innerRect.left(), innerRect.top(), innerRect.right(),
-                                 innerRect.top());
-                painter.drawLine(innerRect.left(), innerRect.top(), innerRect.left(),
-                                 innerRect.bottom());
-                painter.setPen(shadow);
-                painter.drawLine(innerRect.left(), innerRect.bottom(), innerRect.right(),
-                                 innerRect.bottom());
-                painter.drawLine(innerRect.right(), innerRect.top(), innerRect.right(),
-                                 innerRect.bottom());
-            } else if (innerEdge == 2) { // Sunken inner
-                painter.setPen(shadow);
-                painter.drawLine(innerRect.left(), innerRect.top(), innerRect.right(),
-                                 innerRect.top());
-                painter.drawLine(innerRect.left(), innerRect.top(), innerRect.left(),
-                                 innerRect.bottom());
-                painter.setPen(lightShadow);
-                painter.drawLine(innerRect.left(), innerRect.bottom(), innerRect.right(),
-                                 innerRect.bottom());
-                painter.drawLine(innerRect.right(), innerRect.top(), innerRect.right(),
-                                 innerRect.bottom());
-            }
+            QRect inner = rect.adjusted(1, 1, -1, -1);
+            painter.setPen(innerTL);
+            if (flags & BF_TOP)
+                painter.drawLine(inner.left(), inner.top(), inner.right(), inner.top());
+            if (flags & BF_LEFT)
+                painter.drawLine(inner.left(), inner.top(), inner.left(), inner.bottom());
+            painter.setPen(innerBR);
+            if (flags & BF_BOTTOM)
+                painter.drawLine(inner.left(), inner.bottom(), inner.right(), inner.bottom());
+            if (flags & BF_RIGHT)
+                painter.drawLine(inner.right(), inner.top(), inner.right(), inner.bottom());
             break;
+        }
+
+        case 4: { // Draw3dRect (original: miniwindow.cpp:295-299)
+            // penColor = highlight (top/left), brushColor = shadow (bottom/right)
+            QColor hilite = bgrToColor(penColor);
+            QColor shad = bgrToColor(brushColor);
+            painter.setPen(hilite);
+            painter.drawLine(left, top, fixedRight - 1, top);
+            painter.drawLine(left, top, left, fixedBottom - 1);
+            painter.setPen(shad);
+            painter.drawLine(left, fixedBottom - 1, fixedRight - 1, fixedBottom - 1);
+            painter.drawLine(fixedRight - 1, top, fixedRight - 1, fixedBottom - 1);
+            break;
+        }
+
+        case 6:   // Flood fill border (original: miniwindow.cpp:323-331)
+        case 7: { // Flood fill surface (original: miniwindow.cpp:334-342)
+            // penColor = border/surface color, brushColor = fill color
+            painter.end(); // Release painter to access pixels directly
+
+            QRgb fillRgb = bgrToQRgb(brushColor);
+
+            if (left < 0 || left >= image->width() || top < 0 || top >= image->height()) {
+                dirty = true;
+                emit needsRedraw();
+                return eOK;
+            }
+
+            QRgb seedRgb = image->pixel(left, top);
+
+            // Don't fill if seed is already fill color, or seed is border (action 6)
+            if (seedRgb == fillRgb)
+                break;
+            if (action == 6) {
+                QRgb borderRgb = bgrToQRgb(penColor);
+                if (seedRgb == borderRgb)
+                    break;
+            }
+
+            // Determine target: action 7 fills matching seedRgb, action 6 fills until border
+            QRgb borderRgb = bgrToQRgb(penColor);
+            QRgb targetRgb = (action == 7) ? seedRgb : 0; // action 6 doesn't use target
+
+            // Scanline flood fill
+            std::vector<QPoint> stk;
+            stk.push_back(QPoint(left, top));
+
+            while (!stk.empty()) {
+                QPoint pt = stk.back();
+                stk.pop_back();
+                int px = pt.x(), py = pt.y();
+                if (px < 0 || px >= image->width() || py < 0 || py >= image->height())
+                    continue;
+                QRgb cur = image->pixel(px, py);
+                if (cur == fillRgb)
+                    continue;
+                if (action == 7 && cur != targetRgb)
+                    continue;
+                if (action == 6 && cur == borderRgb)
+                    continue;
+                image->setPixel(px, py, fillRgb);
+                stk.push_back(QPoint(px + 1, py));
+                stk.push_back(QPoint(px - 1, py));
+                stk.push_back(QPoint(px, py + 1));
+                stk.push_back(QPoint(px, py - 1));
+            }
+
+            dirty = true;
+            emit needsRedraw();
+            return eOK;
         }
 
         default:
@@ -407,6 +514,9 @@ qint32 MiniWindow::CircleOp(qint16 action, qint32 left, qint32 top, qint32 right
 
     if (!image)
         return eBadParameter;
+
+    if (!validatePenStyle(penStyle, penWidth))
+        return ePenStyleNotValid;
 
     // Handle special meaning for right/bottom (from miniwindow.cpp)
     // - right <= 0 means offset from right edge (0 = right edge, -1 = 1px from right)
@@ -448,15 +558,23 @@ qint32 MiniWindow::CircleOp(qint16 action, qint32 left, qint32 top, qint32 right
             case 3: // Rounded rectangle
                 painter.drawRoundedRect(rect, extra1, extra2);
                 break;
-            case 4: // Chord
-                painter.drawChord(rect, extra1 * 16, extra2 * 16);
-                break;
+            case 4: // Chord (point-based: extra1,2=start; extra3,4=end)
             case 5: // Pie
-                painter.drawPie(rect, extra1 * 16, extra2 * 16);
+            {
+                qreal pcx = rect.center().x();
+                qreal pcy = rect.center().y();
+                qreal psa = qAtan2(-(extra2 - pcy), extra1 - pcx) * 180.0 / M_PI;
+                qreal pea = qAtan2(-(extra4 - pcy), extra3 - pcx) * 180.0 / M_PI;
+                qreal pspan = pea - psa;
+                if (pspan <= 0)
+                    pspan += 360.0;
+                if (action == 4)
+                    painter.drawChord(rect, qRound(psa * 16), qRound(pspan * 16));
+                else
+                    painter.drawPie(rect, qRound(psa * 16), qRound(pspan * 16));
                 break;
-            case 6: // Arc
-                painter.drawArc(rect, extra1 * 16, extra2 * 16);
-                break;
+            }
+                // Note: action 6 (arc) is NOT valid for CircleOp in original — only 1-5
         }
 
         // Now set up pattern brush with penColor for the pattern lines
@@ -528,22 +646,29 @@ qint32 MiniWindow::CircleOp(qint16 action, qint32 left, qint32 top, qint32 right
             painter.drawRoundedRect(rect, extra1, extra2);
             break;
 
-        case 4: // Chord
-            // extra1=start angle (degrees), extra2=span angle (degrees)
-            // Qt uses 1/16 degree units
-            painter.drawChord(rect, extra1 * 16, extra2 * 16);
+        case 4: // Chord — extra1,extra2=start point; extra3,extra4=end point (GDI convention)
+        case 5: // Pie   — same point-based parameters
+        {
+            // Convert GDI point-based coords to Qt angle-based.
+            // GDI Chord/Pie draw counter-clockwise from startPoint to endPoint.
+            // (original: miniwindow.cpp:592-608)
+            qreal cx = rect.center().x();
+            qreal cy = rect.center().y();
+            qreal startAngle = qAtan2(-(extra2 - cy), extra1 - cx) * 180.0 / M_PI;
+            qreal endAngle = qAtan2(-(extra4 - cy), extra3 - cx) * 180.0 / M_PI;
+            qreal spanAngle = endAngle - startAngle;
+            if (spanAngle <= 0)
+                spanAngle += 360.0;
+            int qtStart = qRound(startAngle * 16);
+            int qtSpan = qRound(spanAngle * 16);
+            if (action == 4)
+                painter.drawChord(rect, qtStart, qtSpan);
+            else
+                painter.drawPie(rect, qtStart, qtSpan);
             break;
+        }
 
-        case 5: // Pie
-            // extra1=start angle (degrees), extra2=span angle (degrees)
-            painter.drawPie(rect, extra1 * 16, extra2 * 16);
-            break;
-
-        case 6: // Arc
-            // extra1=start angle (degrees), extra2=span angle (degrees)
-            painter.drawArc(rect, extra1 * 16, extra2 * 16);
-            break;
-
+        // Note: action 6 (arc) is NOT valid for CircleOp — use WindowArc instead
         default:
             return eUnknownOption;
     }
@@ -565,6 +690,9 @@ qint32 MiniWindow::Line(qint32 x1, qint32 y1, qint32 x2, qint32 y2, QRgb penColo
 {
     if (!image)
         return eBadParameter;
+
+    if (!validatePenStyle(penStyle, penWidth))
+        return ePenStyleNotValid;
 
     QPainter painter(image.get());
     // Don't use antialiasing - can cause pixels to extend beyond bounds
@@ -599,6 +727,9 @@ qint32 MiniWindow::Arc(qint32 left, qint32 top, qint32 right, qint32 bottom, qin
     if (!image)
         return eBadParameter;
 
+    if (!validatePenStyle(penStyle, penWidth))
+        return ePenStyleNotValid;
+
     QPainter painter(image.get());
 
     // Create pen with Windows GDI-compatible dash patterns
@@ -618,17 +749,20 @@ qint32 MiniWindow::Arc(qint32 left, qint32 top, qint32 right, qint32 bottom, qin
     qreal cx = (left + right) / 2.0;
     qreal cy = (top + bottom) / 2.0;
 
-    // Calculate angles from center to start/end points (in degrees)
-    qreal angle1 = qAtan2(y1 - cy, x1 - cx) * 180.0 / M_PI;
-    qreal angle2 = qAtan2(y2 - cy, x2 - cx) * 180.0 / M_PI;
+    // Convert GDI point-based arc to Qt angle-based arc.
+    // GDI Arc draws counterclockwise (mathematically) from start to end point.
+    // Qt drawArc uses angles in 1/16 degree, counterclockwise from 3 o'clock.
+    // In screen coords (Y-down), atan2 gives clockwise angles from east,
+    // so negate Y to convert to Qt's counterclockwise convention.
+    qreal startAngle = qAtan2(-(y1 - cy), x1 - cx) * 180.0 / M_PI;
+    qreal endAngle = qAtan2(-(y2 - cy), x2 - cx) * 180.0 / M_PI;
 
-    // Calculate span angle (going counter-clockwise from angle1 to angle2)
-    qreal spanAngle = angle2 - angle1;
-    if (spanAngle < 0)
-        spanAngle += 360;
+    // GDI draws counterclockwise from start to end (positive direction in Qt)
+    qreal spanAngle = endAngle - startAngle;
+    if (spanAngle <= 0)
+        spanAngle += 360.0;
 
-    // Qt uses 1/16 degree units and measures angles counter-clockwise from 3 o'clock
-    int startAngle16 = qRound(angle1 * 16);
+    int startAngle16 = qRound(startAngle * 16);
     int spanAngle16 = qRound(spanAngle * 16);
 
     painter.drawArc(rect, startAngle16, spanAngle16);
@@ -654,6 +788,9 @@ qint32 MiniWindow::Bezier(const QString& pointsStr, QRgb penColor, qint32 penSty
 {
     if (!image)
         return eBadParameter;
+
+    if (!validatePenStyle(penStyle, penWidth))
+        return ePenStyleNotValid;
 
     // Parse comma-separated points
     QStringList parts = pointsStr.split(',');
@@ -721,14 +858,13 @@ qint32 MiniWindow::SetPixel(qint32 x, qint32 y, QRgb color)
     if (!image)
         return eBadParameter;
 
-    if (x < 0 || x >= image->width() || y < 0 || y >= image->height())
-        return eBadParameter;
-
-    // Convert BGR (from Lua) to ARGB (for QImage)
-    image->setPixel(x, y, bgrToQRgb(color));
-
-    dirty = true;
-    emit needsRedraw();
+    // Original (miniwindow.cpp:3293-3297) calls SetPixelV with no bounds check.
+    // GDI silently ignores out-of-bounds coordinates. Match that behavior.
+    if (x >= 0 && x < image->width() && y >= 0 && y < image->height()) {
+        image->setPixel(x, y, bgrToQRgb(color));
+        dirty = true;
+        emit needsRedraw();
+    }
     return eOK;
 }
 
@@ -741,11 +877,15 @@ qint32 MiniWindow::SetPixel(qint32 x, qint32 y, QRgb color)
  */
 QRgb MiniWindow::GetPixel(qint32 x, qint32 y)
 {
+    // Original (miniwindow.cpp:3306-3309) returns GDI GetPixel which
+    // returns CLR_INVALID (0xFFFFFFFF = -1) for out-of-bounds
+    constexpr QRgb CLR_INVALID = 0xFFFFFFFF;
+
     if (!image)
-        return 0;
+        return CLR_INVALID;
 
     if (x < 0 || x >= image->width() || y < 0 || y >= image->height())
-        return 0;
+        return CLR_INVALID;
 
     // Convert ARGB (from QImage) to BGR (for Lua)
     return qRgbToBgr(image->pixel(x, y));
@@ -763,6 +903,9 @@ qint32 MiniWindow::Polygon(const QString& points, QRgb penColor, qint32 penStyle
 {
     if (!image)
         return eBadParameter;
+
+    if (!validatePenStyle(penStyle, penWidth))
+        return ePenStyleNotValid;
 
     // Parse comma-separated coordinate pairs (x1,y1,x2,y2,...)
     QStringList coords = points.split(',', Qt::SkipEmptyParts);
@@ -903,9 +1046,9 @@ qint32 MiniWindow::Gradient(qint32 left, qint32 top, qint32 right, qint32 bottom
     qint32 fixedRight = (right <= 0) ? width + right : right;
     qint32 fixedBottom = (bottom <= 0) ? height + bottom : bottom;
 
-    // Bounds check
-    if (left < 0 || top < 0 || fixedRight > width || fixedBottom > height)
-        return eBadParameter;
+    // Original (miniwindow.cpp:2596-2597): zero/negative size → return eOK (no error)
+    if (fixedRight - left <= 0 || fixedBottom - top <= 0)
+        return eOK;
 
     // Convert to QRect
     QRect rect(left, top, fixedRight - left, fixedBottom - top);
@@ -914,6 +1057,30 @@ qint32 MiniWindow::Gradient(qint32 left, qint32 top, qint32 right, qint32 bottom
     painter.setRenderHint(QPainter::Antialiasing);
 
     // Create gradient based on mode
+    if (mode == 3) {
+        // Texture fill (original: MakeTexture in miniwindow.cpp:2555-2585)
+        // Generates XOR pattern: pixel = (col ^ row) * color_component
+        painter.end(); // Access image pixels directly
+
+        int r = (color1 >> 0) & 0xFF; // BGR format: blue in low byte
+        int g = (color1 >> 8) & 0xFF;
+        int b = (color1 >> 16) & 0xFF;
+
+        for (int col = left; col < fixedRight; col++) {
+            for (int row = top; row < fixedBottom; row++) {
+                int c = (col - left) ^ (row - top);
+                int pr = (c * b) & 0xFF; // BGR→RGB: original's rval is from GetRValue
+                int pg = (c * g) & 0xFF;
+                int pb = (c * r) & 0xFF;
+                image->setPixel(col, row, qRgb(pr, pg, pb));
+            }
+        }
+
+        dirty = true;
+        emit needsRedraw();
+        return eOK;
+    }
+
     QLinearGradient gradient;
 
     switch (mode) {
@@ -953,8 +1120,17 @@ qint32 MiniWindow::Gradient(qint32 left, qint32 top, qint32 right, qint32 bottom
 qint32 MiniWindow::Font(const QString& fontId, const QString& fontName, double size, bool bold,
                         bool italic, bool underline, bool strikeout)
 {
+    // Delete font if name is empty and size is 0 (original: miniwindow.cpp:637-639)
+    if (fontName.isEmpty() && size == 0.0) {
+        fonts.remove(fontId);
+        return eOK;
+    }
+
+    // Default to 10pt if size is 0 (original: miniwindow.cpp:643 — Size ? Size : 10.0)
+    double effectiveSize = (size != 0.0) ? size : 10.0;
+
     // Use createScaledFontF for cross-platform DPI-consistent sizing
-    QFont font = createScaledFontF(fontName, size);
+    QFont font = createScaledFontF(fontName, effectiveSize);
 
     font.setBold(bold);
     font.setItalic(italic);
@@ -1009,8 +1185,11 @@ qint32 MiniWindow::Text(const QString& fontId, const QString& text, qint32 left,
     dirty = true;
     emit needsRedraw();
 
-    // Return the width of the text drawn (MUSHclient API returns text length in pixels)
-    return fm.horizontalAdvance(displayText);
+    // Return the lesser of text width and clip rect width
+    // (original: miniwindow.cpp:882 — min(textsize.cx, FixRight(Right) - Left))
+    qint32 textWidth = fm.horizontalAdvance(displayText);
+    qint32 rectWidth = fixedRight - left;
+    return qMin(textWidth, rectWidth);
 }
 
 /**
@@ -1067,6 +1246,30 @@ QVariant MiniWindow::FontInfo(const QString& fontId, qint32 infoType)
             return font.weight(); // tmWeight (QFont::Weight enum, compatible with Windows values)
         case 9:
             return fm.leftBearing('x') + fm.rightBearing('x'); // tmOverhang approximation
+        case 10:
+            return 0; // tmDigitizedAspectX (not available in Qt)
+        case 11:
+            return 0; // tmDigitizedAspectY (not available in Qt)
+        case 12:
+            return 0; // tmFirstChar (not available in Qt)
+        case 13:
+            return 65535; // tmLastChar (Unicode range, approximate)
+        case 14:
+            return 0; // tmDefaultChar (not available in Qt)
+        case 15:
+            return 0; // tmBreakChar (not available in Qt)
+        case 16:
+            return font.italic() ? 1 : 0; // tmItalic
+        case 17:
+            return font.underline() ? 1 : 0; // tmUnderlined
+        case 18:
+            return font.strikeOut() ? 1 : 0; // tmStruckOut
+        case 19:
+            return 0; // tmPitchAndFamily (not available in Qt)
+        case 20:
+            return 0; // tmCharSet (not available in Qt, DEFAULT_CHARSET = 1)
+        case 21:
+            return font.family(); // Font face name (string)
         default:
             return QVariant();
     }
@@ -1109,10 +1312,18 @@ qint32 MiniWindow::LoadImage(const QString& imageId, const QString& filepath)
         return eOK;
     }
 
+    // Original (miniwindow.cpp:1067-1076) requires minimum 5 chars and .bmp/.png extension
+    if (filepath.trimmed().length() < 5)
+        return eBadParameter;
+
+    if (!filepath.endsWith(".bmp", Qt::CaseInsensitive) &&
+        !filepath.endsWith(".png", Qt::CaseInsensitive))
+        return eBadParameter;
+
     // Load image using Qt (QImage is platform-independent)
     auto img = std::make_unique<QImage>(filepath);
     if (img->isNull()) {
-        return 30051; // eFileNotFound / eCouldNotOpenFile
+        return eFileNotFound;
     }
 
     // Insert new image (replaces old one if it exists; old unique_ptr automatically deletes)
@@ -1149,7 +1360,7 @@ qint32 MiniWindow::DrawImage(const QString& imageId, qint32 left, qint32 top, qi
     // Get raw pointer from unique_ptr in map
     auto it = images.find(imageId);
     if (it == images.end() || !it->second)
-        return 30009; // eImageNotFound
+        return eImageNotInstalled;
     QImage* img = it->second.get();
 
     // Handle special meaning for right/bottom (from miniwindow.cpp)
@@ -1167,20 +1378,34 @@ qint32 MiniWindow::DrawImage(const QString& imageId, qint32 left, qint32 top, qi
         srcRect = QRect(0, 0, img->width(), img->height());
     }
 
-    // Set composition mode based on draw mode
+    // Draw modes (original miniwindow.cpp:1403-1448):
+    //   1 = BitBlt SRCCOPY (straight copy, no stretch — uses source dimensions)
+    //   2 = StretchBlt (stretch source to dest rect)
+    //   3 = Transparency (top-left pixel is color key)
     switch (mode) {
-        case 1: // image_copy (overwrite)
+        case 1: { // Straight copy — use source dimensions, not dest rect
             painter.setCompositionMode(QPainter::CompositionMode_Source);
+            QRect copyDest(left, top, srcRect.width(), srcRect.height());
+            painter.drawImage(copyDest, *img, srcRect);
             break;
-        case 2: // image_transparent_copy (respect alpha)
+        }
+        case 2: // Stretch — scale source to dest rect
+            painter.setCompositionMode(QPainter::CompositionMode_Source);
+            painter.drawImage(destRect, *img, srcRect);
+            break;
+        case 3: { // Transparency — top-left pixel (0,0) of source is the transparent color
+            QImage copy = img->copy(srcRect);
+            QRgb transparentColor = img->pixel(0, 0); // Always from full image (0,0)
+            QImage mask = copy.createMaskFromColor(transparentColor, Qt::MaskOutColor);
+            copy.setAlphaChannel(mask);
             painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
+            QRect copyDest(left, top, srcRect.width(), srcRect.height());
+            painter.drawImage(copyDest, copy);
             break;
+        }
         default:
-            painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
-            break;
+            return eBadParameter;
     }
-
-    painter.drawImage(destRect, *img, srcRect);
 
     dirty = true;
     emit needsRedraw();
@@ -1188,23 +1413,25 @@ qint32 MiniWindow::DrawImage(const QString& imageId, qint32 left, qint32 top, qi
 }
 
 /**
- * @brief BlendImage - Draw image with opacity and blend modes
+ * @brief BlendImage - Draw image with opacity and one of 65 blend modes
  *
  * Image Operations
- * Draws an image with alpha blending and various composition modes
- * for advanced visual effects.
+ * Ported from MUSHclient CMiniWindow::BlendImage.
+ * Modes 1-35:  per-channel mathematical blend functions (see blend_modes.h)
+ * Modes 36-59: channel-routing / channel-selection operations
+ * Modes 60-64: HSL (hue/saturation/luminance) component swaps
  *
- * @param imageId Image identifier
- * @param left Destination left coordinate
- * @param top Destination top coordinate
- * @param right Destination right coordinate
- * @param bottom Destination bottom coordinate
- * @param mode Blend mode (1=normal, 2=multiply, 3=screen, 4=overlay)
- * @param opacity Opacity (0.0 = transparent, 1.0 = opaque)
- * @param srcLeft Source left (0 = use full image)
- * @param srcTop Source top
- * @param srcRight Source right
- * @param srcBottom Source bottom
+ * @param imageId  Image identifier (blend/upper layer)
+ * @param left     Destination left
+ * @param top      Destination top
+ * @param right    Destination right  (<=0 → width+right)
+ * @param bottom   Destination bottom (<=0 → height+bottom)
+ * @param mode     Blend mode 1–64
+ * @param opacity  Opacity [0.0, 1.0]
+ * @param srcLeft  Source image left   (all zero → use full image)
+ * @param srcTop   Source image top
+ * @param srcRight Source image right  (<=0 → srcImg.width()+srcRight)
+ * @param srcBottom Source image bottom (<=0 → srcImg.height()+srcBottom)
  * @return eOK on success, error code on failure
  */
 qint32 MiniWindow::BlendImage(const QString& imageId, qint32 left, qint32 top, qint32 right,
@@ -1214,50 +1441,436 @@ qint32 MiniWindow::BlendImage(const QString& imageId, qint32 left, qint32 top, q
     if (!image)
         return eBadParameter;
 
-    // Get raw pointer from unique_ptr in map
+    if (mode < 1 || mode > 64)
+        return eUnknownOption;
+
     auto it = images.find(imageId);
     if (it == images.end() || !it->second)
-        return 30009; // eImageNotFound
-    QImage* img = it->second.get();
+        return eImageNotInstalled;
 
-    // Handle special meaning for right/bottom
-    qint32 fixedRight = (right <= 0) ? width + right : right;
-    qint32 fixedBottom = (bottom <= 0) ? height + bottom : bottom;
+    // Clamp opacity
+    if (opacity < 0.0)
+        opacity = 0.0;
+    if (opacity > 1.0)
+        opacity = 1.0;
 
-    QPainter painter(image.get());
-    painter.setRenderHint(QPainter::SmoothPixmapTransform);
-    painter.setOpacity(opacity);
+    // ── Resolve destination rect ──────────────────────────────────────────
+    qint32 destLeft = left;
+    qint32 destTop = top;
+    qint32 destRight = (right <= 0) ? width + right : right;
+    qint32 destBottom = (bottom <= 0) ? height + bottom : bottom;
 
-    // Map blend mode to Qt composition mode
-    QPainter::CompositionMode compMode;
-    switch (mode) {
-        case 1: // Normal (SourceOver)
-            compMode = QPainter::CompositionMode_SourceOver;
-            break;
-        case 2: // Multiply
-            compMode = QPainter::CompositionMode_Multiply;
-            break;
-        case 3: // Screen
-            compMode = QPainter::CompositionMode_Screen;
-            break;
-        case 4: // Overlay
-            compMode = QPainter::CompositionMode_Overlay;
-            break;
-        default:
-            compMode = QPainter::CompositionMode_SourceOver;
-            break;
+    // Clamp to miniwindow bounds
+    destLeft = std::max(destLeft, 0);
+    destTop = std::max(destTop, 0);
+    destRight = std::min(destRight, width);
+    destBottom = std::min(destBottom, height);
+
+    // ── Resolve source rect ───────────────────────────────────────────────
+    // Work on an ARGB32 copy of the source so we can use QRgb scanlines.
+    QImage srcImg = it->second->convertToFormat(QImage::Format_ARGB32);
+
+    // Clamp src bounds to actual image dimensions first
+    if (srcLeft < 0)
+        srcLeft = 0;
+    if (srcTop < 0)
+        srcTop = 0;
+    if (srcRight > srcImg.width())
+        srcRight = srcImg.width();
+    if (srcBottom > srcImg.height())
+        srcBottom = srcImg.height();
+
+    // Apply FixRight/FixBottom: <=0 means offset from the right/bottom edge
+    if (srcRight <= 0)
+        srcRight = srcImg.width() + srcRight;
+    if (srcBottom <= 0)
+        srcBottom = srcImg.height() + srcBottom;
+
+    // If all four source args were zero, use the full source image
+    if (srcLeft == 0 && srcTop == 0 && srcRight == 0 && srcBottom == 0) {
+        srcRight = srcImg.width();
+        srcBottom = srcImg.height();
     }
-    painter.setCompositionMode(compMode);
 
-    QRect destRect(left, top, fixedRight - left, fixedBottom - top);
-    QRect srcRect(srcLeft, srcTop, srcRight - srcLeft, srcBottom - srcTop);
+    // Effective pixel region is the minimum of dest and src sizes
+    qint32 blendW = std::min(destRight - destLeft, srcRight - srcLeft);
+    qint32 blendH = std::min(destBottom - destTop, srcBottom - srcTop);
 
-    // If source rect is empty, use full image
-    if (srcRect.isEmpty() || srcRect.width() == 0 || srcRect.height() == 0) {
-        srcRect = QRect(0, 0, img->width(), img->height());
+    if (blendW <= 0 || blendH <= 0)
+        return eOK;
+
+    // Ensure destination is ARGB32 for direct pixel access
+    if (image->format() != QImage::Format_ARGB32 &&
+        image->format() != QImage::Format_ARGB32_Premultiplied) {
+        *image = image->convertToFormat(QImage::Format_ARGB32);
     }
 
-    painter.drawImage(destRect, *img, srcRect);
+    // ── Precompute cosine table (mode 3 / Interpolate) ────────────────────
+    static uint8_t cos_table[256];
+    static bool cos_table_ready = false;
+    if (!cos_table_ready) {
+        constexpr double pi_div255 = 3.1415926535898 / 255.0;
+        for (int i = 0; i < 256; ++i) {
+            double a = 64.0 - std::cos(static_cast<double>(i) * pi_div255) * 64.0;
+            cos_table[i] = static_cast<uint8_t>(a + 0.5);
+        }
+        cos_table_ready = true;
+    }
+
+    // ── Per-pixel blend ───────────────────────────────────────────────────
+    for (int row = 0; row < blendH; ++row) {
+        const int srcY = srcTop + row;
+        const int destY = destTop + row;
+
+        const auto* srcLine = reinterpret_cast<const QRgb*>(srcImg.constScanLine(srcY));
+        auto* dstLine = reinterpret_cast<QRgb*>(image->scanLine(destY));
+
+        for (int col = 0; col < blendW; ++col) {
+            const int srcX = srcLeft + col;
+            const int destX = destLeft + col;
+
+            const QRgb pixA = srcLine[srcX];  // A = blend layer
+            const QRgb pixB = dstLine[destX]; // B = base layer
+
+            const auto rA = static_cast<uint8_t>(qRed(pixA));
+            const auto gA = static_cast<uint8_t>(qGreen(pixA));
+            const auto bA = static_cast<uint8_t>(qBlue(pixA));
+
+            const auto rB = static_cast<uint8_t>(qRed(pixB));
+            const auto gB = static_cast<uint8_t>(qGreen(pixB));
+            const auto bB = static_cast<uint8_t>(qBlue(pixB));
+
+            uint8_t rOut{}, gOut{}, bOut{};
+
+            // Helper lambdas that apply opacity after blending
+            auto ch = [&](uint8_t blended, uint8_t base) -> uint8_t {
+                return (opacity >= 1.0) ? blended : Simple_Opacity(base, blended, opacity);
+            };
+            // Colour_Op equivalent: compute final (fR,fG,fB) then apply opacity
+            auto colourOp = [&](uint8_t fR, uint8_t fG, uint8_t fB) {
+                rOut = (opacity >= 1.0) ? fR : Simple_Opacity(rB, fR, opacity);
+                gOut = (opacity >= 1.0) ? fG : Simple_Opacity(gB, fG, opacity);
+                bOut = (opacity >= 1.0) ? fB : Simple_Opacity(bB, fB, opacity);
+            };
+
+            switch (mode) {
+                // ── Modes 1–35: per-channel mathematical blends ──────────
+                case 1:
+                    rOut = ch(Blend_Normal(rA, rB), rB);
+                    gOut = ch(Blend_Normal(gA, gB), gB);
+                    bOut = ch(Blend_Normal(bA, bB), bB);
+                    break;
+                case 2:
+                    rOut = ch(Blend_Average(rA, rB), rB);
+                    gOut = ch(Blend_Average(gA, gB), gB);
+                    bOut = ch(Blend_Average(bA, bB), bB);
+                    break;
+                case 3: // Interpolate — cosine table
+                    rOut = ch(Blend_Interpolate(cos_table[rA], cos_table[rB]), rB);
+                    gOut = ch(Blend_Interpolate(cos_table[gA], cos_table[gB]), gB);
+                    bOut = ch(Blend_Interpolate(cos_table[bA], cos_table[bB]), bB);
+                    break;
+                case 4: { // Dissolve — random per-pixel selection
+                    double rnd = QRandomGenerator::global()->generateDouble();
+                    bool useA = (rnd < opacity);
+                    rOut = useA ? rA : rB;
+                    gOut = useA ? gA : gB;
+                    bOut = useA ? bA : bB;
+                    break;
+                }
+                case 5:
+                    rOut = ch(Blend_Darken(rA, rB), rB);
+                    gOut = ch(Blend_Darken(gA, gB), gB);
+                    bOut = ch(Blend_Darken(bA, bB), bB);
+                    break;
+                case 6:
+                    rOut = ch(Blend_Multiply(rA, rB), rB);
+                    gOut = ch(Blend_Multiply(gA, gB), gB);
+                    bOut = ch(Blend_Multiply(bA, bB), bB);
+                    break;
+                case 7:
+                    rOut = ch(Blend_ColorBurn(rA, rB), rB);
+                    gOut = ch(Blend_ColorBurn(gA, gB), gB);
+                    bOut = ch(Blend_ColorBurn(bA, bB), bB);
+                    break;
+                case 8:
+                    rOut = ch(Blend_LinearBurn(rA, rB), rB);
+                    gOut = ch(Blend_LinearBurn(gA, gB), gB);
+                    bOut = ch(Blend_LinearBurn(bA, bB), bB);
+                    break;
+                case 9:
+                    rOut = ch(Blend_InverseColorBurn(rA, rB), rB);
+                    gOut = ch(Blend_InverseColorBurn(gA, gB), gB);
+                    bOut = ch(Blend_InverseColorBurn(bA, bB), bB);
+                    break;
+                case 10:
+                    rOut = ch(Blend_Subtract(rA, rB), rB);
+                    gOut = ch(Blend_Subtract(gA, gB), gB);
+                    bOut = ch(Blend_Subtract(bA, bB), bB);
+                    break;
+                case 11:
+                    rOut = ch(Blend_Lighten(rA, rB), rB);
+                    gOut = ch(Blend_Lighten(gA, gB), gB);
+                    bOut = ch(Blend_Lighten(bA, bB), bB);
+                    break;
+                case 12:
+                    rOut = ch(Blend_Screen(rA, rB), rB);
+                    gOut = ch(Blend_Screen(gA, gB), gB);
+                    bOut = ch(Blend_Screen(bA, bB), bB);
+                    break;
+                case 13:
+                    rOut = ch(Blend_ColorDodge(rA, rB), rB);
+                    gOut = ch(Blend_ColorDodge(gA, gB), gB);
+                    bOut = ch(Blend_ColorDodge(bA, bB), bB);
+                    break;
+                case 14:
+                    rOut = ch(Blend_LinearDodge(rA, rB), rB);
+                    gOut = ch(Blend_LinearDodge(gA, gB), gB);
+                    bOut = ch(Blend_LinearDodge(bA, bB), bB);
+                    break;
+                case 15:
+                    rOut = ch(Blend_InverseColorDodge(rA, rB), rB);
+                    gOut = ch(Blend_InverseColorDodge(gA, gB), gB);
+                    bOut = ch(Blend_InverseColorDodge(bA, bB), bB);
+                    break;
+                case 16:
+                    rOut = ch(Blend_Add(rA, rB), rB);
+                    gOut = ch(Blend_Add(gA, gB), gB);
+                    bOut = ch(Blend_Add(bA, bB), bB);
+                    break;
+                case 17:
+                    rOut = ch(Blend_Overlay(rA, rB), rB);
+                    gOut = ch(Blend_Overlay(gA, gB), gB);
+                    bOut = ch(Blend_Overlay(bA, bB), bB);
+                    break;
+                case 18:
+                    rOut = ch(Blend_SoftLight(rA, rB), rB);
+                    gOut = ch(Blend_SoftLight(gA, gB), gB);
+                    bOut = ch(Blend_SoftLight(bA, bB), bB);
+                    break;
+                case 19:
+                    rOut = ch(Blend_HardLight(rA, rB), rB);
+                    gOut = ch(Blend_HardLight(gA, gB), gB);
+                    bOut = ch(Blend_HardLight(bA, bB), bB);
+                    break;
+                case 20:
+                    rOut = ch(Blend_VividLight(rA, rB), rB);
+                    gOut = ch(Blend_VividLight(gA, gB), gB);
+                    bOut = ch(Blend_VividLight(bA, bB), bB);
+                    break;
+                case 21:
+                    rOut = ch(Blend_LinearLight(rA, rB), rB);
+                    gOut = ch(Blend_LinearLight(gA, gB), gB);
+                    bOut = ch(Blend_LinearLight(bA, bB), bB);
+                    break;
+                case 22:
+                    rOut = ch(Blend_PinLight(rA, rB), rB);
+                    gOut = ch(Blend_PinLight(gA, gB), gB);
+                    bOut = ch(Blend_PinLight(bA, bB), bB);
+                    break;
+                case 23:
+                    rOut = ch(Blend_HardMix(rA, rB), rB);
+                    gOut = ch(Blend_HardMix(gA, gB), gB);
+                    bOut = ch(Blend_HardMix(bA, bB), bB);
+                    break;
+                case 24:
+                    rOut = ch(Blend_Difference(rA, rB), rB);
+                    gOut = ch(Blend_Difference(gA, gB), gB);
+                    bOut = ch(Blend_Difference(bA, bB), bB);
+                    break;
+                case 25:
+                    rOut = ch(Blend_Exclusion(rA, rB), rB);
+                    gOut = ch(Blend_Exclusion(gA, gB), gB);
+                    bOut = ch(Blend_Exclusion(bA, bB), bB);
+                    break;
+                case 26:
+                    rOut = ch(Blend_Reflect(rA, rB), rB);
+                    gOut = ch(Blend_Reflect(gA, gB), gB);
+                    bOut = ch(Blend_Reflect(bA, bB), bB);
+                    break;
+                case 27:
+                    rOut = ch(Blend_Glow(rA, rB), rB);
+                    gOut = ch(Blend_Glow(gA, gB), gB);
+                    bOut = ch(Blend_Glow(bA, bB), bB);
+                    break;
+                case 28:
+                    rOut = ch(Blend_Freeze(rA, rB), rB);
+                    gOut = ch(Blend_Freeze(gA, gB), gB);
+                    bOut = ch(Blend_Freeze(bA, bB), bB);
+                    break;
+                case 29:
+                    rOut = ch(Blend_Heat(rA, rB), rB);
+                    gOut = ch(Blend_Heat(gA, gB), gB);
+                    bOut = ch(Blend_Heat(bA, bB), bB);
+                    break;
+                case 30:
+                    rOut = ch(Blend_Negation(rA, rB), rB);
+                    gOut = ch(Blend_Negation(gA, gB), gB);
+                    bOut = ch(Blend_Negation(bA, bB), bB);
+                    break;
+                case 31:
+                    rOut = ch(Blend_Phoenix(rA, rB), rB);
+                    gOut = ch(Blend_Phoenix(gA, gB), gB);
+                    bOut = ch(Blend_Phoenix(bA, bB), bB);
+                    break;
+                case 32:
+                    rOut = ch(Blend_Stamp(rA, rB), rB);
+                    gOut = ch(Blend_Stamp(gA, gB), gB);
+                    bOut = ch(Blend_Stamp(bA, bB), bB);
+                    break;
+                case 33:
+                    rOut = ch(Blend_Xor(rA, rB), rB);
+                    gOut = ch(Blend_Xor(gA, gB), gB);
+                    bOut = ch(Blend_Xor(bA, bB), bB);
+                    break;
+                case 34:
+                    rOut = ch(Blend_And(rA, rB), rB);
+                    gOut = ch(Blend_And(gA, gB), gB);
+                    bOut = ch(Blend_And(bA, bB), bB);
+                    break;
+                case 35:
+                    rOut = ch(Blend_Or(rA, rB), rB);
+                    gOut = ch(Blend_Or(gA, gB), gB);
+                    bOut = ch(Blend_Or(bA, bB), bB);
+                    break;
+
+                // ── Modes 36–59: channel-routing operations ──────────────
+                // Take one channel from A (blend), retain others from B (base)
+                case 36:
+                    colourOp(rA, gB, bB);
+                    break; // red from A
+                case 37:
+                    colourOp(rB, gA, bB);
+                    break; // green from A
+                case 38:
+                    colourOp(rB, gB, bA);
+                    break; // blue from A
+                // Take two channels from A, retain one from B
+                case 39:
+                    colourOp(rA, gA, bB);
+                    break; // yellow (R+G from A)
+                case 40:
+                    colourOp(rB, gA, bA);
+                    break; // cyan   (G+B from A)
+                case 41:
+                    colourOp(rA, gB, bA);
+                    break; // magenta (R+B from A)
+                // Limit green
+                case 42:
+                    colourOp(rA, (gA > rA) ? rA : gA, bA);
+                    break; // green limited by red
+                case 43:
+                    colourOp(rA, (gA > bA) ? bA : gA, bA);
+                    break; // green limited by blue
+                case 44:
+                    colourOp(rA, (gA > ((rA + bA) / 2)) ? ((rA + bA) / 2) : gA, bA);
+                    break;
+                // Limit blue
+                case 45:
+                    colourOp(rA, gA, (bA > rA) ? rA : bA);
+                    break; // blue limited by red
+                case 46:
+                    colourOp(rA, gA, (bA > gA) ? gA : bA);
+                    break; // blue limited by green
+                case 47:
+                    colourOp(rA, gA, (bA > ((rA + gA) / 2)) ? ((rA + gA) / 2) : bA);
+                    break;
+                // Limit red
+                case 48:
+                    colourOp((rA > gA) ? gA : rA, gA, bA);
+                    break; // red limited by green
+                case 49:
+                    colourOp((rA > bA) ? bA : rA, gA, bA);
+                    break; // red limited by blue
+                case 50:
+                    colourOp((rA > ((gA + bA) / 2)) ? ((gA + bA) / 2) : rA, gA, bA);
+                    break;
+                // Single channel selection
+                case 51:
+                    colourOp(rA, 0, 0);
+                    break; // red only   → looks red
+                case 52:
+                    colourOp(0, gA, 0);
+                    break; // green only → looks green
+                case 53:
+                    colourOp(0, 0, bA);
+                    break; // blue only  → looks blue
+                // Discard one channel
+                case 54:
+                    colourOp(0, gA, bA);
+                    break; // discard red   → looks cyan
+                case 55:
+                    colourOp(rA, 0, bA);
+                    break; // discard green → looks magenta
+                case 56:
+                    colourOp(rA, gA, 0);
+                    break; // discard blue  → looks yellow
+                // One channel expanded to all
+                case 57:
+                    colourOp(rA, rA, rA);
+                    break; // all red   → grey
+                case 58:
+                    colourOp(gA, gA, gA);
+                    break; // all green → grey
+                case 59:
+                    colourOp(bA, bA, bA);
+                    break; // all blue  → grey
+
+                // ── Modes 60–64: HSL component swaps ─────────────────────
+                case 60: { // Hue from A, saturation+lightness from B
+                    QColor cA(rA, gA, bA);
+                    QColor cB(rB, gB, bB);
+                    cB.setHsl(cA.hslHue() < 0 ? 0 : cA.hslHue(), cB.hslSaturation(),
+                              cB.lightness());
+                    colourOp(static_cast<uint8_t>(cB.red()), static_cast<uint8_t>(cB.green()),
+                             static_cast<uint8_t>(cB.blue()));
+                    break;
+                }
+                case 61: { // Saturation from A, hue+lightness from B
+                    QColor cA(rA, gA, bA);
+                    QColor cB(rB, gB, bB);
+                    cB.setHsl(cB.hslHue() < 0 ? 0 : cB.hslHue(), cA.hslSaturation(),
+                              cB.lightness());
+                    colourOp(static_cast<uint8_t>(cB.red()), static_cast<uint8_t>(cB.green()),
+                             static_cast<uint8_t>(cB.blue()));
+                    break;
+                }
+                case 62: { // Hue+Saturation from A, lightness from B
+                    QColor cA(rA, gA, bA);
+                    QColor cB(rB, gB, bB);
+                    cB.setHsl(cA.hslHue() < 0 ? 0 : cA.hslHue(), cA.hslSaturation(),
+                              cB.lightness());
+                    colourOp(static_cast<uint8_t>(cB.red()), static_cast<uint8_t>(cB.green()),
+                             static_cast<uint8_t>(cB.blue()));
+                    break;
+                }
+                case 63: { // Luminance (lightness) from A, hue+saturation from B
+                    QColor cA(rA, gA, bA);
+                    QColor cB(rB, gB, bB);
+                    cB.setHsl(cB.hslHue() < 0 ? 0 : cB.hslHue(), cB.hslSaturation(),
+                              cA.lightness());
+                    colourOp(static_cast<uint8_t>(cB.red()), static_cast<uint8_t>(cB.green()),
+                             static_cast<uint8_t>(cB.blue()));
+                    break;
+                }
+                case 64: { // Visualise HSL: hue→R, saturation→G, lightness→B
+                    QColor cA(rA, gA, bA);
+                    // Hue is in [0,360) (or -1 for achromatic); scale to [0,255]
+                    int hue = cA.hslHue();
+                    auto hueOut = static_cast<uint8_t>((hue < 0 ? 0 : hue) * 255 / 359);
+                    auto satOut = static_cast<uint8_t>(cA.hslSaturation()); // already [0,255]
+                    auto lightOut = static_cast<uint8_t>(cA.lightness());   // already [0,255]
+                    colourOp(hueOut, satOut, lightOut);
+                    break;
+                }
+
+                default:
+                    return eUnknownOption;
+            }
+
+            dstLine[destX] = qRgb(rOut, gOut, bOut);
+        }
+    }
 
     dirty = true;
     emit needsRedraw();
@@ -1343,11 +1956,20 @@ QVariant MiniWindow::ImageInfo(const QString& imageId, qint32 infoType)
         return QVariant();
     QImage* img = it->second.get();
 
+    // Original miniwindow.cpp:1500-1508 — Windows BITMAP struct fields
     switch (infoType) {
         case 1:
-            return img->width();
+            return 0; // bmType — always 0 for standard bitmaps
         case 2:
-            return img->height();
+            return img->width(); // bmWidth
+        case 3:
+            return img->height(); // bmHeight
+        case 4:
+            return img->bytesPerLine(); // bmWidthBytes
+        case 5:
+            return 1; // bmPlanes — modern displays use 1 plane
+        case 6:
+            return img->depth(); // bmBitsPixel
         default:
             return QVariant();
     }
@@ -1466,14 +2088,15 @@ qint32 MiniWindow::ImageOp(qint16 action, qint32 left, qint32 top, qint32 right,
 
     QImage* brushImg = it->second.get();
 
+    if (!validatePenStyle(penStyle, penWidth))
+        return ePenStyleNotValid;
+
     // Create painter
     QPainter painter(image.get());
     painter.setRenderHint(QPainter::Antialiasing, false);
 
-    // Setup pen (convert BGR to Qt color)
-    QPen pen(bgrToColor(penColor));
-    pen.setWidth(penWidth);
-    pen.setStyle(static_cast<Qt::PenStyle>(penStyle));
+    // Setup pen using shared Windows GDI pen converter
+    QPen pen = createWindowsPen(bgrToColor(penColor), penWidth, penStyle);
     painter.setPen(pen);
 
     // Setup brush with image pattern
@@ -1481,16 +2104,15 @@ qint32 MiniWindow::ImageOp(qint16 action, qint32 left, qint32 top, qint32 right,
     brush.setStyle(Qt::TexturePattern);
     painter.setBrush(brush);
 
-    // Normalize coordinates
-    if (left > right)
-        std::swap(left, right);
-    if (top > bottom)
-        std::swap(top, bottom);
+    // Handle right/bottom <= 0 as offset from window edge (same as RectOp)
+    qint32 fixedRight = (right <= 0) ? width + right : right;
+    qint32 fixedBottom = (bottom <= 0) ? height + bottom : bottom;
 
-    QRect rect(left, top, right - left, bottom - top);
+    int w = fixedRight - left;
+    int h = fixedBottom - top;
+    QRect rect(left, top, w > 0 ? w : 0, h > 0 ? h : 0);
 
-    // Perform operation based on action
-    // Match original MUSHclient action codes: 1=ellipse, 2=rectangle, 3=round rect
+    // Original action codes: 1=ellipse, 2=rectangle, 3=round rect
     switch (action) {
         case 1: // Ellipse (filled with pattern brush)
             painter.drawEllipse(rect);
@@ -2105,127 +2727,133 @@ qint32 MiniWindow::Filter(qint32 left, qint32 top, qint32 right, qint32 bottom, 
             break;
         }
 
-        case 3:    // Blur (5x5 kernel)
-        case 25:   // Lesser blur (3x3 kernel)
-        case 26: { // Minor blur (3x3 kernel, lighter)
-            int kernelSize = (operation == 3) ? 5 : 3;
-            QImage temp = image->copy(left, top, w, h);
+        case 3:    // Blur (5-tap separable kernel {1,1,1,1,1}/5)
+        case 25:   // Lesser blur (5-tap separable kernel {0,1,1,1,0}/3)
+        case 26: { // Minor blur (5-tap separable kernel {0,0.5,1,0.5,0}/2)
+            // Kernel and divisor per original GeneralFilter call in WindowFilter()
+            std::array<double, 5> kernel;
+            double divisor;
+            if (operation == 3) {
+                kernel = {1, 1, 1, 1, 1};
+                divisor = 5.0;
+            } else if (operation == 25) {
+                kernel = {0, 1, 1, 1, 0};
+                divisor = 3.0;
+            } else {
+                kernel = {0, 0.5, 1, 0.5, 0};
+                divisor = 2.0;
+            }
 
-            for (qint32 y = top; y < bottom; y++) {
-                for (qint32 x = left; x < right; x++) {
-                    int r = 0, g = 0, b = 0, count = 0;
-                    int halfKernel = kernelSize / 2;
+            // Options controls direction: 1=horizontal only, 2=vertical only, other=both.
+            // Passes are applied in-place (horizontal first, vertical reads the result).
+            QImage work = image->copy(left, top, w, h).convertToFormat(QImage::Format_RGB32);
 
-                    // Average surrounding pixels
-                    for (int ky = -halfKernel; ky <= halfKernel; ky++) {
-                        for (int kx = -halfKernel; kx <= halfKernel; kx++) {
-                            int px = x + kx;
-                            int py = y + ky;
-                            if (px >= left && px < right && py >= top && py < bottom) {
-                                QRgb pixel = temp.pixel(px - left, py - top);
-                                r += qRed(pixel);
-                                g += qGreen(pixel);
-                                b += qBlue(pixel);
-                                count++;
-                            }
+            // Horizontal pass (skip if Options == 2)
+            if (options != 2.0) {
+                for (qint32 y = 0; y < h; y++) {
+                    for (qint32 x = 0; x < w; x++) {
+                        double r = 0, g = 0, b = 0;
+                        for (int k = 0; k < 5; k++) {
+                            int sx = qBound(0, x + k - 2, w - 1);
+                            QRgb px = work.pixel(sx, y);
+                            r += qRed(px) * kernel[k];
+                            g += qGreen(px) * kernel[k];
+                            b += qBlue(px) * kernel[k];
                         }
+                        image->setPixel(left + x, top + y,
+                                        qRgb(qBound(0, (int)(r / divisor), 255),
+                                             qBound(0, (int)(g / divisor), 255),
+                                             qBound(0, (int)(b / divisor), 255)));
                     }
-                    if (count > 0) {
-                        image->setPixel(x, y, qRgb(r / count, g / count, b / count));
+                }
+                // Refresh work from the horizontally-filtered image for the vertical pass
+                if (options != 1.0)
+                    work = image->copy(left, top, w, h).convertToFormat(QImage::Format_RGB32);
+            }
+
+            // Vertical pass (skip if Options == 1)
+            if (options != 1.0) {
+                for (qint32 x = 0; x < w; x++) {
+                    for (qint32 y = 0; y < h; y++) {
+                        double r = 0, g = 0, b = 0;
+                        for (int k = 0; k < 5; k++) {
+                            int sy = qBound(0, y + k - 2, h - 1);
+                            QRgb px = work.pixel(x, sy);
+                            r += qRed(px) * kernel[k];
+                            g += qGreen(px) * kernel[k];
+                            b += qBlue(px) * kernel[k];
+                        }
+                        image->setPixel(left + x, top + y,
+                                        qRgb(qBound(0, (int)(r / divisor), 255),
+                                             qBound(0, (int)(g / divisor), 255),
+                                             qBound(0, (int)(b / divisor), 255)));
                     }
                 }
             }
             break;
         }
 
-        case 4: { // Sharpen
-            QImage temp = image->copy(left, top, w, h);
-            // Sharpen kernel: [-1, -1, 7, -1, -1] with divisor 3 (from original line 3224)
-            double kernel[5] = {-1, -1, 7, -1, -1};
-            double divisor = 3.0;
-
-            for (qint32 y = top; y < bottom; y++) {
-                for (qint32 x = left; x < right; x++) {
-                    double r = 0, g = 0, b = 0;
-
-                    // Apply 1D kernel horizontally and vertically
-                    for (int i = -2; i <= 2; i++) {
-                        int px = qBound(left, x + i, right - 1);
-                        int py = qBound(top, y + i, bottom - 1);
-                        QRgb hPixel = temp.pixel(px - left, py - top);
-                        QRgb vPixel = temp.pixel(x - left, py - top);
-
-                        r += (qRed(hPixel) + qRed(vPixel)) * kernel[i + 2];
-                        g += (qGreen(hPixel) + qGreen(vPixel)) * kernel[i + 2];
-                        b += (qBlue(hPixel) + qBlue(vPixel)) * kernel[i + 2];
-                    }
-
-                    image->setPixel(x, y,
-                                    qRgb(qBound(0, (int)(r / divisor), 255),
-                                         qBound(0, (int)(g / divisor), 255),
-                                         qBound(0, (int)(b / divisor), 255)));
-                }
+        case 4:   // Sharpen (5-tap separable kernel {-1,-1,7,-1,-1}/3)
+        case 5:   // Edge detect (5-tap separable kernel {0,2.5,-6,2.5,0}/1)
+        case 6: { // Emboss (5-tap separable kernel {1,2,1,-1,-2}/1)
+            // All three use GeneralFilter (separable two-pass: horizontal then vertical),
+            // identical in structure to blur (cases 3/25/26) — only kernel/divisor differs.
+            std::array<double, 5> kernel;
+            double divisor;
+            if (operation == 4) {
+                kernel = {-1, -1, 7, -1, -1};
+                divisor = 3.0;
+            } else if (operation == 5) {
+                kernel = {0, 2.5, -6, 2.5, 0};
+                divisor = 1.0;
+            } else {
+                kernel = {1, 2, 1, -1, -2};
+                divisor = 1.0;
             }
-            break;
-        }
 
-        case 5: { // Edge detect (from original line 3228)
-            QImage temp = image->copy(left, top, w, h);
-            // Edge detect kernel: [0, 2.5, -6, 2.5, 0] with divisor 1
-            double kernel[5] = {0, 2.5, -6, 2.5, 0};
-            double divisor = 1.0;
+            // Options controls direction: 1=horizontal only, 2=vertical only, other=both.
+            QImage work = image->copy(left, top, w, h).convertToFormat(QImage::Format_RGB32);
 
-            for (qint32 y = top; y < bottom; y++) {
-                for (qint32 x = left; x < right; x++) {
-                    double r = 0, g = 0, b = 0;
-
-                    // Apply 1D kernel horizontally and vertically
-                    for (int i = -2; i <= 2; i++) {
-                        int px = qBound(left, x + i, right - 1);
-                        int py = qBound(top, y + i, bottom - 1);
-                        QRgb hPixel = temp.pixel(px - left, py - top);
-                        QRgb vPixel = temp.pixel(x - left, py - top);
-
-                        r += (qRed(hPixel) + qRed(vPixel)) * kernel[i + 2];
-                        g += (qGreen(hPixel) + qGreen(vPixel)) * kernel[i + 2];
-                        b += (qBlue(hPixel) + qBlue(vPixel)) * kernel[i + 2];
+            // Horizontal pass (skip if options == 2)
+            if (options != 2.0) {
+                for (qint32 y = 0; y < h; y++) {
+                    for (qint32 x = 0; x < w; x++) {
+                        double r = 0, g = 0, b = 0;
+                        for (int k = 0; k < 5; k++) {
+                            int sx = qBound(0, x + k - 2, w - 1);
+                            QRgb px = work.pixel(sx, y);
+                            r += qRed(px) * kernel[k];
+                            g += qGreen(px) * kernel[k];
+                            b += qBlue(px) * kernel[k];
+                        }
+                        image->setPixel(left + x, top + y,
+                                        qRgb(qBound(0, (int)(r / divisor), 255),
+                                             qBound(0, (int)(g / divisor), 255),
+                                             qBound(0, (int)(b / divisor), 255)));
                     }
-
-                    image->setPixel(x, y,
-                                    qRgb(qBound(0, (int)(r / divisor), 255),
-                                         qBound(0, (int)(g / divisor), 255),
-                                         qBound(0, (int)(b / divisor), 255)));
                 }
+                // Refresh work from the horizontally-filtered image for the vertical pass
+                if (options != 1.0)
+                    work = image->copy(left, top, w, h).convertToFormat(QImage::Format_RGB32);
             }
-            break;
-        }
 
-        case 6: { // Emboss (from original line 3234)
-            QImage temp = image->copy(left, top, w, h);
-            // Emboss kernel: [1, 2, 1, -1, -2] with divisor 1
-            double kernel[5] = {1, 2, 1, -1, -2};
-            double divisor = 1.0;
-
-            for (qint32 y = top; y < bottom; y++) {
-                for (qint32 x = left; x < right; x++) {
-                    double r = 0, g = 0, b = 0;
-
-                    // Apply 1D kernel horizontally and vertically
-                    for (int i = -2; i <= 2; i++) {
-                        int px = qBound(left, x + i, right - 1);
-                        int py = qBound(top, y + i, bottom - 1);
-                        QRgb hPixel = temp.pixel(px - left, py - top);
-                        QRgb vPixel = temp.pixel(x - left, py - top);
-
-                        r += (qRed(hPixel) + qRed(vPixel)) * kernel[i + 2];
-                        g += (qGreen(hPixel) + qGreen(vPixel)) * kernel[i + 2];
-                        b += (qBlue(hPixel) + qBlue(vPixel)) * kernel[i + 2];
+            // Vertical pass (skip if options == 1)
+            if (options != 1.0) {
+                for (qint32 x = 0; x < w; x++) {
+                    for (qint32 y = 0; y < h; y++) {
+                        double r = 0, g = 0, b = 0;
+                        for (int k = 0; k < 5; k++) {
+                            int sy = qBound(0, y + k - 2, h - 1);
+                            QRgb px = work.pixel(x, sy);
+                            r += qRed(px) * kernel[k];
+                            g += qGreen(px) * kernel[k];
+                            b += qBlue(px) * kernel[k];
+                        }
+                        image->setPixel(left + x, top + y,
+                                        qRgb(qBound(0, (int)(r / divisor), 255),
+                                             qBound(0, (int)(g / divisor), 255),
+                                             qBound(0, (int)(b / divisor), 255)));
                     }
-
-                    image->setPixel(x, y,
-                                    qRgb(qBound(0, (int)(r / divisor), 255),
-                                         qBound(0, (int)(g / divisor), 255),
-                                         qBound(0, (int)(b / divisor), 255)));
                 }
             }
             break;

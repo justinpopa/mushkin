@@ -77,8 +77,11 @@ docs/api/xml/
 docs/api/lua/
 docs/api/*.tag
 
-# User-specific directories (personal plugins)
-plugins/
+# User-specific plugins (personal worlds, etc.) — ignored by default.
+# Project-owned plugins below are explicitly unignored.
+plugins/*
+!plugins/acid_test.xml
+!plugins/mushkin_audit.xml
 
 # Qt installations (from aqt)
 6.*/

@@ -1,13 +1,9 @@
 /**
  * global_options.h - Global Application Preferences
  *
- * Defines application-wide preferences using QSettings for platform-native storage:
- * - Windows: Registry at HKEY_CURRENT_USER\Software\Gammon Software Solutions\MUSHclient
- * - macOS: ~/Library/Preferences/com.mushkin.Mushkin.plist
- * - Linux: ~/.config/Mushkin/Mushkin.conf
- *
- * On Windows, uses MUSHclient paths for backwards compatibility with original MUSHclient.
- * On macOS/Linux, uses Mushkin-specific paths (no MUSHclient legacy on these platforms).
+ * Defines application-wide preferences stored in the SQLite database
+ * (mushclient_prefs.sqlite). This matches the original MUSHclient's storage
+ * mechanism, providing drop-in compatibility with existing preference databases.
  *
  * Ported from: globalregistryoptions.cpp (original MUSHclient)
  *
@@ -15,7 +11,7 @@
  *   GlobalOptions& opts = GlobalOptions::instance();
  *   bool autoConnect = opts.autoConnectWorlds();
  *   opts.setAutoConnectWorlds(false);
- *   opts.save();  // Persist to storage
+ *   opts.save();  // Persist to database
  */
 
 #ifndef GLOBAL_OPTIONS_H
@@ -30,17 +26,17 @@ enum ThemeMode { ThemeLight = 0, ThemeDark = 1, ThemeSystem = 2 };
 /**
  * GlobalOptions - Singleton class for application-wide preferences
  *
- * All options are loaded from QSettings on first access and cached.
+ * All options are loaded from the database on first access and cached.
  * Changes are not persisted until save() is called.
  */
 class GlobalOptions {
   public:
     static GlobalOptions& instance();
 
-    // Load all options from QSettings
+    // Load all options from database
     void load();
 
-    // Save all options to QSettings
+    // Save all options to database
     void save();
 
     // Reset all options to defaults
@@ -821,7 +817,7 @@ class GlobalOptions {
     int m_printerLinesPerPage = 60;
     int m_timerInterval = 0;
     int m_activityWindowRefreshInterval = 15;
-    int m_activityWindowRefreshType = 0; // eRefreshBoth
+    int m_activityWindowRefreshType = 2; // eRefreshBoth (matches original default)
     int m_windowTabsStyle = 0;
     int m_iconPlacement = 0; // ICON_PLACEMENT_TASKBAR
     int m_trayIcon = 0;

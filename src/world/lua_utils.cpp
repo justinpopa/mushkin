@@ -2357,8 +2357,7 @@ static int L_utils_spellcheckdialog(lua_State* L)
 static int L_utils_reload_global_prefs(lua_State* L)
 {
     Q_UNUSED(L);
-    // In Qt port, preferences are handled by QSettings
-    // Could reload from QSettings here if needed
+    // GlobalOptions are loaded from SQLite on startup; no runtime reload needed.
     return 0;
 }
 

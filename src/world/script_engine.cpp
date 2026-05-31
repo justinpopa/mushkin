@@ -1,5 +1,6 @@
 #include "script_engine.h"
 #include "../automation/plugin.h"
+#include "../storage/global_options.h"
 #include "../utils/app_paths.h"
 #include "../world/world_document.h"
 #include <QCoreApplication>
@@ -239,6 +240,23 @@ void ScriptEngine::openLua()
     // This opens: base, package, string, table, math, io, os, debug, coroutine
     luaL_openlibs(L);
 
+    // 2b. Save standard package loaders before language modules can modify package.loaders
+    // Language modules (MoonScript, YueScript, Teal, Fennel) insert their own searchers,
+    // pushing the standard searchers to higher indices. The sandbox later strips the table
+    // down to just preload; we restore the standard searchers from the registry afterward.
+    // Standard Lua 5.1 loaders: [1]=preload, [2]=Lua file, [3]=C library, [4]=all-in-one
+    // The all-in-one loader handles submodules (e.g., ssl.core → opens ssl.so, calls
+    // luaopen_ssl_core)
+    lua_getglobal(L, "package");
+    lua_getfield(L, -1, "loaders");
+    lua_rawgeti(L, -1, 2); // standard Lua file searcher
+    lua_setfield(L, LUA_REGISTRYINDEX, "mushclient.lua_searcher");
+    lua_rawgeti(L, -1, 3); // C library searcher
+    lua_setfield(L, LUA_REGISTRYINDEX, "mushclient.c_searcher");
+    lua_rawgeti(L, -1, 4); // all-in-one searcher (for submodules like ssl.core)
+    lua_setfield(L, LUA_REGISTRYINDEX, "mushclient.allinone_searcher");
+    lua_pop(L, 2); // pop loaders + package
+
     // 3. Store world document pointer in registry
     // This allows Lua C functions to retrieve the document pointer
     // Key: DOCUMENT_STATE = "mushclient.document"
@@ -257,13 +275,29 @@ void ScriptEngine::openLua()
     // Bundled modules (inside app bundle) take priority over user files
     // to avoid conflicts with incompatible versions (e.g., lua-openssl vs LuaSec).
     QString exeDir2 = AppPaths::getExecutableDirectory();
+    QString appDir = AppPaths::getAppDirectory();
     QStringList luaPaths = {
         exeDir2 + "/../Resources/lua/?.lua",
         exeDir2 + "/../Resources/lua/?/init.lua",
+        appDir + "/?.lua",
+        appDir + "/lua/?.lua",
+        appDir + "/lua/?/init.lua",
         "./?.lua",
         "./lua/?.lua",
         "./lua/?/init.lua",
     };
+
+    // Add world file's directory to search path so plugins can find Lua modules
+    // that live alongside the world file (e.g., Aardwolf's lua/ subfolder).
+    // This matches original MUSHclient which runs from its install directory.
+    if (m_doc && !m_doc->m_strWorldFilePath.isEmpty()) {
+        QFileInfo worldFileInfo(m_doc->m_strWorldFilePath);
+        QString worldDir = worldFileInfo.absolutePath();
+        luaPaths << worldDir + "/?.lua";
+        luaPaths << worldDir + "/?/init.lua";
+        luaPaths << worldDir + "/lua/?.lua";
+        luaPaths << worldDir + "/lua/?/init.lua";
+    }
 
     // For plugins, add the plugin directory paths
     // This allows require() to find Lua files in:
@@ -817,15 +851,10 @@ return re
             return orig_loadfile(resolve_path(filename), ...)
         end
 
-        -- Wrap require to normalize backslashes in package.path before searching
-        -- This handles plugins that use Windows-style paths like "..\\subdir\\?.lua"
-        local orig_require = require
-        require = function(modname)
-            -- Normalize backslashes in package.path and package.cpath
-            package.path = (package.path or ""):gsub("\\", "/")
-            package.cpath = (package.cpath or ""):gsub("\\", "/")
-            return orig_require(modname)
-        end
+        -- Normalize backslashes in package.path/cpath once at setup time
+        -- (instead of wrapping require, which interferes with LuaJIT's searcher iteration)
+        package.path = (package.path or ""):gsub("\\", "/")
+        package.cpath = (package.cpath or ""):gsub("\\", "/")
 
         -- Clean up the global we used to pass the path
         _MUSHCLIENT_APP_DIR = nil
@@ -880,7 +909,7 @@ return re
     SET_ERROR_CODE(eNotAPlugin, 30035);
     SET_ERROR_CODE(eNoSuchRoutine, 30036);
     SET_ERROR_CODE(ePluginDoesNotSaveState, 30037);
-    SET_ERROR_CODE(ePluginCouldNotSaveState, 30038);
+    SET_ERROR_CODE(ePluginCouldNotSaveState, 30037); // original lua_methods.cpp:6991 maps both to 30037
     SET_ERROR_CODE(ePluginDisabled, 30039);
     SET_ERROR_CODE(eErrorCallingPluginRoutine, 30040);
     SET_ERROR_CODE(eCommandsNestedTooDeeply, 30041);
@@ -935,7 +964,88 @@ return re
         lua_pop(L, 1);
     }
 
-    // 10. Clear stack to ensure clean state
+    // 10. Sandbox: disable dangerous functions (original: DisableDLLs in lua_methods.cpp:7676-7742)
+    const char* sandbox_code = R"(
+        -- Replace os.exit with error (original raises luaL_error)
+        os.exit = function() error("os.exit not implemented in Mushkin") end
+        -- Replace io.popen with error (prevents shell command execution)
+        io.popen = function() error("io.popen not implemented in Mushkin") end
+        -- Remove package.loadlib (prevents loading arbitrary native DLLs)
+        package.loadlib = nil
+        -- Remove C library loaders from package.loaders (keep preload + Lua file searcher)
+        -- Language modules (MoonScript, YueScript, etc.) insert their own searchers,
+        -- pushing the standard Lua file searcher to a higher index. We remove all
+        -- non-preload entries here; the standard Lua file searcher is restored from
+        -- the registry in C++ immediately after this sandbox runs.
+        if package.loaders then
+            for i = #package.loaders, 2, -1 do
+                table.remove(package.loaders, i)
+            end
+        end
+        -- Replace debug.debug with error (prevents interactive debugging)
+        if debug then
+            debug.debug = function() error("debug.debug not implemented in Mushkin") end
+        end
+    )";
+    if (luaL_dostring(L, sandbox_code) != 0) {
+        qWarning() << "Sandbox setup error:" << lua_tostring(L, -1);
+        lua_pop(L, 1);
+    }
+
+    // 10b. Restore standard searchers and add backslash normalizer
+    // After the sandbox stripped package.loaders to just {preload}, rebuild it
+    // WITHOUT nil holes (ipairs stops at first nil):
+    //   [1] preload searcher     (already there)
+    //   [2] Lua file searcher    (saved in registry at step 2b)
+    //   [3] C library searcher   (saved in registry at step 2b, for bundled .so modules)
+    //   [4] all-in-one searcher  (for submodules like ssl.core → ssl.so + luaopen_ssl_core)
+    lua_getglobal(L, "package");
+    lua_getfield(L, -1, "loaders");
+    lua_getfield(L, LUA_REGISTRYINDEX, "mushclient.lua_searcher");
+    lua_rawseti(L, -2, 2); // package.loaders[2] = Lua file searcher
+    lua_getfield(L, LUA_REGISTRYINDEX, "mushclient.c_searcher");
+    lua_rawseti(L, -2, 3); // package.loaders[3] = C library searcher
+    lua_getfield(L, LUA_REGISTRYINDEX, "mushclient.allinone_searcher");
+    lua_rawseti(L, -2, 4); // package.loaders[4] = all-in-one searcher
+    lua_pop(L, 2);         // pop loaders + package
+
+    // Then insert backslash normalizer at [2], shifting others to [3], [4], [5]:
+    //   [1] preload, [2] normalizer, [3] Lua, [4] C library, [5] all-in-one
+    // Plugins append Windows-style paths (e.g., "\\subdir\\?.lua") to package.path at runtime.
+    // This searcher normalizes backslashes before the real Lua file searcher runs.
+    {
+        const char* normalizerCode = R"(
+            local function normalize_paths(modname)
+                package.path = (package.path or ""):gsub("\\", "/")
+                package.cpath = (package.cpath or ""):gsub("\\", "/")
+                return nil -- fall through to next searcher
+            end
+            table.insert(package.loaders, 2, normalize_paths)
+        )";
+        if (luaL_dostring(L, normalizerCode) != 0) {
+            qWarning() << "Path normalizer setup error:" << lua_tostring(L, -1);
+            lua_pop(L, 1);
+        }
+    }
+
+    // 11. Execute global sandbox/init script (original: lua_scripting.cpp:222-226)
+    // This runs the user's Lua initialization script from global preferences
+    // (accessible via "Edit > Global Preferences > Lua" in the original)
+    {
+        GlobalOptions& opts = GlobalOptions::instance();
+        QString luaScript = opts.luaScript();
+        if (!luaScript.isEmpty()) {
+            m_doc->m_iCurrentActionSource = ActionSource::eLuaSandbox;
+            QByteArray scriptUtf8 = luaScript.toUtf8();
+            if (luaL_dostring(L, scriptUtf8.constData()) != 0) {
+                qWarning() << "Sandbox script error:" << lua_tostring(L, -1);
+                lua_pop(L, 1);
+            }
+            m_doc->m_iCurrentActionSource = ActionSource::eUnknownActionSource;
+        }
+    }
+
+    // 12. Clear stack to ensure clean state
     lua_settop(L, 0);
 }
 
@@ -1062,9 +1172,9 @@ static void luaError(lua_State* L, const QString& event, const QString& name, Wo
 
     // Display in output window
     if (doc) {
-        // Orange error text on black background (BGR format for MUSHclient compatibility)
-        doc->colourNote(BGR(255, 140, 0), BGR(0, 0, 0), QString("=== %1: %2 ===").arg(event, name));
-        doc->colourNote(BGR(255, 140, 0), BGR(0, 0, 0), errorMsg);
+        // Orangered error text on black background (original: SCRIPTERRORFORECOLOUR = "orangered")
+        doc->colourNote(BGR(255, 69, 0), BGR(0, 0, 0), QString("=== %1: %2 ===").arg(event, name));
+        doc->colourNote(BGR(255, 69, 0), BGR(0, 0, 0), errorMsg);
 
         // Show error lines (if we have a line number and script file)
         if (lineNumber > 0) {
@@ -1123,9 +1233,13 @@ bool ScriptEngine::parseLua(const QString& code, const QString& name)
     lua_settop(L, 0);
 
     // Update statistics (stored in document)
+    // M188: Also track per-plugin timing, matching original lua_scripting.cpp:291-293
     if (m_doc) {
         qint64 elapsed = timer.nsecsElapsed();
         m_doc->m_iScriptTimeTaken += elapsed;
+        if (m_doc->m_CurrentPlugin) {
+            m_doc->m_CurrentPlugin->m_iScriptTimeTaken += elapsed;
+        }
     }
 
     return false; // Success

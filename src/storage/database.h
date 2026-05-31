@@ -191,6 +191,10 @@ class Database : public QObject {
      */
     std::expected<void, StorageError> setPreferenceInt(const QString& name, int value);
 
+    // Transaction support (wraps multiple writes for atomicity)
+    void beginTransaction();
+    void commitTransaction();
+
     // Worlds Table Operations (per-world window geometry)
 
     /**

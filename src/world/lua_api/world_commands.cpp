@@ -626,7 +626,7 @@ int L_DoCommand(lua_State* L)
     auto uiCallback = DoCommandCallbacks::get();
     if (uiCallback) {
         int uiResult = uiCallback(command_name);
-        if (uiResult != 30054) { // eNoSuchCommand
+        if (uiResult != eNoSuchCommand) {
             lua_pushnumber(L, uiResult);
             return 1;
         }

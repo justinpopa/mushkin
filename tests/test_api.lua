@@ -256,7 +256,7 @@ end
 function test_set_command_not_empty()
     -- This assumes InputView has text (set up by C++ test)
     local err = world.SetCommand("other command")
-    check(err == 30011, "SetCommand should return eCommandNotEmpty (30011)")
+    check(err == 30020, "SetCommand should return eCommandNotEmpty (30020)")
 
     return 0
 end
@@ -294,11 +294,11 @@ end
 function test_set_custom_colour_name_out_of_range()
     -- Test below range
     local err = world.SetCustomColourName(0, "Test")
-    check(err == 30009, "SetCustomColourName should return eOptionOutOfRange (30009) for index 0")
+    check(err == 30026, "SetCustomColourName should return eOptionOutOfRange (30026) for index 0")
 
     -- Test above range (MAX_CUSTOM = 16)
     err = world.SetCustomColourName(17, "Test")
-    check(err == 30009, "SetCustomColourName should return eOptionOutOfRange (30009) for index 17")
+    check(err == 30026, "SetCustomColourName should return eOptionOutOfRange (30026) for index 17")
 
     return 0
 end

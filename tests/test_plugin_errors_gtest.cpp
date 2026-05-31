@@ -15,17 +15,7 @@
 #include <QFile>
 #include <QTemporaryDir>
 
-// Error codes from methods_plugins.cpp
-#define eOK 0
-#define eNoSuchPlugin 30010
-#define ePluginDisabled 30011
-#define eNoSuchPluginFunction 30012
-#define eNoSuchPluginTrigger 30013
-#define eNoSuchPluginAlias 30014
-#define eNoSuchPluginTimer 30015
-#define eNoSuchPluginVariable 30016
-#define eNoSuchPluginInfo 30017
-#define eNoSuchPluginOption 30018
+#include "../../src/utils/error_codes.h"
 
 // Test fixture for plugin error tests
 class PluginErrorTest : public ::testing::Test {

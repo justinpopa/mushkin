@@ -18,6 +18,7 @@
 #include "../utils/logging.h"
 #include "telnet_parser.h"
 #include "world_document.h"
+#include <QCoreApplication>
 #include <QDebug>
 #include <QRegularExpression>
 #include <memory>
@@ -63,92 +64,86 @@ void MXPEngine::InitializeMXPElements()
     };
 
     static const MXP_ElementDef elements[] = {
-        // Basic text styling (secure - work in all modes)
-        {"b", TAG_MXP, MXP_ACTION_BOLD, ""},
-        {"bold", TAG_MXP, MXP_ACTION_BOLD, ""},
-        {"i", TAG_MXP, MXP_ACTION_ITALIC, ""},
-        {"italic", TAG_MXP, MXP_ACTION_ITALIC, ""},
-        {"u", TAG_MXP, MXP_ACTION_UNDERLINE, ""},
-        {"underline", TAG_MXP, MXP_ACTION_UNDERLINE, ""},
-        {"strike", TAG_MXP, MXP_ACTION_STRIKE, ""},
-        {"strikeout", TAG_MXP, MXP_ACTION_STRIKE, ""},
-        {"small", TAG_MXP, MXP_ACTION_SMALL, ""},
-        {"tt", TAG_MXP, MXP_ACTION_TT, ""},
-        {"high", TAG_MXP, MXP_ACTION_HIGH, ""},
+        // Open tags - work in open/unsecure mode (TAG_OPEN = 0x01)
+        // Source: mxpinit.cpp lines 26-46
+        {"bold", TAG_OPEN, MXP_ACTION_BOLD, ""},
+        {"b", TAG_OPEN, MXP_ACTION_BOLD, ""},
+        {"high", TAG_OPEN, MXP_ACTION_HIGH, ""},
+        {"h", TAG_OPEN, MXP_ACTION_HIGH, ""},
+        {"underline", TAG_OPEN, MXP_ACTION_UNDERLINE, ""},
+        {"u", TAG_OPEN, MXP_ACTION_UNDERLINE, ""},
+        {"italic", TAG_OPEN, MXP_ACTION_ITALIC, ""},
+        {"i", TAG_OPEN, MXP_ACTION_ITALIC, ""},
+        {"em", TAG_OPEN, MXP_ACTION_ITALIC, ""}, // same as <i>
+        {"color", TAG_OPEN, MXP_ACTION_COLOR, "fore,back"},
+        {"c", TAG_OPEN, MXP_ACTION_COLOR, "fore,back"},
+        {"s", TAG_OPEN | TAG_NOT_IMP, MXP_ACTION_STRIKE, ""},      // strikethrough
+        {"strike", TAG_OPEN | TAG_NOT_IMP, MXP_ACTION_STRIKE, ""}, // strikethrough
+        {"strong", TAG_OPEN, MXP_ACTION_BOLD, ""},                 // same as bold
+        {"small", TAG_OPEN | TAG_NOT_IMP, MXP_ACTION_SMALL, ""},
+        {"tt", TAG_OPEN | TAG_NOT_IMP, MXP_ACTION_TT, ""},
+        {"font", TAG_OPEN, MXP_ACTION_FONT, "color,back,fgcolor,bgcolor"},
 
-        // Paragraph and formatting (secure)
-        {"p", TAG_MXP | TAG_COMMAND, MXP_ACTION_P, ""},
-        {"br", TAG_MXP | TAG_COMMAND, MXP_ACTION_BR, ""},
-        {"nobr", TAG_MXP, MXP_ACTION_NOBR, ""},
-        {"sbr", TAG_MXP | TAG_COMMAND, MXP_ACTION_BR, ""},
-        {"hr", TAG_MXP | TAG_COMMAND, MXP_ACTION_HR, ""},
+        // Secure tags - flags=0 (no TAG_OPEN, no TAG_COMMAND)
+        // Source: mxpinit.cpp lines 49-73
+        {"frame", TAG_NOT_IMP, MXP_ACTION_FRAME, ""},
+        {"dest", TAG_NOT_IMP, MXP_ACTION_DEST, ""},
+        {"image", TAG_COMMAND | TAG_NOT_IMP, MXP_ACTION_IMAGE, "url,fname"},
+        {"filter", TAG_NOT_IMP, MXP_ACTION_FILTER, ""},
+        {"a", 0, MXP_ACTION_HYPERLINK, "href,xch_cmd,xch_hint"},
+        {"h1", TAG_NOT_IMP, MXP_ACTION_H1, ""},
+        {"h2", TAG_NOT_IMP, MXP_ACTION_H2, ""},
+        {"h3", TAG_NOT_IMP, MXP_ACTION_H3, ""},
+        {"h4", TAG_NOT_IMP, MXP_ACTION_H4, ""},
+        {"h5", TAG_NOT_IMP, MXP_ACTION_H5, ""},
+        {"h6", TAG_NOT_IMP, MXP_ACTION_H6, ""},
+        {"hr", TAG_COMMAND, MXP_ACTION_HR, ""},
+        {"nobr", TAG_NOT_IMP, MXP_ACTION_NOBR, ""},
+        {"p", 0, MXP_ACTION_P, ""},
+        {"script", TAG_NOT_IMP, MXP_ACTION_SCRIPT, ""},
+        {"send", 0, MXP_ACTION_SEND, "href,hint,xch_cmd,xch_hint,prompt"},
+        {"ul", 0, MXP_ACTION_UL, ""},
+        {"ol", 0, MXP_ACTION_OL, ""},
+        {"samp", 0, MXP_ACTION_SAMP, ""},
+        {"center", TAG_NOT_IMP, MXP_ACTION_CENTER, ""},
+        {"var", 0, MXP_ACTION_VAR, ""},
+        {"v", 0, MXP_ACTION_VAR, ""},
+        {"gauge", TAG_NOT_IMP, MXP_ACTION_GAUGE, ""},
+        {"stat", TAG_NOT_IMP, MXP_ACTION_STAT, ""},
+        {"expire", TAG_NOT_IMP, MXP_ACTION_EXPIRE, ""},
+        {"li", TAG_COMMAND, MXP_ACTION_LI, ""}, // treated as command (few close it)
 
-        // Headings (secure)
-        {"h1", TAG_MXP, MXP_ACTION_H1, ""},
-        {"h2", TAG_MXP, MXP_ACTION_H2, ""},
-        {"h3", TAG_MXP, MXP_ACTION_H3, ""},
-        {"h4", TAG_MXP, MXP_ACTION_H4, ""},
-        {"h5", TAG_MXP, MXP_ACTION_H5, ""},
-        {"h6", TAG_MXP, MXP_ACTION_H6, ""},
+        // Secure command tags
+        // Source: mxpinit.cpp lines 85-102
+        {"sound", TAG_COMMAND | TAG_NOT_IMP, MXP_ACTION_SOUND, ""},
+        {"music", TAG_COMMAND | TAG_NOT_IMP, MXP_ACTION_SOUND, ""},
+        {"br", TAG_COMMAND, MXP_ACTION_BR, ""},
+        {"username", TAG_COMMAND, MXP_ACTION_USER, ""},
+        {"user", TAG_COMMAND, MXP_ACTION_USER, ""},
+        {"password", TAG_COMMAND, MXP_ACTION_PASSWORD, ""},
+        {"pass", TAG_COMMAND, MXP_ACTION_PASSWORD, ""},
+        {"relocate", TAG_COMMAND | TAG_NOT_IMP, MXP_ACTION_RELOCATE, ""},
+        {"version", TAG_COMMAND, MXP_ACTION_VERSION, ""},
 
-        // Lists (secure)
-        {"ul", TAG_MXP, MXP_ACTION_UL, ""},
-        {"ol", TAG_MXP, MXP_ACTION_OL, ""},
-        {"li", TAG_MXP, MXP_ACTION_LI, ""},
-
-        // Color and font (secure)
-        {"color", TAG_MXP, MXP_ACTION_COLOR, "fore,back"},
-        {"font", TAG_MXP, MXP_ACTION_FONT, "face,size,color,back"},
-
-        // Links and actions (hyperlink is secure, send requires open mode)
-        {"a", TAG_MXP, MXP_ACTION_HYPERLINK, "href"},
-        {"send", TAG_OPEN | TAG_MXP, MXP_ACTION_SEND, "href,hint,prompt"},
-
-        // Media (open mode required for security)
-        {"sound", TAG_OPEN | TAG_COMMAND | TAG_MXP, MXP_ACTION_SOUND, "fname,v,l,p,t,u"},
-        {"music", TAG_OPEN | TAG_COMMAND | TAG_MXP, MXP_ACTION_SOUND, "fname,v,l,p,t,u,c"},
-        {"image", TAG_OPEN | TAG_COMMAND | TAG_MXP, MXP_ACTION_IMAGE,
-         "fname,url,t,h,w,hspace,vspace,align"},
-
-        // Gauges and stats (secure)
-        {"gauge", TAG_MXP, MXP_ACTION_GAUGE, "entity,max,caption,color"},
-        {"stat", TAG_MXP, MXP_ACTION_STAT, "entity,max,caption"},
-
-        // Special commands (mostly secure)
-        {"version", TAG_MXP | TAG_COMMAND, MXP_ACTION_VERSION, ""},
-        {"support", TAG_MXP, MXP_ACTION_SUPPORT, ""},
-        {"expire", TAG_MXP, MXP_ACTION_EXPIRE, "name"},
-        {"var", TAG_MXP | TAG_COMMAND, MXP_ACTION_VAR, ""},
-
-        // User/password (open mode)
-        {"user", TAG_OPEN | TAG_COMMAND | TAG_MXP, MXP_ACTION_USER, ""},
-        {"password", TAG_OPEN | TAG_COMMAND | TAG_MXP, MXP_ACTION_PASSWORD, ""},
-
-        // Frame operations (secure - not fully implemented)
-        {"frame", TAG_MXP | TAG_NOT_IMP, MXP_ACTION_FRAME,
-         "name,action,title,internal,align,left,top,width,height,scrolling,floating"},
-        {"dest", TAG_MXP | TAG_NOT_IMP, MXP_ACTION_DEST, "name,x,y,eol"},
-
-        // Scripting (secure)
-        {"script", TAG_MXP, MXP_ACTION_SCRIPT, ""},
-
-        // Misc (secure)
-        {"center", TAG_MXP, MXP_ACTION_CENTER, ""},
-        {"samp", TAG_MXP, MXP_ACTION_SAMP, ""},
-        {"afk", TAG_MXP | TAG_COMMAND, MXP_ACTION_AFK, ""},
+        // MXP extension commands
+        // Source: mxpinit.cpp lines 97-102
+        {"reset", TAG_COMMAND, MXP_ACTION_RESET, ""},
+        {"mxp", TAG_COMMAND, MXP_ACTION_MXP, "off"},
+        {"support", TAG_COMMAND, MXP_ACTION_SUPPORT, ""},
+        {"option", TAG_COMMAND, MXP_ACTION_OPTION, ""},
+        {"afk", TAG_COMMAND, MXP_ACTION_AFK, ""},
+        {"recommend_option", TAG_COMMAND, MXP_ACTION_RECOMMEND_OPTION, ""},
 
         // Pueblo-specific tags
+        // Source: mxpinit.cpp lines 107-115
         {"pre", TAG_PUEBLO, MXP_ACTION_PRE, ""},
         {"body", TAG_PUEBLO | TAG_NO_RESET, MXP_ACTION_BODY, ""},
         {"head", TAG_PUEBLO | TAG_NO_RESET, MXP_ACTION_HEAD, ""},
         {"html", TAG_PUEBLO | TAG_NO_RESET, MXP_ACTION_HTML, ""},
         {"title", TAG_PUEBLO, MXP_ACTION_TITLE, ""},
-        {"img", TAG_PUEBLO | TAG_COMMAND, MXP_ACTION_IMG,
-         "src,fname,url,t,h,w,hspace,vspace,align"},
-
-        // Special MXP commands
-        {"reset", TAG_MXP | TAG_COMMAND, MXP_ACTION_RESET, ""},
-        {"mxp", TAG_MXP | TAG_COMMAND, MXP_ACTION_MXP, ""},
+        {"img", TAG_PUEBLO | TAG_COMMAND, MXP_ACTION_IMG, "src,xch_mode"},
+        {"xch_page", TAG_PUEBLO | TAG_COMMAND, MXP_ACTION_XCH_PAGE, ""},
+        {"xch_pane", TAG_PUEBLO | TAG_COMMAND | TAG_NOT_IMP, MXP_ACTION_XCH_PANE, ""},
 
         {nullptr, 0, 0, nullptr} // Sentinel
     };
@@ -192,36 +187,262 @@ void MXPEngine::InitializeMXPEntities()
         {"amp", '&'},
         {"quot", '"'},
         {"apos", '\''},
-        {"nbsp", 0xA0}, // Non-breaking space
 
-        // Common symbols
-        {"copy", 0xA9},    // ©
-        {"reg", 0xAE},     // ®
-        {"trade", 0x2122}, // ™
-        {"euro", 0x20AC},  // €
-        {"pound", 0xA3},   // £
-        {"yen", 0xA5},     // ¥
-        {"cent", 0xA2},    // ¢
-
-        // Math symbols
-        {"times", 0xD7},  // ×
-        {"divide", 0xF7}, // ÷
-        {"plusmn", 0xB1}, // ±
+        // ISO-8859-1 Latin characters (160–255)
+        {"nbsp", 0xA0},   // Non-breaking space
+        {"iexcl", 0xA1},  // ¡
+        {"cent", 0xA2},   // ¢
+        {"pound", 0xA3},  // £
+        {"curren", 0xA4}, // ¤
+        {"yen", 0xA5},    // ¥
+        {"brvbar", 0xA6}, // ¦
+        {"sect", 0xA7},   // §
+        {"uml", 0xA8},    // ¨
+        {"copy", 0xA9},   // ©
+        {"ordf", 0xAA},   // ª
+        {"laquo", 0xAB},  // «
+        {"not", 0xAC},    // ¬
+        {"shy", 0xAD},    // Soft hyphen
+        {"reg", 0xAE},    // ®
+        {"macr", 0xAF},   // ¯
         {"deg", 0xB0},    // °
-        {"frac12", 0xBD}, // ½
+        {"plusmn", 0xB1}, // ±
+        {"sup2", 0xB2},   // ²
+        {"sup3", 0xB3},   // ³
+        {"acute", 0xB4},  // ´
+        {"micro", 0xB5},  // µ
+        {"para", 0xB6},   // ¶
+        {"middot", 0xB7}, // ·
+        {"cedil", 0xB8},  // ¸
+        {"sup1", 0xB9},   // ¹
+        {"ordm", 0xBA},   // º
+        {"raquo", 0xBB},  // »
         {"frac14", 0xBC}, // ¼
+        {"frac12", 0xBD}, // ½
         {"frac34", 0xBE}, // ¾
+        {"iquest", 0xBF}, // ¿
+        {"Agrave", 0xC0}, // À
+        {"Aacute", 0xC1}, // Á
+        {"Acirc", 0xC2},  // Â
+        {"Atilde", 0xC3}, // Ã
+        {"Auml", 0xC4},   // Ä
+        {"Aring", 0xC5},  // Å
+        {"AElig", 0xC6},  // Æ
+        {"Ccedil", 0xC7}, // Ç
+        {"Egrave", 0xC8}, // È
+        {"Eacute", 0xC9}, // É
+        {"Ecirc", 0xCA},  // Ê
+        {"Euml", 0xCB},   // Ë
+        {"Igrave", 0xCC}, // Ì
+        {"Iacute", 0xCD}, // Í
+        {"Icirc", 0xCE},  // Î
+        {"Iuml", 0xCF},   // Ï
+        {"ETH", 0xD0},    // Ð
+        {"Ntilde", 0xD1}, // Ñ
+        {"Ograve", 0xD2}, // Ò
+        {"Oacute", 0xD3}, // Ó
+        {"Ocirc", 0xD4},  // Ô
+        {"Otilde", 0xD5}, // Õ
+        {"Ouml", 0xD6},   // Ö
+        {"times", 0xD7},  // ×
+        {"Oslash", 0xD8}, // Ø
+        {"Ugrave", 0xD9}, // Ù
+        {"Uacute", 0xDA}, // Ú
+        {"Ucirc", 0xDB},  // Û
+        {"Uuml", 0xDC},   // Ü
+        {"Yacute", 0xDD}, // Ý
+        {"THORN", 0xDE},  // Þ
+        {"szlig", 0xDF},  // ß
+        {"agrave", 0xE0}, // à
+        {"aacute", 0xE1}, // á
+        {"acirc", 0xE2},  // â
+        {"atilde", 0xE3}, // ã
+        {"auml", 0xE4},   // ä
+        {"aring", 0xE5},  // å
+        {"aelig", 0xE6},  // æ
+        {"ccedil", 0xE7}, // ç
+        {"egrave", 0xE8}, // è
+        {"eacute", 0xE9}, // é
+        {"ecirc", 0xEA},  // ê
+        {"euml", 0xEB},   // ë
+        {"igrave", 0xEC}, // ì
+        {"iacute", 0xED}, // í
+        {"icirc", 0xEE},  // î
+        {"iuml", 0xEF},   // ï
+        {"eth", 0xF0},    // ð
+        {"ntilde", 0xF1}, // ñ
+        {"ograve", 0xF2}, // ò
+        {"oacute", 0xF3}, // ó
+        {"ocirc", 0xF4},  // ô
+        {"otilde", 0xF5}, // õ
+        {"ouml", 0xF6},   // ö
+        {"divide", 0xF7}, // ÷
+        {"oslash", 0xF8}, // ø
+        {"ugrave", 0xF9}, // ù
+        {"uacute", 0xFA}, // ú
+        {"ucirc", 0xFB},  // û
+        {"uuml", 0xFC},   // ü
+        {"yacute", 0xFD}, // ý
+        {"thorn", 0xFE},  // þ
+        {"yuml", 0xFF},   // ÿ
+
+        // HTML 4 special characters
+        {"OElig", 0x0152},  // Œ
+        {"oelig", 0x0153},  // œ
+        {"Scaron", 0x0160}, // Š
+        {"scaron", 0x0161}, // š
+        {"Yuml", 0x0178},   // Ÿ
+        {"fnof", 0x0192},   // ƒ
+        {"circ", 0x02C6},   // ˆ
+        {"tilde", 0x02DC},  // ˜
+
+        // Greek letters
+        {"Alpha", 0x0391},    // Α
+        {"Beta", 0x0392},     // Β
+        {"Gamma", 0x0393},    // Γ
+        {"Delta", 0x0394},    // Δ
+        {"Epsilon", 0x0395},  // Ε
+        {"Zeta", 0x0396},     // Ζ
+        {"Eta", 0x0397},      // Η
+        {"Theta", 0x0398},    // Θ
+        {"Iota", 0x0399},     // Ι
+        {"Kappa", 0x039A},    // Κ
+        {"Lambda", 0x039B},   // Λ
+        {"Mu", 0x039C},       // Μ
+        {"Nu", 0x039D},       // Ν
+        {"Xi", 0x039E},       // Ξ
+        {"Omicron", 0x039F},  // Ο
+        {"Pi", 0x03A0},       // Π
+        {"Rho", 0x03A1},      // Ρ
+        {"Sigma", 0x03A3},    // Σ
+        {"Tau", 0x03A4},      // Τ
+        {"Upsilon", 0x03A5},  // Υ
+        {"Phi", 0x03A6},      // Φ
+        {"Chi", 0x03A7},      // Χ
+        {"Psi", 0x03A8},      // Ψ
+        {"Omega", 0x03A9},    // Ω
+        {"alpha", 0x03B1},    // α
+        {"beta", 0x03B2},     // β
+        {"gamma", 0x03B3},    // γ
+        {"delta", 0x03B4},    // δ
+        {"epsilon", 0x03B5},  // ε
+        {"zeta", 0x03B6},     // ζ
+        {"eta", 0x03B7},      // η
+        {"theta", 0x03B8},    // θ
+        {"iota", 0x03B9},     // ι
+        {"kappa", 0x03BA},    // κ
+        {"lambda", 0x03BB},   // λ
+        {"mu", 0x03BC},       // μ
+        {"nu", 0x03BD},       // ν
+        {"xi", 0x03BE},       // ξ
+        {"omicron", 0x03BF},  // ο
+        {"pi", 0x03C0},       // π
+        {"rho", 0x03C1},      // ρ
+        {"sigmaf", 0x03C2},   // ς
+        {"sigma", 0x03C3},    // σ
+        {"tau", 0x03C4},      // τ
+        {"upsilon", 0x03C5},  // υ
+        {"phi", 0x03C6},      // φ
+        {"chi", 0x03C7},      // χ
+        {"psi", 0x03C8},      // ψ
+        {"omega", 0x03C9},    // ω
+        {"thetasym", 0x03D1}, // ϑ
+        {"upsih", 0x03D2},    // ϒ
+        {"piv", 0x03D6},      // ϖ
+
+        // General punctuation and typographic characters
+        {"ensp", 0x2002},   // En space
+        {"emsp", 0x2003},   // Em space
+        {"thinsp", 0x2009}, // Thin space
+        {"zwnj", 0x200C},   // Zero-width non-joiner
+        {"zwj", 0x200D},    // Zero-width joiner
+        {"lrm", 0x200E},    // Left-to-right mark
+        {"rlm", 0x200F},    // Right-to-left mark
+        {"ndash", 0x2013},  // –
+        {"mdash", 0x2014},  // —
+        {"lsquo", 0x2018},  // '
+        {"rsquo", 0x2019},  // '
+        {"sbquo", 0x201A},  // ‚
+        {"ldquo", 0x201C},  // "
+        {"rdquo", 0x201D},  // "
+        {"bdquo", 0x201E},  // „
+        {"dagger", 0x2020}, // †
+        {"Dagger", 0x2021}, // ‡
+        {"bull", 0x2022},   // •
+        {"hellip", 0x2026}, // …
+        {"permil", 0x2030}, // ‰
+        {"prime", 0x2032},  // ′
+        {"Prime", 0x2033},  // ″
+        {"lsaquo", 0x2039}, // ‹
+        {"rsaquo", 0x203A}, // ›
+        {"oline", 0x203E},  // ‾
+        {"frasl", 0x2044},  // ⁄
+        {"euro", 0x20AC},   // €
+        {"trade", 0x2122},  // ™
 
         // Arrows
         {"larr", 0x2190}, // ←
         {"uarr", 0x2191}, // ↑
         {"rarr", 0x2192}, // →
         {"darr", 0x2193}, // ↓
+        {"harr", 0x2194}, // ↔
+        {"lArr", 0x21D0}, // ⇐
+        {"uArr", 0x21D1}, // ⇑
+        {"rArr", 0x21D2}, // ⇒
+        {"dArr", 0x21D3}, // ⇓
+        {"hArr", 0x21D4}, // ⇔
 
-        // Misc
-        {"hearts", 0x2665}, // ♥
-        {"clubs", 0x2663},  // ♣
+        // Mathematical operators
+        {"forall", 0x2200}, // ∀
+        {"part", 0x2202},   // ∂
+        {"exist", 0x2203},  // ∃
+        {"empty", 0x2205},  // ∅
+        {"nabla", 0x2207},  // ∇
+        {"isin", 0x2208},   // ∈
+        {"notin", 0x2209},  // ∉
+        {"ni", 0x220B},     // ∋
+        {"prod", 0x220F},   // ∏
+        {"sum", 0x2211},    // ∑
+        {"minus", 0x2212},  // −
+        {"lowast", 0x2217}, // ∗
+        {"radic", 0x221A},  // √
+        {"prop", 0x221D},   // ∝
+        {"infin", 0x221E},  // ∞
+        {"ang", 0x2220},    // ∠
+        {"and", 0x2227},    // ∧
+        {"or", 0x2228},     // ∨
+        {"cap", 0x2229},    // ∩
+        {"cup", 0x222A},    // ∪
+        {"int", 0x222B},    // ∫
+        {"there4", 0x2234}, // ∴
+        {"sim", 0x223C},    // ∼
+        {"cong", 0x2245},   // ≅
+        {"asymp", 0x2248},  // ≈
+        {"ne", 0x2260},     // ≠
+        {"equiv", 0x2261},  // ≡
+        {"le", 0x2264},     // ≤
+        {"ge", 0x2265},     // ≥
+        {"sub", 0x2282},    // ⊂
+        {"sup", 0x2283},    // ⊃
+        {"nsub", 0x2284},   // ⊄
+        {"sube", 0x2286},   // ⊆
+        {"supe", 0x2287},   // ⊇
+        {"oplus", 0x2295},  // ⊕
+        {"otimes", 0x2297}, // ⊗
+        {"perp", 0x22A5},   // ⊥
+        {"sdot", 0x22C5},   // ⋅
+        {"lceil", 0x2308},  // ⌈
+        {"rceil", 0x2309},  // ⌉
+        {"lfloor", 0x230A}, // ⌊
+        {"rfloor", 0x230B}, // ⌋
+        {"lang", 0x2329},   // 〈
+        {"rang", 0x232A},   // 〉
+        {"loz", 0x25CA},    // ◊
+
+        // Suit symbols
         {"spades", 0x2660}, // ♠
+        {"clubs", 0x2663},  // ♣
+        {"hearts", 0x2665}, // ♥
         {"diams", 0x2666},  // ♦
 
         {nullptr, 0} // Sentinel
@@ -266,8 +487,15 @@ void MXPEngine::CleanupMXP()
  * MXP_On - Turn on MXP (MUD eXtension Protocol)
  *
  * Port from: mxp/mxpOnOff.cpp
+ *
+ * @param manual If true, preserve existing custom elements/entities/active tags
+ *               (user toggled MXP off then on again). If false (default), clear
+ *               custom definitions — we assume a fresh connection.
+ *
+ * Original: MXP_On(bPueblo, bManual) — when bManual is true, skips clearing
+ *           m_CustomElementMap, m_ActiveTagList, m_CustomEntityMap.
  */
-void MXPEngine::MXP_On()
+void MXPEngine::MXP_On(bool manual)
 {
     // Do nothing if already on
     if (m_bMXP) {
@@ -281,15 +509,28 @@ void MXPEngine::MXP_On()
     m_bPuebloActive = false; // Not Pueblo mode
     m_bMXP_script = false;
     m_bPreMode = false;
-    m_iMXP_mode = eMXP_open;        // Start in open mode
-    m_iMXP_defaultMode = eMXP_open; // Default is open mode
-    m_iListMode = 0;                // No list mode (eNoList)
+    m_iListMode = eNoList;
     m_iListCount = 0;
     m_iMXPerrors = 0;
     m_iMXPtags = 0;
     m_iMXPentities = 0;
 
-    // Initialize MXP elements and entities
+    // If NOT a manual toggle, reset mode to open and clear custom definitions.
+    // Original: mxpOnOff.cpp:136-155 — the !bManual branch resets mode and
+    //           deletes custom elements, active tags, and custom entities.
+    if (!manual) {
+        m_iMXP_mode = eMXP_open;
+        m_iMXP_defaultMode = eMXP_open;
+
+        // Clear custom element/entity definitions and active tag stack.
+        // Built-in maps (m_atomicElementMap, m_entityMap) are re-initialized below.
+        m_customElementMap.clear();
+        m_activeTagList.clear();
+        m_customEntityMap.clear();
+    }
+
+    // (Re-)initialize built-in atomic elements and standard HTML entities.
+    // These are statically defined and safe to reload on every non-manual start.
     InitializeMXPElements();
     InitializeMXPEntities();
 
@@ -310,6 +551,9 @@ void MXPEngine::MXP_Off(bool force)
         return;
     }
 
+    // Reset ANSI colors to default (original: MXP_Off calls InterpretANSIcode(0))
+    m_doc.InterpretANSIcode(0);
+
     if (force) {
         qCDebug(lcWorld) << "Closing down MXP";
     }
@@ -318,16 +562,18 @@ void MXPEngine::MXP_Off(bool force)
     m_bInParagraph = false;
     m_bMXP_script = false;
     m_bPreMode = false;
-    m_iListMode = 0;
+    m_iListMode = eNoList;
     m_iListCount = 0;
 
-    // Close all open tags
-    MXP_CloseOpenTags();
+    // Close ALL tags including secure ones (original: mxpOnOff.cpp:34 calls MXP_CloseAllTags)
+    MXP_CloseOpenTags(true);
 
     if (force) {
-        // Clean up MXP resources
-        CleanupMXP();
-        // Change back to open mode
+        // Change back to open mode.
+        // NOTE: Do NOT call CleanupMXP() here. The original MXP_Off(bCompletely=true)
+        // does NOT clear custom elements/entities — that only happens in MXP_On(manual=false).
+        // Clearing them here would destroy server-defined definitions that should survive
+        // a manual off→on toggle (M175).
         MXP_mode_change(eMXP_open);
 
         // If in MXP collection phase, reset to Phase::NONE
@@ -393,10 +639,11 @@ void MXPEngine::MXP_mode_change(int mode)
         qCDebug(lcWorld) << "MXP mode change from" << oldMode << "to" << newMode;
     }
 
-    // TODO(mxp): Close open tags when transitioning from OPEN to SECURE/LOCKED mode.
-    // if (MXP_Open() && mode != eMXP_open && mode != eMXP_perm_open) {
-    //     MXP_CloseOpenTags();
-    // }
+    // Close open tags when transitioning from OPEN to non-OPEN mode
+    // Original: mxpMode.cpp:78-81
+    if (MXP_Open() && mode != eMXP_open && mode != eMXP_perm_open) {
+        MXP_CloseOpenTags();
+    }
 
     // Set default mode based on new mode
     switch (mode) {
@@ -760,14 +1007,31 @@ void MXPEngine::ParseMXPTag(const QString& tagString, QString& tagName, MXPArgum
  * @param name Argument name (case-insensitive)
  * @return Argument value, or empty string if not found
  */
-QString MXPEngine::GetMXPArgument(MXPArgumentList& args, const QString& name)
+QString MXPEngine::GetMXPArgument(MXPArgumentList& args, const QString& name, int position)
 {
+    MXPArgument* positionalMatch = nullptr;
+
     for (const auto& arg : args) {
-        if (arg->strName.compare(name, Qt::CaseInsensitive) == 0) {
+        if (arg->bKeyword) {
+            continue; // keywords are not arguments (original: mxputils.cpp:210-211)
+        }
+        // Name match takes priority
+        if (!name.isEmpty() && arg->strName.compare(name, Qt::CaseInsensitive) == 0) {
             arg->bUsed = true;
             return arg->strValue;
         }
+        // Remember positional match as fallback (original: mxputils.cpp:221-222)
+        if (position > 0 && arg->iPosition == position) {
+            positionalMatch = arg.get();
+        }
     }
+
+    // Fall back to positional match if no name match found
+    if (positionalMatch) {
+        positionalMatch->bUsed = true;
+        return positionalMatch->strValue;
+    }
+
     return QString();
 }
 
@@ -776,9 +1040,9 @@ QString MXPEngine::GetMXPArgument(MXPArgumentList& args, const QString& name)
  *
  * Swaps the parameter order to make it more natural to call: MXP_GetArgument("href", args)
  */
-QString MXPEngine::MXP_GetArgument(const QString& name, MXPArgumentList& args)
+QString MXPEngine::MXP_GetArgument(const QString& name, MXPArgumentList& args, int position)
 {
-    return GetMXPArgument(args, name);
+    return GetMXPArgument(args, name, position);
 }
 
 /**
@@ -924,9 +1188,15 @@ QString MXPEngine::MXP_GetEntity(const QString& entityName)
         return QString::fromUcs4(reinterpret_cast<const char32_t*>(&codepoint), 1);
     }
 
+    // Custom entity lookup is case-insensitive: keys are stored lowercased by
+    // MXP_DefineEntity (line: strName = remaining.left(spacePos).toLower()).
+    // Original: mxpEntities.cpp:64-66 — MXP_GetEntity lowercases the name before
+    // looking up m_CustomEntityMap.
+    const QString lowerEntityName = entityName.toLower();
+
     // Check custom entities first (they can override)
     {
-        auto it = m_customEntityMap.find(entityName);
+        auto it = m_customEntityMap.find(lowerEntityName);
         if (it != m_customEntityMap.end()) {
             const MXPEntity* entity = it->second.get();
             // Custom entities use strValue (can be multi-character)
@@ -938,7 +1208,9 @@ QString MXPEngine::MXP_GetEntity(const QString& entityName)
         }
     }
 
-    // Check standard entities (these always use iCodepoint)
+    // Check standard entities (these always use iCodepoint).
+    // Standard entities use the original (non-lowercased) name since HTML entities
+    // like &lt; &gt; &amp; etc. are already lowercase by convention.
     {
         auto it = m_entityMap.find(entityName);
         if (it != m_entityMap.end()) {
@@ -982,10 +1254,9 @@ void MXPEngine::MXP_StartTag(const QString& tagString)
     // Check if current mode is secure
     bool bSecure = (m_iMXP_mode == eMXP_secure || m_iMXP_mode == eMXP_perm_secure);
 
-    // Restore mode (cancel secure-once)
-    if (m_iMXP_mode == eMXP_perm_secure) {
-        m_iMXP_previousMode = eMXP_secure;
-        m_iMXP_mode = eMXP_secure;
+    // Restore mode (cancel secure-once) — original: MXP_Restore_Mode in mxpMode.cpp
+    if (m_iMXP_mode == eMXP_secure_once) {
+        m_iMXP_mode = m_iMXP_previousMode;
     }
 
     // Count tags
@@ -1015,9 +1286,10 @@ void MXPEngine::MXP_StartTag(const QString& tagString)
         bCommand = pCustomElement->bCommand;
     }
 
-    // SECURITY CHECK: Tags WITH TAG_OPEN require open mode (blocked in secure mode)
-    if (bOpen && bSecure) {
-        qCWarning(lcMXP) << "Open-mode tag blocked in secure mode:" << tagName;
+    // SECURITY CHECK: Tags WITHOUT TAG_OPEN are secure-only; reject in non-secure mode
+    // (original: mxpStart.cpp:140-148 — if (!bOpen && !bSecure) reject)
+    if (!bOpen && !bSecure) {
+        qCWarning(lcMXP) << "Secure MXP tag ignored when not in secure mode:" << tagName;
         m_iMXPerrors++;
         return;
     }
@@ -1136,10 +1408,9 @@ void MXPEngine::MXP_EndTag(const QString& tagString)
     // Check if current mode is secure
     bool bSecure = (m_iMXP_mode == eMXP_secure || m_iMXP_mode == eMXP_perm_secure);
 
-    // Restore mode (cancel secure-once)
-    if (m_iMXP_mode == eMXP_perm_secure) {
-        m_iMXP_previousMode = eMXP_secure;
-        m_iMXP_mode = eMXP_secure;
+    // Restore mode (cancel secure-once) — original: MXP_Restore_Mode in mxpMode.cpp
+    if (m_iMXP_mode == eMXP_secure_once) {
+        m_iMXP_mode = m_iMXP_previousMode;
     }
 
     QString strName = tagString.trimmed().toLower(); // Case-insensitive
@@ -1215,6 +1486,22 @@ void MXPEngine::MXP_EndTag(const QString& tagString)
  */
 void MXPEngine::MXP_Definition(const QString& defString)
 {
+    // Definitions require secure mode (original: mxpDefs.cpp:30-42)
+    bool bSecure = (m_iMXP_mode == eMXP_secure || m_iMXP_mode == eMXP_perm_secure ||
+                    m_iMXP_mode == eMXP_secure_once);
+
+    // Restore mode (cancel secure-once)
+    if (m_iMXP_mode == eMXP_secure_once) {
+        m_iMXP_mode = m_iMXP_previousMode;
+    }
+
+    if (!bSecure) {
+        qCWarning(lcMXP) << "MXP definition ignored when not in secure mode: <!" << defString
+                         << ">";
+        m_iMXPerrors++;
+        return;
+    }
+
     if (defString.startsWith("ELEMENT", Qt::CaseInsensitive)) {
         MXP_DefineElement(defString.mid(7).trimmed());
     } else if (defString.startsWith("ENTITY", Qt::CaseInsensitive)) {
@@ -1569,6 +1856,17 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
     }
 
     int action = elem->iAction;
+
+    // Pueblo compatibility: <A xch_cmd="..."> converts hyperlink to SEND action
+    // (original: mxpOpenAtomic.cpp:97-106)
+    if (action == MXP_ACTION_HYPERLINK) {
+        QString xchCmd = MXP_GetArgument("xch_cmd", args);
+        if (!xchCmd.isEmpty()) {
+            m_bPuebloActive = true;
+            action = MXP_ACTION_SEND;
+        }
+    }
+
     qCDebug(lcMXP) << "Execute action:" << action << "(" << elem->strName << ")";
 
     switch (action) {
@@ -1662,25 +1960,27 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
         // ========== COLOR ==========
         case MXP_ACTION_COLOR: {
             // <color fore=red back=blue>
+            // Original (mxpOpenAtomic.cpp:124-149): checks m_bIgnoreMXPcolourChanges before
+            // applying both foreground and background colour changes.
+            if (m_doc.m_bIgnoreMXPcolourChanges)
+                break;
+
             QString fore = MXP_GetArgument("fore", args);
             QString back = MXP_GetArgument("back", args);
 
+            // Set RGB color mode upfront (mirrors original: always clears COLOURTYPE)
+            m_doc.m_iFlags = (m_doc.m_iFlags & ~COLOURTYPE) | COLOUR_RGB;
+
             if (!fore.isEmpty()) {
                 QRgb fgColor = MXP_GetColor(fore);
-                // Convert QRgb to int for storage
                 m_doc.m_iForeColour = (int)fgColor;
-                // Set RGB color mode
-                m_doc.m_iFlags = (m_doc.m_iFlags & ~COLOURTYPE) | COLOUR_RGB;
                 qCDebug(lcMXP) << "Set foreground color:" << fore << "="
                                << QString::number(fgColor, 16);
             }
 
             if (!back.isEmpty()) {
                 QRgb bgColor = MXP_GetColor(back);
-                // Convert QRgb to int for storage
                 m_doc.m_iBackColour = (int)bgColor;
-                // Set RGB color mode (only need to set once)
-                m_doc.m_iFlags = (m_doc.m_iFlags & ~COLOURTYPE) | COLOUR_RGB;
                 qCDebug(lcMXP) << "Set background color:" << back << "="
                                << QString::number(bgColor, 16);
             }
@@ -1689,37 +1989,67 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
 
         // ========== FONT ==========
         case MXP_ACTION_FONT: {
-            // <font face=Arial size=12 color=red>
+            // <font color=Red,Blink back=blue face=Arial size=12>
+            // Original (mxpOpenAtomic.cpp:226-285): parses comma-separated color+style list
             QString face = MXP_GetArgument("face", args);
-            QString size = MXP_GetArgument("size", args);
-            QString color = MXP_GetArgument("color", args);
 
+            // Set RGB color mode
+            m_doc.m_iFlags = (m_doc.m_iFlags & ~COLOURTYPE) | COLOUR_RGB;
+
+            // Color argument: comma-separated list of color name and/or style keywords
+            QString colorArg = MXP_GetArgument("color", args);
+            if (colorArg.isEmpty()) {
+                colorArg = MXP_GetArgument("fgcolor", args); // Pueblo fallback
+            }
+
+            if (!colorArg.isEmpty()) {
+                QStringList items = colorArg.split(',', Qt::SkipEmptyParts);
+                for (const QString& item : items) {
+                    QString trimmed = item.trimmed().toLower();
+                    if (trimmed == "blink" || trimmed == "italic") {
+                        m_doc.m_iFlags |= BLINK;
+                    } else if (trimmed == "underline") {
+                        m_doc.m_iFlags |= UNDERLINE;
+                    } else if (trimmed == "bold") {
+                        m_doc.m_iFlags |= HILITE;
+                    } else if (trimmed == "inverse") {
+                        m_doc.m_iFlags |= INVERSE;
+                    } else if (!m_doc.m_bIgnoreMXPcolourChanges) {
+                        m_doc.m_iForeColour = static_cast<QRgb>(MXP_GetColor(item.trimmed()));
+                    }
+                }
+            }
+
+            // Background color
+            QString backArg = MXP_GetArgument("back", args);
+            if (backArg.isEmpty()) {
+                backArg = MXP_GetArgument("bgcolor", args); // Pueblo fallback
+            }
+            if (!backArg.isEmpty() && !m_doc.m_bIgnoreMXPcolourChanges) {
+                m_doc.m_iBackColour = static_cast<QRgb>(MXP_GetColor(backArg));
+            }
+
+            // face/size: not fully supported (need MXP style stack)
             if (!face.isEmpty()) {
-                // TODO(mxp): Push font face onto MXP style stack (requires style stack
-                // implementation).
-                qCDebug(lcMXP) << "Set font face:" << face;
+                qCDebug(lcMXP) << "Font face:" << face << "(needs style stack)";
             }
 
-            if (!size.isEmpty()) {
-                // TODO(mxp): Push font size onto MXP style stack (requires style stack
-                // implementation).
-                qCDebug(lcMXP) << "Set font size:" << size;
-            }
-
-            if (!color.isEmpty()) {
-                QRgb fgColor = MXP_GetColor(color);
-                // TODO(mxp): Push font color onto MXP style stack (requires style stack
-                // implementation).
-                qCDebug(lcMXP) << "Set font color:" << color;
-            }
+            // consume size argument to avoid unused-argument warnings
+            (void)MXP_GetArgument("size", args);
             break;
         }
 
         // ========== INTERACTIVE ELEMENTS ==========
         case MXP_ACTION_SEND: {
             // <send href="command" hint="tooltip" prompt>
+            // Pueblo fallback: xch_cmd if href empty, xch_hint if hint empty
+            // (original: mxpOpenAtomic.cpp:172-205)
             QString href = MXP_GetArgument("href", args);
+            if (href.isEmpty())
+                href = MXP_GetArgument("xch_cmd", args);
             QString hint = MXP_GetArgument("hint", args);
+            if (hint.isEmpty())
+                hint = MXP_GetArgument("xch_hint", args);
             bool prompt = MXP_HasArgument("prompt", args);
 
             // Store link info for text that follows
@@ -1727,8 +2057,20 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
             m_strMXP_hint = hint;
             m_bMXP_link_prompt = prompt;
 
-            // Mark that we're in a clickable region
-            m_doc.m_iFlags |= 0x0400; // ACTION_SEND flag (part of ACTIONTYPE bits)
+            // Set action type bits: cancel old, set SEND or PROMPT
+            // (original: mxpOpenAtomic.cpp:175-179)
+            m_doc.m_iFlags &= ~ACTIONTYPE;
+            m_doc.m_iFlags |= prompt ? ACTION_PROMPT : ACTION_SEND;
+
+            // Apply underline if world option is set (original: mxpOpenAtomic.cpp:181-182)
+            if (m_doc.m_bUnderlineHyperlinks)
+                m_doc.m_iFlags |= UNDERLINE;
+
+            // Apply custom link color if configured (original: mxpOpenAtomic.cpp:184-191)
+            if (m_doc.m_bUseCustomLinkColour) {
+                m_doc.m_iForeColour = static_cast<int>(m_doc.m_colors.hyperlink_colour);
+                m_doc.m_iFlags = (m_doc.m_iFlags & ~COLOURTYPE) | COLOUR_RGB;
+            }
 
             qCDebug(lcMXP) << "Begin send link:" << href << "hint:" << hint << "prompt:" << prompt;
             break;
@@ -1736,6 +2078,7 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
 
         case MXP_ACTION_HYPERLINK: {
             // <a href="http://url">
+            // (original: mxpOpenAtomic.cpp:207-224)
             QString href = MXP_GetArgument("href", args);
             QString hint = MXP_GetArgument("hint", args);
 
@@ -1744,8 +2087,16 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
             m_strMXP_hint = hint;
             m_bMXP_link_prompt = false;
 
-            // Mark that we're in a hyperlink region
-            m_doc.m_iFlags |= 0x0800; // ACTION_HYPERLINK flag (part of ACTIONTYPE bits)
+            // Set action type bits and unconditionally apply underline
+            // (original: mxpOpenAtomic.cpp:213-214 — <a> always underlines)
+            m_doc.m_iFlags &= ~ACTIONTYPE;
+            m_doc.m_iFlags |= ACTION_HYPERLINK | UNDERLINE;
+
+            // Apply custom link color if configured (original: mxpOpenAtomic.cpp:216-222)
+            if (m_doc.m_bUseCustomLinkColour) {
+                m_doc.m_iForeColour = static_cast<int>(m_doc.m_colors.hyperlink_colour);
+                m_doc.m_iFlags = (m_doc.m_iFlags & ~COLOURTYPE) | COLOUR_RGB;
+            }
 
             qCDebug(lcMXP) << "Begin hyperlink:" << href << "hint:" << hint;
             break;
@@ -1753,58 +2104,134 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
 
         // ========== MEDIA ==========
         case MXP_ACTION_SOUND: {
-            // <sound fname="file.wav" v=100 l=1 p=50 t=music u="http://url">
+            // <sound fname="file.wav" v=100 l=1 p=50 t=category u="http://url">
+            // <music fname="file.mp3" v=100 l=-1 p=50 t=category u="http://url" c=1>
+            // MXP spec: fname=filename, v=volume(1-100), l=loops(-1=infinite,1=once),
+            //           p=priority, t=type/category, u=base URL for download.
+            // MUSIC also has c=continue (don't restart if same file already playing).
+            // Original: TAG_NOT_IMP in reference; behavioural spec from MXP standard.
             QString fname = MXP_GetArgument("fname", args);
-            QString volume = MXP_GetArgument("v", args);
-            QString loops = MXP_GetArgument("l", args);
-            QString priority = MXP_GetArgument("p", args);
-            QString type = MXP_GetArgument("t", args);
+            QString volumeStr = MXP_GetArgument("v", args);
+            QString loopsStr = MXP_GetArgument("l", args);
+            // Priority is not implemented — no sound priority queue in Mushkin.
+            (void)MXP_GetArgument("p", args);
+            // Type/category is informational only.
+            QString typeStr = MXP_GetArgument("t", args);
+            if (!typeStr.isEmpty())
+                qCDebug(lcMXP) << "Sound type/category:" << typeStr;
             QString url = MXP_GetArgument("u", args);
+            // c=continue is MUSIC-only; consume so it isn't flagged as unused.
+            (void)MXP_GetArgument("c", args);
 
-            if (fname.isEmpty() && url.isEmpty()) {
+            QString soundFile = fname.isEmpty() ? url : fname;
+            if (soundFile.isEmpty()) {
                 qCWarning(lcMXP) << "Sound tag has no fname or URL";
                 break;
             }
 
-            // Use Lua sound API
-            int vol = volume.isEmpty() ? 100 : volume.toInt();
-            int loop = loops.isEmpty() ? 1 : (loops.toInt() == -1 ? -1 : loops.toInt());
+            // v=1-100 (MXP spec, 100=full); convert to Mushkin API scale (-100..0).
+            int vol = volumeStr.isEmpty() ? 100 : qBound(1, volumeStr.toInt(), 100);
+            double volumeApi = static_cast<double>(vol) - 100.0; // 100→0.0, 1→-99.0
 
-            QString soundFile = fname.isEmpty() ? url : fname;
-            qCDebug(lcMXP) << "Playing sound:" << soundFile << "volume:" << vol << "loops:" << loop;
+            // l=loops: -1=infinite, 1=once (default), N>1=N times.
+            int loopCount = loopsStr.isEmpty() ? 1 : loopsStr.toInt();
+            bool loop = (loopCount < 0 || loopCount > 1);
 
-            // Play sound using Qt Multimedia system
-            if (m_doc.PlaySoundFile(soundFile)) {
-                qCDebug(lcMXP) << "Successfully started sound playback";
-            } else {
-                qCWarning(lcMXP) << "Failed to play sound:" << soundFile;
-            }
+            // <music> uses the dedicated music buffer (1); <sound> auto-selects (0).
+            bool isMusic = (elem->strName.compare("music", Qt::CaseInsensitive) == 0);
+            qint16 buffer = isMusic ? 1 : 0;
+
+            qCDebug(lcMXP) << (isMusic ? "MXP MUSIC" : "MXP SOUND") << "file:" << soundFile
+                           << "volume:" << vol << "loops:" << loopCount << "url:" << url;
+
+            m_doc.PlayMSPSound(soundFile, url, loop, volumeApi, buffer);
             break;
         }
 
         case MXP_ACTION_IMAGE:
         case MXP_ACTION_IMG: {
             // <image fname="pic.png" url="http://..." align=left h=100 w=100>
-            // Display inline image in text flow
+            // We are a text client — display a clickable placeholder link instead.
+            // Original (mxpOpenAtomic.cpp:723-796): when url is present, appends fname to
+            // url, outputs "[url+fname]" as a hyperlink on its own line, then restores style.
+            // Pueblo also checks "src" as a fallback for url.
             QString fname = MXP_GetArgument("fname", args);
             QString url = MXP_GetArgument("url", args);
-            QString align = MXP_GetArgument("align", args);
-            QString height = MXP_GetArgument("h", args);
-            QString width = MXP_GetArgument("w", args);
+            if (url.isEmpty())
+                url = MXP_GetArgument("src", args); // Pueblo fallback
+            // Consume remaining recognised args to suppress unused-arg warnings
+            (void)MXP_GetArgument("align", args);
+            (void)MXP_GetArgument("h", args);
+            (void)MXP_GetArgument("w", args);
+            (void)MXP_GetArgument("hspace", args);
+            (void)MXP_GetArgument("vspace", args);
+            (void)MXP_GetArgument("t", args);
+            (void)MXP_GetArgument("ismap", args);
+            (void)MXP_GetArgument("xch_mode", args);
 
-            QString imgSource = fname.isEmpty() ? url : fname;
-            qCDebug(lcMXP) << "Image: src=" << imgSource << "align=" << align << "w=" << width
-                           << "h=" << height
-                           << "(requires text pipeline integration for inline images)";
+            if (!url.isEmpty()) {
+                // Append filename to URL as the original does (original:770 strArgument +=
+                // strFilename)
+                QString linkTarget = url + fname;
+
+                // Ensure image link appears on its own line (original:755-756)
+                if (m_doc.m_currentLine && m_doc.m_currentLine->len() > 0)
+                    m_doc.StartNewLine(true, 0);
+
+                // Save current style
+                quint16 savedFlags = m_doc.m_iFlags;
+                QRgb savedFore = m_doc.m_iForeColour;
+                QRgb savedBack = m_doc.m_iBackColour;
+                auto savedAction = m_doc.m_currentAction;
+
+                // Set hyperlink style (original:762-776)
+                m_doc.m_currentAction =
+                    std::make_shared<Action>(linkTarget, linkTarget, QString(), &m_doc);
+                m_doc.m_iFlags &= ~ACTIONTYPE;
+                m_doc.m_iFlags |= ACTION_HYPERLINK;
+                if (m_doc.m_bUnderlineHyperlinks)
+                    m_doc.m_iFlags |= UNDERLINE;
+                if (m_doc.m_bUseCustomLinkColour) {
+                    m_doc.m_iForeColour = static_cast<int>(m_doc.m_colors.hyperlink_colour);
+                    m_doc.m_iFlags = (m_doc.m_iFlags & ~COLOURTYPE) | COLOUR_RGB;
+                }
+
+                // Output "[url+fname]" as clickable text (original:778-780)
+                QByteArray linkBytes = QString("[%1]").arg(linkTarget).toUtf8();
+                m_doc.AddToLine(linkBytes.constData(), linkBytes.size());
+
+                // Restore style (original:787-793)
+                m_doc.m_iFlags = savedFlags;
+                m_doc.m_iForeColour = savedFore;
+                m_doc.m_iBackColour = savedBack;
+                m_doc.m_currentAction = savedAction;
+
+                // Start a new line after the image link (original:786)
+                m_doc.StartNewLine(true, 0);
+
+                qCDebug(lcMXP) << "Image placeholder link:" << linkTarget;
+            } else if (!fname.isEmpty()) {
+                // No URL — just log; can't make a clickable link without a URL
+                qCDebug(lcMXP) << "Image: fname=" << fname << "(no URL; no placeholder output)";
+            }
             break;
         }
 
         // ========== SERVER COMMANDS ==========
-        case MXP_ACTION_VERSION:
-            // Send client version to server
-            // Not implemented: MXP VERSION tag — would send client version to server. Rarely used.
-            qCDebug(lcMXP) << "Send version (not implemented)";
+        case MXP_ACTION_VERSION: {
+            // Send client version to server (original: mxpOpenAtomic.cpp:288-304)
+            // Format: ESC[1z<VERSION MXP="0.4" CLIENT=Mushkin VERSION="x.y.z" REGISTERED=YES>\r\n
+            QString versionResponse =
+                QString("\x1B[1z<VERSION MXP=\"0.4\" CLIENT=Mushkin VERSION=\"%1\" "
+                        "REGISTERED=YES>\r\n")
+                    .arg(QCoreApplication::applicationVersion());
+            QByteArray data = versionResponse.toUtf8();
+            m_doc.SendPacket(
+                std::span<const unsigned char>(reinterpret_cast<const unsigned char*>(data.data()),
+                                               static_cast<size_t>(data.size())));
+            qCDebug(lcMXP) << "Sent version response:" << versionResponse.trimmed();
             break;
+        }
 
         case MXP_ACTION_USER:
             // Send username to server
@@ -1912,20 +2339,113 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
 
         // ========== PROTOCOL CONTROL ==========
         case MXP_ACTION_RESET:
-            // <reset> - close all open tags
-            MXP_CloseOpenTags();
+            // <reset> - reset MXP state: close open tags, reset ANSI formatting,
+            // and reset paragraph/pre mode.
+            // Original: mxpOpenAtomic.cpp:615-616 — calls MXP_Off() (bCompletely=false),
+            // which also calls InterpretANSIcode(0), resets bInParagraph/bPreMode/listMode,
+            // and then calls MXP_CloseAllTags(). This is more than just closing open tags.
+            MXP_Off(false);
             break;
 
         case MXP_ACTION_MXP: {
-            // <mxp> - MXP protocol commands
-            qCDebug(lcMXP) << "MXP command (not implemented)";
+            // <mxp off> — server requests permanent MXP disable (original:
+            // mxpOpenAtomic.cpp:620-659) Only "off" is implemented; mode-change keywords
+            // (default_open, etc.) are commented out in the original too.
+            if (MXP_HasArgument("off", args)) {
+                qCDebug(lcMXP) << "MXP off: disabling MXP completely";
+                MXP_Off(true);
+            } else {
+                qCDebug(lcMXP) << "MXP command (no recognised keyword)";
+            }
             break;
         }
 
         case MXP_ACTION_SUPPORT: {
-            // <support> - report what we support
-            // TODO(mxp): Reply with list of supported MXP tags for server capability negotiation.
-            qCDebug(lcMXP) << "Support query (not implemented)";
+            // <support> - report supported tags (original: mxpOpenAtomic.cpp:326-462)
+            QString supports;
+
+            if (args.empty()) {
+                // No args: report all supported elements and their sub-attributes
+                // (original: lists +elem for each implemented element, then +elem.attr
+                // for each attribute in pElement->strArgs)
+                for (const auto& [name, elem] : m_atomicElementMap) {
+                    if (elem->iFlags & TAG_NOT_IMP) {
+                        supports += QString("-%1 ").arg(name);
+                    } else {
+                        supports += QString("+%1 ").arg(name);
+                        // Also list each supported sub-attribute (original: 345-355)
+                        if (!elem->strArgs.isEmpty()) {
+                            const QStringList subAttrs =
+                                elem->strArgs.split(',', Qt::SkipEmptyParts);
+                            for (const QString& attr : subAttrs) {
+                                supports += QString("+%1.%2 ").arg(name, attr.trimmed());
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Report on specific requested elements, with dot-notation sub-attribute
+                // and wildcard support (original: mxpOpenAtomic.cpp:361-451).
+                // Arguments are positional: strValue holds the full "elem" or "elem.attr"
+                // token (original: pArgument->strValue).
+                for (const auto& arg : args) {
+                    if (arg->bKeyword)
+                        continue;
+                    // Use strValue for positional args (the full "elem" or "elem.attr" token)
+                    QString argValue = arg->strValue.isEmpty() ? arg->strName : arg->strValue;
+                    argValue = argValue.toLower();
+
+                    const QStringList parts = argValue.split('.', Qt::SkipEmptyParts);
+                    if (parts.isEmpty() || parts.size() > 2) {
+                        qCWarning(lcMXP) << "Invalid <support> argument:" << argValue;
+                        continue;
+                    }
+
+                    const QString tagName = parts[0];
+                    auto it = m_atomicElementMap.find(tagName);
+                    if (it == m_atomicElementMap.end() || (it->second->iFlags & TAG_NOT_IMP)) {
+                        // Tag unknown or not supported
+                        supports += QString("-%1 ").arg(tagName);
+                        continue;
+                    }
+
+                    if (parts.size() == 1) {
+                        // Just "elem" — report supported
+                        supports += QString("+%1 ").arg(tagName);
+                        continue;
+                    }
+
+                    // "elem.subtag" or "elem.*"
+                    const QString subtag = parts[1];
+                    const QStringList subAttrs = it->second->strArgs.split(',', Qt::SkipEmptyParts);
+                    if (subtag == "*") {
+                        // Wildcard: list all sub-attributes (original: 411-424)
+                        for (const QString& attr : subAttrs) {
+                            supports += QString("+%1.%2 ").arg(tagName, attr.trimmed());
+                        }
+                    } else {
+                        // Specific sub-attribute lookup (original: 437-449)
+                        bool found = false;
+                        for (const QString& attr : subAttrs) {
+                            if (attr.trimmed().compare(subtag, Qt::CaseInsensitive) == 0) {
+                                found = true;
+                                break;
+                            }
+                        }
+                        supports += found ? QString("+%1.%2 ").arg(tagName, subtag)
+                                          : QString("-%1.%2 ").arg(tagName, subtag);
+                    }
+                }
+            }
+
+            {
+                QString response = QString("\x1B[1z<SUPPORTS %1>\r\n").arg(supports.trimmed());
+                QByteArray data = response.toUtf8();
+                m_doc.SendPacket(std::span<const unsigned char>(
+                    reinterpret_cast<const unsigned char*>(data.data()),
+                    static_cast<size_t>(data.size())));
+                qCDebug(lcMXP) << "Sent support response:" << supports.trimmed();
+            }
             break;
         }
 
@@ -1953,24 +2473,33 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
 
         // ========== LISTS ==========
         case MXP_ACTION_UL:
-            // Unordered list
+            // Unordered list (original: mxpOpenAtomic.cpp:692-695)
             m_iMXP_list_depth++;
+            m_iListMode = eUnorderedList;
+            m_iListCount = 0;
             qCDebug(lcMXP) << "Start unordered list (depth:" << m_iMXP_list_depth << ")";
             break;
 
         case MXP_ACTION_OL:
-            // Ordered list
+            // Ordered list (original: mxpOpenAtomic.cpp:696-699)
             m_iMXP_list_depth++;
-            m_iMXP_list_counter = 1;
+            m_iListMode = eOrderedList;
+            m_iListCount = 0;
             qCDebug(lcMXP) << "Start ordered list (depth:" << m_iMXP_list_depth << ")";
             break;
 
-        case MXP_ACTION_LI:
-            // List item
-            // Not implemented: MXP LI tag — bulleted/numbered lists. Text-only rendering;
-            // decorative.
-            qCDebug(lcMXP) << "List item";
+        case MXP_ACTION_LI: {
+            // List item — output bullet or number prefix (original: mxpOpenAtomic.cpp:700-710)
+            // Wrap up previous line if necessary
+            if (m_doc.m_currentLine && m_doc.m_currentLine->len() > 0)
+                m_doc.StartNewLine(true, 0);
+            QString listItem = " * ";
+            if (m_iListMode == eOrderedList)
+                listItem = QString(" %1. ").arg(++m_iListCount);
+            m_doc.AddToLine(listItem.toLatin1().constData());
+            qCDebug(lcMXP) << "List item:" << listItem.trimmed();
             break;
+        }
 
         // ========== ALIGNMENT ==========
         case MXP_ACTION_CENTER:
@@ -2101,28 +2630,33 @@ void MXPEngine::MXP_EndAction(int action)
 
         // ========== INTERACTIVE ELEMENTS ==========
         case MXP_ACTION_SEND:
-            // Clear send link state
+            // Clear send link state and undo style side-effects applied on open
             m_strMXP_link.clear();
             m_strMXP_hint.clear();
             m_bMXP_link_prompt = false;
-            m_doc.m_iFlags &= ~0x0400; // Clear ACTION_SEND flag
+            m_doc.m_iFlags &= ~(ACTIONTYPE | UNDERLINE);
             qCDebug(lcMXP) << "End send link";
             break;
 
         case MXP_ACTION_HYPERLINK:
-            // Clear hyperlink state
+            // Clear hyperlink state and undo style side-effects applied on open
             m_strMXP_link.clear();
             m_strMXP_hint.clear();
-            m_doc.m_iFlags &= ~0x0800; // Clear ACTION_HYPERLINK flag
+            m_doc.m_iFlags &= ~(ACTIONTYPE | UNDERLINE);
             qCDebug(lcMXP) << "End hyperlink";
             break;
 
         // ========== LISTS ==========
         case MXP_ACTION_UL:
         case MXP_ACTION_OL:
+            // Reset list mode and wrap up the last item (original: mxpCloseAtomic.cpp:126-139)
+            m_iListMode = eNoList;
+            m_iListCount = 0;
             if (m_iMXP_list_depth > 0) {
                 m_iMXP_list_depth--;
             }
+            if (m_doc.m_currentLine && m_doc.m_currentLine->len() > 0)
+                m_doc.StartNewLine(true, 0);
             qCDebug(lcMXP) << "End list (depth:" << m_iMXP_list_depth << ")";
             break;
 
@@ -2228,45 +2762,168 @@ QRgb MXPEngine::MXP_GetColor(const QString& colorSpec)
         }
     }
 
-    // Named colors (HTML/CSS basic colors)
-    QString lower = colorSpec.toLower();
+    // Named colors — full HTML/CSS color table matching MUSHclient's MXP_colours[]
+    // (reference/mushclient-original/mxp/mxpinit.cpp). RGB values are 0xRRGGBB in
+    // the original; we extract R, G, B directly.
+    // clang-format off
+    struct ColorEntry { const char* name; quint8 r; quint8 g; quint8 b; };
+    static constexpr ColorEntry kColors[] = {
+        {"aliceblue",            0xf0, 0xf8, 0xff},
+        {"antiquewhite",         0xfa, 0xeb, 0xd7},
+        {"aqua",                 0x00, 0xff, 0xff},
+        {"aquamarine",           0x7f, 0xff, 0xd4},
+        {"azure",                0xf0, 0xff, 0xff},
+        {"beige",                0xf5, 0xf5, 0xdc},
+        {"bisque",               0xff, 0xe4, 0xc4},
+        {"black",                0x00, 0x00, 0x00},
+        {"blanchedalmond",       0xff, 0xeb, 0xcd},
+        {"blue",                 0x00, 0x00, 0xff},
+        {"blueviolet",           0x8a, 0x2b, 0xe2},
+        {"brown",                0xa5, 0x2a, 0x2a},
+        {"burlywood",            0xde, 0xb8, 0x87},
+        {"cadetblue",            0x5f, 0x9e, 0xa0},
+        {"chartreuse",           0x7f, 0xff, 0x00},
+        {"chocolate",            0xd2, 0x69, 0x1e},
+        {"coral",                0xff, 0x7f, 0x50},
+        {"cornflowerblue",       0x64, 0x95, 0xed},
+        {"cornsilk",             0xff, 0xf8, 0xdc},
+        {"crimson",              0xdc, 0x14, 0x3c},
+        {"cyan",                 0x00, 0xff, 0xff},
+        {"darkblue",             0x00, 0x00, 0x8b},
+        {"darkcyan",             0x00, 0x8b, 0x8b},
+        {"darkgoldenrod",        0xb8, 0x86, 0x0b},
+        {"darkgray",             0xa9, 0xa9, 0xa9},
+        {"darkgrey",             0xa9, 0xa9, 0xa9},
+        {"darkgreen",            0x00, 0x64, 0x00},
+        {"darkkhaki",            0xbd, 0xb7, 0x6b},
+        {"darkmagenta",          0x8b, 0x00, 0x8b},
+        {"darkolivegreen",       0x55, 0x6b, 0x2f},
+        {"darkorange",           0xff, 0x8c, 0x00},
+        {"darkorchid",           0x99, 0x32, 0xcc},
+        {"darkred",              0x8b, 0x00, 0x00},
+        {"darksalmon",           0xe9, 0x96, 0x7a},
+        {"darkseagreen",         0x8f, 0xbc, 0x8f},
+        {"darkslateblue",        0x48, 0x3d, 0x8b},
+        {"darkslategray",        0x2f, 0x4f, 0x4f},
+        {"darkslategrey",        0x2f, 0x4f, 0x4f},
+        {"darkturquoise",        0x00, 0xce, 0xd1},
+        {"darkviolet",           0x94, 0x00, 0xd3},
+        {"deeppink",             0xff, 0x14, 0x93},
+        {"deepskyblue",          0x00, 0xbf, 0xff},
+        {"dimgray",              0x69, 0x69, 0x69},
+        {"dimgrey",              0x69, 0x69, 0x69},
+        {"dodgerblue",           0x1e, 0x90, 0xff},
+        {"firebrick",            0xb2, 0x22, 0x22},
+        {"floralwhite",          0xff, 0xfa, 0xf0},
+        {"forestgreen",          0x22, 0x8b, 0x22},
+        {"fuchsia",              0xff, 0x00, 0xff},
+        {"gainsboro",            0xdc, 0xdc, 0xdc},
+        {"ghostwhite",           0xf8, 0xf8, 0xff},
+        {"gold",                 0xff, 0xd7, 0x00},
+        {"goldenrod",            0xda, 0xa5, 0x20},
+        {"gray",                 0x80, 0x80, 0x80},
+        {"grey",                 0x80, 0x80, 0x80},
+        {"green",                0x00, 0x80, 0x00},
+        {"greenyellow",          0xad, 0xff, 0x2f},
+        {"honeydew",             0xf0, 0xff, 0xf0},
+        {"hotpink",              0xff, 0x69, 0xb4},
+        {"indianred",            0xcd, 0x5c, 0x5c},
+        {"indigo",               0x4b, 0x00, 0x82},
+        {"ivory",                0xff, 0xff, 0xf0},
+        {"khaki",                0xf0, 0xe6, 0x8c},
+        {"lavender",             0xe6, 0xe6, 0xfa},
+        {"lavenderblush",        0xff, 0xf0, 0xf5},
+        {"lawngreen",            0x7c, 0xfc, 0x00},
+        {"lemonchiffon",         0xff, 0xfa, 0xcd},
+        {"lightblue",            0xad, 0xd8, 0xe6},
+        {"lightcoral",           0xf0, 0x80, 0x80},
+        {"lightcyan",            0xe0, 0xff, 0xff},
+        {"lightgoldenrodyellow", 0xfa, 0xfa, 0xd2},
+        {"lightgreen",           0x90, 0xee, 0x90},
+        {"lightgrey",            0xd3, 0xd3, 0xd3},
+        {"lightgray",            0xd3, 0xd3, 0xd3},
+        {"lightpink",            0xff, 0xb6, 0xc1},
+        {"lightsalmon",          0xff, 0xa0, 0x7a},
+        {"lightseagreen",        0x20, 0xb2, 0xaa},
+        {"lightskyblue",         0x87, 0xce, 0xfa},
+        {"lightslategray",       0x77, 0x88, 0x99},
+        {"lightslategrey",       0x77, 0x88, 0x99},
+        {"lightsteelblue",       0xb0, 0xc4, 0xde},
+        {"lightyellow",          0xff, 0xff, 0xe0},
+        {"lime",                 0x00, 0xff, 0x00},
+        {"limegreen",            0x32, 0xcd, 0x32},
+        {"linen",                0xfa, 0xf0, 0xe6},
+        {"magenta",              0xff, 0x00, 0xff},
+        {"maroon",               0x80, 0x00, 0x00},
+        {"mediumaquamarine",     0x66, 0xcd, 0xaa},
+        {"mediumblue",           0x00, 0x00, 0xcd},
+        {"mediumorchid",         0xba, 0x55, 0xd3},
+        {"mediumpurple",         0x93, 0x70, 0xdb},
+        {"mediumseagreen",       0x3c, 0xb3, 0x71},
+        {"mediumslateblue",      0x7b, 0x68, 0xee},
+        {"mediumspringgreen",    0x00, 0xfa, 0x9a},
+        {"mediumturquoise",      0x48, 0xd1, 0xcc},
+        {"mediumvioletred",      0xc7, 0x15, 0x85},
+        {"midnightblue",         0x19, 0x19, 0x70},
+        {"mintcream",            0xf5, 0xff, 0xfa},
+        {"mistyrose",            0xff, 0xe4, 0xe1},
+        {"moccasin",             0xff, 0xe4, 0xb5},
+        {"navajowhite",          0xff, 0xde, 0xad},
+        {"navy",                 0x00, 0x00, 0x80},
+        {"oldlace",              0xfd, 0xf5, 0xe6},
+        {"olive",                0x80, 0x80, 0x00},
+        {"olivedrab",            0x6b, 0x8e, 0x23},
+        {"orange",               0xff, 0xa5, 0x00},
+        {"orangered",            0xff, 0x45, 0x00},
+        {"orchid",               0xda, 0x70, 0xd6},
+        {"palegoldenrod",        0xee, 0xe8, 0xaa},
+        {"palegreen",            0x98, 0xfb, 0x98},
+        {"paleturquoise",        0xaf, 0xee, 0xee},
+        {"palevioletred",        0xdb, 0x70, 0x93},
+        {"papayawhip",           0xff, 0xef, 0xd5},
+        {"peachpuff",            0xff, 0xda, 0xb9},
+        {"peru",                 0xcd, 0x85, 0x3f},
+        {"pink",                 0xff, 0xc0, 0xcb},
+        {"plum",                 0xdd, 0xa0, 0xdd},
+        {"powderblue",           0xb0, 0xe0, 0xe6},
+        {"purple",               0x80, 0x00, 0x80},
+        {"rebeccapurple",        0x66, 0x33, 0x99},
+        {"red",                  0xff, 0x00, 0x00},
+        {"rosybrown",            0xbc, 0x8f, 0x8f},
+        {"royalblue",            0x41, 0x69, 0xe1},
+        {"saddlebrown",          0x8b, 0x45, 0x13},
+        {"salmon",               0xfa, 0x80, 0x72},
+        {"sandybrown",           0xf4, 0xa4, 0x60},
+        {"seagreen",             0x2e, 0x8b, 0x57},
+        {"seashell",             0xff, 0xf5, 0xee},
+        {"sienna",               0xa0, 0x52, 0x2d},
+        {"silver",               0xc0, 0xc0, 0xc0},
+        {"skyblue",              0x87, 0xce, 0xeb},
+        {"slateblue",            0x6a, 0x5a, 0xcd},
+        {"slategray",            0x70, 0x80, 0x90},
+        {"slategrey",            0x70, 0x80, 0x90},
+        {"snow",                 0xff, 0xfa, 0xfa},
+        {"springgreen",          0x00, 0xff, 0x7f},
+        {"steelblue",            0x46, 0x82, 0xb4},
+        {"tan",                  0xd2, 0xb4, 0x8c},
+        {"teal",                 0x00, 0x80, 0x80},
+        {"thistle",              0xd8, 0xbf, 0xd8},
+        {"tomato",               0xff, 0x63, 0x47},
+        {"turquoise",            0x40, 0xe0, 0xd0},
+        {"violet",               0xee, 0x82, 0xee},
+        {"wheat",                0xf5, 0xde, 0xb3},
+        {"white",                0xff, 0xff, 0xff},
+        {"whitesmoke",           0xf5, 0xf5, 0xf5},
+        {"yellow",               0xff, 0xff, 0x00},
+        {"yellowgreen",          0x9a, 0xcd, 0x32},
+    };
+    // clang-format on
 
-    if (lower == "black")
-        return qRgb(0, 0, 0);
-    if (lower == "red")
-        return qRgb(255, 0, 0);
-    if (lower == "green")
-        return qRgb(0, 128, 0);
-    if (lower == "yellow")
-        return qRgb(255, 255, 0);
-    if (lower == "blue")
-        return qRgb(0, 0, 255);
-    if (lower == "magenta" || lower == "fuchsia")
-        return qRgb(255, 0, 255);
-    if (lower == "cyan" || lower == "aqua")
-        return qRgb(0, 255, 255);
-    if (lower == "white")
-        return qRgb(255, 255, 255);
-
-    // Extended colors
-    if (lower == "gray" || lower == "grey")
-        return qRgb(128, 128, 128);
-    if (lower == "maroon")
-        return qRgb(128, 0, 0);
-    if (lower == "olive")
-        return qRgb(128, 128, 0);
-    if (lower == "navy")
-        return qRgb(0, 0, 128);
-    if (lower == "purple")
-        return qRgb(128, 0, 128);
-    if (lower == "teal")
-        return qRgb(0, 128, 128);
-    if (lower == "silver")
-        return qRgb(192, 192, 192);
-    if (lower == "lime")
-        return qRgb(0, 255, 0);
-    if (lower == "orange")
-        return qRgb(255, 165, 0);
+    QString lower = colorSpec.toLower().trimmed();
+    for (const auto& entry : kColors) {
+        if (lower == QLatin1StringView(entry.name))
+            return qRgb(entry.r, entry.g, entry.b);
+    }
 
     qCDebug(lcMXP) << "Unknown color:" << colorSpec << "- defaulting to white";
     return qRgb(255, 255, 255); // Default white
@@ -2280,13 +2937,22 @@ QRgb MXPEngine::MXP_GetColor(const QString& colorSpec)
  * Closes all tags in the active tag list, executing their end actions.
  * Tags marked with TAG_NO_RESET are protected from this.
  */
-void MXPEngine::MXP_CloseOpenTags()
+void MXPEngine::MXP_CloseOpenTags(bool closeAll)
 {
-    qCDebug(lcMXP) << "Closing" << m_activeTagList.size() << "open tags";
+    qCDebug(lcMXP) << "Closing" << (closeAll ? "ALL" : "open") << "tags";
 
     // Close tags in reverse order (most recent first)
+    // Original: MXP_CloseOpenTags (mxpClose.cpp:363-387) stops at secure tags
+    //           MXP_CloseAllTags (mxpClose.cpp:389-406) closes all except TAG_NO_RESET
     while (!m_activeTagList.empty()) {
-        // Move last element out and pop; unique_ptr destructor cleans up at end of scope
+        ActiveTag* tag = m_activeTagList.back().get();
+
+        // Don't close securely-opened tags (unless closeAll is true)
+        if (!closeAll && tag->bSecure) {
+            return;
+        }
+
+        // Move last element out and pop
         auto owned = std::move(m_activeTagList.back());
         m_activeTagList.pop_back();
 
@@ -2294,7 +2960,6 @@ void MXPEngine::MXP_CloseOpenTags()
         if (!owned->bNoReset) {
             MXP_EndAction(owned->iAction);
         }
-        // owned goes out of scope here — ActiveTag is destroyed automatically
     }
 }
 
@@ -2332,7 +2997,7 @@ bool MXPEngine::MXP_Open() const
  */
 bool MXPEngine::MXP_Secure() const
 {
+    // Original: secure, perm_secure, secure_once. Locked mode = NO tags allowed.
     return m_iMXP_mode == eMXP_secure || m_iMXP_mode == eMXP_perm_secure ||
-           m_iMXP_mode == eMXP_locked || m_iMXP_mode == eMXP_perm_locked ||
            m_iMXP_mode == eMXP_secure_once;
 }

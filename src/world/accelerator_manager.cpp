@@ -5,6 +5,7 @@
  */
 
 #include "accelerator_manager.h"
+#include "../utils/error_codes.h"
 #include "world_document.h"
 #include <QShortcut>
 #include <QWidget>
@@ -33,7 +34,10 @@ void AcceleratorManager::initKeyNameMap()
         s_keyNameMap[QString("F%1").arg(i)] = static_cast<Qt::Key>(Qt::Key_F1 + (i - 1));
     }
 
-    // Numpad keys
+    // Numpad digit keys (MUSHclient VK_NUMPAD0-9).  The base Qt::Key is the
+    // same as the regular digit row, but parseKeyString detects "NumpadN" names
+    // and adds Qt::KeypadModifier, making the resulting QKeySequence distinct
+    // from pressing the plain digit keys.
     for (int i = 0; i <= 9; i++) {
         s_keyNameMap[QString("Numpad%1").arg(i)] = static_cast<Qt::Key>(Qt::Key_0 + i);
     }
@@ -218,11 +222,18 @@ bool AcceleratorManager::parseKeyString(const QString& keyString, QKeySequence& 
                 return false; // Already have a key
             }
 
-            // Try case-insensitive lookup (build search key)
-            QString searchKey;
+            // Try case-insensitive lookup
             for (auto it = s_keyNameMap.constBegin(); it != s_keyNameMap.constEnd(); ++it) {
                 if (it.key().compare(trimmed, Qt::CaseInsensitive) == 0) {
                     key = it.value();
+                    // "NumpadN" names (MUSHclient VK_NUMPAD0-9) must carry
+                    // Qt::KeypadModifier so they are distinct from the regular
+                    // digit row (VK_0-9).  The map stores the same Qt::Key_0-9
+                    // base values for both, so we add the modifier here.
+                    if (it.key().startsWith("Numpad", Qt::CaseInsensitive) &&
+                        it.key().length() == 7 && it.key().back().isDigit()) {
+                        modifiers |= Qt::KeypadModifier;
+                    }
                     break;
                 }
             }
@@ -256,8 +267,72 @@ bool AcceleratorManager::parseKeyString(const QString& keyString, QKeySequence& 
 
 QString AcceleratorManager::keySequenceToString(const QKeySequence& keySeq)
 {
-    // Qt provides a portable string representation
-    return keySeq.toString(QKeySequence::PortableText);
+    // M156: Match MUSHclient's KeyCodeToString format.
+    // Original outputs modifiers in order: Shift+Ctrl+Alt+ then key name.
+    // Qt's PortableText uses Ctrl+Shift+Alt+Meta order and different key names
+    // (e.g., "PgDown" vs "PageDown", "Ins" vs "Insert").
+
+    if (keySeq.isEmpty()) {
+        return {};
+    }
+
+    int combo = keySeq[0].toCombined();
+    Qt::KeyboardModifiers mods =
+        Qt::KeyboardModifiers(combo & static_cast<int>(Qt::KeyboardModifierMask));
+    Qt::Key key = static_cast<Qt::Key>(combo & ~static_cast<int>(Qt::KeyboardModifierMask));
+
+    QString result;
+
+    // MUSHclient modifier order: Shift, Ctrl, Alt (never Meta on original)
+    if (mods & Qt::ShiftModifier) {
+        result += "Shift+";
+    }
+    if (mods & Qt::ControlModifier) {
+        result += "Ctrl+";
+    }
+    if (mods & Qt::AltModifier) {
+        result += "Alt+";
+    }
+
+    // Reverse-lookup key name from our s_keyNameMap (MUSHclient names)
+    initKeyNameMap();
+    QString keyName;
+
+    // Special handling for numpad digits (KeypadModifier + digit key)
+    if ((mods & Qt::KeypadModifier) && key >= Qt::Key_0 && key <= Qt::Key_9) {
+        keyName = QString("Numpad%1").arg(key - Qt::Key_0);
+    } else {
+        // Look up using the same names MUSHclient uses (first match wins)
+        // Prefer canonical names: avoid alias duplicates by checking length
+        // (shorter canonical names like "Esc" preferred over "Escape")
+        for (auto it = s_keyNameMap.constBegin(); it != s_keyNameMap.constEnd(); ++it) {
+            if (it.value() == key) {
+                // Skip "Numpad" prefix entries for non-keypad lookups
+                if (it.key().startsWith("Numpad") && it.key().length() == 7 &&
+                    it.key().back().isDigit()) {
+                    continue;
+                }
+                if (keyName.isEmpty() || it.key().length() < keyName.length()) {
+                    keyName = it.key();
+                }
+            }
+        }
+    }
+
+    if (keyName.isEmpty()) {
+        // Fallback: single character for printable keys
+        if (key >= Qt::Key_A && key <= Qt::Key_Z) {
+            keyName = QChar('A' + (key - Qt::Key_A));
+        } else if (key >= Qt::Key_0 && key <= Qt::Key_9) {
+            keyName = QChar('0' + (key - Qt::Key_0));
+        } else {
+            // Last resort: Qt's portable text for the key part
+            keyName = QKeySequence(key).toString(QKeySequence::PortableText);
+        }
+    }
+
+    result += keyName;
+    return result;
 }
 
 int AcceleratorManager::addAccelerator(const QString& keyString, const QString& action, int sendTo,
@@ -266,7 +341,7 @@ int AcceleratorManager::addAccelerator(const QString& keyString, const QString& 
     // Parse the key string
     QKeySequence keySeq;
     if (!parseKeyString(keyString, keySeq)) {
-        return 30001; // eBadParameter - invalid key string
+        return eBadParameter; // invalid key string
     }
 
     // Normalize key string for storage
@@ -281,6 +356,12 @@ int AcceleratorManager::addAccelerator(const QString& keyString, const QString& 
     if (action.isEmpty()) {
         m_accelerators.remove(normalizedKey);
         return 0; // eOK
+    }
+
+    // Enforce a maximum of 1000 accelerators, matching the original MUSHclient limit.
+    // Only reject when this would be a genuinely new entry (not a replacement).
+    if (!m_accelerators.contains(normalizedKey) && m_accelerators.size() >= 1000) {
+        return eBadParameter; // too many accelerators
     }
 
     // Create new entry
@@ -367,7 +448,7 @@ int AcceleratorManager::addKeyBinding(const QString& keyString, const QString& a
     // Parse the key string
     QKeySequence keySeq;
     if (!parseKeyString(keyString, keySeq)) {
-        return 30001; // eBadParameter - invalid key string
+        return eBadParameter; // invalid key string
     }
 
     // Normalize key string for storage
@@ -513,7 +594,9 @@ void AcceleratorManager::activateShortcut(AcceleratorEntry& entry)
     }
 
     entry.shortcut = new QShortcut(entry.keySeq, m_parentWidget);
-    entry.shortcut->setContext(Qt::WidgetWithChildrenShortcut);
+    // Original uses Win32 accelerator table (window-scope). Qt::WindowShortcut
+    // fires when the parent window is active, matching the global scope.
+    entry.shortcut->setContext(Qt::WindowShortcut);
 
     // Store the key string in the shortcut for retrieval in slot
     entry.shortcut->setProperty("keyString", entry.keyString.toUpper().simplified());
@@ -542,5 +625,11 @@ void AcceleratorManager::onShortcutActivated()
     }
 
     const AcceleratorEntry& entry = m_accelerators[keyString];
-    emit acceleratorTriggered(entry.action, entry.sendTo);
+
+    // Gate keypad entries on m_keypad_enable (original checks before dispatching numpad)
+    if (keyString.contains("Num+") && m_doc && !m_doc->m_keypad_enable) {
+        return;
+    }
+
+    emit acceleratorTriggered(entry.action, entry.sendTo, entry.pluginId);
 }
