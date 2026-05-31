@@ -334,8 +334,14 @@ WorldDocument::WorldDocument(QObject* parent) : QObject(parent)
     m_last_line_with_IAC_GA = 0;
 
     // ========== Timing Variables ==========
-    // m_tConnectTime, m_tsConnectDuration, m_whenWorldStarted,
-    // m_whenWorldStartedHighPrecision: zero-initialized by ConnectionManager ctor.
+    // m_whenWorldStarted: set once at construction to reflect "when this world was created/opened"
+    // (original: doc_construct.cpp:28 — m_whenWorldStarted = CTime::GetCurrentTime()).
+    // m_tConnectTime: also initialized at construction so GetInfo(301) always returns a date before
+    // first connect (original: doc_construct.cpp:305 — m_tConnectTime = CTime::GetCurrentTime()).
+    m_connectionManager->m_whenWorldStarted = QDateTime::currentDateTime();
+    m_connectionManager->m_tConnectTime = QDateTime::currentDateTime();
+    // m_tsConnectDuration, m_whenWorldStartedHighPrecision: zero-initialized by ConnectionManager
+    // ctor.
     m_tLastPlayerInput = QDateTime();
     m_tStatusTime = QDateTime();
     m_lastMousePosition = QPoint(0, 0);
@@ -681,24 +687,19 @@ int WorldDocument::reloadDefaults()
     int totalImported = 0;
 
     if (m_colors.use_default_colours)
-        totalImported +=
-            loadDefaultSet(this, opts.defaultColoursFile(), XML_COLOURS);
+        totalImported += loadDefaultSet(this, opts.defaultColoursFile(), XML_COLOURS);
 
     if (m_bUseDefaultTriggers)
-        totalImported +=
-            loadDefaultSet(this, opts.defaultTriggersFile(), XML_TRIGGERS);
+        totalImported += loadDefaultSet(this, opts.defaultTriggersFile(), XML_TRIGGERS);
 
     if (m_bUseDefaultAliases)
-        totalImported +=
-            loadDefaultSet(this, opts.defaultAliasesFile(), XML_ALIASES);
+        totalImported += loadDefaultSet(this, opts.defaultAliasesFile(), XML_ALIASES);
 
     if (m_bUseDefaultTimers)
-        totalImported +=
-            loadDefaultSet(this, opts.defaultTimersFile(), XML_TIMERS);
+        totalImported += loadDefaultSet(this, opts.defaultTimersFile(), XML_TIMERS);
 
     if (m_bUseDefaultMacros)
-        totalImported +=
-            loadDefaultSet(this, opts.defaultMacrosFile(), XML_MACROS);
+        totalImported += loadDefaultSet(this, opts.defaultMacrosFile(), XML_MACROS);
 
     // Input font override (original: methods_defaults.cpp:137-150).
     if (m_bUseDefaultInputFont && !opts.defaultInputFont().isEmpty()) {
