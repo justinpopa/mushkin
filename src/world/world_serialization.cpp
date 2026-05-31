@@ -611,6 +611,23 @@ void WorldDocument::loadAliasesFromXml(QXmlStreamReader& xml, Plugin* plugin)
                 qCDebug(lcWorld) << "Added alias to plugin:" << internalName
                                  << "sequence:" << sequence;
             } else {
+                // Structural duplicate detection for unnamed world aliases
+                // (original: xml_load_world.cpp:1604-1621 — unnamed alias with identical
+                // content is silently dropped)
+                if (alias->label.isEmpty()) {
+                    bool isDuplicate = false;
+                    for (const auto& [existingName, existing] : m_automationRegistry->m_AliasMap) {
+                        if (*existing == *alias) {
+                            isDuplicate = true;
+                            break;
+                        }
+                    }
+                    if (isDuplicate) {
+                        qCDebug(lcWorld)
+                            << "Skipping duplicate unnamed world alias:" << alias->name;
+                        continue;
+                    }
+                }
                 // Add to world's collections (existing behavior)
                 QString internalName = alias->internal_name;
                 (void)addAlias(internalName, std::move(alias)); // intentional: deserialization load
@@ -856,6 +873,23 @@ void WorldDocument::loadTimersFromXml(QXmlStreamReader& xml, Plugin* plugin)
                 }
                 qCDebug(lcWorld) << "Added timer to plugin:" << internalName;
             } else {
+                // Structural duplicate detection for unnamed world timers
+                // (original: xml_load_world.cpp:1810-1827 — unnamed timer with identical
+                // content is silently dropped)
+                if (timer->label.isEmpty()) {
+                    bool isDuplicate = false;
+                    for (const auto& [existingName, existing] : m_automationRegistry->m_TimerMap) {
+                        if (*existing == *timer) {
+                            isDuplicate = true;
+                            break;
+                        }
+                    }
+                    if (isDuplicate) {
+                        qCDebug(lcWorld)
+                            << "Skipping duplicate unnamed world timer:" << internalName;
+                        continue;
+                    }
+                }
                 // Add to world's collections (transfer ownership via move)
                 (void)addTimer(internalName, std::move(timer)); // intentional: deserialization load
             }
@@ -911,28 +945,42 @@ void WorldDocument::loadVariablesFromXml(QXmlStreamReader& xml, Plugin* plugin)
 
         if (xml.isStartElement() && xml.name() == QLatin1String("variable")) {
             QString name = xml.attributes().value("name").toString();
-            bool trim = xml.attributes().value("trim").toString() == "y";
+            // Parse boolean 'trim' attribute the same way as original Get_XML_boolean:
+            // accepts y/Y/yes/true/t/1/-1 (case-insensitive) as true;
+            // original: xmlparse.cpp:1004-1029
+            const QString trimStr = xml.attributes().value("trim").toString().toLower();
+            const bool trim = (trimStr == "y" || trimStr == "yes" || trimStr == "true" ||
+                               trimStr == "t" || trimStr == "1" || trimStr == "-1");
             QString contents = xml.readElementText();
 
-            // Trim whitespace if requested (original: xml_load_world.cpp:1977-1986)
+            // Trim only \n \r \t and space — original uses TrimLeft/TrimRight("\n\r\t ")
+            // (xml_load_world.cpp:1984-1985). Qt::trimmed() also removes \v and \f,
+            // which the original does not strip.
             if (trim) {
-                contents = contents.trimmed();
+                const QString ws = "\n\r\t ";
+                int start = 0;
+                while (start < contents.size() && ws.contains(contents[start]))
+                    ++start;
+                int end = contents.size() - 1;
+                while (end >= start && ws.contains(contents[end]))
+                    --end;
+                contents = contents.mid(start, end - start + 1);
             }
 
-            // Original preserves variable name case (CheckObjectName validates but doesn't
-            // lowercase)
-            QString varName = name;
+            // Original CheckObjectName lowercases the variable name before inserting into the map
+            // (doc.cpp:4602). Use lowercase as the map key; label retains original case.
+            QString varName = name.toLower();
 
             // Overwrite existing variables (original: xml_load_world.cpp:1995-2006 deletes old,
             // inserts new). Previous code skipped duplicates which broke state restore.
             auto var = std::make_unique<Variable>();
-            var->label = varName;
+            var->label = name; // label preserves original case
             var->contents = contents;
 
             if (plugin) {
-                plugin->m_VariableMap[var->label] = std::move(var);
+                plugin->m_VariableMap[varName] = std::move(var);
             } else {
-                m_VariableMap[var->label] = std::move(var);
+                m_VariableMap[varName] = std::move(var);
             }
         }
     }
@@ -1334,17 +1382,17 @@ void WorldDocument::Save_One_Timer_XML(QTextStream& out, Timer* timer)
     // At-time fields (for AtTime timers)
     out << QString("   at_hour=\"%1\"\n").arg(timer->at_hour);
     out << QString("   at_minute=\"%1\"\n").arg(timer->at_minute);
-    out << QString("   at_second=\"%1\"\n").arg(timer->at_second, 0, 'f', 4);
+    out << QString("   at_second=\"%1\"\n").arg(timer->at_second, 0, 'f', 2);
 
     // Interval fields (for Interval timers)
     out << QString("   every_hour=\"%1\"\n").arg(timer->every_hour);
     out << QString("   every_minute=\"%1\"\n").arg(timer->every_minute);
-    out << QString("   every_second=\"%1\"\n").arg(timer->every_second, 0, 'f', 4);
+    out << QString("   every_second=\"%1\"\n").arg(timer->every_second, 0, 'f', 2);
 
     // Offset fields (for interval timers)
     out << QString("   offset_hour=\"%1\"\n").arg(timer->offset_hour);
     out << QString("   offset_minute=\"%1\"\n").arg(timer->offset_minute);
-    out << QString("   offset_second=\"%1\"\n").arg(timer->offset_second, 0, 'f', 4);
+    out << QString("   offset_second=\"%1\"\n").arg(timer->offset_second, 0, 'f', 2);
 
     // Behavior flags (only write if not default)
     if (timer->one_shot)

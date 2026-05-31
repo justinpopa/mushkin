@@ -154,8 +154,9 @@ TEST_F(WorldSerializationTest, VariableRoundtripViaFile)
     EXPECT_EQ(it->second->contents, "hello world");
 }
 
-// Test 4: Variable name is lowercased on load
-TEST_F(WorldSerializationTest, VariableNamePreservedOnLoad)
+// Test 4: Variable map key is lowercased on load (original CheckObjectName lowercases —
+// doc.cpp:4602)
+TEST_F(WorldSerializationTest, VariableKeyLowercasedOnLoad)
 {
     doc1 = std::make_unique<WorldDocument>();
     doc1->m_mush_name = "Variable Case Test";
@@ -176,10 +177,15 @@ TEST_F(WorldSerializationTest, VariableNamePreservedOnLoad)
     int imported = XmlSerialization::ImportXML(doc2.get(), mixedCaseXml, XML_VARIABLES);
     EXPECT_GE(imported, 0) << "ImportXML failed on mixed-case variable";
 
-    // Original preserves variable name case (CheckObjectName validates but doesn't lowercase)
-    auto it = doc2->m_VariableMap.find("MyVar");
+    // Original CheckObjectName lowercases the name before inserting into the map (doc.cpp:4602).
+    // The map key must be lowercase; label preserves original case.
+    auto it = doc2->m_VariableMap.find("myvar");
     EXPECT_NE(it, doc2->m_VariableMap.end())
-        << "Variable key should preserve original case 'MyVar' after import";
+        << "Variable map key should be lowercased to 'myvar' after import";
+    if (it != doc2->m_VariableMap.end()) {
+        EXPECT_EQ(it->second->label, "MyVar")
+            << "Variable label should preserve original case 'MyVar'";
+    }
 }
 
 // Test 5: Duplicate variable names on import keep only the first
@@ -606,4 +612,120 @@ TEST_F(WorldSerializationTest, LoadedAlphaSnapshotPopulated)
     ASSERT_NE(it, doc2->m_loadedAlphaOptions.end())
         << "m_loadedAlphaOptions should contain 'name' key after load";
     EXPECT_EQ(it->second, "TestWorld") << "m_loadedAlphaOptions['name'] should be 'TestWorld'";
+}
+
+// =============================================================================
+// Category 7: Behavioral Parity Regressions
+// =============================================================================
+
+// Test 21: Save_One_Timer_XML writes seconds with 2 decimal places (L67)
+// Original Save_XML_double uses "%.2f" (xml_save_world.cpp:201)
+TEST_F(WorldSerializationTest, SaveOneTimerXmlSecondsTwoDecimalPlaces)
+{
+    doc1 = std::make_unique<WorldDocument>();
+
+    auto timer = std::make_unique<Timer>();
+    timer->label = "dp_timer";
+    timer->type = Timer::TimerType::Interval;
+    timer->every_second = 5.5;
+
+    QTextStream out(new QString, QIODevice::WriteOnly);
+    QString buf;
+    QTextStream ts(&buf);
+    doc1->Save_One_Timer_XML(ts, timer.get());
+
+    // Should contain "5.50" not "5.5000"
+    EXPECT_TRUE(buf.contains("5.50")) << "every_second should be formatted as '5.50' (2 dp)";
+    EXPECT_FALSE(buf.contains("5.5000")) << "every_second must not use 4 decimal places";
+}
+
+// Test 22: Variable 'trim' boolean attribute accepts full range of truthy values (L26)
+// Original Get_XML_boolean accepts y/yes/true/t/1/-1 (xmlparse.cpp:1019-1025)
+TEST_F(WorldSerializationTest, VariableTrimAcceptsFullBooleanSyntax)
+{
+    // Build XML with trim="yes" (not just "y")
+    QString xmlStr = R"(<?xml version="1.0" encoding="UTF-8"?>
+<muclient>
+<variables>
+<variable name="trimvar" trim="yes">  hello  </variable>
+</variables>
+</muclient>)";
+
+    doc1 = std::make_unique<WorldDocument>();
+    int imported = XmlSerialization::ImportXML(doc1.get(), xmlStr, XML_VARIABLES);
+    EXPECT_GE(imported, 0) << "ImportXML failed";
+
+    auto it = doc1->m_VariableMap.find("trimvar");
+    ASSERT_NE(it, doc1->m_VariableMap.end()) << "Variable 'trimvar' not found";
+    EXPECT_EQ(it->second->contents, "hello")
+        << "trim=\"yes\" should trim surrounding spaces (full boolean syntax)";
+}
+
+// Test 23: Variable trim strips \n, \r, \t and space from both ends (L26)
+// Original: TrimLeft/TrimRight("\n\r\t ") — xml_load_world.cpp:1984-1985.
+// The fix replaces Qt::trimmed() which also strips \v and \f with a targeted trim.
+// Note: \v (0x0B) and \f (0x0C) are invalid XML characters and can't appear in an XML
+// document, so the only testable side is that the correct chars ARE stripped.
+TEST_F(WorldSerializationTest, VariableTrimStripsCorrectWhitespace)
+{
+    // Leading/trailing \n, \t, space and \r should all be removed
+    QString xmlStr = R"(<?xml version="1.0" encoding="UTF-8"?>
+<muclient>
+<variables>
+<variable name="wstrimvar" trim="y">)"
+                     "\n\t  hello world  \t\n"
+                     R"(</variable>
+</variables>
+</muclient>)";
+
+    doc1 = std::make_unique<WorldDocument>();
+    int imported = XmlSerialization::ImportXML(doc1.get(), xmlStr, XML_VARIABLES);
+    EXPECT_GE(imported, 0) << "ImportXML failed";
+
+    auto it = doc1->m_VariableMap.find("wstrimvar");
+    ASSERT_NE(it, doc1->m_VariableMap.end()) << "Variable 'wstrimvar' not found";
+    EXPECT_EQ(it->second->contents, "hello world")
+        << "trim=\"y\" should strip leading/trailing \\n\\t\\space from variable contents";
+}
+
+// Test 24: Unnamed world-level aliases with identical content are deduplicated (M32)
+// Original: xml_load_world.cpp:1604-1621 drops duplicate unnamed alias
+TEST_F(WorldSerializationTest, UnnamedWorldAliasDeduplication)
+{
+    // Build XML with two identical unnamed aliases
+    QString xmlStr = R"(<?xml version="1.0" encoding="UTF-8"?>
+<muclient>
+<aliases>
+<alias name="" enabled="y" match="gg" send_to="0"><send>go gate</send></alias>
+<alias name="" enabled="y" match="gg" send_to="0"><send>go gate</send></alias>
+</aliases>
+</muclient>)";
+
+    doc1 = std::make_unique<WorldDocument>();
+    XmlSerialization::ImportXML(doc1.get(), xmlStr, XML_ALIASES);
+
+    // Only one alias should be present (duplicate dropped)
+    EXPECT_EQ(static_cast<int>(doc1->m_automationRegistry->m_AliasMap.size()), 1)
+        << "Identical unnamed aliases should be deduplicated on world load";
+}
+
+// Test 25: Unnamed world-level timers with identical content are deduplicated (M32)
+// Original: xml_load_world.cpp:1810-1827 drops duplicate unnamed timer
+TEST_F(WorldSerializationTest, UnnamedWorldTimerDeduplication)
+{
+    // Build XML with two identical unnamed interval timers
+    QString xmlStr = R"(<?xml version="1.0" encoding="UTF-8"?>
+<muclient>
+<timers>
+<timer name="" enabled="y" at_time="n" second="30.00" send_to="0"></timer>
+<timer name="" enabled="y" at_time="n" second="30.00" send_to="0"></timer>
+</timers>
+</muclient>)";
+
+    doc1 = std::make_unique<WorldDocument>();
+    XmlSerialization::ImportXML(doc1.get(), xmlStr, XML_TIMERS);
+
+    // Only one timer should be present (duplicate dropped)
+    EXPECT_EQ(static_cast<int>(doc1->m_automationRegistry->m_TimerMap.size()), 1)
+        << "Identical unnamed timers should be deduplicated on world load";
 }
