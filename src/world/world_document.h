@@ -1817,7 +1817,9 @@ class WorldDocument : public QObject, public IWorldContext {
                        ProgressCallback progressCallback = nullptr);
 
     // ========== Command Stacking ==========
-    void
+    // Returns an error code (eOK, eCommandsNestedTooDeeply, ...) matching the original
+    // CMUSHclientDoc::Execute long return value, which world.Execute pushes to Lua.
+    long
     Execute(const QString& command, bool allowScriptPrefix = true, bool addHistory = true,
             const QString& originalCommand = QString()); // Process command with stacking support
     bool checkConnected(); // Prompt to reconnect if disconnected (original: doc.cpp:5158)

@@ -1390,7 +1390,7 @@ bool WorldDocument::checkConnected()
     return false;
 }
 
-void WorldDocument::Execute(const QString& command, bool allowScriptPrefix, bool addHistory,
+long WorldDocument::Execute(const QString& command, bool allowScriptPrefix, bool addHistory,
                             const QString& originalCommand)
 {
     // Recursion depth guard — prevents infinite alias loops from crashing.
@@ -1398,7 +1398,8 @@ void WorldDocument::Execute(const QString& command, bool allowScriptPrefix, bool
     constexpr int MAX_EXECUTION_DEPTH = 100;
     if (++m_iExecutionDepth > MAX_EXECUTION_DEPTH) {
         --m_iExecutionDepth;
-        return; // Original returns eCommandsNestedTooDeeply to Lua caller
+        // Original (methods_commands.cpp:265) returns eCommandsNestedTooDeeply to Lua caller.
+        return eCommandsNestedTooDeeply;
     }
     // RAII guard to decrement depth on any return path
     struct DepthGuard {
@@ -1438,7 +1439,7 @@ void WorldDocument::Execute(const QString& command, bool allowScriptPrefix, bool
             // Warn that scripting is not active
             note("Scripting is not active yet, or script file had a parse error.");
         }
-        return; // Don't process further (script handled)
+        return eOK; // Don't process further (script handled)
     }
 
     // ========== Speed Walking ==========
@@ -1450,7 +1451,7 @@ void WorldDocument::Execute(const QString& command, bool allowScriptPrefix, bool
     if (m_speedwalk.enabled && strFixedCommand.startsWith(m_speedwalk.prefix)) {
         // Check connection before processing speedwalk (original: evaluate.cpp:52-53)
         if (connectPhase() != eConnectConnectedToMud)
-            return;
+            return eWorldClosed;
         // Remove prefix and evaluate speedwalk
         QString speedwalkInput = strFixedCommand.mid(m_speedwalk.prefix.length());
         QString expandedSpeedwalk = speedwalk::evaluate(speedwalkInput, m_speedwalk.filler);
@@ -1461,13 +1462,13 @@ void WorldDocument::Execute(const QString& command, bool allowScriptPrefix, bool
                 // Show error message to user (skip the '*')
                 qCDebug(lcWorld) << "Speedwalk error:" << expandedSpeedwalk.mid(1);
                 note(expandedSpeedwalk.mid(1)); // Display error in output window
-                return;
+                return eOK;
             }
 
             // Send expanded speedwalk commands via SendMsg with queue=true
             SendMsg(expandedSpeedwalk, m_display_my_input, true, m_logging.log_input);
         }
-        return; // Don't process further (speedwalk handled)
+        return eOK; // Don't process further (speedwalk handled)
     }
 
     // ========== Command Stacking ==========
@@ -1555,6 +1556,9 @@ void WorldDocument::Execute(const QString& command, bool allowScriptPrefix, bool
             addToCommandHistory(originalCommand.isEmpty() ? str : originalCommand);
         }
     }
+
+    // All commands processed successfully (original: methods_commands.cpp:398).
+    return eOK;
 }
 
 // NOTE: GetCommandQueue(), Queue(), DiscardQueue() implementation moved to ConnectionManager.

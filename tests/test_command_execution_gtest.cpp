@@ -16,6 +16,7 @@
  * fixtures, and assertion messages.
  */
 
+#include "../src/utils/error_codes.h"
 #include "../src/world/world_document.h"
 #include "fixtures/world_fixtures.h"
 #include <QFile>
@@ -221,4 +222,40 @@ TEST_F(CommandExecutionTest, ImmediateSending)
     // For now, just verify queue is empty
     EXPECT_TRUE(doc->m_connectionManager->m_CommandQueue.isEmpty())
         << "Queue should remain empty with no speedwalk delay";
+}
+
+/**
+ * Test 8: Execute() returns eOK on a normal command
+ *
+ * Mirrors original CMUSHclientDoc::Execute (methods_commands.cpp:398), whose long
+ * return value is pushed to the Lua caller by world.Execute (lua_methods.cpp:2269).
+ */
+TEST_F(CommandExecutionTest, ExecuteReturnsOkForNormalCommand)
+{
+    EXPECT_EQ(doc->Execute("look", true, false), static_cast<long>(eOK))
+        << "A normal command should return eOK";
+    // Depth counter must be balanced after a successful Execute().
+    EXPECT_EQ(doc->m_iExecutionDepth, 0) << "Execution depth should return to 0 after Execute()";
+}
+
+/**
+ * Test 9: Execute() returns eCommandsNestedTooDeeply when the recursion guard fires
+ *
+ * Original (methods_commands.cpp:262-265) returns eCommandsNestedTooDeeply (30041)
+ * once m_iExecutionDepth exceeds MAX_EXECUTION_DEPTH (100). Previously Mushkin's
+ * Execute() returned void and world.Execute always pushed eOK, masking the guard.
+ */
+TEST_F(CommandExecutionTest, ExecuteReturnsNestedTooDeeplyAtDepthLimit)
+{
+    // Pre-load the depth so the next ++ pushes it over MAX_EXECUTION_DEPTH (100).
+    doc->m_iExecutionDepth = 100;
+
+    EXPECT_EQ(doc->Execute("look", true, false), static_cast<long>(eCommandsNestedTooDeeply))
+        << "Exceeding the execution depth limit should return eCommandsNestedTooDeeply";
+
+    // The guard decrements before returning, restoring the pre-call depth.
+    EXPECT_EQ(doc->m_iExecutionDepth, 100)
+        << "Depth guard must decrement back to its pre-call value on the deep path";
+
+    doc->m_iExecutionDepth = 0; // restore for any subsequent tests
 }
