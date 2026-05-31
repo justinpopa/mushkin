@@ -106,6 +106,60 @@ TEST_F(XmlSerializationTest, IsArchiveXMLDetectsUTF8BOM)
     file.close();
 }
 
+// M106: isspace() parity — \v and \f before XML content must be skipped
+TEST_F(XmlSerializationTest, IsArchiveXMLSkipsVerticalTabBeforeTag)
+{
+    QTemporaryFile tmpFile;
+    ASSERT_TRUE(tmpFile.open()) << "Failed to open temporary file";
+    // \v (vertical tab, 0x0B) before XML — original uses isspace() which covers \v and \f
+    tmpFile.write("\v<muclient></muclient>");
+    tmpFile.close();
+
+    QFile file(tmpFile.fileName());
+    ASSERT_TRUE(file.open(QIODevice::ReadOnly)) << "Failed to open file for reading";
+    EXPECT_TRUE(XmlSerialization::IsArchiveXML(file))
+        << "Should skip \\v (vertical tab) before XML tag (M106: isspace parity)";
+    file.close();
+}
+
+TEST_F(XmlSerializationTest, IsArchiveXMLSkipsFormFeedBeforeTag)
+{
+    QTemporaryFile tmpFile;
+    ASSERT_TRUE(tmpFile.open()) << "Failed to open temporary file";
+    // \f (form feed, 0x0C) before XML — original uses isspace() which covers \v and \f
+    tmpFile.write("\f<muclient></muclient>");
+    tmpFile.close();
+
+    QFile file(tmpFile.fileName());
+    ASSERT_TRUE(file.open(QIODevice::ReadOnly)) << "Failed to open file for reading";
+    EXPECT_TRUE(XmlSerialization::IsArchiveXML(file))
+        << "Should skip \\f (form feed) before XML tag (M106: isspace parity)";
+    file.close();
+}
+
+// M152: tooltipSettingsChanged emitted during LoadWorldXML so tooltip timing is applied on load
+TEST_F(XmlSerializationTest, LoadWorldXMLEmitsTooltipSettingsChanged)
+{
+    auto doc = std::make_unique<WorldDocument>();
+    doc->m_mush_name = "Tooltip Test World";
+
+    QString filename = generateTempFilename("tooltip_signal");
+    ASSERT_TRUE(XmlSerialization::SaveWorldXML(doc.get(), filename)) << "SaveWorldXML failed";
+
+    auto doc2 = std::make_unique<WorldDocument>();
+    bool signalFired = false;
+    QObject::connect(doc2.get(), &WorldDocument::tooltipSettingsChanged, doc2.get(),
+                     [&signalFired]() { signalFired = true; });
+
+    ASSERT_TRUE(XmlSerialization::LoadWorldXML(doc2.get(), filename)) << "LoadWorldXML failed";
+
+    EXPECT_TRUE(signalFired)
+        << "tooltipSettingsChanged must be emitted during LoadWorldXML so tooltip "
+           "timing is applied after load (M152: SetOptionItem bDoSpecial=true parity)";
+
+    cleanupSaveFiles(filename);
+}
+
 // Tests for SaveWorldXML and LoadWorldXML round-trip
 
 TEST_F(XmlSerializationTest, BasicWorldPropertiesRoundTrip)
