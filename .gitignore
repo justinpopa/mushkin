@@ -71,11 +71,9 @@ TODO.md
 # Debug
 *.dSYM/
 
-# Generated documentation
-docs/api/html/
-docs/api/xml/
-docs/api/lua/
-docs/api/*.tag
+# Documentation & internal working notes (audits, worklists, generated API docs)
+# — not part of the shipped project.
+docs/
 
 # User-specific plugins (personal worlds, etc.) — ignored by default.
 # Project-owned plugins below are explicitly unignored.
@@ -86,7 +84,6 @@ plugins/*
 # Qt installations (from aqt)
 6.*/
 aqtinstall.log
-docs/
 
 # Reference copies of original MUSHclient source (not part of this project)
 reference/
