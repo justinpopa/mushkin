@@ -106,6 +106,17 @@ class WorldPropertiesDialog : public QDialog {
     bool isSpeedwalkPrefixValid() const;
     bool isCommandStackCharacterValid() const;
 
+    // Pure predicate mirroring the original CPrefsP14::DoDataExchange memory check
+    // (prefspropertypages.cpp:5789-5813): warn when the output-buffer line count
+    // changed, exceeds 1000, and the estimated allocation (16 MB OS + 60 bytes per
+    // line) exceeds the machine's physical RAM. Kept pure (RAM passed in) so it can
+    // be exercised in tests without depending on the host's memory.
+    static bool isMaxLinesMemoryWarningNeeded(int oldLines, int newLines,
+                                              quint64 totalPhysicalBytes);
+
+    // Returns the machine's total physical RAM in bytes (0 if it cannot be queried).
+    static quint64 totalPhysicalMemoryBytes();
+
     // Validate UI fields before applying. Returns false (and shows a message box)
     // if a required field is invalid; mirrors original DDX/DDV validation.
     bool validateSettings();
@@ -202,6 +213,15 @@ class WorldPropertiesDialog : public QDialog {
     QLineEdit* m_scriptFileEdit;
     QPushButton* m_scriptFileBrowse;
     QComboBox* m_scriptLanguageCombo;
+    // Script prefix / editor fields (original CPrefsP17: IDC_SCRIPT_PREFIX /
+    // IDC_SCRIPT_EDITOR, prefspropertypages.cpp:7007-7009). Backed by
+    // m_scripting.prefix and m_scripting.editor.
+    QLineEdit* m_scriptPrefixEdit;
+    QLineEdit* m_scriptEditorEdit;
+    QPushButton* m_scriptEditorBrowse;
+    // Opens the MXP script-routines sub-dialog (original IDC_MXP_SCRIPTS /
+    // CPrefsP17::OnMxpScripts, prefspropertypages.cpp:7069, 7300-7321).
+    QPushButton* m_mxpScriptsButton;
     QLineEdit* m_onWorldOpenEdit;
     QLineEdit* m_onWorldCloseEdit;
     QLineEdit* m_onWorldConnectEdit;

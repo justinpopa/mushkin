@@ -2,6 +2,7 @@
 #include "world/world_document.h"
 
 #include "logging.h"
+#include "mxp_script_routines_dialog.h"
 #include "network/ssh_host_key_manager.h"
 #include <QCheckBox>
 #include <QColor>
@@ -22,6 +23,14 @@
 #include <QSpinBox>
 #include <QTabWidget>
 #include <QVBoxLayout>
+
+// For totalPhysicalMemoryBytes() — platform RAM query (M78 memory warning).
+#if defined(Q_OS_MACOS) || defined(Q_OS_BSD4)
+#    include <sys/sysctl.h>
+#    include <sys/types.h>
+#elif defined(Q_OS_UNIX)
+#    include <unistd.h>
+#endif
 
 WorldPropertiesDialog::WorldPropertiesDialog(WorldDocument* doc, QWidget* parent)
     : QDialog(parent), m_doc(doc), m_tabWidget(nullptr), m_buttonBox(nullptr)
@@ -468,6 +477,42 @@ void WorldPropertiesDialog::setupScriptingTab()
     m_scriptLanguageCombo->setEnabled(false);
     layout->addRow("Language:", m_scriptLanguageCombo);
 
+    // Script prefix (original IDC_SCRIPT_PREFIX, prefspropertypages.cpp:7007). The
+    // prefix that flags a command line as a script expression. Backed by
+    // m_scripting.prefix.
+    m_scriptPrefixEdit = new QLineEdit();
+    m_scriptPrefixEdit->setPlaceholderText("Prefix marking a line as a script expression");
+    layout->addRow("Script prefix:", m_scriptPrefixEdit);
+
+    // Script editor (original IDC_SCRIPT_EDITOR + OnChooseEditor,
+    // prefspropertypages.cpp:7009, 7247-7267). External editor used to edit the
+    // script file; Browse mirrors the original CFileDialog. Backed by
+    // m_scripting.editor.
+    QHBoxLayout* editorLayout = new QHBoxLayout();
+    m_scriptEditorEdit = new QLineEdit();
+    m_scriptEditorEdit->setPlaceholderText("Path to external script editor");
+    editorLayout->addWidget(m_scriptEditorEdit);
+    m_scriptEditorBrowse = new QPushButton("Browse...");
+    editorLayout->addWidget(m_scriptEditorBrowse);
+    connect(m_scriptEditorBrowse, &QPushButton::clicked, this, [this]() {
+        QString path = QFileDialog::getOpenFileName(
+            this, "Script editor", m_scriptEditorEdit->text(), "Applications (*);;All files (*.*)");
+        if (!path.isEmpty()) {
+            m_scriptEditorEdit->setText(path);
+        }
+    });
+    layout->addRow("Script editor:", editorLayout);
+
+    // MXP Scripts button (original IDC_MXP_SCRIPTS / CPrefsP17::OnMxpScripts,
+    // prefspropertypages.cpp:7069, 7300-7321). Opens the sub-dialog that edits the
+    // six MXP callback routine names, which it reads/writes directly on the document.
+    m_mxpScriptsButton = new QPushButton("MXP Scripts...");
+    connect(m_mxpScriptsButton, &QPushButton::clicked, this, [this]() {
+        MxpScriptRoutinesDialog dlg(m_doc, this);
+        dlg.exec();
+    });
+    layout->addRow("", m_mxpScriptsButton);
+
     // Event handler entry points
     layout->addRow("", new QLabel("Event Handlers:"));
     m_onWorldOpenEdit = new QLineEdit();
@@ -828,6 +873,8 @@ void WorldPropertiesDialog::loadSettings()
     // Scripting tab
     m_enableScriptCheck->setChecked(m_doc->m_scripting.enabled);
     m_scriptFileEdit->setText(m_doc->m_scripting.filename);
+    m_scriptPrefixEdit->setText(m_doc->m_scripting.prefix);
+    m_scriptEditorEdit->setText(m_doc->m_scripting.editor);
     m_onWorldOpenEdit->setText(m_doc->m_scripting.on_world_open);
     m_onWorldCloseEdit->setText(m_doc->m_scripting.on_world_close);
     m_onWorldConnectEdit->setText(m_doc->m_scripting.on_world_connect);
@@ -876,162 +923,200 @@ void WorldPropertiesDialog::loadSettings()
     qCDebug(lcDialog) << "WorldPropertiesDialog::loadSettings() - loaded from WorldDocument";
 }
 
+namespace {
+// Assigns src into dst only if they differ, recording that a change occurred.
+// Used by saveSettings to reproduce the original's per-page ChangedPrefsPN check
+// (configuration.cpp:1973-2016): the document is marked modified iff at least one
+// committed value actually differs from its prior state.
+template <typename T, typename U> void assignChanged(T& dst, U&& src, bool& changed)
+{
+    if (dst != static_cast<T>(src)) {
+        dst = static_cast<T>(std::forward<U>(src));
+        changed = true;
+    }
+}
+} // namespace
+
 void WorldPropertiesDialog::saveSettings()
 {
     if (!m_doc)
         return;
 
+    // Tracks whether any committed value differs from the document's prior state.
+    // When true at the end, the document is marked modified — mirroring the original
+    // CMUSHclientDoc::OnApply, which calls SetModifiedFlag(TRUE) when any preference
+    // page changed (configuration.cpp:1973-2016). Clicking OK without editing
+    // anything must NOT mark the document modified, so unconditional marking is wrong.
+    bool changed = false;
+
     // Connection tab
-    m_doc->m_server = m_serverEdit->text();
-    m_doc->m_port = m_portSpin->value();
-    m_doc->m_name = m_nameEdit->text();
-    m_doc->m_password = m_passwordEdit->text();
-    m_doc->m_connect_now = m_connectMethodCombo->currentData().toInt();
-    m_doc->m_connect_text = m_connectTextEdit->toPlainText();
+    assignChanged(m_doc->m_server, m_serverEdit->text(), changed);
+    assignChanged(m_doc->m_port, m_portSpin->value(), changed);
+    assignChanged(m_doc->m_name, m_nameEdit->text(), changed);
+    assignChanged(m_doc->m_password, m_passwordEdit->text(), changed);
+    assignChanged(m_doc->m_connect_now, m_connectMethodCombo->currentData().toInt(), changed);
+    assignChanged(m_doc->m_connect_text, m_connectTextEdit->toPlainText(), changed);
 
     // Output tab
-    m_doc->m_output.font_name = m_outputFont.family();
-    m_doc->m_output.font_height = m_outputFont.pointSize(); // Store as points
-    m_doc->m_output.font_weight = m_outputFont.weight();
+    assignChanged(m_doc->m_output.font_name, m_outputFont.family(), changed);
+    assignChanged(m_doc->m_output.font_height, m_outputFont.pointSize(), changed); // points
+    assignChanged(m_doc->m_output.font_weight, m_outputFont.weight(), changed);
     // Save ANSI colors back to WorldDocument (QRgb → BGR format)
     for (int i = 0; i < 8; i++) {
         QRgb rgb = m_ansiColors[i];
-        m_doc->m_colors.normal_colour[i] =
-            static_cast<QRgb>((qRed(rgb)) | (qGreen(rgb) << 8) | (qBlue(rgb) << 16));
+        assignChanged(m_doc->m_colors.normal_colour[i],
+                      static_cast<QRgb>((qRed(rgb)) | (qGreen(rgb) << 8) | (qBlue(rgb) << 16)),
+                      changed);
     }
     for (int i = 0; i < 8; i++) {
         QRgb rgb = m_ansiColors[i + 8];
-        m_doc->m_colors.bold_colour[i] =
-            static_cast<QRgb>((qRed(rgb)) | (qGreen(rgb) << 8) | (qBlue(rgb) << 16));
+        assignChanged(m_doc->m_colors.bold_colour[i],
+                      static_cast<QRgb>((qRed(rgb)) | (qGreen(rgb) << 8) | (qBlue(rgb) << 16)),
+                      changed);
     }
 
     // Display options
-    m_doc->m_display.wrap = m_wrapCheck->isChecked();
-    m_doc->m_display.wrap_column = static_cast<quint16>(m_wrapColumnSpin->value());
-    m_doc->m_display.max_lines = m_maxLinesSpin->value();
-    m_doc->m_display.utf8 = m_utf8Check->isChecked();
-    m_doc->m_bNAWS = m_nawsCheck->isChecked();
-    m_doc->m_strTerminalIdentification = m_terminalTypeEdit->text();
-    m_doc->m_display.indent_paras = m_indentParasCheck->isChecked();
-    m_doc->m_display.show_bold = m_showBoldCheck->isChecked();
-    m_doc->m_display.show_italic = m_showItalicCheck->isChecked();
-    m_doc->m_display.show_underline = m_showUnderlineCheck->isChecked();
-    m_doc->m_display.line_spacing = static_cast<quint16>(m_lineSpacingSpin->value());
+    assignChanged(m_doc->m_display.wrap, m_wrapCheck->isChecked(), changed);
+    assignChanged(m_doc->m_display.wrap_column, static_cast<quint16>(m_wrapColumnSpin->value()),
+                  changed);
+    assignChanged(m_doc->m_display.max_lines, m_maxLinesSpin->value(), changed);
+    assignChanged(m_doc->m_display.utf8, m_utf8Check->isChecked(), changed);
+    assignChanged(m_doc->m_bNAWS, m_nawsCheck->isChecked(), changed);
+    assignChanged(m_doc->m_strTerminalIdentification, m_terminalTypeEdit->text(), changed);
+    assignChanged(m_doc->m_display.indent_paras, m_indentParasCheck->isChecked(), changed);
+    assignChanged(m_doc->m_display.show_bold, m_showBoldCheck->isChecked(), changed);
+    assignChanged(m_doc->m_display.show_italic, m_showItalicCheck->isChecked(), changed);
+    assignChanged(m_doc->m_display.show_underline, m_showUnderlineCheck->isChecked(), changed);
+    assignChanged(m_doc->m_display.line_spacing, static_cast<quint16>(m_lineSpacingSpin->value()),
+                  changed);
 
     // Output-page options carried over from original CPrefsP14
-    m_doc->m_sound.enable_beeps = m_enableBeepsCheck->isChecked();
-    m_doc->m_display.line_information = m_lineInformationCheck->isChecked();
-    m_doc->m_bStartPaused = m_startPausedCheck->isChecked();
-    m_doc->m_bUnpauseOnSend = m_unpauseOnSendCheck->isChecked();
-    m_doc->m_display.auto_freeze = m_autoFreezeCheck->isChecked();
-    m_doc->m_bDisableCompression = m_disableCompressionCheck->isChecked();
-    m_doc->m_bUseDefaultOutputFont = m_useDefaultOutputFontCheck->isChecked() ? 1 : 0;
-    m_doc->m_bAlternativeInverse = m_alternativeInverseCheck->isChecked();
-    m_doc->m_display.pixel_offset = static_cast<quint16>(m_pixelOffsetSpin->value());
+    assignChanged(m_doc->m_sound.enable_beeps, m_enableBeepsCheck->isChecked(), changed);
+    assignChanged(m_doc->m_display.line_information, m_lineInformationCheck->isChecked(), changed);
+    assignChanged(m_doc->m_bStartPaused, m_startPausedCheck->isChecked(), changed);
+    assignChanged(m_doc->m_bUnpauseOnSend, m_unpauseOnSendCheck->isChecked(), changed);
+    assignChanged(m_doc->m_display.auto_freeze, m_autoFreezeCheck->isChecked(), changed);
+    assignChanged(m_doc->m_bDisableCompression, m_disableCompressionCheck->isChecked(), changed);
+    assignChanged(m_doc->m_bUseDefaultOutputFont, m_useDefaultOutputFontCheck->isChecked() ? 1 : 0,
+                  changed);
+    assignChanged(m_doc->m_bAlternativeInverse, m_alternativeInverseCheck->isChecked(), changed);
+    assignChanged(m_doc->m_display.pixel_offset, static_cast<quint16>(m_pixelOffsetSpin->value()),
+                  changed);
 
     // Activity settings
-    m_doc->m_display.flash_icon = m_flashIconCheck->isChecked();
+    assignChanged(m_doc->m_display.flash_icon, m_flashIconCheck->isChecked(), changed);
 
     // Input tab
-    m_doc->m_input.font_name = m_inputFont.family();
-    m_doc->m_input.font_height = m_inputFont.pointSize();
-    m_doc->m_input.font_weight = m_inputFont.weight();
-    m_doc->m_input.font_italic = m_inputFont.italic() ? 1 : 0;
-    m_doc->m_display_my_input = m_echoInputCheck->isChecked();
+    assignChanged(m_doc->m_input.font_name, m_inputFont.family(), changed);
+    assignChanged(m_doc->m_input.font_height, m_inputFont.pointSize(), changed);
+    assignChanged(m_doc->m_input.font_weight, m_inputFont.weight(), changed);
+    assignChanged(m_doc->m_input.font_italic, m_inputFont.italic() ? 1 : 0, changed);
+    assignChanged(m_doc->m_display_my_input, m_echoInputCheck->isChecked(), changed);
     // echo_colour: combo index 0 = SAMECOLOUR (65535), 1-16 = custom color 0-15
     int echoIdx = m_echoColorCombo->currentIndex();
-    m_doc->m_output.echo_colour = (echoIdx == 0) ? 65535 : static_cast<quint16>(echoIdx - 1);
+    assignChanged(m_doc->m_output.echo_colour,
+                  (echoIdx == 0) ? quint16(65535) : static_cast<quint16>(echoIdx - 1), changed);
 
     // Command history size
-    m_doc->m_maxCommandHistory = m_historySizeSpin->value();
+    assignChanged(m_doc->m_maxCommandHistory, m_historySizeSpin->value(), changed);
 
     // Command stacking
-    m_doc->m_input.enable_command_stack = m_enableCommandStackCheck->isChecked();
-    m_doc->m_input.command_stack_character = m_commandStackCharEdit->text();
+    assignChanged(m_doc->m_input.enable_command_stack, m_enableCommandStackCheck->isChecked(),
+                  changed);
+    assignChanged(m_doc->m_input.command_stack_character, m_commandStackCharEdit->text(), changed);
     // Original CPrefsP9::DoDataExchange (prefspropertypages.cpp:4720-4721): when
     // stacking is disabled and the character is blank, default it to a space.
     if (!m_doc->m_input.enable_command_stack && m_doc->m_input.command_stack_character.isEmpty())
         m_doc->m_input.command_stack_character = " ";
 
     // Speed walk
-    m_doc->m_speedwalk.enabled = m_enableSpeedwalkCheck->isChecked();
-    m_doc->m_speedwalk.prefix = m_speedwalkPrefixEdit->text();
-    m_doc->m_speedwalk.filler = m_speedwalkFillerEdit->text();
-    m_doc->m_speedwalk.delay = m_speedwalkDelaySpin->value();
+    assignChanged(m_doc->m_speedwalk.enabled, m_enableSpeedwalkCheck->isChecked(), changed);
+    assignChanged(m_doc->m_speedwalk.prefix, m_speedwalkPrefixEdit->text(), changed);
+    assignChanged(m_doc->m_speedwalk.filler, m_speedwalkFillerEdit->text(), changed);
+    assignChanged(m_doc->m_speedwalk.delay, m_speedwalkDelaySpin->value(), changed);
 
     // Options
-    m_doc->m_input.escape_deletes_input = m_escapeDeletesInputCheck->isChecked();
-    m_doc->m_input.no_echo_off = m_noEchoOffCheck->isChecked();
+    assignChanged(m_doc->m_input.escape_deletes_input, m_escapeDeletesInputCheck->isChecked(),
+                  changed);
+    assignChanged(m_doc->m_input.no_echo_off, m_noEchoOffCheck->isChecked(), changed);
 
     // Spam prevention
-    m_doc->m_spam.enabled = m_enableSpamPreventionCheck->isChecked();
-    m_doc->m_spam.line_count = static_cast<quint16>(m_spamLineCountSpin->value());
-    m_doc->m_spam.message = m_spamMessageEdit->text();
+    assignChanged(m_doc->m_spam.enabled, m_enableSpamPreventionCheck->isChecked(), changed);
+    assignChanged(m_doc->m_spam.line_count, static_cast<quint16>(m_spamLineCountSpin->value()),
+                  changed);
+    assignChanged(m_doc->m_spam.message, m_spamMessageEdit->text(), changed);
 
     // Logging tab
-    m_doc->m_logging.log_output = m_enableLogCheck->isChecked();
-    m_doc->m_logging.auto_log_file_name = m_logFileEdit->text();
+    assignChanged(m_doc->m_logging.log_output, m_enableLogCheck->isChecked(), changed);
+    assignChanged(m_doc->m_logging.auto_log_file_name, m_logFileEdit->text(), changed);
     // Log format: Text=0, HTML=1, Raw=2
-    m_doc->m_logging.log_html = (m_logFormatCombo->currentIndex() == 1);
-    m_doc->m_logging.log_raw = (m_logFormatCombo->currentIndex() == 2);
+    assignChanged(m_doc->m_logging.log_html, m_logFormatCombo->currentIndex() == 1, changed);
+    assignChanged(m_doc->m_logging.log_raw, m_logFormatCombo->currentIndex() == 2, changed);
 
     // Scripting tab — capture the previous engine-relevant state so applySettings
     // can reconcile the running script engine (original: SavePrefsP17 disables/recreates
     // the engine when the filename or enabled flag changes).
     m_prevScriptFilename = m_doc->m_scripting.filename;
     m_prevScriptEnabled = m_doc->m_scripting.enabled;
-    m_doc->m_scripting.enabled = m_enableScriptCheck->isChecked();
-    m_doc->m_scripting.filename = m_scriptFileEdit->text();
-    m_doc->m_scripting.on_world_open = m_onWorldOpenEdit->text();
-    m_doc->m_scripting.on_world_close = m_onWorldCloseEdit->text();
-    m_doc->m_scripting.on_world_connect = m_onWorldConnectEdit->text();
-    m_doc->m_scripting.on_world_disconnect = m_onWorldDisconnectEdit->text();
-    m_doc->m_scripting.on_world_get_focus = m_onWorldGetFocusEdit->text();
-    m_doc->m_scripting.on_world_lose_focus = m_onWorldLoseFocusEdit->text();
-    m_doc->m_scripting.on_world_save = m_onWorldSaveEdit->text();
+    assignChanged(m_doc->m_scripting.enabled, m_enableScriptCheck->isChecked(), changed);
+    assignChanged(m_doc->m_scripting.filename, m_scriptFileEdit->text(), changed);
+    assignChanged(m_doc->m_scripting.prefix, m_scriptPrefixEdit->text(), changed);
+    assignChanged(m_doc->m_scripting.editor, m_scriptEditorEdit->text(), changed);
+    assignChanged(m_doc->m_scripting.on_world_open, m_onWorldOpenEdit->text(), changed);
+    assignChanged(m_doc->m_scripting.on_world_close, m_onWorldCloseEdit->text(), changed);
+    assignChanged(m_doc->m_scripting.on_world_connect, m_onWorldConnectEdit->text(), changed);
+    assignChanged(m_doc->m_scripting.on_world_disconnect, m_onWorldDisconnectEdit->text(), changed);
+    assignChanged(m_doc->m_scripting.on_world_get_focus, m_onWorldGetFocusEdit->text(), changed);
+    assignChanged(m_doc->m_scripting.on_world_lose_focus, m_onWorldLoseFocusEdit->text(), changed);
+    assignChanged(m_doc->m_scripting.on_world_save, m_onWorldSaveEdit->text(), changed);
     // Not applicable: Script language is always Lua — no multi-language support needed.
 
     // Paste to World tab
-    m_doc->m_paste.paste_preamble = m_pastePreambleEdit->text();
-    m_doc->m_paste.paste_postamble = m_pastePostambleEdit->text();
-    m_doc->m_paste.pasteline_preamble = m_pasteLinePreambleEdit->text();
-    m_doc->m_paste.pasteline_postamble = m_pasteLinePostambleEdit->text();
-    m_doc->m_paste.paste_delay = m_pasteDelaySpin->value();
-    m_doc->m_paste.paste_delay_per_lines = m_pasteDelayPerLinesSpin->value();
-    m_doc->m_paste.paste_commented_softcode = m_pasteCommentedSoftcodeCheck->isChecked();
-    m_doc->m_paste.paste_echo = m_pasteEchoCheck->isChecked();
-    m_doc->m_paste.confirm_on_paste = m_pasteConfirmCheck->isChecked();
+    assignChanged(m_doc->m_paste.paste_preamble, m_pastePreambleEdit->text(), changed);
+    assignChanged(m_doc->m_paste.paste_postamble, m_pastePostambleEdit->text(), changed);
+    assignChanged(m_doc->m_paste.pasteline_preamble, m_pasteLinePreambleEdit->text(), changed);
+    assignChanged(m_doc->m_paste.pasteline_postamble, m_pasteLinePostambleEdit->text(), changed);
+    assignChanged(m_doc->m_paste.paste_delay, m_pasteDelaySpin->value(), changed);
+    assignChanged(m_doc->m_paste.paste_delay_per_lines, m_pasteDelayPerLinesSpin->value(), changed);
+    assignChanged(m_doc->m_paste.paste_commented_softcode,
+                  m_pasteCommentedSoftcodeCheck->isChecked(), changed);
+    assignChanged(m_doc->m_paste.paste_echo, m_pasteEchoCheck->isChecked(), changed);
+    assignChanged(m_doc->m_paste.confirm_on_paste, m_pasteConfirmCheck->isChecked(), changed);
 
     // Send File tab
-    m_doc->m_paste.file_preamble = m_filePreambleEdit->text();
-    m_doc->m_paste.file_postamble = m_filePostambleEdit->text();
-    m_doc->m_paste.line_preamble = m_fileLinePreambleEdit->text();
-    m_doc->m_paste.line_postamble = m_fileLinePostambleEdit->text();
-    m_doc->m_paste.file_delay = m_fileDelaySpin->value();
-    m_doc->m_paste.file_delay_per_lines = m_fileDelayPerLinesSpin->value();
-    m_doc->m_paste.file_commented_softcode = m_fileCommentedSoftcodeCheck->isChecked();
-    m_doc->m_input.send_echo = m_fileEchoCheck->isChecked();
-    m_doc->m_bConfirmOnSend = m_fileConfirmCheck->isChecked();
+    assignChanged(m_doc->m_paste.file_preamble, m_filePreambleEdit->text(), changed);
+    assignChanged(m_doc->m_paste.file_postamble, m_filePostambleEdit->text(), changed);
+    assignChanged(m_doc->m_paste.line_preamble, m_fileLinePreambleEdit->text(), changed);
+    assignChanged(m_doc->m_paste.line_postamble, m_fileLinePostambleEdit->text(), changed);
+    assignChanged(m_doc->m_paste.file_delay, m_fileDelaySpin->value(), changed);
+    assignChanged(m_doc->m_paste.file_delay_per_lines, m_fileDelayPerLinesSpin->value(), changed);
+    assignChanged(m_doc->m_paste.file_commented_softcode, m_fileCommentedSoftcodeCheck->isChecked(),
+                  changed);
+    assignChanged(m_doc->m_input.send_echo, m_fileEchoCheck->isChecked(), changed);
+    assignChanged(m_doc->m_bConfirmOnSend, m_fileConfirmCheck->isChecked(), changed);
 
     // Remote Access tab
-    m_doc->m_remote.enabled = m_enableRemoteAccessCheck->isChecked();
-    m_doc->m_remote.port = m_remotePortSpin->value();
-    m_doc->m_remote.password = m_remotePasswordEdit->text();
-    m_doc->m_remote.authorized_keys_file = m_remoteAuthorizedKeysEdit->text();
-    m_doc->m_remote.scrollback_lines = m_remoteScrollbackSpin->value();
-    m_doc->m_remote.max_clients = m_remoteMaxClientsSpin->value();
+    assignChanged(m_doc->m_remote.enabled, m_enableRemoteAccessCheck->isChecked(), changed);
+    assignChanged(m_doc->m_remote.port, m_remotePortSpin->value(), changed);
+    assignChanged(m_doc->m_remote.password, m_remotePasswordEdit->text(), changed);
+    assignChanged(m_doc->m_remote.authorized_keys_file, m_remoteAuthorizedKeysEdit->text(),
+                  changed);
+    assignChanged(m_doc->m_remote.scrollback_lines, m_remoteScrollbackSpin->value(), changed);
+    assignChanged(m_doc->m_remote.max_clients, m_remoteMaxClientsSpin->value(), changed);
 
     // Proxy settings
-    m_doc->m_proxy.type = static_cast<quint16>(m_proxyTypeCombo->currentIndex());
-    m_doc->m_proxy.server = m_proxyServerEdit->text();
-    m_doc->m_proxy.port = static_cast<quint16>(m_proxyPortSpin->value());
-    m_doc->m_proxy.username = m_proxyUsernameEdit->text();
-    m_doc->m_proxy.password = m_proxyPasswordEdit->text();
+    assignChanged(m_doc->m_proxy.type, static_cast<quint16>(m_proxyTypeCombo->currentIndex()),
+                  changed);
+    assignChanged(m_doc->m_proxy.server, m_proxyServerEdit->text(), changed);
+    assignChanged(m_doc->m_proxy.port, static_cast<quint16>(m_proxyPortSpin->value()), changed);
+    assignChanged(m_doc->m_proxy.username, m_proxyUsernameEdit->text(), changed);
+    assignChanged(m_doc->m_proxy.password, m_proxyPasswordEdit->text(), changed);
 
-    // Don't unconditionally mark modified — original only sets modified flag
-    // when values actually change (via individual option setters). The document's
-    // existing m_bModified state is preserved; it will be set true by the save-to-XML
-    // comparison if any values differ from what's on disk.
+    // Original CMUSHclientDoc::OnApply marks the document modified when any
+    // preference page changed (configuration.cpp:1973-2016). Reproduce that here:
+    // set the flag (never clear it) when at least one committed value differed.
+    if (changed)
+        m_doc->setModified(true);
 
     qCDebug(lcDialog) << "WorldPropertiesDialog::saveSettings() - saved to WorldDocument";
 }
@@ -1097,7 +1182,59 @@ bool WorldPropertiesDialog::validateSettings()
         return false;
     }
 
+    // Original CPrefsP14::DoDataExchange (prefspropertypages.cpp:5789-5813): warn if
+    // the output-buffer line count changed, exceeds 1000, and the estimated allocation
+    // would exceed physical RAM. The user may continue (Yes) or abort the save (No).
+    // saveSettings has not run yet, so m_doc still holds the previous line count.
+    if (isMaxLinesMemoryWarningNeeded(m_doc->m_display.max_lines, m_maxLinesSpin->value(),
+                                      totalPhysicalMemoryBytes())) {
+        const QString msg =
+            QStringLiteral(
+                "You are allocating %1 lines for your output buffer, but have only %2 Mb of "
+                "physical RAM. This is not recommended. Do you wish to continue anyway?")
+                .arg(m_maxLinesSpin->value())
+                .arg(totalPhysicalMemoryBytes() / 1024 / 1024);
+        if (QMessageBox::question(this, "World Properties", msg,
+                                  QMessageBox::Yes | QMessageBox::No) == QMessageBox::No) {
+            m_tabWidget->setCurrentIndex(1); // Output tab
+            m_maxLinesSpin->setFocus();
+            return false;
+        }
+    }
+
     return true;
+}
+
+bool WorldPropertiesDialog::isMaxLinesMemoryWarningNeeded(int oldLines, int newLines,
+                                                          quint64 totalPhysicalBytes)
+{
+    // Mirrors prefspropertypages.cpp:5789-5811 exactly: only when the count changed
+    // and exceeds 1000, estimate 16 MB for the OS plus 60 bytes per line and warn if
+    // that exceeds physical RAM. A zero RAM reading (query failed) suppresses the warning.
+    if (oldLines == newLines || newLines <= 1000 || totalPhysicalBytes == 0)
+        return false;
+    const quint64 bytesNeeded = 16ULL * 1024ULL * 1024ULL + static_cast<quint64>(newLines) * 60ULL;
+    return bytesNeeded > totalPhysicalBytes;
+}
+
+quint64 WorldPropertiesDialog::totalPhysicalMemoryBytes()
+{
+#if defined(Q_OS_MACOS) || defined(Q_OS_BSD4)
+    int mib[2] = {CTL_HW, HW_MEMSIZE};
+    uint64_t memsize = 0;
+    size_t len = sizeof(memsize);
+    if (sysctl(mib, 2, &memsize, &len, nullptr, 0) == 0)
+        return static_cast<quint64>(memsize);
+    return 0;
+#elif defined(Q_OS_UNIX)
+    const long pages = sysconf(_SC_PHYS_PAGES);
+    const long pageSize = sysconf(_SC_PAGE_SIZE);
+    if (pages > 0 && pageSize > 0)
+        return static_cast<quint64>(pages) * static_cast<quint64>(pageSize);
+    return 0;
+#else
+    return 0;
+#endif
 }
 
 bool WorldPropertiesDialog::isSpeedwalkPrefixValid() const

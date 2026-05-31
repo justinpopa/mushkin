@@ -14,6 +14,7 @@
 #include <QComboBox>
 #include <QLabel>
 #include <QLineEdit>
+#include <QPushButton>
 #include <QSpinBox>
 #include <QTextEdit>
 #include <gtest/gtest.h>
@@ -167,6 +168,39 @@ class WorldPropertiesDialogParityTest : public ::testing::Test {
     int pixelOffsetValue() const
     {
         return dlg->m_pixelOffsetSpin->value();
+    }
+
+    // L58: max-output-lines spin + validate-time memory warning predicate.
+    void setMaxLines(int n)
+    {
+        dlg->m_maxLinesSpin->setValue(n);
+    }
+    static bool maxLinesWarningNeeded(int oldLines, int newLines, quint64 totalPhysicalBytes)
+    {
+        return WorldPropertiesDialog::isMaxLinesMemoryWarningNeeded(oldLines, newLines,
+                                                                    totalPhysicalBytes);
+    }
+
+    // M75: script prefix / editor field accessors and MXP Scripts button presence.
+    QString scriptPrefixText() const
+    {
+        return dlg->m_scriptPrefixEdit->text();
+    }
+    void setScriptPrefix(const QString& text)
+    {
+        dlg->m_scriptPrefixEdit->setText(text);
+    }
+    QString scriptEditorText() const
+    {
+        return dlg->m_scriptEditorEdit->text();
+    }
+    void setScriptEditor(const QString& text)
+    {
+        dlg->m_scriptEditorEdit->setText(text);
+    }
+    bool hasMxpScriptsButton() const
+    {
+        return dlg->m_mxpScriptsButton != nullptr;
     }
 };
 
@@ -385,4 +419,87 @@ TEST_F(WorldPropertiesDialogParityTest, OutputOptionsSave)
     EXPECT_NE(doc->m_bUseDefaultOutputFont, 0);
     EXPECT_TRUE(doc->m_bAlternativeInverse);
     EXPECT_EQ(doc->m_display.pixel_offset, 12);
+}
+
+// L58: saveSettings must mark the document modified when at least one committed value
+// actually changed (mirrors CMUSHclientDoc::OnApply / SetModifiedFlag(TRUE),
+// configuration.cpp:1973-2016). It must NOT mark modified when nothing changed.
+TEST_F(WorldPropertiesDialogParityTest, SaveMarksDocumentModifiedOnChange)
+{
+    doc->m_name = QStringLiteral("OldName");
+    makeDialog();
+    loadSettings();
+
+    // Settle widget/doc into a fixed point first: a few load/save fields default
+    // asymmetrically (e.g. remote port 0 -> 4001), so the very first save can
+    // legitimately report a change. After one save the dialog and doc agree.
+    saveSettings();
+    doc->setModified(false);
+
+    // A second save with no edits must leave the document clean.
+    saveSettings();
+    EXPECT_FALSE(doc->isModified());
+
+    // An actual edit must flip the modified flag.
+    setNameFieldText(QStringLiteral("NewName"));
+    saveSettings();
+    EXPECT_TRUE(doc->isModified());
+}
+
+// L58: once modified, a subsequent no-op save must not clear the flag.
+TEST_F(WorldPropertiesDialogParityTest, SaveNeverClearsModifiedFlag)
+{
+    makeDialog();
+    loadSettings();
+    doc->setModified(true);
+    saveSettings(); // no edits
+    EXPECT_TRUE(doc->isModified());
+}
+
+// M75: the script prefix and editor fields round-trip through m_scripting.prefix /
+// m_scripting.editor (original IDC_SCRIPT_PREFIX / IDC_SCRIPT_EDITOR).
+TEST_F(WorldPropertiesDialogParityTest, ScriptPrefixAndEditorRoundTrip)
+{
+    doc->m_scripting.prefix = QStringLiteral("@");
+    doc->m_scripting.editor = QStringLiteral("/usr/bin/vim");
+    makeDialog();
+    loadSettings();
+    EXPECT_EQ(scriptPrefixText(), QStringLiteral("@"));
+    EXPECT_EQ(scriptEditorText(), QStringLiteral("/usr/bin/vim"));
+
+    setScriptPrefix(QStringLiteral("!"));
+    setScriptEditor(QStringLiteral("/usr/local/bin/nano"));
+    saveSettings();
+    EXPECT_EQ(doc->m_scripting.prefix, QStringLiteral("!"));
+    EXPECT_EQ(doc->m_scripting.editor, QStringLiteral("/usr/local/bin/nano"));
+}
+
+// M75: the MXP Scripts button (original IDC_MXP_SCRIPTS) must exist on the dialog.
+TEST_F(WorldPropertiesDialogParityTest, MxpScriptsButtonPresent)
+{
+    makeDialog();
+    EXPECT_TRUE(hasMxpScriptsButton());
+}
+
+// M78: the output-lines memory-warning predicate mirrors prefspropertypages.cpp:5789-5811.
+TEST_F(WorldPropertiesDialogParityTest, MaxLinesMemoryWarningPredicate)
+{
+    // 1 GB of RAM.
+    const quint64 oneGb = 1024ULL * 1024ULL * 1024ULL;
+
+    // Unchanged count: never warns even if huge.
+    EXPECT_FALSE(maxLinesWarningNeeded(5'000'000, 5'000'000, oneGb));
+
+    // Changed but <= 1000: never warns.
+    EXPECT_FALSE(maxLinesWarningNeeded(500, 1000, oneGb));
+
+    // Changed, > 1000, but allocation (16 MB + 60 B/line) fits in RAM: no warning.
+    EXPECT_FALSE(maxLinesWarningNeeded(1000, 50'000, oneGb));
+
+    // Changed, > 1000, allocation exceeds RAM: warns. 16 MB + 60 B/line > 1 GB needs
+    // ~17.9M lines; use a generous count to clear the threshold.
+    EXPECT_TRUE(maxLinesWarningNeeded(1000, 30'000'000, oneGb));
+
+    // A zero RAM reading (query failed) suppresses the warning.
+    EXPECT_FALSE(maxLinesWarningNeeded(1000, 30'000'000, 0));
 }
