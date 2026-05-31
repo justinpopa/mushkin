@@ -71,7 +71,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: C:\vcpkg\installed
-          key: vcpkg-windows-${{ env.QT_VERSION }}-v1
+          key: vcpkg-windows-${{ env.QT_VERSION }}-v2
+          restore-keys: |
+            vcpkg-windows-${{ env.QT_VERSION }}-
 
       # ===== Linux (Ubuntu 24.04) =====
       - name: Install toolchain (Linux)
@@ -173,7 +175,7 @@ jobs:
             git clone https://github.com/microsoft/vcpkg.git C:\vcpkg
             C:\vcpkg\bootstrap-vcpkg.bat
           }
-          C:\vcpkg\vcpkg install pcre:x64-windows luajit:x64-windows sqlite3:x64-windows openssl:x64-windows zlib:x64-windows
+          C:\vcpkg\vcpkg install pcre:x64-windows luajit:x64-windows sqlite3:x64-windows openssl:x64-windows zlib:x64-windows libssh:x64-windows
 
       - name: Install Qt (Windows)
         if: matrix.os == 'Windows'
