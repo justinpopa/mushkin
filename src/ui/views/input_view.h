@@ -121,6 +121,17 @@ class InputView : public QPlainTextEdit, public IInputView {
     void applyInputSettings();
 
     /**
+     * inputViewportMargins - Public accessor for viewportMargins() (testing).
+     *
+     * viewportMargins() is protected in QAbstractScrollArea; expose it here
+     * so unit tests can verify the column-based right margin set by updateWrapMargin().
+     */
+    QMargins inputViewportMargins() const
+    {
+        return viewportMargins();
+    }
+
+    /**
      * handleTabCompletion - Tab completion for commands (Tab key)
      *
      * Tab Completion (IDENTICAL to original MUSHclient)
@@ -165,6 +176,16 @@ class InputView : public QPlainTextEdit, public IInputView {
      * Passes other keys to QPlainTextEdit::keyPressEvent().
      */
     void keyPressEvent(QKeyEvent* event) override;
+
+    /**
+     * resizeEvent - Recalculate the wrap margin when the widget is resized.
+     *
+     * When auto_wrap is enabled, the right viewport margin must be recomputed
+     * whenever the widget size changes so that text still wraps at the configured
+     * column count (original: CSendView::UpdateWrap is called from OnChange
+     * which fires on every edit and on initial creation).
+     */
+    void resizeEvent(QResizeEvent* event) override;
 
   private:
     /**
@@ -252,6 +273,17 @@ class InputView : public QPlainTextEdit, public IInputView {
      * - Current line count
      */
     void updateHeight();
+
+    /**
+     * updateWrapMargin - Apply the column-based right viewport margin.
+     *
+     * M149: Mirrors CSendView::UpdateWrap() from sendvw.cpp:3015-3062.
+     * When auto_wrap is enabled, sets a right viewport margin so WidgetWidth
+     * wrapping is effectively bounded by m_display.wrap_column columns
+     * (iWidth = wrap_column+1, clamped to [20, MAX_LINE_WIDTH]).
+     * When disabled, removes the margin and switches to NoWrap.
+     */
+    void updateWrapMargin();
 
     // Data members
     WorldDocument* m_doc;        // Document (not owned)

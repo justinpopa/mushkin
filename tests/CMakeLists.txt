@@ -532,6 +532,20 @@ gtest_discover_tests(test-tab-completion-gtest
     DISCOVERY_TIMEOUT 30
 )
 
+# Input wrap parity test (M149)
+add_executable(test-input-wrap-gtest
+    test_input_wrap_gtest.cpp
+)
+
+target_link_libraries(test-input-wrap-gtest PRIVATE
+    test_main_gui
+    ui
+)
+
+gtest_discover_tests(test-input-wrap-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
 # Word wrap test
 add_executable(test-word-wrap-gtest
     test_word_wrap_gtest.cpp
