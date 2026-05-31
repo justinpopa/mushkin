@@ -21,15 +21,28 @@ qint32 WorldDocument::PlaySound(qint16 buffer, const QString& filename, bool loo
 
 qint32 WorldDocument::StopSound(qint16 buffer)
 {
-    // When stopping all sounds (buffer=0), fire OnPluginPlaySound with empty string
-    // to let plugins know sounds are being cancelled.
-    // Original: CancelSound (doc.cpp:7137-7158)
-    if (buffer == 0 && !m_bInPlaySoundFilePlugin) {
-        m_bInPlaySoundFilePlugin = true;
-        SendToFirstPluginCallbacks(ON_PLUGIN_PLAY_SOUND, QString());
-        m_bInPlaySoundFilePlugin = false;
-    }
+    // Pure DirectSound buffer stop — no plugin callback.
+    // Original: CMUSHclientDoc::StopSound (methods_sounds.cpp:361-402) fires no callback;
+    // the OnPluginPlaySound notification belongs to CancelSound, not StopSound.
     return m_soundManager->stopSound(buffer);
+}
+
+void WorldDocument::CancelSound()
+{
+    // Fire OnPluginPlaySound with the empty string so plugins can suppress the cancel.
+    // If a plugin handles it (returns true), skip the stop entirely — matching the
+    // original CMUSHclientDoc::CancelSound (doc.cpp:7135-7158).
+    if (!m_bInCancelSoundFilePlugin) {
+        m_bInCancelSoundFilePlugin = true;
+        const bool handled = SendToFirstPluginCallbacks(ON_PLUGIN_PLAY_SOUND, QString());
+        m_bInCancelSoundFilePlugin = false;
+        if (handled) {
+            return; // handled by plugin? don't do our own sound cancel
+        }
+    }
+
+    // default sound-cancel mechanism
+    StopSound(0);
 }
 
 bool WorldDocument::PlaySoundFile(const QString& filename)

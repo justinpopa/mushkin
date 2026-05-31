@@ -201,7 +201,7 @@ inline QRgb getColor(lua_State* L, int index, QRgb defaultColor = qRgb(255, 255,
  * - Must start with a letter
  * - Can only contain letters, digits, and underscores
  *
- * @param name Name to validate (will be trimmed)
+ * @param name Name to validate (will be trimmed and lowercased on success)
  * @return eOK (0) if valid, eInvalidObjectLabel (30008) if invalid
  */
 inline qint32 validateObjectName(QString& name)
@@ -226,6 +226,9 @@ inline qint32 validateObjectName(QString& name)
             return eInvalidObjectLabel;
         }
     }
+
+    // Object names are keyed in lower case (matches CheckObjectName::MakeLower)
+    name = name.toLower();
 
     return eOK;
 }

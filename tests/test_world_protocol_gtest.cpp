@@ -6,9 +6,11 @@
  * defined in src/world/world_protocol.cpp.
  */
 
+#include "../src/network/world_socket.h"
 #include "../src/text/line.h"
 #include "../src/text/style.h"
 #include "../src/world/color_utils.h"
+#include "../src/world/mxp_engine.h"
 #include "../src/world/telnet_parser.h"
 #include "../src/world/world_document.h"
 #include "fixtures/world_fixtures.h"
@@ -496,4 +498,70 @@ TEST_F(WorldProtocolTest, SendPacket_WithData_DoesNotCrash)
     // SendPacket with data to a non-connected socket should not crash.
     const unsigned char data[] = {0xFF, 0xFB, 0x01};
     EXPECT_NO_FATAL_FAILURE(doc->SendPacket(std::span<const unsigned char>{data, 3}));
+}
+
+// ========== Category 14: M17 — outgoing packet debug dump ==========
+// Original: doc.cpp:5593-5594 — SendPacket dumps the outgoing packet when packet
+// debug is enabled. The hex dump is written to the output window (via colourNote)
+// when no plugin handles ON_PLUGIN_PACKET_DEBUG, so the line list grows.
+
+TEST_F(WorldProtocolTest, SendPacket_DebugOn_EmitsHexDump)
+{
+    auto* socket = new WorldSocket(doc.get(), doc.get());
+    doc->m_connectionManager->m_pSocket = socket;
+    doc->m_bDebugIncomingPackets = true;
+
+    int before = lineCount();
+    const unsigned char data[] = {0xFF, 0xFB, 0x01};
+    doc->SendPacket(std::span<const unsigned char>{data, 3});
+
+    EXPECT_GT(lineCount(), before) << "outgoing packet debug must produce a hex dump in the output";
+
+    doc->m_connectionManager->m_pSocket = nullptr;
+}
+
+TEST_F(WorldProtocolTest, SendPacket_DebugOff_EmitsNoHexDump)
+{
+    auto* socket = new WorldSocket(doc.get(), doc.get());
+    doc->m_connectionManager->m_pSocket = socket;
+    doc->m_bDebugIncomingPackets = false;
+
+    int before = lineCount();
+    const unsigned char data[] = {0xFF, 0xFB, 0x01};
+    doc->SendPacket(std::span<const unsigned char>{data, 3});
+
+    EXPECT_EQ(lineCount(), before)
+        << "with packet debug off, SendPacket must not produce any output";
+
+    doc->m_connectionManager->m_pSocket = nullptr;
+}
+
+// ========== Category 15: M83 — EOL closes MXP tags + reverts line mode ==========
+// Original: doc.cpp:2071-2076 — on '\n', when MXP is active and not in Pueblo mode,
+// close open tags and revert to the default line mode via MXP_mode_change(-1).
+
+TEST_F(WorldProtocolTest, Newline_WhenMXPActive_RevertsToDefaultMode)
+{
+    doc->MXP_On();
+    auto& mxp = *doc->m_mxpEngine;
+    mxp.m_iMXP_defaultMode = eMXP_open; // default after newline
+    mxp.m_iMXP_mode = eMXP_secure;      // currently in a non-default mode
+
+    feed({'\n'});
+
+    EXPECT_EQ(mxp.m_iMXP_mode, mxp.m_iMXP_defaultMode)
+        << "newline must revert MXP to the default line mode";
+}
+
+TEST_F(WorldProtocolTest, Newline_WhenMXPInactive_LeavesModeUnchanged)
+{
+    // MXP off by default — the EOL MXP block must be skipped entirely.
+    auto& mxp = *doc->m_mxpEngine;
+    ASSERT_FALSE(doc->isMXPActive());
+    mxp.m_iMXP_mode = eMXP_secure;
+
+    feed({'\n'});
+
+    EXPECT_EQ(mxp.m_iMXP_mode, eMXP_secure)
+        << "with MXP inactive, newline must not touch the MXP mode";
 }

@@ -79,8 +79,9 @@ enum { DBG_NONE = 0 };
 // Reload options - see ScriptReloadOption enum in world_document.h
 // eReloadConfirm = 0, eReloadAlways = 1, eReloadNever = 2
 
-// MXP modes
-enum { eNoMXP = 0, eUseMXP = 1, eOnCommandMXP = 2 };
+// MXP modes — numeric values match the original MUSHclient enum (doc.h:350-355)
+// for "use_mxp" world-file / Lua GetOption/SetOption cross-compatibility.
+enum { eOnCommandMXP = 0, eQueryMXP = 1, eUseMXP = 2, eNoMXP = 3 };
 
 // Sound literal
 inline constexpr const char* NOSOUNDLIT = "";

@@ -258,3 +258,36 @@ TEST_F(LuaApiTest, DisconnectErrorCodes)
     EXPECT_EQ(resultDisconnecting, static_cast<double>(eWorldClosed))
         << "Disconnect() should return eWorldClosed (30002) when already disconnecting";
 }
+
+// Test 16: API-created object names are keyed in lower case, matching the original
+// CMUSHclientDoc::CheckObjectName() which calls MakeLower() after validation. The
+// AutomationRegistry keys triggers directly off the validated name without any further
+// lowercasing, so validateObjectName() lowercasing is what makes API trigger names
+// case-insensitive. Without it, a mixed-case AddTrigger name would be stored verbatim and
+// only findable with the exact same case.
+TEST_F(LuaApiTest, ObjectNamesKeyedLowerCase)
+{
+    // Create a trigger under a mixed-case name via the Lua API.
+    executeLua("world.AddTrigger('MyTrigger', 'hello', '', 1, 0, 0, '', '', 0, 100)");
+
+    auto& triggerMap = doc->m_automationRegistry->m_TriggerMap;
+
+    // Stored key should be lowercased, not the original case.
+    EXPECT_TRUE(triggerMap.find("mytrigger") != triggerMap.end())
+        << "Trigger should be stored under the lowercased key";
+    EXPECT_TRUE(triggerMap.find("MyTrigger") == triggerMap.end())
+        << "Trigger should NOT be stored under the original-case key";
+
+    // Re-adding with a different case (and no eReplace) must collide with the existing one,
+    // proving the lookup is case-insensitive.
+    executeLua("dup_result = world.AddTrigger('MYTRIGGER', 'world', '', 1, 0, 0, '', '', 0, 100)");
+    EXPECT_EQ(getGlobalNumber("dup_result"), static_cast<double>(eTriggerAlreadyExists))
+        << "Adding a same-named trigger in different case should report it already exists";
+
+    // Deleting under yet another case must succeed and remove the single stored trigger.
+    executeLua("del_result = world.DeleteTrigger('mytrigger')");
+    EXPECT_EQ(getGlobalNumber("del_result"), 0.0)
+        << "DeleteTrigger should find and delete the trigger regardless of name case";
+    EXPECT_TRUE(triggerMap.find("mytrigger") == triggerMap.end())
+        << "Trigger should be gone after case-insensitive delete";
+}

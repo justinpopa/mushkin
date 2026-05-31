@@ -395,6 +395,10 @@ std::expected<void, QString> WorldWidget::loadFromFile(const QString& filename)
     // This will monitor the script file and reload it based on m_scripting.reload_option
     m_document->setupScriptFileWatcher();
 
+    // Fire OnWorldOpen Lua callback now that the script file has been loaded and its
+    // handler functions are defined. Original: CMUSHclientDoc::OpenSession (doc.cpp:902-913).
+    m_document->onWorldOpen();
+
     // Apply start_paused setting to output view (M192)
     // Original: doc.cpp:789 — pmyView->m_freeze = m_bStartPaused
     applyStartPaused();

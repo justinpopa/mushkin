@@ -64,28 +64,14 @@ int L_WindowLoadImage(lua_State* L)
         return luaReturnError(L, eNoSuchWindow);
     }
 
-    // Load the image file using Qt
-    qFilename = qFilename.trimmed();
+    // Delegate to MiniWindow::LoadImage, which enforces the original's behavior:
+    // minimum length >= 5, .bmp/.png extension filter, and distinguishes
+    // eFileNotFound from eUnableToLoadImage (original lua_methods.cpp:6067-6077 ->
+    // miniwindow.cpp:1047-1103).
+    qint32 result = win->LoadImage(qImageId, qFilename.trimmed());
 
-    // Empty filename means remove the image
-    if (qFilename.isEmpty()) {
-        // Erase from map (unique_ptr automatically deletes)
-        win->images.erase(qImageId);
-        return luaReturnOK(L);
-    }
-
-    // Load the image as a QImage
-    auto image = std::make_unique<QImage>(qFilename);
-    if (image->isNull()) {
-        lua_pushnumber(L, eFileNotFound);
-        return 1;
-    }
-
-    // Store in miniwindow's image map (replaces old one if it exists; old unique_ptr automatically
-    // deletes)
-    win->images[qImageId] = std::move(image);
-
-    return luaReturnOK(L);
+    lua_pushnumber(L, result);
+    return 1;
 }
 
 /**

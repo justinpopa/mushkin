@@ -2311,6 +2311,18 @@ void MainWindow::closeWorld()
         }
     }
 
+    // Fire the OnWorldClose Lua handler before tearing down the document.
+    // Original: SaveModified() runs the close script once the world is confirmed
+    // closing (doc.cpp:4374-4390).
+    {
+        auto* widget = qobject_cast<WorldWidget*>(sub->widget());
+        if (widget) {
+            if (WorldDocument* doc = widget->document()) {
+                doc->onWorldClose();
+            }
+        }
+    }
+
     sub->close();
 }
 
@@ -4394,8 +4406,9 @@ void MainWindow::stopSound()
         return;
     }
 
-    // Stop all sounds for this world (buffer 0 = all)
-    worldWidget->document()->StopSound(0);
+    // "Stop sound playing" menu — original OnDisplayStopsoundplaying calls CancelSound,
+    // which fires OnPluginPlaySound (plugins may suppress) before stopping all buffers.
+    worldWidget->document()->CancelSound();
 }
 
 void MainWindow::toggleCommandEcho()
@@ -5500,6 +5513,12 @@ void MainWindow::updateStatusIndicators()
         }
         disconnect(m_trackedWorld, &WorldWidget::connectedChanged, this,
                    &MainWindow::onConnectionStateChanged);
+
+        // Fire OnWorldLoseFocus on the world that is losing focus.
+        // Original: CSendView::OnActivateView (sendvw.cpp:972-978).
+        if (WorldDocument* doc = m_trackedWorld->document()) {
+            doc->onWorldLoseFocus();
+        }
     }
 
     // Connect to new world's signals
@@ -5510,6 +5529,12 @@ void MainWindow::updateStatusIndicators()
         }
         connect(worldWidget, &WorldWidget::connectedChanged, this,
                 &MainWindow::onConnectionStateChanged);
+
+        // Fire OnWorldGetFocus on the world that is gaining focus.
+        // Original: CSendView::OnActivateView (sendvw.cpp:941-947).
+        if (WorldDocument* doc = worldWidget->document()) {
+            doc->onWorldGetFocus();
+        }
     }
 
     m_trackedWorld = worldWidget;

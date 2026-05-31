@@ -7,6 +7,7 @@
  */
 
 #include "../src/automation/plugin.h"
+#include "../src/automation/trigger.h"
 #include "../src/world/world_document.h"
 #include "../src/world/xml_serialization.h"
 #include "fixtures/world_fixtures.h"
@@ -61,6 +62,47 @@ Test plugin description
 </muclient>
 )")
                                 .arg(name, id, QString::number(sequence));
+
+        pluginFile.write(pluginXml.toUtf8());
+        pluginFile.close();
+    }
+
+    // Helper to create a test plugin file containing a single trigger with the
+    // given (possibly mixed-case) label.
+    void createPluginFileWithTrigger(const QString& path, const QString& triggerLabel)
+    {
+        QFile pluginFile(path);
+        ASSERT_TRUE(pluginFile.open(QIODevice::WriteOnly | QIODevice::Text))
+            << "Cannot create plugin file: " << path.toStdString();
+
+        QString pluginXml = QString(R"(<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE muclient>
+<muclient>
+<plugin
+   name="TriggerPlugin"
+   author="Test Author"
+   id="33333333333333333333333333333333"
+   language="Lua"
+   purpose="Test plugin with a trigger"
+   save_state="y"
+   date_written="2025-01-01"
+   requires="5.00"
+   version="1.0"
+   sequence="100"
+>
+<triggers>
+  <trigger
+   name="%1"
+   match="hello world"
+   enabled="y"
+   sequence="100"
+  >
+  </trigger>
+</triggers>
+</plugin>
+</muclient>
+)")
+                                .arg(triggerLabel);
 
         pluginFile.write(pluginXml.toUtf8());
         pluginFile.close();
@@ -210,4 +252,33 @@ TEST_F(PluginSerializationTest, VerifyPluginSortingBySequence)
     EXPECT_EQ(doc2.m_PluginList[0]->m_iSequence, -100) << "First plugin sequence should be -100";
 
     EXPECT_EQ(doc2.m_PluginList[1]->m_iSequence, 100) << "Second plugin sequence should be 100";
+}
+
+// Test 7 (H65): A plugin-scoped trigger with a mixed-case label must be stored
+// under a lowercased internal name, matching the original MUSHclient behavior
+// (xml_load_world.cpp:1314 MakeLower). The plugin load path previously
+// re-assigned internal_name from the original-case label, undoing the fix.
+TEST_F(PluginSerializationTest, PluginTriggerLabelIsLowercased)
+{
+    createPluginFileWithTrigger(pluginPath, "MixedCaseLabel");
+
+    WorldDocument doc;
+    QString errorMsg;
+    Plugin* plugin = doc.LoadPlugin(pluginPath, errorMsg);
+    ASSERT_NE(plugin, nullptr) << "LoadPlugin failed: " << errorMsg.toStdString();
+
+    ASSERT_EQ(plugin->m_TriggerMap.size(), 1u) << "Expected exactly one plugin trigger";
+
+    // The map key (internal_name) must be the lowercased label.
+    EXPECT_TRUE(plugin->m_TriggerMap.find("mixedcaselabel") != plugin->m_TriggerMap.end())
+        << "Plugin trigger should be stored under lowercased internal name";
+    EXPECT_TRUE(plugin->m_TriggerMap.find("MixedCaseLabel") == plugin->m_TriggerMap.end())
+        << "Plugin trigger must NOT be stored under original-case label";
+
+    const Trigger* trigger = plugin->m_TriggerMap.begin()->second.get();
+    ASSERT_NE(trigger, nullptr);
+    EXPECT_EQ(trigger->internal_name, QString("mixedcaselabel"))
+        << "internal_name should be lowercased";
+    // The display label is preserved in original case.
+    EXPECT_EQ(trigger->label, QString("MixedCaseLabel")) << "label should preserve original case";
 }

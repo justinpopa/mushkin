@@ -134,7 +134,7 @@ void ConnectionManager::onConnect(int errorCode)
 
         // Activate MXP if always-on mode is configured.
         // Original: doc.cpp:6611-6612 — MXP_On() called at connect when m_iUseMXP == eUseMXP
-        if (m_doc.m_iUseMXP == MXPMode::eMXP_On) {
+        if (m_doc.m_iUseMXP == MXPMode::eMXP_Always) {
             m_doc.MXP_On();
         }
 
