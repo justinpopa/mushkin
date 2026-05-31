@@ -361,6 +361,16 @@ class WorldDocument : public QObject, public IWorldContext {
 
     void applyGlobalFontDefaults();
 
+    // Reload configured global default sets (colours/triggers/aliases/timers/macros)
+    // and input/output fonts into this world, gated on the world's per-set
+    // m_bUseDefault* opt-in flags. Mirrors the original
+    // CMUSHclientDoc::OnFileReloaddefaults (methods_defaults.cpp:115-170):
+    // a set is loaded only when its flag is set AND its configured file path is
+    // non-empty; fonts are re-applied (and the matching settings-changed signal
+    // emitted) under the same gating. Does NOT modify the flags. Returns the
+    // number of XML items imported across all loaded sets.
+    int reloadDefaults();
+
     // Public member variables (for direct port compatibility)
 
     // NOTE: m_pSocket is now stored inside m_connectionManager->m_pSocket.

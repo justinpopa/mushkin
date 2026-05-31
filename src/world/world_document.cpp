@@ -18,6 +18,7 @@
 #include "speedwalk_engine.h" // speedwalk::evaluate/reverse/removeBacktracks
 #include "view_interfaces.h"
 #include "world_socket.h"
+#include "xml_serialization.h" // XmlSerialization::ImportXML + XML_* flags (reloadDefaults)
 #include <QClipboard>
 #include <QColor>
 #include <QCoreApplication>
@@ -650,6 +651,73 @@ void WorldDocument::applyGlobalFontDefaults()
         m_input.font_italic = opts.defaultInputFontItalic(); // original: doc_construct.cpp:691
         m_bUseDefaultInputFont = true;
     }
+}
+
+namespace {
+// Load one configured default-set file into the document if the file path is
+// non-empty, returning the number of XML items imported (0 on empty path or
+// open failure). Mirrors Load_Set in the original OnFileReloaddefaults.
+int loadDefaultSet(WorldDocument* doc, const QString& path, int flag)
+{
+    if (path.isEmpty())
+        return 0;
+
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+        return 0;
+
+    return XmlSerialization::ImportXML(doc, QString::fromUtf8(file.readAll()), flag);
+}
+} // namespace
+
+int WorldDocument::reloadDefaults()
+{
+    // Original: CMUSHclientDoc::OnFileReloaddefaults (methods_defaults.cpp:115-170).
+    // Each default set is loaded only when the world opted into it
+    // (m_bUseDefault* / use_default_colours) AND a file path is configured.
+    // The flags are NOT modified here.
+    const auto& opts = GlobalOptions::instance();
+
+    int totalImported = 0;
+
+    if (m_colors.use_default_colours)
+        totalImported +=
+            loadDefaultSet(this, opts.defaultColoursFile(), XML_COLOURS);
+
+    if (m_bUseDefaultTriggers)
+        totalImported +=
+            loadDefaultSet(this, opts.defaultTriggersFile(), XML_TRIGGERS);
+
+    if (m_bUseDefaultAliases)
+        totalImported +=
+            loadDefaultSet(this, opts.defaultAliasesFile(), XML_ALIASES);
+
+    if (m_bUseDefaultTimers)
+        totalImported +=
+            loadDefaultSet(this, opts.defaultTimersFile(), XML_TIMERS);
+
+    if (m_bUseDefaultMacros)
+        totalImported +=
+            loadDefaultSet(this, opts.defaultMacrosFile(), XML_MACROS);
+
+    // Input font override (original: methods_defaults.cpp:137-150).
+    if (m_bUseDefaultInputFont && !opts.defaultInputFont().isEmpty()) {
+        m_input.font_height = opts.defaultInputFontHeight();
+        m_input.font_name = opts.defaultInputFont();
+        m_input.font_italic = opts.defaultInputFontItalic();
+        m_input.font_weight = opts.defaultInputFontWeight();
+        emit inputSettingsChanged();
+    }
+
+    // Output font override (original: methods_defaults.cpp:152-166).
+    if (m_bUseDefaultOutputFont && !opts.defaultOutputFont().isEmpty()) {
+        m_output.font_height = opts.defaultOutputFontHeight();
+        m_output.font_name = opts.defaultOutputFont();
+        m_output.font_weight = 400; // FW_NORMAL
+        emit outputSettingsChanged();
+    }
+
+    return totalImported;
 }
 
 void WorldDocument::initializeColors()

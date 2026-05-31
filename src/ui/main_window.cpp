@@ -76,6 +76,7 @@
 #include <QVBoxLayout>
 #include <functional>
 #include <memory>
+#include <unordered_set>
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent), m_mdiArea(nullptr), m_mainToolBar(nullptr), m_gameToolBar(nullptr),
@@ -1553,6 +1554,13 @@ void MainWindow::closeEvent(QCloseEvent* event)
 
     // Auto-save worlds with m_bSaveWorldAutomatically set (M194).
     // Original: SaveModified() calls DoSave silently when m_bSaveWorldAutomatically is true.
+    // A world is only excused from the unsaved-changes prompt below when its
+    // auto-save actually SUCCEEDS — matching the original, where a failed DoSave
+    // (or an empty path that the user cancels out of) leaves IsModified() true so
+    // SaveModified() still prompts. An empty filename here means the world was
+    // never saved, so it must fall through to the prompt rather than be discarded
+    // silently (original DoSave shows a Save As dialog for an empty path).
+    std::unordered_set<const WorldWidget*> autoSaved;
     for (QMdiSubWindow* window : windows) {
         WorldWidget* worldWidget = qobject_cast<WorldWidget*>(window->widget());
         if (!worldWidget || !worldWidget->isModified())
@@ -1560,12 +1568,14 @@ void MainWindow::closeEvent(QCloseEvent* event)
         WorldDocument* doc = worldWidget->document();
         if (doc && doc->m_bSaveWorldAutomatically) {
             QString filename = worldWidget->filename();
-            if (!filename.isEmpty()) {
-                if (auto result = worldWidget->saveToFile(filename); !result) {
-                    QMessageBox::critical(
-                        this, "Error",
-                        QString("Failed to auto-save world file:\n%1").arg(result.error()));
-                }
+            if (filename.isEmpty())
+                continue; // no path: fall through to the unsaved-changes prompt
+            if (auto result = worldWidget->saveToFile(filename); result) {
+                autoSaved.insert(worldWidget);
+            } else {
+                QMessageBox::critical(
+                    this, "Error",
+                    QString("Failed to auto-save world file:\n%1").arg(result.error()));
             }
         }
     }
@@ -1574,9 +1584,8 @@ void MainWindow::closeEvent(QCloseEvent* event)
     for (QMdiSubWindow* window : windows) {
         WorldWidget* worldWidget = qobject_cast<WorldWidget*>(window->widget());
         if (worldWidget && worldWidget->isModified()) {
-            WorldDocument* doc = worldWidget->document();
-            // Skip worlds that have auto-save set (already handled above).
-            if (doc && doc->m_bSaveWorldAutomatically)
+            // Skip only worlds whose auto-save above actually succeeded.
+            if (autoSaved.contains(worldWidget))
                 continue;
             unsavedWorlds.append(worldWidget->worldName());
         }
@@ -2441,55 +2450,12 @@ void MainWindow::reloadDefaults()
         return;
     }
 
-    const auto& opts = GlobalOptions::instance();
+    // Reload default sets/fonts via the document, gated on each world's
+    // per-set m_bUseDefault* opt-in flags (original:
+    // CMUSHclientDoc::OnFileReloaddefaults, methods_defaults.cpp:115-170).
+    const int totalImported = doc->reloadDefaults();
 
-    const std::array<std::pair<QString, int>, 5> defaultFiles = {{
-        {opts.defaultColoursFile(), XML_COLOURS},
-        {opts.defaultTriggersFile(), XML_TRIGGERS},
-        {opts.defaultAliasesFile(), XML_ALIASES},
-        {opts.defaultTimersFile(), XML_TIMERS},
-        {opts.defaultMacrosFile(), XML_MACROS},
-    }};
-
-    int totalImported = 0;
-    int filesProcessed = 0;
-
-    for (const auto& [path, flag] : defaultFiles) {
-        if (path.isEmpty())
-            continue;
-
-        // Set m_bUseDefault* flag before loading (original: doc_construct.cpp:658-683)
-        switch (flag) {
-            case XML_TRIGGERS:
-                doc->m_bUseDefaultTriggers = true;
-                break;
-            case XML_ALIASES:
-                doc->m_bUseDefaultAliases = true;
-                break;
-            case XML_TIMERS:
-                doc->m_bUseDefaultTimers = true;
-                break;
-            case XML_MACROS:
-                doc->m_bUseDefaultMacros = true;
-                break;
-            default:
-                break;
-        }
-
-        QFile file(path);
-        if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
-            continue;
-
-        totalImported += XmlSerialization::ImportXML(doc, QString::fromUtf8(file.readAll()), flag);
-        ++filesProcessed;
-    }
-
-    if (filesProcessed == 0) {
-        statusBar()->showMessage(tr("No default files configured"), 3000);
-    } else {
-        statusBar()->showMessage(tr("Reloaded defaults: %1 item(s) imported").arg(totalImported),
-                                 3000);
-    }
+    statusBar()->showMessage(tr("Reloaded defaults: %1 item(s) imported").arg(totalImported), 3000);
 }
 
 void MainWindow::toggleLogSession()
