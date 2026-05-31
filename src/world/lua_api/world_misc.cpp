@@ -11,6 +11,7 @@
 #include <QDesktopServices>
 #include <QDir>
 #include <QFileDialog>
+#include <QMap>
 #include <QRandomGenerator>
 #include <QRegularExpression>
 #include <QSet>
@@ -108,14 +109,46 @@ int L_GetGlobalOption(lua_State* L)
         return 1;
     }
 
-    // String options (from AlphaGlobalOptionsTable in original)
-    QString value = db.getPreference(qName, QString());
-    if (!value.isNull()) {
+    // String options (from AlphaGlobalOptionsTable in original).
+    // The original PopulateDatabase pre-populates the DB with all alpha-option
+    // defaults at startup (globalregistryoptions.cpp:131-155), so GetGlobalOption
+    // always returns a value for known string options even on a fresh install.
+    // Reproduce that behaviour by keeping a static table of defaults and using them
+    // as the fallback when the key is absent from the database.
+    static const QMap<QString, QString> stringOptionDefaults = {
+        {"AsciiArtFont", "fonts/standard.flf"},
+        {"DefaultAliasesFile", ""},
+        {"DefaultColoursFile", ""},
+        {"DefaultInputFont", "Courier New"},
+        {"DefaultLogFileDirectory", "./logs/"},
+        {"DefaultMacrosFile", ""},
+        {"DefaultNameGenerationFile", "names.txt"},
+        {"DefaultOutputFont", "Courier New"},
+        {"DefaultTimersFile", ""},
+        {"DefaultTriggersFile", ""},
+        {"DefaultWorldFileDirectory", "./worlds/"},
+        {"NotepadQuoteString", "> "},
+        {"PluginList", ""},
+        {"PluginsDirectory", "./worlds/plugins/"},
+        {"StateFilesDirectory", "./worlds/plugins/state/"},
+        {"PrinterFont", "Courier"},
+        {"TrayIconFileName", ""},
+        {"WordDelimiters", ".,()[]\"'"},
+        {"WordDelimitersDblClick", ".,()[]\"'"},
+        {"WorldList", ""},
+        {"LuaScript", ""},
+        {"Locale", "EN"},
+        {"FixedPitchFont", "Courier New"},
+    };
+
+    auto it = stringOptionDefaults.find(qName);
+    if (it != stringOptionDefaults.end()) {
+        const QString value = db.getPreference(qName, it.value());
         luaPushQString(L, value);
         return 1;
     }
 
-    // Not found
+    // Not a known global option.
     lua_pushnil(L);
     return 1;
 }

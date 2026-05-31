@@ -12,6 +12,7 @@
  * 7. error_code table exists
  */
 
+#include "../src/storage/database.h"
 #include "../src/utils/error_codes.h"
 #include "fixtures/world_fixtures.h"
 
@@ -320,4 +321,56 @@ TEST_F(LuaApiTest, GetMappingStringParenthesisesMultiCharSingle)
     doc->m_mapList = QStringList{"n", "ne", "n", "n"};
     executeLua("map_mixed = world.GetMappingString()");
     EXPECT_EQ(getGlobalString("map_mixed"), "n (ne) 2n ") << "Mixed run: 'n (ne) 2n '";
+// Fixture that extends ConnectedWorldTest with an open preferences database.
+// GetGlobalOption queries the DB, so tests for it need the DB open.
+class LuaApiWithDbTest : public ConnectedWorldTest {
+  protected:
+    void SetUp() override
+    {
+        ConnectedWorldTest::SetUp();
+        ASSERT_TRUE(Database::instance().open().has_value()) << "preferences database must open";
+    }
+
+    void TearDown() override
+    {
+        Database::instance().close();
+        ConnectedWorldTest::TearDown();
+    }
+};
+
+// Test 17: world.GetGlobalOption() returns string defaults when DB key is absent
+// (H13 fix — parity with original PopulateDatabase which pre-populates all
+// AlphaGlobalOptionsTable entries so GetGlobalOption never returns nil for known
+// string options, even on a fresh install before save() has been called).
+TEST_F(LuaApiWithDbTest, GetGlobalOptionStringDefaultNotNil)
+{
+    // Remove the key from the DB so we exercise the "absent" path.
+    Database::instance().execute("DELETE FROM prefs WHERE name = 'DefaultLogFileDirectory'");
+
+    executeLua("gopt_val = world.GetGlobalOption('DefaultLogFileDirectory')");
+
+    lua_getglobal(L, "gopt_val");
+    bool isNil = lua_isnil(L, -1);
+    lua_pop(L, 1);
+
+    EXPECT_FALSE(isNil)
+        << "GetGlobalOption must return the string default, not nil, when the DB has no entry";
+
+    // The default from AlphaGlobalOptionsTable for DefaultLogFileDirectory is ".\\logs\\".
+    // The Mushkin port stores it as "./logs/".
+    const QString val = getGlobalString("gopt_val");
+    EXPECT_EQ(val, "./logs/")
+        << "GetGlobalOption should return the original default for DefaultLogFileDirectory";
+}
+
+// Test 18: world.GetGlobalOption() returns nil for a name that is not a known global option.
+TEST_F(LuaApiWithDbTest, GetGlobalOptionUnknownNameReturnsNil)
+{
+    executeLua("gopt_unknown = world.GetGlobalOption('NoSuchOption_XYZ')");
+
+    lua_getglobal(L, "gopt_unknown");
+    bool isNil = lua_isnil(L, -1);
+    lua_pop(L, 1);
+
+    EXPECT_TRUE(isNil) << "GetGlobalOption must return nil for an unknown option name";
 }
