@@ -13,6 +13,8 @@
  * 8. Element collection and routing
  */
 
+#include "../src/network/world_socket.h"
+#include "../src/world/connection_manager.h"
 #include "../src/world/mxp_types.h"
 #include "fixtures/world_fixtures.h"
 
@@ -1044,4 +1046,147 @@ TEST_F(MXPTest, HighTagIncreasesColorValues)
     // Should set high intensity flag
     // (Implementation specific)
     SUCCEED();
+}
+
+// ========== Story 6: secure_once parity (H46/H106, M85) ==========
+
+// H46/H106: a secure-only (non-open) tag must be ACCEPTED while in secure_once
+// mode. Original captures bSecure = MXP_Secure() (true for eMXP_secure_once) BEFORE
+// MXP_Restore_Mode() cancels secure-once. The old Mushkin code computed bSecure
+// inline omitting eMXP_secure_once, so it wrongly rejected the tag.
+TEST_F(MXPTest, StartTagAcceptsSecureOnlyTagInSecureOnceMode)
+{
+    // <samp> has flags == 0: not open, not command -> secure-only, tracked in active list.
+    doc->m_mxpEngine->m_iMXP_mode = eMXP_secure_once;
+    doc->m_mxpEngine->m_iMXP_previousMode = eMXP_open;
+
+    const qint64 errorsBefore = doc->m_mxpEngine->mxpErrors();
+    const size_t tagsBefore = doc->m_mxpEngine->m_activeTagList.size();
+
+    doc->m_mxpEngine->m_strMXPstring = "samp";
+    doc->m_mxpEngine->MXP_collected_element();
+
+    // Tag accepted: no new error, pushed onto the active tag list, marked secure.
+    EXPECT_EQ(doc->m_mxpEngine->mxpErrors(), errorsBefore);
+    ASSERT_EQ(doc->m_mxpEngine->m_activeTagList.size(), tagsBefore + 1);
+    EXPECT_EQ(doc->m_mxpEngine->m_activeTagList.back()->strName, "samp");
+    EXPECT_TRUE(doc->m_mxpEngine->m_activeTagList.back()->bSecure);
+
+    // secure_once is cancelled after the tag: mode restored to the previous mode.
+    EXPECT_EQ(doc->m_mxpEngine->m_iMXP_mode, eMXP_open);
+}
+
+// Control: outside secure mode a secure-only tag is still rejected (regression guard
+// that the fix did not make every mode "secure").
+TEST_F(MXPTest, StartTagRejectsSecureOnlyTagInOpenMode)
+{
+    doc->m_mxpEngine->m_iMXP_mode = eMXP_open;
+
+    const qint64 errorsBefore = doc->m_mxpEngine->mxpErrors();
+    const size_t tagsBefore = doc->m_mxpEngine->m_activeTagList.size();
+
+    doc->m_mxpEngine->m_strMXPstring = "samp";
+    doc->m_mxpEngine->MXP_collected_element();
+
+    EXPECT_EQ(doc->m_mxpEngine->mxpErrors(), errorsBefore + 1);
+    EXPECT_EQ(doc->m_mxpEngine->m_activeTagList.size(), tagsBefore);
+}
+
+// H46/H106: EndTag must close a secure tag while in secure_once mode (bSecure must be
+// true for the duration of the close lookup before the mode is restored).
+TEST_F(MXPTest, EndTagClosesSecureTagInSecureOnceMode)
+{
+    // Open a secure tag in full secure mode.
+    doc->m_mxpEngine->m_iMXP_mode = eMXP_secure;
+    doc->m_mxpEngine->m_strMXPstring = "samp";
+    doc->m_mxpEngine->MXP_collected_element();
+    ASSERT_FALSE(doc->m_mxpEngine->m_activeTagList.empty());
+    ASSERT_EQ(doc->m_mxpEngine->m_activeTagList.back()->strName, "samp");
+
+    // Now close it while in secure_once mode — should succeed (tag popped).
+    doc->m_mxpEngine->m_iMXP_mode = eMXP_secure_once;
+    doc->m_mxpEngine->m_iMXP_previousMode = eMXP_open;
+    doc->m_mxpEngine->m_strMXPstring = "/samp";
+    doc->m_mxpEngine->MXP_collected_element();
+
+    EXPECT_TRUE(doc->m_mxpEngine->m_activeTagList.empty());
+}
+
+// M85: an invalid <support> argument (more than two dot-separated components) must
+// suppress the ENTIRE <SUPPORTS> reply (original returns from MXP_OpenAtomicTag with
+// no SendPacket). A valid argument sends exactly one packet.
+TEST_F(MXPTest, SupportInvalidArgumentSendsNoPacket)
+{
+    // Install a socket so SendPacket counts packets (it no-ops without one).
+    auto* socket = new WorldSocket(doc.get(), doc.get());
+    doc->m_connectionManager->m_pSocket = socket;
+
+    AtomicElement* support = doc->m_mxpEngine->MXP_FindAtomicElement("support");
+    ASSERT_NE(support, nullptr);
+
+    // Invalid: three dot-separated components.
+    {
+        MXPArgumentList args;
+        auto arg = std::make_unique<MXPArgument>();
+        arg->strValue = "send.prompt.extra";
+        args.push_back(std::move(arg));
+
+        doc->m_connectionManager->m_iOutputPacketCount = 0;
+        doc->m_mxpEngine->MXP_ExecuteAction(support, args);
+        EXPECT_EQ(doc->m_connectionManager->m_iOutputPacketCount, 0)
+            << "invalid <support> argument must send no packet";
+    }
+
+    // Valid: a single recognised component sends exactly one packet.
+    {
+        MXPArgumentList args;
+        auto arg = std::make_unique<MXPArgument>();
+        arg->strValue = "send";
+        args.push_back(std::move(arg));
+
+        doc->m_connectionManager->m_iOutputPacketCount = 0;
+        doc->m_mxpEngine->MXP_ExecuteAction(support, args);
+        EXPECT_EQ(doc->m_connectionManager->m_iOutputPacketCount, 1)
+            << "valid <support> argument must send exactly one packet";
+    }
+
+    doc->m_connectionManager->m_pSocket = nullptr;
+}
+
+// M85: an invalid <support> tag name also suppresses the reply.
+TEST_F(MXPTest, SupportInvalidTagNameSendsNoPacket)
+{
+    auto* socket = new WorldSocket(doc.get(), doc.get());
+    doc->m_connectionManager->m_pSocket = socket;
+
+    AtomicElement* support = doc->m_mxpEngine->MXP_FindAtomicElement("support");
+    ASSERT_NE(support, nullptr);
+
+    MXPArgumentList args;
+    auto arg = std::make_unique<MXPArgument>();
+    arg->strValue = "1bad"; // does not start with a letter -> invalid name
+    args.push_back(std::move(arg));
+
+    doc->m_connectionManager->m_iOutputPacketCount = 0;
+    doc->m_mxpEngine->MXP_ExecuteAction(support, args);
+    EXPECT_EQ(doc->m_connectionManager->m_iOutputPacketCount, 0);
+
+    doc->m_connectionManager->m_pSocket = nullptr;
+}
+
+// M85: <version> response is sent (the protocol version string was corrected to "0.5").
+TEST_F(MXPTest, VersionActionSendsPacket)
+{
+    auto* socket = new WorldSocket(doc.get(), doc.get());
+    doc->m_connectionManager->m_pSocket = socket;
+
+    AtomicElement* version = doc->m_mxpEngine->MXP_FindAtomicElement("version");
+    ASSERT_NE(version, nullptr);
+
+    MXPArgumentList args;
+    doc->m_connectionManager->m_iOutputPacketCount = 0;
+    doc->m_mxpEngine->MXP_ExecuteAction(version, args);
+    EXPECT_EQ(doc->m_connectionManager->m_iOutputPacketCount, 1);
+
+    doc->m_connectionManager->m_pSocket = nullptr;
 }
