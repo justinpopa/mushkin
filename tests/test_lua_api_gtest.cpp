@@ -14,6 +14,7 @@
 
 #include "../src/storage/database.h"
 #include "../src/utils/error_codes.h"
+#include "../src/world/accelerator_manager.h"
 #include "fixtures/world_fixtures.h"
 
 class LuaApiTest : public ConnectedWorldTest {};
@@ -435,4 +436,23 @@ TEST_F(LuaApiTest, SetBackgroundImageOldImageClearedBeforeValidation)
     // the old image name must have been cleared first.
     EXPECT_TRUE(doc->m_strBackgroundImageName.isEmpty())
         << "Old background image name must be cleared even when new filename is invalid";
+// M65/M66: AcceleratorList returns nil (not {}) when no script/plugin accelerators are registered
+TEST_F(LuaApiTest, AcceleratorListEmptyReturnsNil)
+{
+    // With no accelerators at all, AcceleratorList() must return nil, not an empty table.
+    executeLua("result = world.AcceleratorList()");
+    EXPECT_TRUE(isGlobalNil("result"))
+        << "AcceleratorList should return nil when no accelerators are registered";
+}
+
+TEST_F(LuaApiTest, AcceleratorListWithScriptEntryReturnsTable)
+{
+    // After adding a script accelerator, AcceleratorList() returns a table (not nil).
+    doc->m_acceleratorManager->addAccelerator("Ctrl+F5", "do_something", 10 /*eSendToExecute*/);
+
+    executeLua("result = world.AcceleratorList()");
+    lua_getglobal(L, "result");
+    EXPECT_TRUE(lua_istable(L, -1))
+        << "AcceleratorList should return a table when script accelerators exist";
+    lua_pop(L, 1);
 }
