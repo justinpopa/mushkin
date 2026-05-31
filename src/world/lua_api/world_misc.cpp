@@ -11,6 +11,7 @@
 #include <QDesktopServices>
 #include <QDir>
 #include <QFileDialog>
+#include <QMap>
 #include <QRandomGenerator>
 #include <QRegularExpression>
 #include <QSet>
@@ -81,57 +82,25 @@ int L_GetGlobalOption(lua_State* L)
     }
 
     // Numeric options (from GlobalOptionsTable in original)
-    static const QSet<QString> numericOptions = {"AllTypingToCommandWindow",
-                                                 "AlwaysOnTop",
-                                                 "AppendToLogFiles",
-                                                 "AutoConnectWorlds",
-                                                 "AutoExpandConfig",
-                                                 "FlatToolbars",
-                                                 "AutoLogWorld",
-                                                 "BleedBackground",
-                                                 "ColourGradientConfig",
-                                                 "ConfirmBeforeClosingMXPdebug",
-                                                 "ConfirmBeforeClosingMushclient",
-                                                 "ConfirmBeforeClosingWorld",
-                                                 "ConfirmBeforeSavingVariables",
-                                                 "ConfirmLogFileClose",
-                                                 "AllowLoadingDlls",
-                                                 "F1macro",
-                                                 "FixedFontForEditing",
-                                                 "NotepadWordWrap",
-                                                 "NotifyIfCannotConnect",
-                                                 "ErrorNotificationToOutputWindow",
-                                                 "NotifyOnDisconnect",
-                                                 "OpenActivityWindow",
-                                                 "OpenWorldsMaximised",
-                                                 "WindowTabsStyle",
-                                                 "ReconnectOnLinkFailure",
-                                                 "RegexpMatchEmpty",
-                                                 "ShowGridLinesInListViews",
-                                                 "SmoothScrolling",
-                                                 "SmootherScrolling",
-                                                 "DisableKeyboardMenuActivation",
-                                                 "TriggerRemoveCheck",
-                                                 "NotepadBackColour",
-                                                 "NotepadTextColour",
-                                                 "ActivityButtonBarStyle",
-                                                 "AsciiArtLayout",
-                                                 "DefaultInputFontHeight",
-                                                 "DefaultInputFontItalic",
-                                                 "DefaultInputFontWeight",
-                                                 "DefaultOutputFontHeight",
-                                                 "IconPlacement",
-                                                 "TrayIcon",
-                                                 "ActivityWindowRefreshInterval",
-                                                 "ActivityWindowRefreshType",
-                                                 "ParenMatchFlags",
-                                                 "PrinterFontSize",
-                                                 "PrinterLeftMargin",
-                                                 "PrinterLinesPerPage",
-                                                 "PrinterTopMargin",
-                                                 "TimerInterval",
-                                                 "FixedPitchFontSize",
-                                                 "TabInsertsTabInMultiLineDialogs"};
+    static const QSet<QString> numericOptions = {
+        "AllTypingToCommandWindow", "AlwaysOnTop", "AppendToLogFiles", "AutoConnectWorlds",
+        "AutoExpandConfig", "FlatToolbars", "AutoLogWorld", "BleedBackground",
+        "ColourGradientConfig", "ConfirmBeforeClosingMXPdebug", "ConfirmBeforeClosingMushclient",
+        "ConfirmBeforeClosingWorld", "ConfirmBeforeSavingVariables", "ConfirmLogFileClose",
+        "AllowLoadingDlls", "F1macro", "FixedFontForEditing", "NotepadWordWrap",
+        "NotifyIfCannotConnect", "ErrorNotificationToOutputWindow", "NotifyOnDisconnect",
+        "OpenActivityWindow", "OpenWorldsMaximised", "WindowTabsStyle", "ReconnectOnLinkFailure",
+        "RegexpMatchEmpty", "ShowGridLinesInListViews", "SmoothScrolling", "SmootherScrolling",
+        "DisableKeyboardMenuActivation", "TriggerRemoveCheck", "NotepadBackColour",
+        "NotepadTextColour", "ActivityButtonBarStyle", "AsciiArtLayout", "DefaultInputFontHeight",
+        // Original key names carry spaces / a trailing
+        // space (globalregistryoptions.cpp:51,54-55);
+        // must match the keys global_options persists.
+        "DefaultInputFontItalic ", "DefaultInputFontWeight", "DefaultOutputFontHeight",
+        "Icon Placement", "Tray Icon", "ActivityWindowRefreshInterval", "ActivityWindowRefreshType",
+        "ParenMatchFlags", "PrinterFontSize", "PrinterLeftMargin", "PrinterLinesPerPage",
+        "PrinterTopMargin", "TimerInterval", "FixedPitchFontSize",
+        "TabInsertsTabInMultiLineDialogs"};
 
     // Check if it's a numeric option
     if (numericOptions.contains(qName)) {
@@ -140,14 +109,46 @@ int L_GetGlobalOption(lua_State* L)
         return 1;
     }
 
-    // String options (from AlphaGlobalOptionsTable in original)
-    QString value = db.getPreference(qName, QString());
-    if (!value.isNull()) {
+    // String options (from AlphaGlobalOptionsTable in original).
+    // The original PopulateDatabase pre-populates the DB with all alpha-option
+    // defaults at startup (globalregistryoptions.cpp:131-155), so GetGlobalOption
+    // always returns a value for known string options even on a fresh install.
+    // Reproduce that behaviour by keeping a static table of defaults and using them
+    // as the fallback when the key is absent from the database.
+    static const QMap<QString, QString> stringOptionDefaults = {
+        {"AsciiArtFont", "fonts/standard.flf"},
+        {"DefaultAliasesFile", ""},
+        {"DefaultColoursFile", ""},
+        {"DefaultInputFont", "Courier New"},
+        {"DefaultLogFileDirectory", "./logs/"},
+        {"DefaultMacrosFile", ""},
+        {"DefaultNameGenerationFile", "names.txt"},
+        {"DefaultOutputFont", "Courier New"},
+        {"DefaultTimersFile", ""},
+        {"DefaultTriggersFile", ""},
+        {"DefaultWorldFileDirectory", "./worlds/"},
+        {"NotepadQuoteString", "> "},
+        {"PluginList", ""},
+        {"PluginsDirectory", "./worlds/plugins/"},
+        {"StateFilesDirectory", "./worlds/plugins/state/"},
+        {"PrinterFont", "Courier"},
+        {"TrayIconFileName", ""},
+        {"WordDelimiters", ".,()[]\"'"},
+        {"WordDelimitersDblClick", ".,()[]\"'"},
+        {"WorldList", ""},
+        {"LuaScript", ""},
+        {"Locale", "EN"},
+        {"FixedPitchFont", "Courier New"},
+    };
+
+    auto it = stringOptionDefaults.find(qName);
+    if (it != stringOptionDefaults.end()) {
+        const QString value = db.getPreference(qName, it.value());
         luaPushQString(L, value);
         return 1;
     }
 
-    // Not found
+    // Not a known global option.
     lua_pushnil(L);
     return 1;
 }
@@ -176,58 +177,24 @@ int L_GetGlobalOptionList(lua_State* L)
     int index = 1;
 
     // Numeric options (same list as in L_GetGlobalOption)
-    static const char* numericOptions[] = {"AllTypingToCommandWindow",
-                                           "AlwaysOnTop",
-                                           "AppendToLogFiles",
-                                           "AutoConnectWorlds",
-                                           "AutoExpandConfig",
-                                           "FlatToolbars",
-                                           "AutoLogWorld",
-                                           "BleedBackground",
-                                           "ColourGradientConfig",
-                                           "ConfirmBeforeClosingMXPdebug",
-                                           "ConfirmBeforeClosingMushclient",
-                                           "ConfirmBeforeClosingWorld",
-                                           "ConfirmBeforeSavingVariables",
-                                           "ConfirmLogFileClose",
-                                           "AllowLoadingDlls",
-                                           "F1macro",
-                                           "FixedFontForEditing",
-                                           "NotepadWordWrap",
-                                           "NotifyIfCannotConnect",
-                                           "ErrorNotificationToOutputWindow",
-                                           "NotifyOnDisconnect",
-                                           "OpenActivityWindow",
-                                           "OpenWorldsMaximised",
-                                           "WindowTabsStyle",
-                                           "ReconnectOnLinkFailure",
-                                           "RegexpMatchEmpty",
-                                           "ShowGridLinesInListViews",
-                                           "SmoothScrolling",
-                                           "SmootherScrolling",
-                                           "DisableKeyboardMenuActivation",
-                                           "TriggerRemoveCheck",
-                                           "NotepadBackColour",
-                                           "NotepadTextColour",
-                                           "ActivityButtonBarStyle",
-                                           "AsciiArtLayout",
-                                           "DefaultInputFontHeight",
-                                           "DefaultInputFontItalic",
-                                           "DefaultInputFontWeight",
-                                           "DefaultOutputFontHeight",
-                                           "IconPlacement",
-                                           "TrayIcon",
-                                           "ActivityWindowRefreshInterval",
-                                           "ActivityWindowRefreshType",
-                                           "ParenMatchFlags",
-                                           "PrinterFontSize",
-                                           "PrinterLeftMargin",
-                                           "PrinterLinesPerPage",
-                                           "PrinterTopMargin",
-                                           "TimerInterval",
-                                           "FixedPitchFontSize",
-                                           "TabInsertsTabInMultiLineDialogs",
-                                           nullptr};
+    static const char* numericOptions[] = {
+        "AllTypingToCommandWindow", "AlwaysOnTop", "AppendToLogFiles", "AutoConnectWorlds",
+        "AutoExpandConfig", "FlatToolbars", "AutoLogWorld", "BleedBackground",
+        "ColourGradientConfig", "ConfirmBeforeClosingMXPdebug", "ConfirmBeforeClosingMushclient",
+        "ConfirmBeforeClosingWorld", "ConfirmBeforeSavingVariables", "ConfirmLogFileClose",
+        "AllowLoadingDlls", "F1macro", "FixedFontForEditing", "NotepadWordWrap",
+        "NotifyIfCannotConnect", "ErrorNotificationToOutputWindow", "NotifyOnDisconnect",
+        "OpenActivityWindow", "OpenWorldsMaximised", "WindowTabsStyle", "ReconnectOnLinkFailure",
+        "RegexpMatchEmpty", "ShowGridLinesInListViews", "SmoothScrolling", "SmootherScrolling",
+        "DisableKeyboardMenuActivation", "TriggerRemoveCheck", "NotepadBackColour",
+        "NotepadTextColour", "ActivityButtonBarStyle", "AsciiArtLayout", "DefaultInputFontHeight",
+        // Original key names carry spaces / a trailing space
+        // (globalregistryoptions.cpp:51,54-55).
+        "DefaultInputFontItalic ", "DefaultInputFontWeight", "DefaultOutputFontHeight",
+        "Icon Placement", "Tray Icon", "ActivityWindowRefreshInterval", "ActivityWindowRefreshType",
+        "ParenMatchFlags", "PrinterFontSize", "PrinterLeftMargin", "PrinterLinesPerPage",
+        "PrinterTopMargin", "TimerInterval", "FixedPitchFontSize",
+        "TabInsertsTabInMultiLineDialogs", nullptr};
 
     // String options (from AlphaGlobalOptionsTable)
     static const char* stringOptions[] = {"AsciiArtFont",
@@ -819,8 +786,7 @@ int L_FixupEscapeSequences(lua_State* L)
                     break;
                 }
                 default:
-                    // Unknown escape, keep the backslash
-                    result += '\\';
+                    // Unknown escape: collapse to just the character (original Utilities.cpp:225)
                     result += c;
                     break;
             }

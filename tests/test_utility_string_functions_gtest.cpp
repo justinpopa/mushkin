@@ -95,6 +95,45 @@ TEST_F(UtilityStringFunctionsTest, FixupEscapeSequencesHexEscape)
     lua_pop(L, 1);
 }
 
+// M118: vertical tab escape (original Utilities.cpp:207)
+TEST_F(UtilityStringFunctionsTest, FixupEscapeSequencesVerticalTab)
+{
+    const char* code = R"(
+        local result = world.FixupEscapeSequences('\\v')
+        return string.byte(result, 1) == 11  -- \v = ASCII 11
+    )";
+    ASSERT_EQ(luaL_dostring(L, code), 0) << lua_tostring(L, -1);
+    EXPECT_TRUE(lua_toboolean(L, -1)) << "\\v should produce vertical tab (ASCII 11)";
+    lua_pop(L, 1);
+}
+
+// M118: question mark escape (original Utilities.cpp:211)
+TEST_F(UtilityStringFunctionsTest, FixupEscapeSequencesQuestionMark)
+{
+    const char* code = R"(return world.FixupEscapeSequences('\\?'))";
+    ASSERT_EQ(luaL_dostring(L, code), 0) << lua_tostring(L, -1);
+    EXPECT_STREQ(lua_tostring(L, -1), "?");
+    lua_pop(L, 1);
+}
+
+// M118: unknown escape collapses to single character (original Utilities.cpp:225)
+// Build the input at runtime to avoid Lua 5.2+ rejecting unknown escape sequences.
+TEST_F(UtilityStringFunctionsTest, FixupEscapeSequencesUnknownCollapsesToChar)
+{
+    // Construct "\j" (backslash + j) at runtime so Lua's string parser doesn't reject it.
+    // Then verify FixupEscapeSequences collapses \j to just 'j' (one character).
+    const char* code = R"(
+        local bs = string.char(92)  -- literal backslash character
+        local input = bs .. 'j'    -- two chars: \ followed by j
+        local result = world.FixupEscapeSequences(input)
+        return result
+    )";
+    ASSERT_EQ(luaL_dostring(L, code), 0) << lua_tostring(L, -1);
+    EXPECT_STREQ(lua_tostring(L, -1), "j")
+        << "Unknown escape \\j should collapse to single char 'j'";
+    lua_pop(L, 1);
+}
+
 TEST_F(UtilityStringFunctionsTest, FixupEscapeSequencesAllBasic)
 {
     const char* code = R"(

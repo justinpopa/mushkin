@@ -72,18 +72,21 @@ TEST_F(AliasIntegrationTest, NonMatchingCommandGoesToMUD)
 }
 
 // Test 3: Command History - omit_from_command_history = false (default)
+// History is added by Execute() after the alias cycle (original: sendvw.cpp:713-714),
+// not by executeAlias() itself. Use Execute() to test the correct code path.
 TEST_F(AliasIntegrationTest, CommandHistoryIncludesCommand)
 {
     // Alias with omit_from_command_history = false (default)
     Alias* a = addAlias("heal_alias", "heal");
-    a->contents = "cast heal self";
+    a->contents = "";                     // empty: no MUD send needed for this test
     a->omit_from_command_history = false; // Should add to history
 
     // Clear command history
     doc->m_commandHistory.clear();
 
-    // Execute alias
-    doc->evaluateAliases("heal");
+    // Execute via Execute() with addHistory=true, which mirrors the UI send path
+    // (original: sendvw.cpp:713-714 — history added after Execute() returns)
+    doc->Execute("heal", false, true);
 
     // Check if added to history
     EXPECT_TRUE(doc->m_commandHistory.contains("heal"))
@@ -91,22 +94,43 @@ TEST_F(AliasIntegrationTest, CommandHistoryIncludesCommand)
 }
 
 // Test 4: Command History - omit_from_command_history = true
+// Original: omit flag set during alias execution propagates to m_bOmitFromCommandHistory,
+// which Execute() checks before calling addToCommandHistory (original: sendvw.cpp:713-714).
 TEST_F(AliasIntegrationTest, CommandHistoryOmitsCommand)
 {
     // Alias with omit_from_command_history = true
     Alias* a = addAlias("secret_alias", "secret");
-    a->contents = "say secret password";
+    a->contents = "";
     a->omit_from_command_history = true; // Should NOT add to history
 
     // Clear command history
     doc->m_commandHistory.clear();
 
-    // Execute alias
-    doc->evaluateAliases("secret");
+    // Execute via Execute() with addHistory=true
+    doc->Execute("secret", false, true);
 
     // Check if NOT in history
     EXPECT_FALSE(doc->m_commandHistory.contains("secret"))
         << "Command should not be added to history (omit_from_command_history = true)";
+}
+
+// Test: evaluateAliases() alone must NOT add to command history.
+// Regression for L33/L79: history belongs to Execute() post-cycle (sendvw.cpp:713-714),
+// not to executeAlias(). Calling evaluateAliases() directly must leave history unchanged.
+TEST_F(AliasIntegrationTest, EvaluateAliasesAloneDoesNotAddToHistory)
+{
+    Alias* a = addAlias("hist_test", "histcmd");
+    a->contents = "";
+    a->omit_from_command_history = false;
+
+    doc->m_commandHistory.clear();
+
+    // Call evaluateAliases directly (no Execute wrapper, no addHistory)
+    doc->evaluateAliases("histcmd");
+
+    // evaluateAliases must not touch history — that is Execute()'s job
+    EXPECT_FALSE(doc->m_commandHistory.contains("histcmd"))
+        << "evaluateAliases() must not add to command history; only Execute() should";
 }
 
 // Test 5: Wildcard Alias End-to-End

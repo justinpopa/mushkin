@@ -232,5 +232,37 @@ TEST(SpeedwalkTest, ComplexSpeedwalk)
     QString result = speedwalk::evaluate("On3e{to the forest}Cs2(portal/entrance)u", kNoFiller);
 
     EXPECT_FALSE(result.startsWith("*")) << "Should not return an error";
-    EXPECT_EQ(result, "open north\r\neast\r\neast\r\neast\r\nclose south\r\nportal\r\nportal\r\nup\r\n");
+    EXPECT_EQ(result,
+              "open north\r\neast\r\neast\r\neast\r\nclose south\r\nportal\r\nportal\r\nup\r\n");
+}
+
+// Parity regression: M42
+// Original MakeSpeedWalkErrorString prepends "*", and DoEvaluateSpeedwalk's
+// default-case TFormat string itself starts with "*", so the combined result
+// is "**Invalid direction...".  (methods_speedwalks.cpp:140-142)
+TEST(SpeedwalkTest, InvalidDirectionDoubleAsterisk)
+{
+    QString result = speedwalk::evaluate("3x", kNoFiller);
+
+    EXPECT_TRUE(result.startsWith("**")) << "Invalid direction error must begin with '**'";
+    EXPECT_TRUE(result.contains("Invalid direction"));
+}
+
+// Parity regression: M122 (full-name parenthesized direction reverses to abbreviation)
+// Original MapDirectionsMap["north"].m_sReverseDirection == "s" (not "south").
+// (Mapping.cpp:23, methods_speedwalks.cpp:281-283)
+TEST(SpeedwalkReverseTest, FullNameParenReversesToAbbreviation)
+{
+    // (north) should reverse to (s), not (south)
+    QString result = speedwalk::reverse("(north)");
+    EXPECT_EQ(result, "(s)") << "Full-name direction in parens must reverse to abbreviation";
+}
+
+// Parity regression: M122 (diagonal long-names absent from original MapDirectionsMap)
+// (northeast) has no entry in original — reverse keeps it as-is.
+TEST(SpeedwalkReverseTest, LongDiagonalParenKeptAsIs)
+{
+    QString result = speedwalk::reverse("(northeast)");
+    // No entry in original MapDirectionsMap -> kept unchanged
+    EXPECT_EQ(result, "(northeast)") << "Unknown paren direction must be kept as-is";
 }

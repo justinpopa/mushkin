@@ -9,16 +9,26 @@
 #include "lua_common.h"
 #include <QMdiSubWindow>
 
-// Concatenate all Lua string args from position `start` onward (original: concatArgs)
+// Concatenate all Lua args from position `start` onward using Lua's tostring.
+// Matches original concatArgs: calls the global "tostring" on every arg so
+// booleans → "true"/"false", nil → "nil", tables use __tostring, etc.
 static QString concatLuaArgs(lua_State* L, int start)
 {
     QString result;
     int top = lua_gettop(L);
+    lua_getglobal(L, "tostring"); // stack: ... tostring
     for (int i = start; i <= top; i++) {
-        if (lua_isstring(L, i)) {
-            result += QString::fromUtf8(lua_tostring(L, i));
+        lua_pushvalue(L, -1); // duplicate tostring function
+        lua_pushvalue(L, i);  // push arg
+        lua_call(L, 1, 1);    // tostring(arg) → string on stack
+        const char* s = lua_tostring(L, -1);
+        if (!s) {
+            luaL_error(L, "'tostring' must return a string to be concatenated");
         }
+        result += QString::fromUtf8(s);
+        lua_pop(L, 1); // pop result
     }
+    lua_pop(L, 1); // pop tostring function
     return result;
 }
 
@@ -112,8 +122,8 @@ int L_CloseNotepad(lua_State* L)
 
     qint32 result = pDoc->CloseNotepad(luaCheckQString(L, 1), querySave);
 
-    // Original returns boolean (true=success, false=failure), not error codes
-    lua_pushboolean(L, result == eOK);
+    // Original returns numeric error code (eOK=0, eNoSuchNotepad=30075, …)
+    lua_pushnumber(L, result);
     return 1;
 }
 
@@ -202,14 +212,22 @@ int L_GetNotepadList(lua_State* L)
 int L_SaveNotepad(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    // Original: optboolean(L, 3, 0) — default false (do not overwrite)
-    bool replaceExisting = lua_isboolean(L, 3) ? lua_toboolean(L, 3) : false;
+    // Original: optboolean(L, 3, 0) — default false (do not overwrite).
+    // optboolean accepts nil (→ default), boolean, or numeric (!=0 → true).
+    bool replaceExisting = false;
+    if (lua_gettop(L) >= 3 && !lua_isnil(L, 3)) {
+        if (lua_isboolean(L, 3)) {
+            replaceExisting = lua_toboolean(L, 3);
+        } else {
+            replaceExisting = luaL_checknumber(L, 3) != 0;
+        }
+    }
 
     qint32 result =
         pDoc->SaveNotepad(luaCheckQString(L, 1), luaCheckQString(L, 2), replaceExisting);
 
-    // Original returns boolean (true=success, false=failure)
-    lua_pushboolean(L, result == eOK);
+    // Original returns numeric error code
+    lua_pushnumber(L, result);
     return 1;
 }
 
@@ -235,8 +253,8 @@ int L_NotepadFont(lua_State* L)
     qint32 result =
         pDoc->NotepadFont(luaCheckQString(L, 1), luaCheckQString(L, 2), size, style, charset);
 
-    // Original returns boolean (true=success, false=failure)
-    lua_pushboolean(L, result == eOK);
+    // Original returns numeric error code
+    lua_pushnumber(L, result);
     return 1;
 }
 
@@ -258,8 +276,8 @@ int L_NotepadColour(lua_State* L)
     qint32 result =
         pDoc->NotepadColour(luaCheckQString(L, 1), luaCheckQString(L, 2), luaCheckQString(L, 3));
 
-    // Original returns boolean (true=success, false=failure)
-    lua_pushboolean(L, result == eOK);
+    // Original returns numeric error code
+    lua_pushnumber(L, result);
     return 1;
 }
 
@@ -275,13 +293,21 @@ int L_NotepadColour(lua_State* L)
 int L_NotepadReadOnly(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    // Original: optboolean(L, 2, 1) — default true (make read-only if arg missing)
-    bool readOnly = (lua_gettop(L) >= 2) ? lua_toboolean(L, 2) : true;
+    // Original: optboolean(L, 2, 1) — default true if arg absent or nil;
+    // also accepts numeric arg (!=0 → true).
+    bool readOnly = true;
+    if (lua_gettop(L) >= 2 && !lua_isnil(L, 2)) {
+        if (lua_isboolean(L, 2)) {
+            readOnly = lua_toboolean(L, 2);
+        } else {
+            readOnly = luaL_checknumber(L, 2) != 0;
+        }
+    }
 
     qint32 result = pDoc->NotepadReadOnly(luaCheckQString(L, 1), readOnly);
 
-    // Original returns boolean (true=success, false=failure)
-    lua_pushboolean(L, result == eOK);
+    // Original returns numeric error code
+    lua_pushnumber(L, result);
     return 1;
 }
 
@@ -301,8 +327,8 @@ int L_NotepadSaveMethod(lua_State* L)
 
     qint32 result = pDoc->NotepadSaveMethod(luaCheckQString(L, 1), method);
 
-    // Original returns boolean (true=success, false=failure)
-    lua_pushboolean(L, result == eOK);
+    // Original returns numeric error code
+    lua_pushnumber(L, result);
     return 1;
 }
 

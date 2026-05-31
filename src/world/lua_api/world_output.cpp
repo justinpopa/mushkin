@@ -116,9 +116,31 @@ int L_Tell(lua_State* L)
     WorldDocument* pDoc = doc(L);
     QString text = concatArgs(L);
 
-    // Use default note colors
-    QRgb foreColor = pDoc->m_bNotesInRGB ? pDoc->m_iNoteColourFore : BGR(255, 255, 255);
-    QRgb backColor = pDoc->m_bNotesInRGB ? pDoc->m_iNoteColourBack : BGR(0, 0, 0);
+    // Resolve note colors from palette in non-RGB mode (matches original Tell() behavior:
+    // methods_noting.cpp:60-67 for outstanding-lines, :100-128 for the inline path).
+    QRgb foreColor;
+    QRgb backColor;
+    if (pDoc->m_bNotesInRGB) {
+        foreColor = pDoc->m_iNoteColourFore;
+        backColor = pDoc->m_iNoteColourBack;
+    } else {
+        quint16 idx = pDoc->m_colors.note_text_colour;
+        if (idx == SAMECOLOUR) {
+            if (pDoc->m_bCustom16isDefaultColour) {
+                foreColor = pDoc->m_colors.custom_text[15];
+                backColor = pDoc->m_colors.custom_back[15];
+            } else {
+                foreColor = pDoc->m_colors.normal_colour[ANSI_WHITE];
+                backColor = pDoc->m_colors.normal_colour[ANSI_BLACK];
+            }
+        } else if (idx < MAX_CUSTOM) {
+            foreColor = pDoc->m_colors.custom_text[idx];
+            backColor = pDoc->m_colors.custom_back[idx];
+        } else {
+            foreColor = qRgb(255, 255, 255);
+            backColor = qRgb(0, 0, 0);
+        }
+    }
 
     pDoc->colourTell(foreColor, backColor, text);
     return 0;
@@ -352,8 +374,22 @@ int L_Hyperlink(lua_State* L)
         foreColor = getColor(L, 4, foreColor);
     }
 
-    // backcolour is optional, defaults to note background
-    QRgb backColor = pDoc->m_bNotesInRGB ? pDoc->m_iNoteColourBack : BGR(0, 0, 0);
+    // backcolour is optional, defaults to note background resolved from palette
+    // (matches original Hyperlink: methods_noting.cpp:701-713)
+    QRgb backColor;
+    if (pDoc->m_bNotesInRGB) {
+        backColor = pDoc->m_iNoteColourBack;
+    } else {
+        quint16 idx = pDoc->m_colors.note_text_colour;
+        if (idx == SAMECOLOUR) {
+            backColor = pDoc->m_bCustom16isDefaultColour ? pDoc->m_colors.custom_back[15]
+                                                         : pDoc->m_colors.normal_colour[ANSI_BLACK];
+        } else if (idx < MAX_CUSTOM) {
+            backColor = pDoc->m_colors.custom_back[idx];
+        } else {
+            backColor = qRgb(0, 0, 0);
+        }
+    }
     if (!lua_isnoneornil(L, 5)) {
         backColor = getColor(L, 5, backColor);
     }
@@ -1019,8 +1055,16 @@ int L_NoteColourName(lua_State* L)
     }
 
     pDoc->m_bNotesInRGB = true;
-    pDoc->m_iNoteColourFore = getColor(L, 1, pDoc->m_iNoteColourFore);
-    pDoc->m_iNoteColourBack = getColor(L, 2, pDoc->m_iNoteColourBack);
+    // On unknown color name the original SetColour() leaves the output param
+    // unchanged (mxputils.cpp:342-343: returns true without writing iColour).
+    // Guard against the 0xFFFFFFFF sentinel that ColourNameToRGB returns for
+    // unrecognised names so we preserve the palette-resolved value set above.
+    QRgb newFore = getColor(L, 1, pDoc->m_iNoteColourFore);
+    QRgb newBack = getColor(L, 2, pDoc->m_iNoteColourBack);
+    if (newFore != static_cast<QRgb>(0xFFFFFFFF))
+        pDoc->m_iNoteColourFore = newFore;
+    if (newBack != static_cast<QRgb>(0xFFFFFFFF))
+        pDoc->m_iNoteColourBack = newBack;
     return 0;
 }
 

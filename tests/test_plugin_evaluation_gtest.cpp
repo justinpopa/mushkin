@@ -586,3 +586,107 @@ TEST_F(PluginEvaluationTest, MultiplePluginsInSamePhaseEvaluatedInSequenceOrder)
     plugin4File.close();
     plugin5File.close();
 }
+
+// Test 8: keep_evaluating=false in one plugin continues to next plugin in same phase (H3)
+// Original (ProcessPreviousLine.cpp:462-483): the for-loop resets m_iStopTriggerEvaluation at the
+// top of each plugin iteration, so a keep_evaluating=false stop only skips the rest of that
+// plugin's trigger sequence; the loop naturally advances to the next plugin.
+TEST_F(PluginEvaluationTest, KeepEvaluatingFalseInFirstNegativePluginDoesNotSkipSecond)
+{
+    // Load a second negative-sequence plugin (seq=-5, runs after seq=-10)
+    QTemporaryFile plugin4File;
+    plugin4File.setFileTemplate("test-plugin4-XXXXXX.xml");
+    plugin4File.open();
+    plugin4File.write(
+        createPluginXml("Plugin-Negative-5", "{44444444-4444-4444-4444-444444444444}", -5)
+            .toUtf8());
+    plugin4File.flush();
+
+    QString errorMsg;
+    Plugin* pluginNeg5 = doc->LoadPlugin(plugin4File.fileName(), errorMsg);
+    ASSERT_NE(pluginNeg5, nullptr) << "Could not load plugin-neg5: " << errorMsg.toStdString();
+    ASSERT_EQ(pluginNeg5->m_iSequence, -5);
+
+    // Trigger in first negative plugin (seq=-10) with keep_evaluating=false
+    auto tNeg10 = std::make_unique<Trigger>();
+    tNeg10->internal_name = "trig_neg10_stop";
+    tNeg10->label = "Trigger-Neg10-Stop";
+    tNeg10->trigger = "phasestop*";
+    tNeg10->enabled = true;
+    tNeg10->sequence = 100;
+    tNeg10->keep_evaluating = false; // stops this plugin's sequence
+    Trigger* pNeg10 = tNeg10.get();
+    pluginNeg->m_TriggerMap[tNeg10->internal_name] = std::move(tNeg10);
+    pluginNeg->m_triggersNeedSorting = true;
+
+    // Trigger in second negative plugin (seq=-5) — should still fire
+    auto tNeg5 = std::make_unique<Trigger>();
+    tNeg5->internal_name = "trig_neg5_cont";
+    tNeg5->label = "Trigger-Neg5-Cont";
+    tNeg5->trigger = "phasestop*";
+    tNeg5->enabled = true;
+    tNeg5->sequence = 100;
+    tNeg5->keep_evaluating = true;
+    Trigger* pNeg5 = tNeg5.get();
+    pluginNeg5->m_TriggerMap[tNeg5->internal_name] = std::move(tNeg5);
+    pluginNeg5->m_triggersNeedSorting = true;
+
+    auto line = createTestLine("phasestop message", 8);
+    doc->evaluateTriggers(line.get());
+
+    EXPECT_EQ(pNeg10->matched, 1) << "First negative plugin trigger should have matched";
+    EXPECT_EQ(pNeg5->matched, 1) << "Second negative plugin trigger must still fire after first "
+                                    "plugin's keep_evaluating=false";
+
+    plugin4File.close();
+}
+
+// Test 9: keep_evaluating=false in one positive-sequence plugin continues to next (H3)
+TEST_F(PluginEvaluationTest, KeepEvaluatingFalseInFirstPositivePluginDoesNotSkipSecond)
+{
+    QTemporaryFile plugin5File;
+    plugin5File.setFileTemplate("test-plugin5-XXXXXX.xml");
+    plugin5File.open();
+    plugin5File.write(
+        createPluginXml("Plugin-Positive-15", "{55555555-5555-5555-5555-555555555555}", 15)
+            .toUtf8());
+    plugin5File.flush();
+
+    QString errorMsg;
+    Plugin* pluginPos15 = doc->LoadPlugin(plugin5File.fileName(), errorMsg);
+    ASSERT_NE(pluginPos15, nullptr) << "Could not load plugin-pos15: " << errorMsg.toStdString();
+    ASSERT_EQ(pluginPos15->m_iSequence, 15);
+
+    // First positive plugin (seq=10) stops its own sequence
+    auto tPos10 = std::make_unique<Trigger>();
+    tPos10->internal_name = "trig_pos10_stop";
+    tPos10->label = "Trigger-Pos10-Stop";
+    tPos10->trigger = "postest*";
+    tPos10->enabled = true;
+    tPos10->sequence = 100;
+    tPos10->keep_evaluating = false;
+    Trigger* pPos10 = tPos10.get();
+    pluginPos->m_TriggerMap[tPos10->internal_name] = std::move(tPos10);
+    pluginPos->m_triggersNeedSorting = true;
+
+    // Second positive plugin (seq=15) must still fire
+    auto tPos15 = std::make_unique<Trigger>();
+    tPos15->internal_name = "trig_pos15_cont";
+    tPos15->label = "Trigger-Pos15-Cont";
+    tPos15->trigger = "postest*";
+    tPos15->enabled = true;
+    tPos15->sequence = 100;
+    tPos15->keep_evaluating = true;
+    Trigger* pPos15 = tPos15.get();
+    pluginPos15->m_TriggerMap[tPos15->internal_name] = std::move(tPos15);
+    pluginPos15->m_triggersNeedSorting = true;
+
+    auto line = createTestLine("postest message", 9);
+    doc->evaluateTriggers(line.get());
+
+    EXPECT_EQ(pPos10->matched, 1) << "First positive plugin trigger should have matched";
+    EXPECT_EQ(pPos15->matched, 1) << "Second positive plugin trigger must still fire after first "
+                                     "plugin's keep_evaluating=false";
+
+    plugin5File.close();
+}

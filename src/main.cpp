@@ -85,6 +85,11 @@ int main(int argc, char* argv[])
 
     QApplication app(argc, argv);
 
+    // Capture application start time immediately after QApplication construction.
+    // Mirrors CMUSHclientApp::InitInstance (MUSHclient.cpp:218) which captures the time
+    // at the top of InitInstance, well before any worlds or scripts are loaded.
+    AppPaths::recordAppStartTime();
+
     // Set working directory to app directory so relative paths work correctly
     // On macOS .app bundles, this is the folder containing the .app
     // On standalone executables, this is the folder containing the executable

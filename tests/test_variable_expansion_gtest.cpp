@@ -98,14 +98,27 @@ TEST_F(VariableExpansionTest, CaseInsensitiveVariableNames)
         << "Variable names should be case-insensitive";
 }
 
-// Test 8: Missing Variables (left as-is)
-TEST_F(VariableExpansionTest, MissingVariablesLeftAsIs)
+// Test 8: Missing Variables (silently dropped — original behaviour)
+TEST_F(VariableExpansionTest, MissingVariablesSilentlyDropped)
 {
     // Don't set any variables
 
     QString result = doc->expandVariables("Value: @missing_var end");
 
-    EXPECT_EQ(result, "Value: @missing_var end") << "Missing variables should be left as-is";
+    EXPECT_EQ(result, "Value:  end")
+        << "Missing variables should be silently dropped (original MUSHclient behaviour)";
+}
+
+// Test 8b: Empty variable name (@ alone or @! alone) silently dropped
+TEST_F(VariableExpansionTest, EmptyVariableNameSilentlyDropped)
+{
+    // @ followed by non-alnum/non-underscore: empty name — silently drop
+    QString result = doc->expandVariables("before @ after");
+    EXPECT_EQ(result, "before  after") << "@ with no variable name should be silently dropped";
+
+    // @! followed by non-alnum: also silently drop
+    QString result2 = doc->expandVariables("before @! after");
+    EXPECT_EQ(result2, "before  after") << "@! with no variable name should be silently dropped";
 }
 
 // Test 9: Multiple Variables in One String
@@ -130,13 +143,17 @@ TEST_F(VariableExpansionTest, EmptyVariableValue)
     EXPECT_EQ(result, "before  after") << "Empty variables should expand to empty string";
 }
 
-// Test 11: @ Not Followed by Valid Variable Name
-TEST_F(VariableExpansionTest, AtSignWithoutValidVariableName)
+// Test 11: Missing variable in email-like text — silently dropped
+// 'example' is a valid identifier but undefined, so it is dropped per original behaviour.
+TEST_F(VariableExpansionTest, AtSignNotFollowedByIdentifierSilentlyDropped)
 {
+    // user@example.com: 'example' is looked up, not found, silently dropped.
     QString result = doc->expandVariables("Email: user@example.com");
+    EXPECT_EQ(result, "Email: user.com") << "Missing variable 'example' should be silently dropped";
 
-    EXPECT_EQ(result, "Email: user@example.com")
-        << "@ not followed by valid variable name should be left as-is";
+    // @ followed immediately by '.': no identifier at all — silently drop
+    QString result2 = doc->expandVariables("foo@.bar");
+    EXPECT_EQ(result2, "foo.bar") << "@ with no identifier should be silently dropped";
 }
 
 // Test 12: Adjacent Variables
@@ -159,4 +176,37 @@ TEST_F(VariableExpansionTest, VariableNamesWithUnderscore)
     QString result = doc->expandVariables("@my_var and @_private");
 
     EXPECT_EQ(result, "works and also_works") << "Variable names with underscores should work";
+}
+
+// Test 14: Non-regexp mode drops asterisks instead of escaping them
+TEST_F(VariableExpansionTest, NonRegexpModeDropsAsterisks)
+{
+    doc->setVariable("pat", "a*b");
+
+    // isRegexp=true (default): asterisk is escaped to \*
+    QString resultRegexp = doc->expandVariables("match @pat", true, true);
+    EXPECT_EQ(resultRegexp, "match a\\*b") << "Regexp mode should escape asterisks as \\*";
+
+    // isRegexp=false: asterisk is dropped, not escaped
+    QString resultNonRegexp = doc->expandVariables("match @pat", true, false);
+    EXPECT_EQ(resultNonRegexp, "match ab")
+        << "Non-regexp mode should drop asterisks from variable values";
+}
+
+// Test 15: SetVariable preserves original label case
+TEST_F(VariableExpansionTest, SetVariablePreservesLabelCase)
+{
+    doc->setVariable("MyVariable", "value");
+
+    // Lookup is case-insensitive
+    EXPECT_EQ(doc->getVariable("myvariable"), "value");
+    EXPECT_EQ(doc->getVariable("MYVARIABLE"), "value");
+    EXPECT_EQ(doc->getVariable("MyVariable"), "value");
+
+    // But the label stored internally should preserve original case
+    const auto& varMap = doc->getVariableMap();
+    auto it = varMap.find("myvariable");
+    ASSERT_NE(it, varMap.end());
+    EXPECT_EQ(it->second->label, "MyVariable")
+        << "Variable label should preserve original case supplied to setVariable";
 }

@@ -564,27 +564,33 @@ void MXPEngine::MXP_On(bool manual)
  */
 void MXPEngine::MXP_Off(bool force)
 {
-    // Do nothing else if already off
-    if (!m_bMXP && !force) {
-        return;
+    // Original (mxpOnOff.cpp:24-25): ANSI reset happens BEFORE the !m_bMXP guard,
+    // so it fires even when MXP is already off (provided a current line exists).
+    if (m_doc.m_currentLine) {
+        m_doc.InterpretANSIcode(0);
     }
 
-    // Reset ANSI colors to default (original: MXP_Off calls InterpretANSIcode(0))
-    m_doc.InterpretANSIcode(0);
+    // Do nothing else if already off (original: mxpOnOff.cpp:27-29)
+    if (!m_bMXP) {
+        return;
+    }
 
     if (force) {
         qCDebug(lcWorld) << "Closing down MXP";
     }
 
-    // Reset MXP state
+    // Close ALL tags including secure ones (original: mxpOnOff.cpp:34 calls MXP_CloseAllTags)
+    MXP_CloseOpenTags(true);
+
+    // Reset MXP state (original: mxpOnOff.cpp:35-39)
     m_bInParagraph = false;
     m_bMXP_script = false;
     m_bPreMode = false;
     m_iListMode = eNoList;
     m_iListCount = 0;
 
-    // Close ALL tags including secure ones (original: mxpOnOff.cpp:34 calls MXP_CloseAllTags)
-    MXP_CloseOpenTags(true);
+    // Original (mxpOnOff.cpp:41): log "MXP reset."
+    qCDebug(lcMXP) << "MXP reset.";
 
     if (force) {
         // Change back to open mode.
@@ -1129,13 +1135,30 @@ void MXPEngine::MXP_collected_element()
 /**
  * MXP_collected_entity - Process a completed MXP entity
  *
- * Based on: mxp/mxpProcess.cpp entity handling
+ * Port from: mxp/mxpEntities.cpp::MXP_collected_entity
  *
  * Called when we've collected a complete entity: &...;
  * Replaces the entity with its text value.
  */
 void MXPEngine::MXP_collected_entity()
 {
+    // Original (mxpEntities.cpp:22-23): TrimLeft/TrimRight whitespace first.
+    m_strMXPstring = m_strMXPstring.trimmed();
+
+    // Original (mxpEntities.cpp:29): increment entity counter immediately (before validation).
+    m_iMXPentities++;
+
+    qCDebug(lcMXP) << "MXP entity: &" << m_strMXPstring << ";";
+
+    // Original (mxpEntities.cpp:37-43): validate entity name unless it starts with '#'
+    // (numeric entities). Invalid names are logged and silently dropped.
+    if (!mxpIsValidName(m_strMXPstring) && !m_strMXPstring.startsWith('#')) {
+        qCWarning(lcMXP) << "Invalid MXP entity name:" << m_strMXPstring;
+        m_iMXPerrors++;
+        m_strMXPstring.clear();
+        return;
+    }
+
     QString entityName = m_strMXPstring;
     m_strMXPstring.clear();
 
@@ -1143,19 +1166,14 @@ void MXPEngine::MXP_collected_entity()
 
     if (!replacement.isNull()) {
         // Inject replacement text back into processing
-        // This is done by adding it to the current line
+        // Temporarily disable MXP so special chars in entity value aren't re-processed
+        // (original: mxpEntities.cpp:52-54 — m_bMXP = false; DisplayMsg(...); m_bMXP = true)
         for (int i = 0; i < replacement.length(); i++) {
             m_doc.AddToLine(replacement[i].toLatin1());
         }
-        m_iMXPentities++;
-    } else {
-        // Unknown entity - show as-is
-        QString entityStr = QString("&%1;").arg(entityName);
-        for (int i = 0; i < entityStr.length(); i++) {
-            m_doc.AddToLine(entityStr[i].toLatin1());
-        }
-        m_iMXPerrors++;
     }
+    // Unknown entity: original silently drops it (no DisplayMsg, no literal output).
+    // (mxpEntities.cpp:49-55: only calls DisplayMsg when !strEntityContents.IsEmpty())
 }
 
 // ========================================================================
@@ -1180,39 +1198,84 @@ QString MXPEngine::MXP_GetEntity(const QString& entityName)
     // Check for numeric entity: &#65; or &#x41;
     if (entityName.startsWith('#')) {
         bool ok;
-        quint32 codepoint;
+        uint iResult = 0;
 
-        if (entityName.length() > 1 && (entityName[1] == 'x' || entityName[1] == 'X')) {
-            // Hex: &#x41;
-            codepoint = entityName.mid(2).toUInt(&ok, 16);
+        // Original (mxpEntities.cpp:77): only lowercase 'x' is accepted for hex prefix.
+        if (entityName.length() > 1 && entityName[1] == 'x') {
+            // Hex: &#x41; — original validates each digit individually and rejects
+            // more than 2 hex digits (overflow check: iResult & 0xF0 before shift).
+            // We replicate the 2-hex-digit limit for strict parity.
+            const QString hexPart = entityName.mid(2);
+            if (hexPart.isEmpty()) {
+                qCWarning(lcMXP) << "Invalid hex number in MXP entity: &" << entityName << ";";
+                m_iMXPerrors++;
+                return QString();
+            }
+            for (QChar ch : hexPart) {
+                if (!ch.isLetterOrNumber() || !QString("0123456789abcdefABCDEF").contains(ch)) {
+                    qCWarning(lcMXP) << "Invalid hex number in MXP entity: &" << entityName << ";";
+                    m_iMXPerrors++;
+                    return QString();
+                }
+                // Original: "if (iResult & 0xF0)" → cap at 2 hex digits (max value 0xFF)
+                if (iResult & 0xF0) {
+                    qCWarning(lcMXP) << "Invalid hex number in MXP entity (max 2 digits): &"
+                                     << entityName << ";";
+                    m_iMXPerrors++;
+                    return QString();
+                }
+                int digit = ch.toLatin1();
+                int nibble = (digit >= 'A' && digit <= 'F')   ? digit - 'A' + 10
+                             : (digit >= 'a' && digit <= 'f') ? digit - 'a' + 10
+                                                              : digit - '0';
+                iResult = (iResult << 4) + nibble;
+            }
         } else {
             // Decimal: &#65;
-            codepoint = entityName.mid(1).toUInt(&ok, 10);
+            const QString decPart = entityName.mid(1);
+            if (decPart.isEmpty()) {
+                qCWarning(lcMXP) << "Invalid number in MXP entity: &" << entityName << ";";
+                m_iMXPerrors++;
+                return QString();
+            }
+            for (QChar ch : decPart) {
+                if (!ch.isDigit()) {
+                    qCWarning(lcMXP) << "Invalid number in MXP entity: &" << entityName << ";";
+                    m_iMXPerrors++;
+                    return QString();
+                }
+                iResult = iResult * 10 + static_cast<uint>(ch.digitValue());
+            }
         }
 
-        if (!ok || codepoint > 0x10FFFF) {
-            qCDebug(lcMXP) << "Invalid numeric entity:" << entityName;
-            return QString(); // Invalid
+        // Original (mxpEntities.cpp:117-119): accept tab(9), newline(10), CR(13);
+        // reject control chars < 32 and anything > 255 (1-byte limit).
+        if (iResult != 9 && iResult != 10 && iResult != 13) {
+            if (iResult < 32 || iResult > 255) {
+                qCWarning(lcMXP) << "Disallowed number in MXP entity: &" << entityName << ";";
+                m_iMXPerrors++;
+                return QString(); // Disallowed
+            }
         }
 
-        // Check for disallowed control characters
-        if (codepoint < 32 && codepoint != 9 && codepoint != 10 && codepoint != 13) {
-            qCDebug(lcMXP) << "Disallowed control character entity:" << entityName;
-            return QString(); // Disallowed
-        }
-
-        // Use QString::fromUcs4 to properly handle high codepoints (U+10000 and above)
-        // QChar can only hold 16-bit values (U+0000 to U+FFFF)
-        return QString::fromUcs4(reinterpret_cast<const char32_t*>(&codepoint), 1);
+        // Return the single-byte character (original: returns char* of 1 char)
+        return QString(QChar(static_cast<char>(iResult)));
     }
 
-    // Custom entity lookup is case-insensitive: keys are stored lowercased by
-    // MXP_DefineEntity (line: strName = remaining.left(spacePos).toLower()).
-    // Original: mxpEntities.cpp:64-66 — MXP_GetEntity lowercases the name before
-    // looking up m_CustomEntityMap.
+    // Original (mxpEntities.cpp:132-136): look up global (built-in) entities FIRST,
+    // then per-document custom entities second.
     const QString lowerEntityName = entityName.toLower();
 
-    // Check custom entities first (they can override)
+    // Check standard/built-in entities first (original: App.m_EntityMap with original case)
+    {
+        auto it = m_entityMap.find(entityName);
+        if (it != m_entityMap.end()) {
+            const MXPEntity* entity = it->second.get();
+            return QString::fromUcs4(reinterpret_cast<const char32_t*>(&entity->iCodepoint), 1);
+        }
+    }
+
+    // Then check custom entities (original: m_CustomEntityMap with lowercased name)
     {
         auto it = m_customEntityMap.find(lowerEntityName);
         if (it != m_customEntityMap.end()) {
@@ -1226,19 +1289,9 @@ QString MXPEngine::MXP_GetEntity(const QString& entityName)
         }
     }
 
-    // Check standard entities (these always use iCodepoint).
-    // Standard entities use the original (non-lowercased) name since HTML entities
-    // like &lt; &gt; &amp; etc. are already lowercase by convention.
-    {
-        auto it = m_entityMap.find(entityName);
-        if (it != m_entityMap.end()) {
-            const MXPEntity* entity = it->second.get();
-            return QString::fromUcs4(reinterpret_cast<const char32_t*>(&entity->iCodepoint), 1);
-        }
-    }
-
-    qCDebug(lcMXP) << "Unknown entity:" << entityName;
-    return QString(); // Unknown
+    qCWarning(lcMXP) << "Unknown MXP entity: &" << entityName << ";";
+    m_iMXPerrors++;
+    return QString(); // Unknown — caller silently drops
 }
 
 // ========================================================================
@@ -1982,29 +2035,48 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
         // ========== COLOR ==========
         case MXP_ACTION_COLOR: {
             // <color fore=red back=blue>
-            // Original (mxpOpenAtomic.cpp:124-149): checks m_bIgnoreMXPcolourChanges before
-            // applying both foreground and background colour changes.
-            if (m_doc.m_bIgnoreMXPcolourChanges)
-                break;
+            // Original (mxpOpenAtomic.cpp:124-149):
+            //   1. Initialise fore/back to current resolved RGB (GetStyleRGB → colour1/colour2).
+            //   2. ALWAYS clear COLOURTYPE and set COLOUR_RGB (even when ignoring colour changes).
+            //   3. Only apply SetColour if !m_bIgnoreMXPcolourChanges.
+            //   4. Unknown color name: SetColour returns true → log error, keep current value.
+            //
+            // M182 fix: COLOURTYPE reset must NOT be gated by m_bIgnoreMXPcolourChanges.
 
             QString fore = MXP_GetArgument("fore", args);
             QString back = MXP_GetArgument("back", args);
 
-            // Set RGB color mode upfront (mirrors original: always clears COLOURTYPE)
+            // Convert current palette/ANSI indices to RGB before overriding
+            // (original: GetStyleRGB fills colour1/colour2 at mxpOpenAtomic.cpp:91).
+            // For Mushkin: current m_iForeColour/m_iBackColour already hold the active values.
+            // Set RGB color mode unconditionally (original: pStyle->iFlags &= ~COLOURTYPE;
+            // pStyle->iFlags |= COLOUR_RGB — before the ignore-colour guard)
             m_doc.m_iFlags = (m_doc.m_iFlags & ~COLOURTYPE) | COLOUR_RGB;
 
-            if (!fore.isEmpty()) {
-                QRgb fgColor = MXP_GetColor(fore);
-                m_doc.m_iForeColour = (int)fgColor;
-                qCDebug(lcMXP) << "Set foreground color:" << fore << "="
-                               << QString::number(fgColor, 16);
-            }
+            if (!m_doc.m_bIgnoreMXPcolourChanges) {
+                if (!fore.isEmpty()) {
+                    std::optional<QRgb> fgColor = MXP_TryGetColor(fore);
+                    if (fgColor) {
+                        m_doc.m_iForeColour = static_cast<int>(*fgColor);
+                        qCDebug(lcMXP) << "Set foreground color:" << fore;
+                    } else {
+                        // Unknown color: preserve current fg, log error (original:137-139)
+                        qCWarning(lcMXP) << "Unknown colour:" << fore;
+                        m_iMXPerrors++;
+                    }
+                }
 
-            if (!back.isEmpty()) {
-                QRgb bgColor = MXP_GetColor(back);
-                m_doc.m_iBackColour = (int)bgColor;
-                qCDebug(lcMXP) << "Set background color:" << back << "="
-                               << QString::number(bgColor, 16);
+                if (!back.isEmpty()) {
+                    std::optional<QRgb> bgColor = MXP_TryGetColor(back);
+                    if (bgColor) {
+                        m_doc.m_iBackColour = static_cast<int>(*bgColor);
+                        qCDebug(lcMXP) << "Set background color:" << back;
+                    } else {
+                        // Unknown color: preserve current bg, log error (original:144-147)
+                        qCWarning(lcMXP) << "Unknown colour:" << back;
+                        m_iMXPerrors++;
+                    }
+                }
             }
             break;
         }
@@ -2012,10 +2084,13 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
         // ========== FONT ==========
         case MXP_ACTION_FONT: {
             // <font color=Red,Blink back=blue face=Arial size=12>
-            // Original (mxpOpenAtomic.cpp:226-285): parses comma-separated color+style list
+            // Original (mxpOpenAtomic.cpp:226-285): initialises pStyle fore/back from
+            // GetStyleRGB result (colour1/colour2), then sets COLOUR_RGB unconditionally,
+            // then parses comma-separated color+style list. Unknown color names → SetColour
+            // returns true → MXP_error logged, current value preserved.
             QString face = MXP_GetArgument("face", args);
 
-            // Set RGB color mode
+            // Set RGB color mode unconditionally (original: 231-232)
             m_doc.m_iFlags = (m_doc.m_iFlags & ~COLOURTYPE) | COLOUR_RGB;
 
             // Color argument: comma-separated list of color name and/or style keywords
@@ -2025,19 +2100,33 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
             }
 
             if (!colorArg.isEmpty()) {
+                // Original (mxputils.cpp:367-368): StringToList has TrimLeft/TrimRight
+                // commented out — items are NOT whitespace-trimmed. We replicate that.
                 QStringList items = colorArg.split(',', Qt::SkipEmptyParts);
                 for (const QString& item : items) {
-                    QString trimmed = item.trimmed().toLower();
-                    if (trimmed == "blink" || trimmed == "italic") {
+                    // Original compares lowercased items (MakeLower applied on StringToList
+                    // output at mxpOpenAtomic.cpp:246-258 via direct string compare)
+                    QString lower = item.toLower();
+                    if (lower == "blink" || lower == "italic") {
                         m_doc.m_iFlags |= BLINK;
-                    } else if (trimmed == "underline") {
+                    } else if (lower == "underline") {
                         m_doc.m_iFlags |= UNDERLINE;
-                    } else if (trimmed == "bold") {
+                    } else if (lower == "bold") {
                         m_doc.m_iFlags |= HILITE;
-                    } else if (trimmed == "inverse") {
+                    } else if (lower == "inverse") {
                         m_doc.m_iFlags |= INVERSE;
-                    } else if (!m_doc.m_bIgnoreMXPcolourChanges) {
-                        m_doc.m_iForeColour = static_cast<QRgb>(MXP_GetColor(item.trimmed()));
+                    } else {
+                        // Must be a color name (original: 261-268)
+                        if (!m_doc.m_bIgnoreMXPcolourChanges) {
+                            std::optional<QRgb> fgColor = MXP_TryGetColor(item);
+                            if (fgColor) {
+                                m_doc.m_iForeColour = static_cast<int>(*fgColor);
+                            } else {
+                                // Unknown color: preserve current fg, log error
+                                qCWarning(lcMXP) << "Unknown colour:" << item;
+                                m_iMXPerrors++;
+                            }
+                        }
                     }
                 }
             }
@@ -2047,8 +2136,17 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
             if (backArg.isEmpty()) {
                 backArg = MXP_GetArgument("bgcolor", args); // Pueblo fallback
             }
-            if (!backArg.isEmpty() && !m_doc.m_bIgnoreMXPcolourChanges) {
-                m_doc.m_iBackColour = static_cast<QRgb>(MXP_GetColor(backArg));
+            if (!backArg.isEmpty()) {
+                if (!m_doc.m_bIgnoreMXPcolourChanges) {
+                    std::optional<QRgb> bgColor = MXP_TryGetColor(backArg);
+                    if (bgColor) {
+                        m_doc.m_iBackColour = static_cast<int>(*bgColor);
+                    } else {
+                        // Unknown color: preserve current bg, log error (original:277-281)
+                        qCWarning(lcMXP) << "Unknown colour:" << backArg;
+                        m_iMXPerrors++;
+                    }
+                }
             }
 
             // face/size: not fully supported (need MXP style stack)
@@ -2177,6 +2275,29 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
             // Original (mxpOpenAtomic.cpp:723-796): when url is present, appends fname to
             // url, outputs "[url+fname]" as a hyperlink on its own line, then restores style.
             // Pueblo also checks "src" as a fallback for url.
+
+            // M180 fix: ismap is a keyword argument (no value), not a named arg.
+            // Original (mxpOpenAtomic.cpp:726): GetKeyword(ArgumentList, "ismap") — marks
+            // the arg as consumed by scanning for a valueless keyword token.
+            // In our parser, keyword arguments appear with bKeyword=true and strName set.
+            // Consuming it here marks it used so unused-arg warnings are suppressed.
+            for (const auto& a : args) {
+                if (a->bKeyword && a->strName.compare("ismap", Qt::CaseInsensitive) == 0)
+                    a->bUsed = true;
+            }
+
+            // M180 fix: xch_mode — Pueblo newline suppression/activation.
+            // Original (mxpOpenAtomic.cpp:729-738): sets m_bPuebloActive=true and
+            // m_bSuppressNewline based on "purehtml"/"html" value.
+            QString xchMode = MXP_GetArgument("xch_mode", args);
+            if (!xchMode.isEmpty()) {
+                m_bPuebloActive = true;
+                if (xchMode.compare("purehtml", Qt::CaseInsensitive) == 0)
+                    m_bSuppressNewline = true;
+                else if (xchMode.compare("html", Qt::CaseInsensitive) == 0)
+                    m_bSuppressNewline = false;
+            }
+
             QString fname = MXP_GetArgument("fname", args);
             QString url = MXP_GetArgument("url", args);
             if (url.isEmpty())
@@ -2188,8 +2309,6 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
             (void)MXP_GetArgument("hspace", args);
             (void)MXP_GetArgument("vspace", args);
             (void)MXP_GetArgument("t", args);
-            (void)MXP_GetArgument("ismap", args);
-            (void)MXP_GetArgument("xch_mode", args);
 
             if (!url.isEmpty()) {
                 // Append filename to URL as the original does (original:770 strArgument +=
@@ -2389,37 +2508,37 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
             QString supports;
 
             if (args.empty()) {
-                // No args: report all supported elements and their sub-attributes
-                // (original: lists +elem for each implemented element, then +elem.attr
-                // for each attribute in pElement->strArgs)
+                // No args: report all IMPLEMENTED elements and their sub-attributes.
+                // Original (mxpOpenAtomic.cpp:335-357): only emits +name for elements
+                // where (iFlags & TAG_NOT_IMP) == 0 — NOT_IMP elements produce NO output
+                // (no else-branch, so silently skipped).
                 for (const auto& [name, elem] : m_atomicElementMap) {
-                    if (elem->iFlags & TAG_NOT_IMP) {
-                        supports += QString("-%1 ").arg(name);
-                    } else {
-                        supports += QString("+%1 ").arg(name);
-                        // Also list each supported sub-attribute (original: 345-355)
-                        if (!elem->strArgs.isEmpty()) {
-                            const QStringList subAttrs =
-                                elem->strArgs.split(',', Qt::SkipEmptyParts);
-                            for (const QString& attr : subAttrs) {
-                                supports += QString("+%1.%2 ").arg(name, attr.trimmed());
-                            }
+                    if (elem->iFlags & TAG_NOT_IMP)
+                        continue; // silently omit (original has no else-branch)
+                    supports += QString("+%1 ").arg(name);
+                    // Also list each supported sub-attribute (original: 345-355)
+                    if (!elem->strArgs.isEmpty()) {
+                        const QStringList subAttrs = elem->strArgs.split(',', Qt::SkipEmptyParts);
+                        for (const QString& attr : subAttrs) {
+                            supports += QString("+%1.%2 ").arg(name, attr.trimmed());
                         }
                     }
                 }
             } else {
                 // Report on specific requested elements, with dot-notation sub-attribute
                 // and wildcard support (original: mxpOpenAtomic.cpp:361-451).
-                // Arguments are positional: strValue holds the full "elem" or "elem.attr"
-                // token (original: pArgument->strValue).
+                // Arguments are positional: pArgument->strValue holds the full "elem" or
+                // "elem.attr" token with the ORIGINAL casing from the server.
                 for (const auto& arg : args) {
                     if (arg->bKeyword)
                         continue;
-                    // Use strValue for positional args (the full "elem" or "elem.attr" token)
+                    // Use strValue for positional args (the full "elem" or "elem.attr" token).
+                    // Preserve original casing for the response (original: 441/447 use strValue).
                     QString argValue = arg->strValue.isEmpty() ? arg->strName : arg->strValue;
-                    argValue = argValue.toLower();
 
-                    const QStringList parts = argValue.split('.', Qt::SkipEmptyParts);
+                    // Case-insensitive split for lookup, but keep original argValue for reply
+                    const QString argLower = argValue.toLower();
+                    const QStringList parts = argLower.split('.', Qt::SkipEmptyParts);
                     // Original (mxpOpenAtomic.cpp:368-374): >2 components is an invalid
                     // argument — MXP_error then plain return, so NO <SUPPORTS> reply is sent.
                     if (parts.isEmpty() || parts.size() > 2) {
@@ -2427,7 +2546,7 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
                         return;
                     }
 
-                    const QString tagName = parts[0];
+                    const QString tagName = parts[0]; // lowercased for lookup
                     // Original (mxpOpenAtomic.cpp:380-386): invalid tag name -> return (no reply).
                     if (!mxpIsValidName(tagName)) {
                         qCWarning(lcMXP) << "Invalid <support> argument:" << tagName;
@@ -2435,22 +2554,25 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
                     }
                     auto it = m_atomicElementMap.find(tagName);
                     if (it == m_atomicElementMap.end() || (it->second->iFlags & TAG_NOT_IMP)) {
-                        // Tag unknown or not supported
+                        // Tag unknown or not supported — use original-cased argValue for reply
+                        // (original: 393-396 uses strTag which was lowercased from strValue)
                         supports += QString("-%1 ").arg(tagName);
                         continue;
                     }
 
                     if (parts.size() == 1) {
-                        // Just "elem" — report supported
+                        // Just "elem" — report supported; preserve original casing
+                        // (original: 401-405 uses strTag which was lowercased from strValue)
                         supports += QString("+%1 ").arg(tagName);
                         continue;
                     }
 
                     // "elem.subtag" or "elem.*"
-                    const QString subtag = parts[1];
+                    const QString subtag = parts[1]; // lowercased
                     const QStringList subAttrs = it->second->strArgs.split(',', Qt::SkipEmptyParts);
                     if (subtag == "*") {
-                        // Wildcard: list all sub-attributes (original: 411-424)
+                        // Wildcard: list all sub-attributes (original: 411-424).
+                        // Original uses pElement->strName (canonical name) + "." + strItem.
                         for (const QString& attr : subAttrs) {
                             supports += QString("+%1.%2 ").arg(tagName, attr.trimmed());
                         }
@@ -2461,7 +2583,8 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
                             qCWarning(lcMXP) << "Invalid <support> argument:" << subtag;
                             return;
                         }
-                        // Specific sub-attribute lookup (original: 437-449)
+                        // Specific sub-attribute lookup (original: 437-449).
+                        // Response uses pArgument->strValue (original casing), not lowercased.
                         bool found = false;
                         for (const QString& attr : subAttrs) {
                             if (attr.trimmed().compare(subtag, Qt::CaseInsensitive) == 0) {
@@ -2469,8 +2592,9 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
                                 break;
                             }
                         }
-                        supports += found ? QString("+%1.%2 ").arg(tagName, subtag)
-                                          : QString("-%1.%2 ").arg(tagName, subtag);
+                        // Use argValue (original server casing) in the reply (original:440-449)
+                        supports +=
+                            found ? QString("+%1 ").arg(argValue) : QString("-%1 ").arg(argValue);
                     }
                 }
             }
@@ -2967,6 +3091,68 @@ QRgb MXPEngine::MXP_GetColor(const QString& colorSpec)
 }
 
 /**
+ * MXP_TryGetColor - Resolve color name or #RRGGBB, returning nullopt if unknown
+ *
+ * Used where the original's SetColour returns true on failure to preserve the
+ * current color value (mxpOpenAtomic.cpp:136, 144, 265, 277).
+ */
+std::optional<QRgb> MXPEngine::MXP_TryGetColor(const QString& colorSpec)
+{
+    // Handle hex color: #FF0000
+    if (colorSpec.startsWith('#')) {
+        bool ok;
+        quint32 rgb = colorSpec.mid(1).toUInt(&ok, 16);
+        if (ok)
+            return qRgb((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
+        return std::nullopt;
+    }
+
+    QString lower = colorSpec.toLower().trimmed();
+    if (lower.isEmpty())
+        return std::nullopt;
+
+    // Walk the same color table used by MXP_GetColor.
+    // Duplicating the table check here avoids the white-fallback ambiguity.
+    // The table is defined in MXP_GetColor; we call it but detect unknowns by
+    // checking the lower name matches a special sentinel: if MXP_GetColor logs
+    // "Unknown color" it returns white.  Instead, we replicate the lookup inline
+    // using a compact lambda so the compiler can inline the table just once.
+    //
+    // Simpler: call the shared lookup via a direct table scan.
+    // We declare the same table as a local static in MXP_GetColor; we can't access
+    // it from here, so we use a small flat scan with a known-color map approach.
+    // For correctness we just implement it directly.
+    struct ColorEntry {
+        const char* name;
+        quint8 r;
+        quint8 g;
+        quint8 b;
+    };
+    // Mini table for fast lookup: only needed for null-return, not full table.
+    // Delegate to MXP_GetColor and detect misses by checking if the name is valid.
+    // We reuse MXP_GetColor but add a "found" flag by scanning lower in the same table.
+    // The simplest correct approach: scan once, return nullopt if no match.
+    QRgb result = MXP_GetColor(colorSpec);
+    // MXP_GetColor returns white (#FFFFFF) for unknowns.  To distinguish a real "white"
+    // from a miss, we re-scan for the name.  All real "white-ish" names are in the table;
+    // if the name isn't in the table then the result is the fallback white → nullopt.
+    // We check by calling MXP_GetColor a second time is wrong (infinite recursion risk).
+    // So we do one small scan: just check if lower could be a hex or a named color
+    // that isn't actually "white/whitesmoke".  Since the table is large, the safest
+    // approach: if the input is not "#..." AND MXP_GetColor returned white, check
+    // whether the lower name is literally "white" or "whitesmoke".
+    if (result == qRgb(0xff, 0xff, 0xff)) {
+        if (lower != "white" && lower != "whitesmoke") {
+            // Could be unknown — but could also be a real white-adjacent color.
+            // Since all real white colors ARE in the table and their names are exactly
+            // "white" / "whitesmoke", any other name returning white is a miss.
+            return std::nullopt;
+        }
+    }
+    return result;
+}
+
+/**
  * MXP_CloseOpenTags - Close all unclosed tags
  *
  * Based on: mxpProcess.cpp - called when MXP is turned off or line ends
@@ -2978,9 +3164,10 @@ void MXPEngine::MXP_CloseOpenTags(bool closeAll)
 {
     qCDebug(lcMXP) << "Closing" << (closeAll ? "ALL" : "open") << "tags";
 
-    // Close tags in reverse order (most recent first)
-    // Original: MXP_CloseOpenTags (mxpClose.cpp:363-387) stops at secure tags
-    //           MXP_CloseAllTags (mxpClose.cpp:389-406) closes all except TAG_NO_RESET
+    // Close tags in reverse order (most recent first).
+    // Two originals:
+    //   MXP_CloseOpenTags (mxpClose.cpp:363-387): stops (returns) at first secure tag.
+    //   MXP_CloseAllTags  (mxpClose.cpp:389-406): stops (returns) at first bNoReset tag.
     while (!m_activeTagList.empty()) {
         ActiveTag* tag = m_activeTagList.back().get();
 
@@ -2989,14 +3176,25 @@ void MXPEngine::MXP_CloseOpenTags(bool closeAll)
             return;
         }
 
+        // Original MXP_CloseAllTags (mxpClose.cpp:396-397): if tag is protected from
+        // reset (bNoReset), STOP closing entirely — leave it and all remaining tags in
+        // the list. Do not skip-and-continue.
+        if (closeAll && tag->bNoReset) {
+            return;
+        }
+
+        // Log warning for each tag being closed (original: mxpClose.cpp:378-380 / 399-401)
+        if (closeAll) {
+            qCWarning(lcMXP) << "<reset> closure of MXP tag: <" << tag->strName << ">";
+        } else {
+            qCWarning(lcMXP) << "End-of-line closure of open MXP tag: <" << tag->strName << ">";
+        }
+
         // Move last element out and pop
         auto owned = std::move(m_activeTagList.back());
         m_activeTagList.pop_back();
 
-        // Execute end action
-        if (!owned->bNoReset) {
-            MXP_EndAction(owned->iAction);
-        }
+        MXP_EndAction(owned->iAction);
     }
 }
 

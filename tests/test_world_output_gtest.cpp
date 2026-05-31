@@ -556,3 +556,90 @@ TEST_F(WorldOutputTest, Hyperlink_AddsTextToOutput)
     EXPECT_TRUE(foundNorth)
         << "Hyperlink text '[North]' should appear somewhere in the output buffer";
 }
+
+// ========== 17. Palette color resolution for Note/Tell/Hyperlink (M18) ==========
+
+// In palette mode (m_bNotesInRGB == false) with a valid note_text_colour index,
+// Note() and Tell() must use the custom palette color, not hardcoded white.
+// Original: methods_noting.cpp:60-67 (outstanding-lines path), :100-128 (inline path).
+TEST_F(WorldOutputTest, Tell_UsesPaletteColorInNonRgbMode)
+{
+    // Set up palette mode with custom cyan color at index 3
+    const QRgb customFore = qRgb(0, 255, 255); // cyan
+    const QRgb customBack = qRgb(0, 0, 128);   // dark blue
+    doc->m_bNotesInRGB = false;
+    doc->m_colors.note_text_colour = 3;
+    doc->m_colors.custom_text[3] = customFore;
+    doc->m_colors.custom_back[3] = customBack;
+
+    executeLua("world.Tell('palette')");
+    executeLua("world.Note('')"); // flush to line list
+
+    // Find a committed line containing "palette" and check its style foreground
+    QRgb foundFore = 0;
+    for (auto& linePtr : doc->m_lineList) {
+        QString text = QString::fromUtf8(linePtr->text().data(), linePtr->text().size());
+        if (text.contains("palette")) {
+            for (auto& style : linePtr->styleList) {
+                if (style->iLength > 0) {
+                    foundFore = style->iForeColour;
+                    break;
+                }
+            }
+            break;
+        }
+    }
+    EXPECT_NE(foundFore, qRgb(255, 255, 255))
+        << "Tell in palette mode must not use hardcoded white";
+    EXPECT_EQ(foundFore, customFore)
+        << "Tell in palette mode should use custom_text[note_text_colour]";
+}
+
+TEST_F(WorldOutputTest, Note_UsesPaletteColorInNonRgbMode)
+{
+    const QRgb customFore = qRgb(255, 128, 0); // orange
+    doc->m_bNotesInRGB = false;
+    doc->m_colors.note_text_colour = 1;
+    doc->m_colors.custom_text[1] = customFore;
+    doc->m_colors.custom_back[1] = qRgb(0, 0, 0);
+
+    executeLua("world.Note('paletnote')");
+
+    QRgb foundFore = 0;
+    for (auto& linePtr : doc->m_lineList) {
+        QString text = QString::fromUtf8(linePtr->text().data(), linePtr->text().size());
+        if (text.contains("paletnote")) {
+            for (auto& style : linePtr->styleList) {
+                if (style->iLength > 0) {
+                    foundFore = style->iForeColour;
+                    break;
+                }
+            }
+            break;
+        }
+    }
+    EXPECT_EQ(foundFore, customFore)
+        << "Note() in palette mode should resolve foreground from custom_text[note_text_colour]";
+}
+
+// ========== 18. NoteColourName preserves value on unknown color (M71) ==========
+
+// Original SetColour (mxputils.cpp:342-343) returns true without writing iColour
+// when the name is not found.  NoteColourName must mirror this: if either argument
+// is an unrecognised name the corresponding stored color must remain unchanged.
+TEST_F(WorldOutputTest, NoteColourName_UnknownNamePreservesColor)
+{
+    // Call NoteColourName with an unknown foreground name; back is valid
+    executeLua(R"(
+        world.NoteColourRGB(0x0000FF, 0x00FF00)
+        world.NoteColourName('__no_such_colour__', 'black')
+        test_fore = world.GetNoteColourFore()
+        test_back = world.GetNoteColourBack()
+    )");
+    // Foreground must be preserved (0x0000FF stored, returned masked to 24-bit = 0xFF = 255).
+    // Back must be black: BGR(0,0,0) = 0x000000, masked to 24-bit = 0.
+    EXPECT_EQ(getGlobalInt("test_fore"), 0x0000FF)
+        << "NoteColourName: unknown foreground name must leave fore unchanged";
+    EXPECT_EQ(getGlobalInt("test_back"), 0)
+        << "NoteColourName: valid 'black' should be stored as black (BGR 0)";
+}

@@ -157,15 +157,18 @@ void WorldDocument::sendTo(SendTo iWhere, const QString& strSendText, bool omit_
             break;
 
         // ========== eSendToExecute: Re-parse as command ==========
-        // Original: doc.cpp
-        case eSendToExecute:
+        // Original: doc.cpp:6314-6325
+        case eSendToExecute: {
             // Re-parse the text as a command, which can trigger:
             // - Alias matching and expansion
             // - Command stacking (multiple commands separated by delimiter)
             // - Speedwalk expansion
-            // Note: omit_from_log flag not currently honored by Execute()
-            Execute(strSendText);
+            // The original calls Execute() without adding to command history.
+            // History is only added in the UI layer (sendvw.cpp:714) for user-typed
+            // commands, never for trigger/alias output re-executed here.
+            Execute(strSendText, /*allowScriptPrefix=*/true, /*addHistory=*/false);
             break;
+        }
 
         // ========== eSendToSpeedwalk: Expand speedwalk and send to MUD ==========
         // Original: doc.cpp:6335-6351 — evaluates, checks for errors, sends via SendMsg

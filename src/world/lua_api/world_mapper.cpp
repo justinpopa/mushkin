@@ -268,18 +268,18 @@ int L_GetMappingString(lua_State* L)
     int i = 0;
     int total = list.size();
 
-    // Helper lambda: flush a direction run into result
+    // Helper lambda: flush a direction run into result.
+    // Multi-char directions are always wrapped in parentheses (original behavior).
     auto flushRun = [&](const QString& item, int run) {
         if (run <= 0)
             return;
+        // Wrap multi-char directions in parentheses regardless of run count.
+        const QString token = (item.size() > 1) ? (QChar('(') + item + QChar(')')) : item;
         if (run == 1) {
-            result += item + QChar(' ');
-        } else if (item.size() == 1) {
-            // Single-char direction: "3n "
-            result += QString::number(run) + item + QChar(' ');
+            result += token + QChar(' ');
         } else {
-            // Multi-char direction (ne/nw/se/sw): "2(ne) "
-            result += QString::number(run) + QChar('(') + item + QChar(')') + QChar(' ');
+            // "3n " or "2(ne) "
+            result += QString::number(run) + token + QChar(' ');
         }
     };
 

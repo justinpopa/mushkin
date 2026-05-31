@@ -4,11 +4,16 @@
  *
  * Tests plugin state persistence including:
  * - Variable saving/loading (label, contents)
- * - Array saving/loading (nested map structure)
  * - OnPluginSaveState callback execution
  * - m_bSaveState flag behavior
  * - File format verification
  * - Multiple save/load cycles
+ *
+ * Parity note: original MUSHclient (plugins.cpp:809) saves only the
+ * <variables> section to the plugin state file via Save_World_XML with the
+ * XML_VARIABLES flag. Plugin arrays (m_Arrays) are in-memory scripting state
+ * that the original discards on unload and never persists, so SaveState() must
+ * NOT emit an <arrays> section.
  */
 
 #include "../src/automation/plugin.h"
@@ -147,8 +152,9 @@ TEST_F(PluginStateTest, SaveStateWithVariables)
     EXPECT_TRUE(QFile::exists(stateFilePath)) << "State file should be created";
 }
 
-// Test 3: Save state with arrays
-TEST_F(PluginStateTest, SaveStateWithArrays)
+// Test 3: Arrays present in memory are NOT persisted to the state file (parity
+// with original MUSHclient, which saves only <variables>).
+TEST_F(PluginStateTest, SaveStateDoesNotPersistArrays)
 {
     // Create arrays
     QMap<QString, QString> inventory;
@@ -164,15 +170,28 @@ TEST_F(PluginStateTest, SaveStateWithArrays)
     plugin->m_Arrays["stats"] = stats;
 
     EXPECT_EQ(plugin->m_Arrays.size(), 2) << "Should have 2 arrays";
-    EXPECT_EQ(plugin->m_Arrays["inventory"].size(), 3) << "inventory should have 3 items";
-    EXPECT_EQ(plugin->m_Arrays["stats"].size(), 3) << "stats should have 3 items";
 
     // Save state
     auto saveResult = plugin->SaveState();
     EXPECT_TRUE(saveResult.has_value()) << "SaveState() should return true";
 
     // Verify state file was created
-    EXPECT_TRUE(QFile::exists(stateFilePath)) << "State file should be created";
+    ASSERT_TRUE(QFile::exists(stateFilePath)) << "State file should be created";
+
+    // Verify the state file contains NO <arrays> or <array> elements.
+    QFile xmlFile(stateFilePath);
+    ASSERT_TRUE(xmlFile.open(QIODevice::ReadOnly | QIODevice::Text));
+    QXmlStreamReader xml(&xmlFile);
+    bool foundArrays = false;
+    while (!xml.atEnd()) {
+        xml.readNext();
+        if (xml.isStartElement() &&
+            (xml.name() == QLatin1String("arrays") || xml.name() == QLatin1String("array"))) {
+            foundArrays = true;
+        }
+    }
+    xmlFile.close();
+    EXPECT_FALSE(foundArrays) << "State file must not contain an <arrays> section (parity)";
 }
 
 // Test 4: OnPluginSaveState callback is called
@@ -209,7 +228,7 @@ TEST_F(PluginStateTest, VerifyXMLStructure)
     var3->contents = "value3";
     plugin->m_VariableMap["test_var3"] = std::move(var3);
 
-    // Create arrays
+    // Create arrays (these must NOT appear in the saved state file)
     QMap<QString, QString> array1;
     array1["key1"] = "val1";
     plugin->m_Arrays["array1"] = array1;
@@ -258,9 +277,10 @@ TEST_F(PluginStateTest, VerifyXMLStructure)
 
     EXPECT_TRUE(foundMuclient) << "XML should have <muclient> element";
     EXPECT_TRUE(foundVariables) << "XML should have <variables> element";
-    EXPECT_TRUE(foundArrays) << "XML should have <arrays> element";
+    // Parity: original MUSHclient never writes arrays to the plugin state file.
+    EXPECT_FALSE(foundArrays) << "XML should NOT have an <arrays> element (parity)";
     EXPECT_EQ(variableCount, 3) << "Expected 3 variables in XML";
-    EXPECT_EQ(arrayCount, 2) << "Expected 2 arrays in XML";
+    EXPECT_EQ(arrayCount, 0) << "Expected 0 arrays in XML (arrays are not persisted)";
 }
 
 // Test 6: Load state restores variables
@@ -309,8 +329,9 @@ TEST_F(PluginStateTest, LoadStateRestoresVariables)
         << "guild value should be correct";
 }
 
-// Test 7: Load state restores arrays
-TEST_F(PluginStateTest, LoadStateRestoresArrays)
+// Test 7: Arrays do not survive a save/load cycle through the state file
+// (parity: original MUSHclient never persists plugin arrays).
+TEST_F(PluginStateTest, LoadStateDoesNotRestoreArrays)
 {
     // Create and save arrays
     QMap<QString, QString> inventory;
@@ -335,23 +356,8 @@ TEST_F(PluginStateTest, LoadStateRestoresArrays)
     auto loadResult = plugin->LoadState();
     EXPECT_TRUE(loadResult.has_value()) << "LoadState() should return true";
 
-    // Verify arrays were restored
-    EXPECT_EQ(plugin->m_Arrays.size(), 2) << "Should have 2 arrays after loading";
-    EXPECT_TRUE(plugin->m_Arrays.contains("inventory")) << "Should have inventory array";
-    EXPECT_TRUE(plugin->m_Arrays.contains("stats")) << "Should have stats array";
-
-    QMap<QString, QString> loadedInventory = plugin->m_Arrays["inventory"];
-    EXPECT_EQ(loadedInventory["sword"], QString("Steel Longsword"))
-        << "inventory.sword should be correct";
-    EXPECT_EQ(loadedInventory["shield"], QString("Oak Shield"))
-        << "inventory.shield should be correct";
-    EXPECT_EQ(loadedInventory["potion"], QString("Healing Potion"))
-        << "inventory.potion should be correct";
-
-    QMap<QString, QString> loadedStats = plugin->m_Arrays["stats"];
-    EXPECT_EQ(loadedStats["strength"], QString("18")) << "stats.strength should be correct";
-    EXPECT_EQ(loadedStats["wisdom"], QString("20")) << "stats.wisdom should be correct";
-    EXPECT_EQ(loadedStats["dexterity"], QString("14")) << "stats.dexterity should be correct";
+    // Arrays were never written to the state file, so nothing is restored.
+    EXPECT_EQ(plugin->m_Arrays.size(), 0) << "Arrays must not be restored from the state file";
 }
 
 // Test 8: save_state=false prevents file creation
@@ -435,7 +441,7 @@ TEST_F(PluginStateTest, MultipleSaveLoadCycles)
         << "Multiple saves should overwrite, keeping latest value";
 }
 
-// Test 12: Complex state with variables and arrays
+// Test 12: Complex state — variables round-trip, arrays do not (parity).
 TEST_F(PluginStateTest, ComplexStateSaveLoad)
 {
     // Create complex state
@@ -469,17 +475,12 @@ TEST_F(PluginStateTest, ComplexStateSaveLoad)
     // Load
     EXPECT_TRUE(plugin->LoadState().has_value());
 
-    // Verify everything restored
+    // Variables are restored; arrays are not persisted by the original.
     EXPECT_EQ(plugin->m_VariableMap.size(), 2) << "Should have 2 variables";
-    EXPECT_EQ(plugin->m_Arrays.size(), 2) << "Should have 2 arrays";
+    EXPECT_EQ(plugin->m_Arrays.size(), 0) << "Arrays must not be restored from the state file";
 
     EXPECT_EQ(plugin->m_VariableMap["var1"]->contents, QString("value1"))
         << "var1 should be correct";
     EXPECT_EQ(plugin->m_VariableMap["var2"]->contents, QString("value2"))
         << "var2 should be correct";
-
-    EXPECT_EQ(plugin->m_Arrays["array1"]["a"], QString("1")) << "array1.a should be correct";
-    EXPECT_EQ(plugin->m_Arrays["array1"]["b"], QString("2")) << "array1.b should be correct";
-    EXPECT_EQ(plugin->m_Arrays["array2"]["x"], QString("10")) << "array2.x should be correct";
-    EXPECT_EQ(plugin->m_Arrays["array2"]["y"], QString("20")) << "array2.y should be correct";
 }

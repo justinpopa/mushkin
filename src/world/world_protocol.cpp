@@ -154,25 +154,33 @@ void WorldDocument::ProcessIncomingByte(unsigned char c)
             } else if (c == '<' && m_mxpEngine->m_bMXP && (MXP_Open() || MXP_Secure())) {
                 m_mxpEngine->m_strMXPstring.clear();
                 phase = Phase::HAVE_MXP_ELEMENT;
-            } else if (c == '&' && m_mxpEngine->m_bMXP && (MXP_Open() || MXP_Secure())) {
-                m_mxpEngine->m_strMXPstring.clear();
-                phase = Phase::HAVE_MXP_ENTITY;
-            } else if (c == '\n') {
-                // Original: doc.cpp:2071-2076 — at end of line, close any open MXP
-                // tags and revert to the default line-mode. flags is always 0 on the
-                // socket path (no NOTE_OR_COMMAND), so the original guard reduces to
-                // MXP active and not in Pueblo mode.
-                if (isMXPActive() && !isPuebloActive()) {
-                    if (!MXP_Open()) {
-                        MXP_CloseOpenTags(); // close all open tags
-                    }
-                    MXP_mode_change(-1); // switch to default mode
+            } else {
+                // Original: doc.cpp:1997-2001 — for any non-'<' character when MXP is
+                // active, cancel secure-once mode immediately (we *must* get an opening
+                // tag right away in secure_once; a non-tag char means that window passed).
+                if (m_mxpEngine->m_bMXP) {
+                    MXP_Restore_Mode();
                 }
-                StartNewLine(true, 0);
-            } else if (c == '\r') {
-                // Carriage return without LF - ignore
-            } else if (c >= 32 || c == '\t') {
-                AddToLine(c);
+                if (c == '&' && m_mxpEngine->m_bMXP && (MXP_Open() || MXP_Secure())) {
+                    m_mxpEngine->m_strMXPstring.clear();
+                    phase = Phase::HAVE_MXP_ENTITY;
+                } else if (c == '\n') {
+                    // Original: doc.cpp:2071-2076 — at end of line, close any open MXP
+                    // tags and revert to the default line-mode. flags is always 0 on the
+                    // socket path (no NOTE_OR_COMMAND), so the original guard reduces to
+                    // MXP active and not in Pueblo mode.
+                    if (isMXPActive() && !isPuebloActive()) {
+                        if (!MXP_Open()) {
+                            MXP_CloseOpenTags(); // close all open tags
+                        }
+                        MXP_mode_change(-1); // switch to default mode
+                    }
+                    StartNewLine(true, 0);
+                } else if (c == '\r') {
+                    // Carriage return without LF - ignore
+                } else if (c >= 32 || c == '\t') {
+                    AddToLine(c);
+                }
             }
             break;
 

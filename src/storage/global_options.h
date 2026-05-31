@@ -546,40 +546,52 @@ class GlobalOptions {
     // ========================================================================
 
     // Directories
-    QString defaultLogFileDirectory() const
-    {
-        return m_defaultLogFileDirectory;
-    }
+    //
+    // Getters return the path resolved to an absolute directory (mirroring the
+    // original's Make_Absolute_Path applied at point-of-use). The members hold the
+    // RAW string as stored in the database so save() round-trips relative defaults
+    // such as "./logs/" instead of writing back a machine-specific absolute path.
+    QString defaultLogFileDirectory() const;
     void setDefaultLogFileDirectory(const QString& v)
     {
         m_defaultLogFileDirectory = v;
     }
 
-    QString defaultWorldFileDirectory() const
-    {
-        return m_defaultWorldFileDirectory;
-    }
+    QString defaultWorldFileDirectory() const;
     void setDefaultWorldFileDirectory(const QString& v)
     {
         m_defaultWorldFileDirectory = v;
     }
 
-    QString pluginsDirectory() const
-    {
-        return m_pluginsDirectory;
-    }
+    QString pluginsDirectory() const;
     void setPluginsDirectory(const QString& v)
     {
         m_pluginsDirectory = v;
     }
 
-    QString stateFilesDirectory() const
-    {
-        return m_stateFilesDirectory;
-    }
+    QString stateFilesDirectory() const;
     void setStateFilesDirectory(const QString& v)
     {
         m_stateFilesDirectory = v;
+    }
+
+    // Raw (unresolved) directory strings as persisted to the database. Used by
+    // save() and exposed for tests verifying round-trip behaviour.
+    QString rawDefaultLogFileDirectory() const
+    {
+        return m_defaultLogFileDirectory;
+    }
+    QString rawDefaultWorldFileDirectory() const
+    {
+        return m_defaultWorldFileDirectory;
+    }
+    QString rawPluginsDirectory() const
+    {
+        return m_pluginsDirectory;
+    }
+    QString rawStateFilesDirectory() const
+    {
+        return m_stateFilesDirectory;
     }
 
     // Default files

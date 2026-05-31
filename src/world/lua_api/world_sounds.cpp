@@ -12,6 +12,7 @@
 #include <QDir>
 #include <QFile>
 #include <QStandardPaths>
+#include <QUuid>
 
 /**
  * world.PlaySound(buffer, filename, loop, volume, pan)
@@ -147,32 +148,42 @@ int L_PlaySoundMemory(lua_State* L)
     }
 
     // Original: lua_methods.cpp:4510-4527 — calls PlaySoundHelper with memory buffer
-    // buffer = arg 1, data = arg 2 (string), loop = arg 3, volume = arg 4, pan = arg 5
-    qint16 buffer = static_cast<qint16>(luaL_optinteger(L, 1, 0));
+    // buffer = arg 1 (required), data = arg 2 (string, required), loop = arg 3, volume = arg 4, pan
+    // = arg 5 my_checknumber(L,1) raises a Lua type error if arg 1 is nil or non-numeric.
+    qint16 buffer = static_cast<qint16>(luaL_checkinteger(L, 1));
     size_t dataLen = 0;
     const char* data = luaL_checklstring(L, 2, &dataLen);
     bool loop = lua_toboolean(L, 3);
     double volume = luaL_optnumber(L, 4, 0.0); // 0 = full volume
     double pan = luaL_optnumber(L, 5, 0.0);    // 0 = center
 
+    // Original methods_sounds.cpp:200-201 — mmioOpen failure (empty/invalid buffer) → eFileNotFound
     if (!data || dataLen == 0) {
-        return luaReturn(L, eCannotPlaySound);
+        return luaReturn(L, eFileNotFound);
     }
 
-    // Write memory buffer to a unique temp file (avoids race condition with concurrent calls)
-    // Qt Multimedia doesn't support raw memory buffer playback directly
+    // Write memory buffer to a uniquely-named temp file.
+    // The original passed memory directly to mmioOpen(MMIO_MEM) which is Windows-only.
+    // Qt Multimedia requires a file path, so we write to a temp file and delete it after play.
+    // Use a UUID suffix so concurrent calls on the same buffer slot don't collide.
     QString tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
-    QString tempPath = tempDir + QString("/mushkin_sound_mem_%1.wav").arg(buffer);
+    QString uid = QUuid::createUuid().toString(QUuid::WithoutBraces).left(8);
+    QString tempPath = tempDir + QString("/mushkin_sound_mem_%1_%2.wav").arg(buffer).arg(uid);
 
     QFile tempFile(tempPath);
     if (!tempFile.open(QIODevice::WriteOnly)) {
-        return luaReturn(L, eCannotPlaySound);
+        // Original: mmioOpen failure → eFileNotFound (methods_sounds.cpp:200-201)
+        return luaReturn(L, eFileNotFound);
     }
     tempFile.write(data, static_cast<qint64>(dataLen));
     tempFile.close();
 
     // Play with all parameters (buffer, loop, volume, pan)
     qint32 result = pDoc->m_soundManager->playSound(buffer, tempPath, loop, volume, pan);
+
+    // Clean up the temp file — original played from memory directly; leave no files on disk.
+    QFile::remove(tempPath);
+
     return luaReturn(L, result);
 }
 

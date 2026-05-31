@@ -100,9 +100,13 @@ int L_WindowCreate(lua_State* L)
     winPtr->setShow(false);
 
     // Clear hotspots unless KEEP_HOTSPOTS flag is set
-    // Original: miniwindow.cpp:205-206
+    // Original: miniwindow.cpp:205-206 — calls DeleteAllHotspots(), which clears
+    // hotspots, mouseOverHotspot, mouseDownHotspot, and callbackPlugin.
     if ((flags & MINIWINDOW_KEEP_HOTSPOTS) == 0) {
         winPtr->hotspots.clear();
+        winPtr->mouseOverHotspot.clear();
+        winPtr->mouseDownHotspot.clear();
+        winPtr->callbackPlugin.clear();
     }
 
     // Create fresh pixmap if dimensions provided (allow 0x0 for initial font setup)
@@ -112,10 +116,13 @@ int L_WindowCreate(lua_State* L)
         winPtr->Resize(width, height, bgColor);
     }
 
-    // Track creating plugin
+    // Track creating plugin.
+    // Original: methods_miniwindows.cpp:130-132 — always erases first, then
+    // sets only when called from a plugin context. callbackPlugin is NEVER set
+    // here; it is established exclusively via AddHotspot.
+    winPtr->setCreatingPlugin(QString{});
     if (pDoc->m_CurrentPlugin) {
         winPtr->setCreatingPlugin(pDoc->m_CurrentPlugin->m_strID);
-        winPtr->setCallbackPlugin(pDoc->m_CurrentPlugin->m_strID);
     }
 
     // Add to rendering order list

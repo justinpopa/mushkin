@@ -194,8 +194,11 @@ void register_lua_constants(lua_State* L)
     lua_pushstring(L, "The world is closed");
     lua_rawseti(L, -2, eWorldClosed);
 
-    lua_pushstring(L, "No name specified");
-    lua_rawseti(L, -2, 2); // eNoNameSpecified
+    lua_pushstring(L, "No name has been specified where one is required");
+    lua_rawseti(L, -2, eNoNameSpecified);
+
+    lua_pushstring(L, "The sound file could not be played");
+    lua_rawseti(L, -2, eCannotPlaySound);
 
     lua_pushstring(L, "Could not open file");
     lua_rawseti(L, -2, eCouldNotOpenFile);
@@ -215,11 +218,23 @@ void register_lua_constants(lua_State* L)
     lua_pushstring(L, "Trigger already exists");
     lua_rawseti(L, -2, eTriggerAlreadyExists);
 
+    lua_pushstring(L, "The trigger \"match\" string cannot be empty");
+    lua_rawseti(L, -2, eTriggerCannotBeEmpty);
+
+    lua_pushstring(L, "The name of this object is invalid");
+    lua_rawseti(L, -2, eInvalidObjectLabel);
+
+    lua_pushstring(L, "Script name is not in the script file");
+    lua_rawseti(L, -2, eScriptNameNotLocated);
+
     lua_pushstring(L, "Alias not found");
     lua_rawseti(L, -2, eAliasNotFound);
 
     lua_pushstring(L, "Alias already exists");
     lua_rawseti(L, -2, eAliasAlreadyExists);
+
+    lua_pushstring(L, "The alias \"match\" string cannot be empty");
+    lua_rawseti(L, -2, eAliasCannotBeEmpty);
 
     lua_pushstring(L, "Timer not found");
     lua_rawseti(L, -2, eTimerNotFound);
@@ -230,55 +245,151 @@ void register_lua_constants(lua_State* L)
     lua_pushstring(L, "Time invalid");
     lua_rawseti(L, -2, eTimeInvalid);
 
-    lua_pushstring(L, "Variable not found");
-    lua_rawseti(L, -2, 30); // eVariableNotFound
+    lua_pushstring(L, "Attempt to delete a variable that does not exist");
+    lua_rawseti(L, -2, eVariableNotFound);
 
-    lua_pushstring(L, "Bad parameter");
-    lua_rawseti(L, -2, eBadParameter);
+    lua_pushstring(L, "Attempt to use SetCommand with a non-empty command window");
+    lua_rawseti(L, -2, eCommandNotEmpty);
+
+    lua_pushstring(L, "Bad regular expression syntax");
+    lua_rawseti(L, -2, eBadRegularExpression);
+
+    lua_pushstring(L, "Direction given to AddToMapper is invalid");
+    lua_rawseti(L, -2, eBadMapItem);
+
+    lua_pushstring(L, "No items in mapper");
+    lua_rawseti(L, -2, eNoMapItems);
+
+    lua_pushstring(L, "Option name not found");
+    lua_rawseti(L, -2, eUnknownOption);
+
+    lua_pushstring(L, "New value for option is out of range");
+    lua_rawseti(L, -2, eOptionOutOfRange);
+
+    lua_pushstring(L, "Trigger sequence value invalid");
+    lua_rawseti(L, -2, eTriggerSequenceOutOfRange);
+
+    lua_pushstring(L, "Where to send trigger text to is invalid");
+    lua_rawseti(L, -2, eTriggerSendToInvalid);
+
+    lua_pushstring(L, "Trigger label not specified/invalid for 'send to variable'");
+    lua_rawseti(L, -2, eTriggerLabelNotSpecified);
+
+    lua_pushstring(L, "File name specified for plugin not found");
+    lua_rawseti(L, -2, ePluginFileNotFound);
+
+    lua_pushstring(L, "There was a parsing or other problem loading the plugin");
+    lua_rawseti(L, -2, eProblemsLoadingPlugin);
+
+    lua_pushstring(L, "Plugin is not allowed to set this option");
+    lua_rawseti(L, -2, ePluginCannotSetOption);
+
+    lua_pushstring(L, "Plugin is not allowed to get this option");
+    lua_rawseti(L, -2, ePluginCannotGetOption);
 
     lua_pushstring(L, "No such plugin");
     lua_rawseti(L, -2, eNoSuchPlugin);
 
-    lua_pushstring(L, "Plugin is disabled");
-    lua_rawseti(L, -2, ePluginDisabled);
-
-    lua_pushstring(L, "No such routine");
-    lua_rawseti(L, -2, eNoSuchRoutine);
-
-    lua_pushstring(L, "Error calling plugin routine");
-    lua_rawseti(L, -2, eErrorCallingPluginRoutine);
-
-    lua_pushstring(L, "Plugin file not found");
-    lua_rawseti(L, -2, ePluginFileNotFound);
-
-    lua_pushstring(L, "Problems loading plugin");
-    lua_rawseti(L, -2, eProblemsLoadingPlugin);
-
-    lua_pushstring(L, "Not a plugin");
+    lua_pushstring(L, "Only a plugin can do this");
     lua_rawseti(L, -2, eNotAPlugin);
 
+    lua_pushstring(L, "Plugin does not support that subroutine (subroutine not in script)");
+    lua_rawseti(L, -2, eNoSuchRoutine);
+
     // M189: error message table indexed by numeric code; use 30037 to match original
-    lua_pushstring(L, "Plugin could not save state");
-    lua_rawseti(L, -2, ePluginDoesNotSaveState); // intentionally 30037 to match original
+    lua_pushstring(L, "Plugin does not support saving state");
+    lua_rawseti(L, -2, ePluginDoesNotSaveState); // intentionally 30037 to match original (duplicate
+                                                 // key in original)
 
-    lua_pushstring(L, "Array already exists");
-    lua_rawseti(L, -2, eArrayAlreadyExists);
+    lua_pushstring(L, "Plugin could not save state (eg. no state directory)");
+    lua_rawseti(L, -2, ePluginCouldNotSaveState);
 
-    lua_pushstring(L, "Array does not exist");
-    lua_rawseti(L, -2, eArrayDoesNotExist);
+    lua_pushstring(L, "Plugin is currently disabled");
+    lua_rawseti(L, -2, ePluginDisabled);
 
-    lua_pushstring(L, "Item in use");
-    lua_rawseti(L, -2, eItemInUse);
+    lua_pushstring(L, "Could not call plugin routine");
+    lua_rawseti(L, -2, eErrorCallingPluginRoutine);
 
-    // Miniwindow error descriptions
-    lua_pushstring(L, "No such window");
-    lua_rawseti(L, -2, eNoSuchWindow);
+    lua_pushstring(L, "Calls to \"Execute\" nested too deeply");
+    lua_rawseti(L, -2, eCommandsNestedTooDeeply);
 
-    lua_pushstring(L, "File not found");
+    lua_pushstring(L, "General problem with a parameter to a script call");
+    lua_rawseti(L, -2, eBadParameter);
+
+    lua_pushstring(L, "Cannot get (text from the) clipboard");
+    lua_rawseti(L, -2, eClipboardEmpty);
+
+    lua_pushstring(L, "Cannot open the specified file");
     lua_rawseti(L, -2, eFileNotFound);
 
-    lua_pushstring(L, "Unable to load image");
+    lua_pushstring(L, "Already transferring a file");
+    lua_rawseti(L, -2, eAlreadyTransferringFile);
+
+    lua_pushstring(L, "Not transferring a file");
+    lua_rawseti(L, -2, eNotTransferringFile);
+
+    lua_pushstring(L, "There is not a command of that name");
+    lua_rawseti(L, -2, eNoSuchCommand);
+
+    lua_pushstring(L, "That array already exists");
+    lua_rawseti(L, -2, eArrayAlreadyExists);
+
+    lua_pushstring(L, "That array does not exist");
+    lua_rawseti(L, -2, eArrayDoesNotExist);
+
+    lua_pushstring(L, "Values to be imported into array are not in pairs");
+    lua_rawseti(L, -2, eArrayNotEvenNumberOfValues);
+
+    lua_pushstring(L, "Import succeeded, however some values were overwritten");
+    lua_rawseti(L, -2, eImportedWithDuplicates);
+
+    lua_pushstring(L, "Import/export delimiter must be a single character, other than backslash");
+    lua_rawseti(L, -2, eBadDelimiter);
+
+    lua_pushstring(L, "Array element set, existing value overwritten");
+    lua_rawseti(L, -2, eSetReplacingExistingValue);
+
+    lua_pushstring(L, "Array key does not exist");
+    lua_rawseti(L, -2, eKeyDoesNotExist);
+
+    lua_pushstring(L, "Cannot import because cannot find unused temporary character");
+    lua_rawseti(L, -2, eCannotImport);
+
+    lua_pushstring(L, "Cannot delete trigger/alias/timer because it is executing a script");
+    lua_rawseti(L, -2, eItemInUse);
+
+    lua_pushstring(L, "Spell checker is not active");
+    lua_rawseti(L, -2, eSpellCheckNotActive);
+
+    lua_pushstring(L, "Cannot create requested font");
+    lua_rawseti(L, -2, eCannotAddFont);
+
+    lua_pushstring(L, "Invalid settings for pen parameter");
+    lua_rawseti(L, -2, ePenStyleNotValid);
+
+    lua_pushstring(L, "Bitmap image could not be loaded");
     lua_rawseti(L, -2, eUnableToLoadImage);
+
+    lua_pushstring(L, "Image has not been loaded into window");
+    lua_rawseti(L, -2, eImageNotInstalled);
+
+    lua_pushstring(L, "Number of points supplied is incorrect");
+    lua_rawseti(L, -2, eInvalidNumberOfPoints);
+
+    lua_pushstring(L, "Point is not numeric");
+    lua_rawseti(L, -2, eInvalidPoint);
+
+    lua_pushstring(L, "Hotspot processing must all be in same plugin");
+    lua_rawseti(L, -2, eHotspotPluginChanged);
+
+    lua_pushstring(L, "Hotspot has not been defined for this window");
+    lua_rawseti(L, -2, eHotspotNotInstalled);
+
+    lua_pushstring(L, "Requested miniwindow does not exist");
+    lua_rawseti(L, -2, eNoSuchWindow);
+
+    lua_pushstring(L, "Invalid settings for brush parameter");
+    lua_rawseti(L, -2, eBrushStyleNotValid);
 
     // Set as global "error_desc"
     lua_setglobal(L, "error_desc");
@@ -590,7 +701,7 @@ void register_lua_constants(lua_State* L)
     lua_pushnumber(L, MINIWINDOW_KEEP_HOTSPOTS);
     lua_setfield(L, -2, "keep_hotspots");
 
-    // RectOp actions
+    // RectOp actions (WindowRectOp argument 2)
     lua_pushnumber(L, 1);
     lua_setfield(L, -2, "rect_frame");
 
@@ -600,8 +711,73 @@ void register_lua_constants(lua_State* L)
     lua_pushnumber(L, 3);
     lua_setfield(L, -2, "rect_invert");
 
-    lua_pushnumber(L, 5);
+    lua_pushnumber(L, 4);
     lua_setfield(L, -2, "rect_3d_rect");
+
+    lua_pushnumber(L, 5);
+    lua_setfield(L, -2, "rect_draw_edge");
+
+    lua_pushnumber(L, 6);
+    lua_setfield(L, -2, "rect_flood_fill_border");
+
+    lua_pushnumber(L, 7);
+    lua_setfield(L, -2, "rect_flood_fill_surface");
+
+    // WindowRectOp colour1 parameter (argument 7) for rect_draw_edge (action 5)
+    // EDGE_* values matching Win32 constants
+    lua_pushnumber(L, 5); // BDR_RAISEDOUTER | BDR_RAISEDINNER
+    lua_setfield(L, -2, "rect_edge_raised");
+
+    lua_pushnumber(L, 6); // BDR_SUNKENOUTER | BDR_RAISEDINNER
+    lua_setfield(L, -2, "rect_edge_etched");
+
+    lua_pushnumber(L, 9); // BDR_RAISEDOUTER | BDR_SUNKENINNER
+    lua_setfield(L, -2, "rect_edge_bump");
+
+    lua_pushnumber(L, 10); // BDR_SUNKENOUTER | BDR_SUNKENINNER
+    lua_setfield(L, -2, "rect_edge_sunken");
+
+    // WindowRectOp colour2 parameter (argument 8) for rect_draw_edge (action 5)
+    // BF_* corner/side flags matching Win32 constants
+    lua_pushnumber(L, 0x0003); // BF_TOPLEFT
+    lua_setfield(L, -2, "rect_edge_at_top_left");
+
+    lua_pushnumber(L, 0x0006); // BF_TOPRIGHT
+    lua_setfield(L, -2, "rect_edge_at_top_right");
+
+    lua_pushnumber(L, 0x0009); // BF_BOTTOMLEFT
+    lua_setfield(L, -2, "rect_edge_at_bottom_left");
+
+    lua_pushnumber(L, 0x000C); // BF_BOTTOMRIGHT
+    lua_setfield(L, -2, "rect_edge_at_bottom_right");
+
+    lua_pushnumber(L, 0x000F); // BF_RECT
+    lua_setfield(L, -2, "rect_edge_at_all");
+
+    lua_pushnumber(L, 0x0013); // BF_DIAGONAL_ENDTOPLEFT
+    lua_setfield(L, -2, "rect_diagonal_end_top_left");
+
+    lua_pushnumber(L, 0x0016); // BF_DIAGONAL_ENDTOPRIGHT
+    lua_setfield(L, -2, "rect_diagonal_end_top_right");
+
+    lua_pushnumber(L, 0x0019); // BF_DIAGONAL_ENDBOTTOMLEFT
+    lua_setfield(L, -2, "rect_diagonal_end_bottom_left");
+
+    lua_pushnumber(L, 0x001C); // BF_DIAGONAL_ENDBOTTOMRIGHT
+    lua_setfield(L, -2, "rect_diagonal_end_bottom_right");
+
+    // WindowRectOp other colour2 flags (or in) for rect_draw_edge (action 5)
+    lua_pushnumber(L, 0x0800); // BF_MIDDLE
+    lua_setfield(L, -2, "rect_option_fill_middle");
+
+    lua_pushnumber(L, 0x1000); // BF_SOFT
+    lua_setfield(L, -2, "rect_option_softer_buttons");
+
+    lua_pushnumber(L, 0x4000); // BF_FLAT
+    lua_setfield(L, -2, "rect_option_flat_borders");
+
+    lua_pushnumber(L, 0x8000); // BF_MONO
+    lua_setfield(L, -2, "rect_option_monochrom_borders");
 
     // CircleOp actions
     lua_pushnumber(L, 1);

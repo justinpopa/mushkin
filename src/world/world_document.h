@@ -361,6 +361,16 @@ class WorldDocument : public QObject, public IWorldContext {
 
     void applyGlobalFontDefaults();
 
+    // Reload configured global default sets (colours/triggers/aliases/timers/macros)
+    // and input/output fonts into this world, gated on the world's per-set
+    // m_bUseDefault* opt-in flags. Mirrors the original
+    // CMUSHclientDoc::OnFileReloaddefaults (methods_defaults.cpp:115-170):
+    // a set is loaded only when its flag is set AND its configured file path is
+    // non-empty; fonts are re-applied (and the matching settings-changed signal
+    // emitted) under the same gating. Does NOT modify the flags. Returns the
+    // number of XML items imported across all loaded sets.
+    int reloadDefaults();
+
     // Public member variables (for direct port compatibility)
 
     // NOTE: m_pSocket is now stored inside m_connectionManager->m_pSocket.
@@ -420,7 +430,7 @@ class WorldDocument : public QObject, public IWorldContext {
         bool keep_commands_on_same_line = false; // keep commands on same line?
 
         // Text style display
-        bool show_bold = true;      // show bold in fonts?
+        bool show_bold = false;     // show bold in fonts? (original default: false)
         bool show_italic = true;    // show italic?
         bool show_underline = true; // show underline?
 
@@ -676,7 +686,7 @@ class WorldDocument : public QObject, public IWorldContext {
 
     // ========== Auto-say Settings ==========
     struct AutoSayConfig {
-        QString say_string;             // string prepended to commands (original default: empty)
+        QString say_string = "say ";    // string prepended to commands (original default: "say ")
         QString override_prefix = "-";  // prefix to bypass auto-say
         bool enabled = false;           // auto-say mode enabled?
         bool exclude_macros = false;    // skip macro/accelerator keys?
@@ -1402,6 +1412,14 @@ class WorldDocument : public QObject, public IWorldContext {
     // m_mxpEngine->Phase_MXP_*().
     void ProcessIncomingByte(unsigned char c);
 
+    // Send NAWS (Negotiate About Window Size) to the server. Forwards to the
+    // TelnetParser companion. No-op until NAWS has been negotiated and the
+    // world is connected (original: CMUSHclientDoc::SendWindowSizes).
+    void sendWindowSizes(int width)
+    {
+        m_telnetParser->sendWindowSizes(width);
+    }
+
     // MXP phase handler forwarding (called from ProcessIncomingByte, delegate to m_mxpEngine)
     void Phase_MXP_ELEMENT(unsigned char c)
     {
@@ -1466,6 +1484,12 @@ class WorldDocument : public QObject, public IWorldContext {
     bool MXP_Secure() const
     {
         return m_mxpEngine->MXP_Secure();
+    }
+    // Cancel secure-once mode when a non-tag character arrives.
+    // Original: doc.h inline MXP_Restore_Mode, called at doc.cpp:2000-2001.
+    void MXP_Restore_Mode()
+    {
+        m_mxpEngine->MXP_Restore_Mode();
     }
 
     // NOTE: SendWindowSizes moved to TelnetParser::sendWindowSizes(int width).
@@ -1586,6 +1610,14 @@ class WorldDocument : public QObject, public IWorldContext {
     void showErrorLines(int lineNumber); // Display error context around line
     void setupScriptFileWatcher();       // Set up file watcher for script file changes
 
+    // Reconcile the scripting engine after m_scripting.{enabled,filename} were
+    // changed (e.g. from the world-properties dialog). Mirrors the original
+    // CMUSHclientDoc::SavePrefsP17 (configuration.cpp:1437-1488): if the script
+    // file name changed, the old engine is torn down; if scripting is enabled
+    // and no engine exists, a new one is created and the script reloaded; cached
+    // entry-point DISPIDs are reset so the new file's handlers are rediscovered.
+    void reinitializeScripting(const QString& previousFilename, bool wasEnabled);
+
     // NOTE: onWorldConnect() and onWorldDisconnect() moved to ConnectionManager (private).
     // They are called from ConnectionManager::onConnect() and onConnectionDisconnect().
 
@@ -1662,7 +1694,8 @@ class WorldDocument : public QObject, public IWorldContext {
                               const QString& matchedText); // Execute Lua script callback
     QString replaceWildcards(const QString& text, const QVector<QString>& wildcards,
                              const QString& itemName = {},
-                             const QMap<QString, QString>& namedWildcards = {});
+                             const QMap<QString, QString>& namedWildcards = {},
+                             SendTo sendTo = eSendToWorld);
     void changeLineColors(Trigger* trigger, Line* line); // Change matched line colors
 
     // ========== Alias Matching and Execution ==========
@@ -1708,8 +1741,8 @@ class WorldDocument : public QObject, public IWorldContext {
                        const QString& value);   // Set variable (create or update)
     qint32 deleteVariable(const QString& name); // Delete variable by name
     QStringList getVariableList() const;        // Get list of all variable names
-    QString expandVariables(const QString& text,
-                            bool escapeRegex = true) const; // Expand @variable references in text
+    QString expandVariables(const QString& text, bool escapeRegex = true,
+                            bool isRegexp = true) const; // Expand @variable references in text
 
     // ========== Array Management (plugin-aware) ==========
     ArraysMap& getArrayMap();                  // Get arrays map (respects plugin context)

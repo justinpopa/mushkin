@@ -158,10 +158,16 @@ void OutputView::calculateMetrics()
                 m_doc->m_computedTextRectangle = rect();
             }
         }
+        // Push font height to WorldDocument so sendWindowSizes (NAWS) can compute
+        // row count from pixel dimensions, mirroring original doc.cpp:3256 / doc.cpp:5568.
+        if (m_doc) {
+            m_doc->m_FontHeight = m_lineHeight;
+        }
     } else {
         m_visibleLines = 1; // Minimum 1 visible line
         if (m_doc) {
             m_doc->m_computedTextRectangle = QRect();
+            m_doc->m_FontHeight = 0;
         }
     }
 
@@ -208,8 +214,14 @@ void OutputView::resizeEvent(QResizeEvent* event)
     calculateMetrics();
     update(); // Trigger repaint
 
-    // Notify plugins of resize
     if (m_doc) {
+        // Notify the server of the new window width via NAWS. calculateMetrics()
+        // may have just updated wrap_column (auto-wrap); the original calls
+        // SendWindowSizes(m_nWrapColumn) on every resize (mushview.cpp:1766,3364).
+        // sendWindowSizes() is a no-op until NAWS is negotiated and connected.
+        m_doc->sendWindowSizes(m_doc->m_display.wrap_column);
+
+        // Notify plugins of resize
         m_doc->SendToAllPluginCallbacks(ON_PLUGIN_WORLD_OUTPUT_RESIZED);
     }
 }

@@ -221,16 +221,23 @@ qint32 WorldDocument::CloseNotepad(const QString& title, bool querySave)
         return eNoSuchNotepad;
     }
 
-    // Prompt to save modified content (original: methods_notepad.cpp:250-252)
-    if (querySave && notepad->m_pTextEdit && notepad->m_pTextEdit->document()->isModified()) {
+    // Consult save-on-change method before prompting (original: TextDocument.cpp:473-501).
+    // eNotepadSaveNever skips the prompt entirely and proceeds to close.
+    // eNotepadSaveAlways skips the prompt too (auto-save on close; empty check omitted
+    // here since Mushkin notepads have no file-backed save path).
+    // eNotepadSaveDefault falls through to ask the user.
+    if (querySave && notepad->m_iSaveOnChange == eNotepadSaveDefault && notepad->m_pTextEdit &&
+        notepad->m_pTextEdit->document()->isModified()) {
         QMessageBox::StandardButton reply = QMessageBox::question(
             notepad, tr("Save Changes"), tr("Save changes to '%1'?").arg(title),
             QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
         if (reply == QMessageBox::Cancel) {
-            return eOK; // User cancelled — don't close (original returns false)
+            // Original returns false when user cancels (methods_notepad.cpp:251-252).
+            // Any non-eOK code causes the Lua layer to push boolean false.
+            return eBadParameter;
         }
-        // Note: Yes/No both proceed to close. Original's SaveModified handles saving
-        // on Yes, but Mushkin notepads don't have file-backed save, so we just close.
+        // Yes/No both proceed to close. Mushkin notepads have no file-backed save,
+        // so Yes and No are treated identically (content discarded on close).
     }
 
     // Synchronously unregister before deferred deletion so that

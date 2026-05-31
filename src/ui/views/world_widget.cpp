@@ -14,6 +14,7 @@
 #include <QLabel>
 #include <QMessageBox>
 #include <QSplitter>
+#include <QTextCursor>
 #include <QVBoxLayout>
 
 /**
@@ -162,12 +163,19 @@ void WorldWidget::setupUi()
     // Setup accelerator manager - set parent widget and connect signal
     m_document->m_acceleratorManager->setParentWidget(this);
     connect(m_document->m_acceleratorManager, &AcceleratorManager::acceleratorTriggered, this,
-            [this](const QString& action, int sendTo, const QString& pluginId) {
+            [this](const QString& action, int sendTo, const QString& pluginId,
+                   const QString& keyString) {
                 // Suppress auto-say and set action source during accelerator execution
                 // (original: sendvw.cpp:2559-2606)
                 bool savedAutoSay = m_document->m_auto_say.enabled;
                 m_document->m_auto_say.enabled = false;
-                m_document->m_iCurrentActionSource = ActionSource::eUserAccelerator;
+
+                // Keypad keys use eUserKeypad (3), regular accelerators use eUserAccelerator (4)
+                // (original: sendvw.cpp:1094 uses eUserKeypad for keypad dispatch;
+                //  sendvw.cpp:2563 uses eUserAccelerator for regular accelerators)
+                const bool isKeypad = keyString.contains(QLatin1String("Num+"));
+                m_document->m_iCurrentActionSource =
+                    isKeypad ? ActionSource::eUserKeypad : ActionSource::eUserAccelerator;
 
                 // Set plugin context if registered by a plugin (original: sendvw.cpp:2587-2606)
                 Plugin* savedPlugin = m_document->m_CurrentPlugin;
@@ -179,17 +187,48 @@ void WorldWidget::setupUi()
 
                 // Handle accelerator execution based on sendTo type
                 if (sendTo == eSendToExecute) { // 10: re-parse as command
-                    m_document->Execute(action);
+                    // Reset execution depth — accelerator-triggered commands are "hand-typed"
+                    // (original: sendvw.cpp:701 via SendCommand)
+                    m_document->m_iExecutionDepth = 0;
+                    // Do not add to history (original: SendCommand(..., FALSE) at sendvw.cpp:2567)
+                    m_document->Execute(action, /*allowScriptPrefix=*/false,
+                                        /*addHistory=*/false);
                 } else {
-                    // For other sendTo types, use sendTo() method
-                    QString output;
-                    m_document->sendTo(static_cast<SendTo>(sendTo), action, true, true,
-                                       QStringLiteral("Accelerator"), QString(), output);
+                    // Plugin existence guard: if a plugin ID was registered, only dispatch if
+                    // the plugin still exists. Stale entries from unloaded plugins are skipped.
+                    // (original: sendvw.cpp:2592-2593)
+                    if (pluginId.isEmpty() || m_document->m_CurrentPlugin != nullptr) {
+                        // Build description with key name (original: sendvw.cpp:2600
+                        // "Accelerator: %s" key)
+                        QString description = QStringLiteral("Accelerator: ") + keyString;
+                        QString output;
+                        m_document->sendTo(static_cast<SendTo>(sendTo), action, true, true,
+                                           description, QString(), output);
+
+                        // Display any extra output generated (original: sendvw.cpp:2608-2611)
+                        if (!output.isEmpty()) {
+                            m_document->note(output);
+                        }
+                    }
                 }
 
                 // Restore plugin context and auto-say
                 m_document->m_CurrentPlugin = savedPlugin;
                 m_document->m_auto_say.enabled = savedAutoSay;
+
+                // Reset action source after dispatch (original: sendvw.cpp:2615)
+                m_document->m_iCurrentActionSource = ActionSource::eUnknownActionSource;
+            });
+
+    // When keypad is disabled, numpad keys insert their literal character into
+    // the input line (original sendvw.cpp:1099 — GetEditCtrl().ReplaceSel).
+    connect(m_document->m_acceleratorManager, &AcceleratorManager::keypadLiteralInsert, this,
+            [this](const QString& literal) {
+                if (m_inputView) {
+                    QTextCursor cursor = m_inputView->textCursor();
+                    cursor.insertText(literal);
+                    m_inputView->setTextCursor(cursor);
+                }
             });
 
     // Focus on input
@@ -540,6 +579,10 @@ void WorldWidget::sendCommand()
                 // (original sendvw.cpp)
                 m_document->m_iExecutionDepth = 0; // Hand-typed command, depth zero
                 QString sayCommand = m_document->m_auto_say.say_string + line;
+                // Apply backslash escape sequences if enabled (original: sendvw.cpp:676-678)
+                if (m_document->m_bTranslateBackslashSequences) {
+                    sayCommand = m_document->fixupEscapeSequences(sayCommand);
+                }
                 m_document->Execute(sayCommand);
             } else {
                 // Direct send mode: prepend auto-say string and call SendMsg()

@@ -29,6 +29,9 @@ class WorldDocument;
 class RecallSearchDialog : public QDialog {
     Q_OBJECT
 
+    // Parity test drives the private load/save round-trip and inspects widgets.
+    friend class RecallSearchDialogParityTest;
+
   public:
     /**
      * Constructor

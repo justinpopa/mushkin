@@ -434,7 +434,8 @@ bool OutputView::mouseDownMiniWindow(const QPoint& pos, Qt::MouseButton button)
 
     // Update mouse position for WindowInfo queries
     QPoint mwPos = pos - mw->rect.topLeft();
-    mw->lastMousePosition = mwPos; // WindowInfo 14/15: miniwindow-relative
+    mw->setLastMousePosition(
+        mwPos); // WindowInfo 14/15: miniwindow-relative; also increments mouseUpdateCount (code 16)
     mw->clientMousePosition = pos; // WindowInfo 17/18: output-window-relative
 
     // Find hotspot under mouse
@@ -492,8 +493,9 @@ bool OutputView::mouseMoveMiniWindow(const QPoint& pos)
             // CRITICAL: Update mouse position BEFORE callback so WindowInfo() returns correct
             // coords
             QPoint prevMwPos = pos - prevMw->rect.topLeft();
-            prevMw->lastMousePosition = prevMwPos; // WindowInfo 14/15: miniwindow-relative
-            prevMw->clientMousePosition = pos;     // WindowInfo 17/18: output-window-relative
+            prevMw->setLastMousePosition(prevMwPos); // WindowInfo 14/15: miniwindow-relative; also
+                                                     // increments mouseUpdateCount (code 16)
+            prevMw->clientMousePosition = pos;       // WindowInfo 17/18: output-window-relative
 
             // Check if we're actively dragging (hotspot was pressed)
             if (!prevMw->mouseDownHotspot.isEmpty()) {
@@ -531,8 +533,9 @@ bool OutputView::mouseMoveMiniWindow(const QPoint& pos)
 
         // Update mouse position for WindowInfo queries
         QPoint mwPos = pos - mw->rect.topLeft();
-        mw->lastMousePosition = mwPos; // WindowInfo 14/15: miniwindow-relative
-        mw->clientMousePosition = pos; // WindowInfo 17/18: output-window-relative
+        mw->setLastMousePosition(mwPos); // WindowInfo 14/15: miniwindow-relative; also increments
+                                         // mouseUpdateCount (code 16)
+        mw->clientMousePosition = pos;   // WindowInfo 17/18: output-window-relative
 
         // Find hotspot under mouse
         Hotspot* hotspot = findHotspotAtPosition(mw, mwPos);
@@ -677,7 +680,8 @@ bool OutputView::mouseUpMiniWindow(const QPoint& pos, Qt::MouseButton button)
 
     // Update mouse position for WindowInfo queries
     QPoint mwPos = pos - mw->rect.topLeft();
-    mw->lastMousePosition = mwPos; // WindowInfo 14/15: miniwindow-relative
+    mw->setLastMousePosition(
+        mwPos); // WindowInfo 14/15: miniwindow-relative; also increments mouseUpdateCount (code 16)
     mw->clientMousePosition = pos; // WindowInfo 17/18: output-window-relative
 
     // Check if we had an active drag operation
@@ -1004,7 +1008,7 @@ bool OutputView::handleMiniWindowScrollWheel(const QPoint& pos, const QPoint& an
 
         if (hotspot && !hotspot->m_sScrollwheelCallback.isEmpty()) {
             // Update mouse position for WindowInfo queries
-            mw->lastMousePosition = mwPos;
+            mw->setLastMousePosition(mwPos); // also increments mouseUpdateCount (code 16)
             mw->clientMousePosition = pos;
 
             // Build flags (no button, just modifiers + scroll direction)

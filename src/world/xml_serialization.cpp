@@ -152,8 +152,10 @@ bool IsArchiveXML(QFile& file)
         p += 3;
     }
 
-    // Skip leading whitespace (original: xml_serialize.cpp:129-130)
-    while (p < end && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r'))
+    // Skip leading whitespace (original: xml_serialize.cpp:129-130 uses isspace())
+    // isspace() covers space, \t, \n, \r, \v (vertical tab), and \f (form feed)
+    while (p < end &&
+           (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r' || *p == '\v' || *p == '\f'))
         p++;
 
     // Need at least 15 chars for minimum valid XML (original: xml_serialize.cpp:134)
@@ -912,6 +914,13 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
 
     // Mark as loaded from disk (original: xml_serialize.cpp:51)
     doc->m_bLoaded = true;
+
+    // Apply tooltip timing side effects — original calls SetOptionItem(i, ..., bDoSpecial=true)
+    // for each option, which for OPT_FIX_TOOLTIP_VISIBLE / OPT_FIX_TOOLTIP_START sends
+    // TTM_SETDELAYTIME to all views (scriptingoptions.cpp:549-575). Emit once after load
+    // to apply the final values loaded from XML.
+    // (original: xml_load_world.cpp:994, 1011, 1027 → SetOptionItem with bDoSpecial=true)
+    emit doc->tooltipSettingsChanged();
 
     // Notify all plugins once after batch loading (original: xml_load_world.cpp:473-474)
     doc->PluginListChanged();

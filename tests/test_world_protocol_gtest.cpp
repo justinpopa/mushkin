@@ -565,3 +565,107 @@ TEST_F(WorldProtocolTest, Newline_WhenMXPInactive_LeavesModeUnchanged)
     EXPECT_EQ(mxp.m_iMXP_mode, eMXP_secure)
         << "with MXP inactive, newline must not touch the MXP mode";
 }
+
+// ========== H17: Default custom text colour palette ==========
+// Original Utilities.cpp:1671-1698 — SetDefaultCustomColours sets specific
+// palette values for the first 16 custom text slots.
+
+TEST_F(WorldProtocolTest, InitializeColors_CustomTextSlot0_IsLightRed)
+{
+    // Slot 0 = RGB(255,128,128) light red
+    EXPECT_EQ(doc->m_colors.custom_text[0], qRgb(255, 128, 128))
+        << "custom_text[0] should be light red RGB(255,128,128) per original "
+           "SetDefaultCustomColours";
+}
+
+TEST_F(WorldProtocolTest, InitializeColors_CustomTextSlot15_IsBlue)
+{
+    // Slot 15 = RGB(0,0,255) blue
+    EXPECT_EQ(doc->m_colors.custom_text[15], qRgb(0, 0, 255))
+        << "custom_text[15] should be blue RGB(0,0,255) per original SetDefaultCustomColours";
+}
+
+TEST_F(WorldProtocolTest, InitializeColors_CustomTextSlot6_IsPureRed)
+{
+    // Slot 6 = RGB(255,0,0)
+    EXPECT_EQ(doc->m_colors.custom_text[6], qRgb(255, 0, 0))
+        << "custom_text[6] should be pure red RGB(255,0,0)";
+}
+
+TEST_F(WorldProtocolTest, InitializeColors_CustomBackSlot0_IsBlack)
+{
+    // custom_back slots all remain black (0,0,0) — the palette only changes custom_text
+    EXPECT_EQ(doc->m_colors.custom_back[0], qRgb(0, 0, 0))
+        << "custom_back[0] should remain black — palette defaults only change custom_text";
+}
+
+// ========== M63: m_LastFlushTime must be valid at construction ==========
+// Original doc_construct.cpp:207 — m_LastFlushTime = CTime::GetCurrentTime()
+// Mushkin previously left it invalid (QDateTime()), causing GetInfo(302) to
+// return nil before the first log flush.
+
+TEST_F(WorldProtocolTest, LastFlushTime_ValidAtConstruction)
+{
+    EXPECT_TRUE(doc->m_LastFlushTime.isValid())
+        << "m_LastFlushTime must be valid at construction (original doc_construct.cpp:207)";
+}
+
+// ========== Category 16: H46 — MXP secure-once mode cancelled on non-tag character ==========
+// Original: doc.cpp:1997-2001 — when MXP is active and a non-'<' character arrives,
+// secure-once mode must be reverted to the previous mode immediately (the "opening tag
+// right away" window has passed). Verified by checking m_iMXP_mode after feeding a
+// plain character, an ampersand, and a newline.
+
+TEST_F(WorldProtocolTest, MXP_SecureOnce_CancelledByPlainCharacter)
+{
+    doc->MXP_On();
+    auto& mxp = *doc->m_mxpEngine;
+    mxp.m_iMXP_previousMode = eMXP_open;
+    mxp.m_iMXP_mode = eMXP_secure_once;
+
+    feed({'A'}); // non-'<' character: must cancel secure-once
+
+    EXPECT_EQ(mxp.m_iMXP_mode, eMXP_open)
+        << "plain character in secure_once must revert to previousMode";
+}
+
+TEST_F(WorldProtocolTest, MXP_SecureOnce_CancelledByAmpersand)
+{
+    doc->MXP_On();
+    auto& mxp = *doc->m_mxpEngine;
+    mxp.m_iMXP_previousMode = eMXP_open;
+    mxp.m_iMXP_mode = eMXP_secure_once;
+
+    feed({'&'}); // entity start is also a non-'<' char: must cancel secure-once first
+
+    EXPECT_EQ(mxp.m_iMXP_mode, eMXP_open) << "ampersand in secure_once must revert to previousMode";
+}
+
+TEST_F(WorldProtocolTest, MXP_SecureOnce_CancelledByNewline)
+{
+    doc->MXP_On();
+    auto& mxp = *doc->m_mxpEngine;
+    mxp.m_iMXP_previousMode = eMXP_open;
+    mxp.m_iMXP_mode = eMXP_secure_once;
+
+    feed({'\n'}); // newline is also a non-'<' char: must cancel secure-once first
+
+    EXPECT_EQ(mxp.m_iMXP_mode, mxp.m_iMXP_defaultMode)
+        << "newline in secure_once must revert to previousMode (then newline reverts to "
+           "defaultMode)";
+}
+
+TEST_F(WorldProtocolTest, MXP_SecureOnce_NotCancelledByOpenTag)
+{
+    doc->MXP_On();
+    auto& mxp = *doc->m_mxpEngine;
+    mxp.m_iMXP_previousMode = eMXP_open;
+    mxp.m_iMXP_mode = eMXP_secure_once;
+
+    feed({'<'}); // '<' enters tag phase: secure-once stays active for tag processing
+
+    EXPECT_EQ(currentPhase(), Phase::HAVE_MXP_ELEMENT)
+        << "opening '<' must enter tag phase without cancelling secure-once";
+    EXPECT_EQ(mxp.m_iMXP_mode, eMXP_secure_once)
+        << "mode must remain secure_once until the tag is processed";
+}

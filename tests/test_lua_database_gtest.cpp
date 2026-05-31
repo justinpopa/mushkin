@@ -557,3 +557,80 @@ TEST_F(LuaDatabaseTest, DatabaseColumnTypeReturnsCorrectType)
     int type2 = getIntResult();
     EXPECT_EQ(type2, SQLITE_TEXT);
 }
+
+// Test 18: DatabaseColumnNames returns nil when statement has zero columns (H40)
+// Original MUSHclient cannot create an empty SafeArray dimension, so it returns nil
+// rather than an empty table when iColumns == 0.
+TEST_F(LuaDatabaseTest, DatabaseColumnNamesReturnsNilForZeroColumns)
+{
+    // Open in-memory database
+    pushWorldFunction("DatabaseOpen");
+    lua_pushstring(L, "colnames_test");
+    lua_pushstring(L, ":memory:");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    // Prepare a non-SELECT statement that yields zero columns (e.g. CREATE TABLE)
+    // sqlite3_column_count on a DDL statement returns 0
+    pushWorldFunction("DatabasePrepare");
+    lua_pushstring(L, "colnames_test");
+    lua_pushstring(L, "CREATE TABLE t (x INTEGER)");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    // Verify zero columns were recorded
+    {
+        auto it = world->m_DatabaseMap.find("colnames_test");
+        ASSERT_TRUE(it != world->m_DatabaseMap.end());
+        ASSERT_NE(it->second->pStmt, nullptr);
+        EXPECT_EQ(it->second->iColumns, 0);
+    }
+
+    // DatabaseColumnNames must return nil (not an empty table) for zero columns
+    pushWorldFunction("DatabaseColumnNames");
+    lua_pushstring(L, "colnames_test");
+    lua_pcall(L, 1, 1, 0);
+
+    EXPECT_EQ(lua_type(L, -1), LUA_TNIL) << "Expected nil for zero-column statement";
+    lua_pop(L, 1);
+}
+
+// Test 19: DatabaseColumnNames returns a table when columns > 0
+TEST_F(LuaDatabaseTest, DatabaseColumnNamesReturnsTableForNonZeroColumns)
+{
+    pushWorldFunction("DatabaseOpen");
+    lua_pushstring(L, "colnames2_test");
+    lua_pushstring(L, ":memory:");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    pushWorldFunction("DatabaseExec");
+    lua_pushstring(L, "colnames2_test");
+    lua_pushstring(L, "CREATE TABLE test (id INTEGER, name TEXT)");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    pushWorldFunction("DatabasePrepare");
+    lua_pushstring(L, "colnames2_test");
+    lua_pushstring(L, "SELECT id, name FROM test");
+    lua_pcall(L, 2, 1, 0);
+    expectOK();
+
+    pushWorldFunction("DatabaseColumnNames");
+    lua_pushstring(L, "colnames2_test");
+    lua_pcall(L, 1, 1, 0);
+
+    ASSERT_EQ(lua_type(L, -1), LUA_TTABLE) << "Expected table for non-zero-column statement";
+
+    // Column 1 should be "id"
+    lua_rawgeti(L, -1, 1);
+    EXPECT_STREQ(lua_tostring(L, -1), "id");
+    lua_pop(L, 1);
+
+    // Column 2 should be "name"
+    lua_rawgeti(L, -1, 2);
+    EXPECT_STREQ(lua_tostring(L, -1), "name");
+    lua_pop(L, 1);
+
+    lua_pop(L, 1); // pop table
+}

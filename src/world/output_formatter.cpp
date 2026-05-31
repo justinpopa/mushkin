@@ -16,12 +16,37 @@ OutputFormatter::OutputFormatter(WorldDocument& doc) : m_doc(doc)
 {
 }
 
+// Resolve effective note fore/back colors from the current document state.
+// In RGB mode, returns the stored RGB values directly.
+// In palette mode (m_bNotesInRGB == false), resolves through note_text_colour:
+//   - SAMECOLOUR (65535): uses custom_text/back[15] when m_bCustom16isDefaultColour,
+//                         otherwise normal_colour[ANSI_WHITE/BLACK].
+//   - Valid index 0..MAX_CUSTOM-1: uses custom_text/back[index].
+//   - Out-of-range: falls back to white on black.
+// Mirrors the original CMUSHclientDoc::Tell() palette resolution path
+// (methods_noting.cpp:60-67 for outstanding-lines, :100-128 for the inline path).
+static std::pair<QRgb, QRgb> resolveNoteColors(const WorldDocument& doc)
+{
+    if (doc.m_bNotesInRGB) {
+        return {doc.m_iNoteColourFore, doc.m_iNoteColourBack};
+    }
+    constexpr quint16 SAMECOLOUR = 65535;
+    quint16 idx = doc.m_colors.note_text_colour;
+    if (idx == SAMECOLOUR) {
+        if (doc.m_bCustom16isDefaultColour) {
+            return {doc.m_colors.custom_text[15], doc.m_colors.custom_back[15]};
+        }
+        return {doc.m_colors.normal_colour[ANSI_WHITE], doc.m_colors.normal_colour[ANSI_BLACK]};
+    }
+    if (idx < MAX_CUSTOM) {
+        return {doc.m_colors.custom_text[idx], doc.m_colors.custom_back[idx]};
+    }
+    return {qRgb(255, 255, 255), qRgb(0, 0, 0)};
+}
+
 void OutputFormatter::note(const QString& text)
 {
-    // Use default note colors (or white on black if not set) - BGR format
-    QRgb foreColor = m_doc.m_bNotesInRGB ? m_doc.m_iNoteColourFore : BGR(255, 255, 255);
-    QRgb backColor = m_doc.m_bNotesInRGB ? m_doc.m_iNoteColourBack : BGR(0, 0, 0);
-
+    auto [foreColor, backColor] = resolveNoteColors(m_doc);
     colourNote(foreColor, backColor, text);
 }
 
@@ -44,8 +69,13 @@ void OutputFormatter::note(const QString& text)
  */
 void OutputFormatter::colourNote(QRgb foreColor, QRgb backColor, const QString& text)
 {
-    // Queue the note for deferred output during plugin callbacks
-    if (m_doc.m_bNotesNotWantedNow) {
+    // Defer note when: output buffer not yet ready, OR we are inside a plugin callback
+    // on a non-empty, non-note line (inserting here would corrupt the MUD line).
+    // Original condition: m_pCurrentLine == NULL || m_pLinePositions == NULL ||
+    //   (m_bNotesNotWantedNow && m_pCurrentLine->len != 0 &&
+    //    (m_pCurrentLine->flags & NOTE_OR_COMMAND) == 0)
+    if (!m_doc.m_currentLine || (m_doc.m_bNotesNotWantedNow && m_doc.m_currentLine->len() != 0 &&
+                                 (m_doc.m_currentLine->flags & NOTE_OR_COMMAND) == 0)) {
         m_doc.m_OutstandingLines.push_back({text, foreColor, backColor, m_doc.m_iNoteStyle});
         return;
     }
@@ -95,8 +125,9 @@ void OutputFormatter::colourNote(QRgb foreColor, QRgb backColor, const QString& 
  */
 void OutputFormatter::colourTell(QRgb foreColor, QRgb backColor, const QString& text)
 {
-    // Queue the tell for deferred output during plugin callbacks
-    if (m_doc.m_bNotesNotWantedNow) {
+    // Defer tell using the same condition as colourNote / original Tell().
+    if (!m_doc.m_currentLine || (m_doc.m_bNotesNotWantedNow && m_doc.m_currentLine->len() != 0 &&
+                                 (m_doc.m_currentLine->flags & NOTE_OR_COMMAND) == 0)) {
         m_doc.m_OutstandingLines.push_back({text, foreColor, backColor, m_doc.m_iNoteStyle});
         return;
     }

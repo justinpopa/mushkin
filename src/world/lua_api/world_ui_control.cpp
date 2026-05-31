@@ -184,6 +184,13 @@ int L_AcceleratorList(lua_State* L)
         lua_rawseti(L, -2, index++);
     }
 
+    // Original returns nil (not an empty table) when no accelerators are registered.
+    // If no entries were added, replace the table with nil to match original behavior.
+    if (index == 1) {
+        lua_pop(L, 1);
+        lua_pushnil(L);
+    }
+
     return 1;
 }
 

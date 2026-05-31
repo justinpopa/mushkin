@@ -78,7 +78,9 @@ void AcceleratorManager::initKeyNameMap()
     s_keyNameMap["Snapshot"] = Qt::Key_Print; // Windows name for PrintScreen
     s_keyNameMap["ScrollLock"] = Qt::Key_ScrollLock;
     s_keyNameMap["Scroll"] = Qt::Key_ScrollLock; // Original MUSHclient name
-    s_keyNameMap["NumLock"] = Qt::Key_NumLock;
+    // "Numlock" (lowercase 'l') matches original MUSHclient VirtualKeys table
+    // (accelerators.cpp:424).  Only this spelling is registered so that
+    // keySequenceToString always returns "Numlock", not "NumLock".
     s_keyNameMap["Numlock"] = Qt::Key_NumLock;
     s_keyNameMap["CapsLock"] = Qt::Key_CapsLock;
     s_keyNameMap["Capital"] = Qt::Key_CapsLock; // Original MUSHclient name
@@ -626,10 +628,22 @@ void AcceleratorManager::onShortcutActivated()
 
     const AcceleratorEntry& entry = m_accelerators[keyString];
 
-    // Gate keypad entries on m_keypad_enable (original checks before dispatching numpad)
-    if (keyString.contains("Num+") && m_doc && !m_doc->m_keypad_enable) {
+    // Gate keypad entries on m_keypad_enable.
+    // keyString is already toUpper()-normalised, so check for "NUM+".
+    // Original (sendvw.cpp:1092-1099): if keypad disabled, insert the literal
+    // key character into the input line (ReplaceSel fallback); otherwise
+    // execute the stored keypad command.
+    const bool isKeypad = keyString.contains(QLatin1String("NUM+"), Qt::CaseSensitive);
+    if (isKeypad && m_doc && !m_doc->m_keypad_enable) {
+        // Extract the character(s) after the last "NUM+" segment.
+        // e.g. "NUM+0" -> "0", "CTRL+NUM+." -> ".", "NUM++" -> "+"
+        const int numPlusPos = keyString.lastIndexOf(QLatin1String("NUM+"));
+        const QString literal = keyString.mid(numPlusPos + 4).toLower(); // restore case
+        if (!literal.isEmpty()) {
+            emit keypadLiteralInsert(literal);
+        }
         return;
     }
 
-    emit acceleratorTriggered(entry.action, entry.sendTo, entry.pluginId);
+    emit acceleratorTriggered(entry.action, entry.sendTo, entry.pluginId, keyString);
 }

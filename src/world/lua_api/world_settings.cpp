@@ -993,12 +993,16 @@ int L_GetInfo(lua_State* L)
             break;
 
         case 212: // Output font height
-            // Original returns tm.tmHeight (rendered pixel height from TEXTMETRIC).
-            // Use QFontMetrics::height() on the same font that OutputView renders with.
+            // Original: if (iLineSpacing) m_FontHeight = iLineSpacing; else m_FontHeight =
+            // tm.tmHeight; (doc.cpp:3253-3256). Respect line_spacing override when non-zero.
             {
-                QFont outputFont =
-                    createScaledFont(pDoc->m_output.font_name, pDoc->m_output.font_height);
-                lua_pushinteger(L, QFontMetrics(outputFont).height());
+                if (pDoc->m_display.line_spacing > 0) {
+                    lua_pushinteger(L, pDoc->m_display.line_spacing);
+                } else {
+                    QFont outputFont =
+                        createScaledFont(pDoc->m_output.font_name, pDoc->m_output.font_height);
+                    lua_pushinteger(L, QFontMetrics(outputFont).height());
+                }
             }
             break;
 
@@ -1183,11 +1187,15 @@ int L_GetInfo(lua_State* L)
             }
             break;
 
-        case 241: // Character height (rendered pixel height, same as GetInfo(212))
+        case 241: // Character height (same as GetInfo(212) — respects line_spacing override)
         {
-            QFont outputFont =
-                createScaledFont(pDoc->m_output.font_name, pDoc->m_output.font_height);
-            lua_pushinteger(L, QFontMetrics(outputFont).height());
+            if (pDoc->m_display.line_spacing > 0) {
+                lua_pushinteger(L, pDoc->m_display.line_spacing);
+            } else {
+                QFont outputFont =
+                    createScaledFont(pDoc->m_output.font_name, pDoc->m_output.font_height);
+                lua_pushinteger(L, QFontMetrics(outputFont).height());
+            }
         } break;
 
         case 242: // UTF-8 error count
@@ -1567,11 +1575,11 @@ int L_GetInfo(lua_State* L)
         } break;
 
         case 305: // Client start time (Unix timestamp)
-        {
-            static const double s_appStartTime =
-                static_cast<double>(QDateTime::currentDateTime().toSecsSinceEpoch());
-            lua_pushnumber(L, s_appStartTime);
-        } break;
+            // Original: App.m_whenClientStarted captured in InitInstance (MUSHclient.cpp:218).
+            // Use AppPaths::appStartTime() which is recorded from main() right after
+            // QApplication construction — matching the original's "app startup" semantics.
+            lua_pushnumber(L, AppPaths::appStartTime());
+            break;
 
         case 306: // World start time (Unix timestamp)
         {
@@ -1665,9 +1673,11 @@ int L_SetOption(lua_State* L)
     int flags = opt.iFlags;
 
     if (flags & OPT_FIX_OUTPUT_BUFFER) {
-        // Trim excess lines immediately when max_output_lines is reduced
-        // (original: scriptingoptions.cpp:513-515 calls FixUpOutputBuffer)
+        // Trim excess lines immediately when max_output_lines is reduced.
+        // (original: scriptingoptions.cpp:513-515 calls FixUpOutputBuffer which also refreshes
+        // all views via addedstuff() so scrollbar ranges are updated — doc.cpp:4161-4171)
         pDoc->trimLineBuffer();
+        emit pDoc->linesAdded(); // refresh view so scrollbar ranges reflect new buffer size
     }
 
     if (flags & OPT_FIX_WRAP_COLUMN) {
@@ -2147,22 +2157,29 @@ int L_TextRectangle(lua_State* L)
 int L_SetBackgroundImage(lua_State* L)
 {
     WorldDocument* pDoc = doc(L);
-    qint32 mode = luaL_optinteger(L, 2, 0);
 
-    // Validate mode (matches original)
+    // Mode is required (original: lua_methods.cpp:4943 uses my_checknumber, not optional)
+    qint32 mode = static_cast<qint32>(luaL_checknumber(L, 2));
+
+    // Validate mode (matches original: methods_output.cpp:489-490)
     if (mode < 0 || mode > 13) {
         return luaReturn(L, eBadParameter);
     }
 
+    // Always clear the old image unconditionally before any further validation.
+    // Original (methods_output.cpp:492-497): DeleteObject + Empty + UpdateAllViews before
+    // inspecting the filename — so on any error the old image is always gone.
+    pDoc->m_strBackgroundImageName.clear();
+    if (pDoc->m_pActiveOutputView) {
+        pDoc->m_pActiveOutputView->reloadBackgroundImage();
+    }
+
     QString fileName = luaOptQString(L, 1).trimmed();
 
-    // No file name means clear the image
+    // No file name means clear the image — return without storing mode.
+    // Original does NOT set m_iBackgroundMode on the empty-filename path
+    // (methods_output.cpp:505-506).
     if (fileName.isEmpty()) {
-        pDoc->m_strBackgroundImageName.clear();
-        pDoc->m_iBackgroundMode = mode;
-        if (pDoc->m_pActiveOutputView) {
-            pDoc->m_pActiveOutputView->reloadBackgroundImage();
-        }
         return luaReturn(L, eOK);
     }
 
@@ -2188,7 +2205,7 @@ int L_SetBackgroundImage(lua_State* L)
         return luaReturn(L, eCouldNotOpenFile);
     }
 
-    // Store the image path and mode
+    // Store the image path and mode only on success (original: methods_output.cpp:543-544)
     pDoc->m_strBackgroundImageName = fileName;
     pDoc->m_iBackgroundMode = mode;
 

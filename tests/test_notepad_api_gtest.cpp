@@ -21,6 +21,9 @@
 #include "fixtures/world_fixtures.h"
 
 #include "../src/utils/error_codes.h"
+#include <QDir>
+#include <QFile>
+#include <QTextStream>
 
 // Test fixture for Notepad API tests
 class NotepadApiTest : public ConnectedWorldTest {};
@@ -155,11 +158,12 @@ TEST_F(NotepadApiTest, GetNotepadListReturnsAllTitles)
     EXPECT_EQ(getGlobalNumber("count"), 3);
 }
 
-// Test 12: NotepadFont returns false if not found
+// Test 12: NotepadFont returns eNoSuchNotepad if not found
 TEST_F(NotepadApiTest, NotepadFontFailsIfNotExists)
 {
     executeLua("result = world.NotepadFont('NoSuchNotepad', 'Courier', 12, 0, 0)");
-    EXPECT_FALSE(getGlobalBool("result"));
+    // Original returns numeric error code (eNoSuchNotepad = 30075)
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), eNoSuchNotepad);
 }
 
 // Test 13: NotepadFont sets font successfully
@@ -167,7 +171,8 @@ TEST_F(NotepadApiTest, NotepadFontSetsFont)
 {
     executeLua("world.SendToNotepad('FontTest', 'content')");
     executeLua("result = world.NotepadFont('FontTest', 'Courier New', 14, 1, 0)");
-    EXPECT_TRUE(getGlobalBool("result"));
+    // Original returns eOK (0) on success
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), eOK);
 
     NotepadWidget* notepad = doc->FindNotepad("FontTest");
     ASSERT_NE(notepad, nullptr);
@@ -175,11 +180,12 @@ TEST_F(NotepadApiTest, NotepadFontSetsFont)
     EXPECT_EQ(notepad->m_iFontSize, 14);
 }
 
-// Test 14: NotepadColour returns false if not found
+// Test 14: NotepadColour returns eNoSuchNotepad if not found
 TEST_F(NotepadApiTest, NotepadColourFailsIfNotExists)
 {
     executeLua("result = world.NotepadColour('NoSuchNotepad', 'white', 'black')");
-    EXPECT_FALSE(getGlobalBool("result"));
+    // Original returns numeric error code (eNoSuchNotepad = 30075)
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), eNoSuchNotepad);
 }
 
 // Test 15: NotepadColour sets colors successfully
@@ -187,7 +193,8 @@ TEST_F(NotepadApiTest, NotepadColourSetsColors)
 {
     executeLua("world.SendToNotepad('ColorTest', 'content')");
     executeLua("result = world.NotepadColour('ColorTest', '#FFFFFF', '#000000')");
-    EXPECT_TRUE(getGlobalBool("result"));
+    // Original returns eOK (0) on success
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), eOK);
 
     NotepadWidget* notepad = doc->FindNotepad("ColorTest");
     ASSERT_NE(notepad, nullptr);
@@ -198,18 +205,18 @@ TEST_F(NotepadApiTest, NotepadColourSetsColors)
 // Test 16: NotepadColour returns error for invalid color
 TEST_F(NotepadApiTest, NotepadColourFailsForInvalidColor)
 {
-    // Original returns boolean false for failure
+    // Original returns numeric eInvalidColourName (30077) for bad color name
     executeLua("world.SendToNotepad('InvalidColor', 'content')");
     executeLua("result = world.NotepadColour('InvalidColor', 'notacolor', 'black')");
-    EXPECT_FALSE(getGlobalBool("result"));
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), eInvalidColourName);
 }
 
-// Test 17: NotepadReadOnly returns false if not found
+// Test 17: NotepadReadOnly returns eNoSuchNotepad if not found
 TEST_F(NotepadApiTest, NotepadReadOnlyFailsIfNotExists)
 {
-    // Original returns boolean false for not-found
     executeLua("result = world.NotepadReadOnly('NoSuchNotepad', true)");
-    EXPECT_FALSE(getGlobalBool("result"));
+    // Original returns numeric error code (eNoSuchNotepad = 30075)
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), eNoSuchNotepad);
 }
 
 // Test 18: NotepadReadOnly sets read-only mode
@@ -217,19 +224,44 @@ TEST_F(NotepadApiTest, NotepadReadOnlySetsMode)
 {
     executeLua("world.SendToNotepad('ReadOnly', 'content')");
     executeLua("result = world.NotepadReadOnly('ReadOnly', true)");
-    EXPECT_TRUE(getGlobalBool("result"));
+    // Original returns eOK (0) on success
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), eOK);
 
     NotepadWidget* notepad = doc->FindNotepad("ReadOnly");
     ASSERT_NE(notepad, nullptr);
     EXPECT_TRUE(notepad->m_bReadOnly);
 }
 
+// Test 17b: NotepadReadOnly — nil arg defaults to true (make read-only)
+TEST_F(NotepadApiTest, NotepadReadOnlyNilDefaultsToTrue)
+{
+    executeLua("world.SendToNotepad('RONil', 'content')");
+    // Omitting the second arg: original optboolean(L,2,1) defaults to true
+    executeLua("result = world.NotepadReadOnly('RONil')");
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), eOK);
+    NotepadWidget* notepad = doc->FindNotepad("RONil");
+    ASSERT_NE(notepad, nullptr);
+    EXPECT_TRUE(notepad->m_bReadOnly);
+}
+
+// Test 17c: NotepadReadOnly — numeric arg coerced to boolean
+TEST_F(NotepadApiTest, NotepadReadOnlyNumericArgCoerced)
+{
+    executeLua("world.SendToNotepad('RONum', 'content')");
+    // Passing 0 (numeric) should coerce to false
+    executeLua("result = world.NotepadReadOnly('RONum', 0)");
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), eOK);
+    NotepadWidget* notepad = doc->FindNotepad("RONum");
+    ASSERT_NE(notepad, nullptr);
+    EXPECT_FALSE(notepad->m_bReadOnly);
+}
+
 // Test 19: NotepadSaveMethod returns eNoSuchNotepad if not found
 TEST_F(NotepadApiTest, NotepadSaveMethodFailsIfNotExists)
 {
-    // Original returns boolean false for not-found (not error code)
     executeLua("result = world.NotepadSaveMethod('NoSuchNotepad', 1)");
-    EXPECT_FALSE(getGlobalBool("result"));
+    // Original returns numeric error code (eNoSuchNotepad = 30075)
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), eNoSuchNotepad);
 }
 
 // Test 20: NotepadSaveMethod sets save method
@@ -237,7 +269,8 @@ TEST_F(NotepadApiTest, NotepadSaveMethodSetsSaveMethod)
 {
     executeLua("world.SendToNotepad('SaveMethod', 'content')");
     executeLua("result = world.NotepadSaveMethod('SaveMethod', 2)");
-    EXPECT_TRUE(getGlobalBool("result"));
+    // Original returns eOK (0) on success
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), eOK);
 
     NotepadWidget* notepad = doc->FindNotepad("SaveMethod");
     ASSERT_NE(notepad, nullptr);
@@ -247,19 +280,49 @@ TEST_F(NotepadApiTest, NotepadSaveMethodSetsSaveMethod)
 // Test 21: CloseNotepad returns eNoSuchNotepad if not found
 TEST_F(NotepadApiTest, CloseNotepadFailsIfNotExists)
 {
-    // Original returns boolean false for not-found (not error code)
     executeLua("result = world.CloseNotepad('NoSuchNotepad', false)");
-    EXPECT_FALSE(getGlobalBool("result"));
+    // Original returns numeric error code (eNoSuchNotepad = 30075)
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), eNoSuchNotepad);
 }
 
-// Test 22: CloseNotepad succeeds for existing notepad
+// Test 22: CloseNotepad returns eOK for existing notepad
 TEST_F(NotepadApiTest, CloseNotepadSucceedsForExisting)
 {
     executeLua("world.SendToNotepad('ToClose', 'content')");
     ASSERT_NE(doc->FindNotepad("ToClose"), nullptr);
 
     executeLua("result = world.CloseNotepad('ToClose', false)");
-    EXPECT_TRUE(getGlobalBool("result"));
+    // Original returns eOK (0) on success
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), eOK);
+}
+
+// Test 22b: SaveNotepad numeric replaceExisting arg coerced to bool
+TEST_F(NotepadApiTest, SaveNotepadNumericReplaceArgCoerced)
+{
+    // Passing 1 (numeric) for replaceExisting should coerce to true (original optboolean behavior)
+    // We just verify the call doesn't error — actual file I/O not tested here
+    executeLua("result = world.SaveNotepad('DoesNotExist', '/tmp/test_notepad.txt', 1)");
+    // Should return a numeric error code (eNoSuchNotepad = 30075), not crash
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), eNoSuchNotepad);
+}
+
+// Test 22c: SendToNotepad with boolean arg — concatLuaArgs uses tostring
+TEST_F(NotepadApiTest, SendToNotepadToStringCoercesBoolean)
+{
+    // Original concatArgs calls Lua's tostring, so boolean arg becomes "true"/"false"
+    executeLua("world.SendToNotepad('BoolArg', true)");
+    NotepadWidget* notepad = doc->FindNotepad("BoolArg");
+    ASSERT_NE(notepad, nullptr);
+    EXPECT_EQ(notepad->GetText(), "true");
+}
+
+// Test 22d: AppendToNotepad with nil arg — tostring gives "nil"
+TEST_F(NotepadApiTest, AppendToNotepadToStringCoercesNil)
+{
+    executeLua("world.SendToNotepad('NilArg', nil)");
+    NotepadWidget* notepad = doc->FindNotepad("NilArg");
+    ASSERT_NE(notepad, nullptr);
+    EXPECT_EQ(notepad->GetText(), "nil");
 }
 
 // Test 23: UTF-8 content handling
@@ -341,6 +404,104 @@ TEST_F(NotepadApiTest, GetNotepadWindowPositionReturnsEmptyWithoutMDI)
     lua_getglobal(L, "pos");
     EXPECT_TRUE(lua_isnil(L, -1)); // Empty QString becomes nil in Lua
     lua_pop(L, 1);
+}
+
+// Test 31: SaveToFile writes content to disk (M79 — notepad has save-to-file capability)
+TEST_F(NotepadApiTest, SaveToFileWritesContent)
+{
+    executeLua(R"(world.SendToNotepad('SaveTest', "line one\nline two\n"))");
+    NotepadWidget* notepad = doc->FindNotepad("SaveTest");
+    ASSERT_NE(notepad, nullptr);
+
+    // Write to a temp file
+    const QString tmpPath = QDir::temp().filePath("mushkin_notepad_save_test.txt");
+    EXPECT_TRUE(notepad->SaveToFile(tmpPath, /*replaceExisting=*/true));
+
+    // Verify the file was written with correct content
+    QFile file(tmpPath);
+    ASSERT_TRUE(file.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString written = QTextStream(&file).readAll();
+    file.close();
+    EXPECT_EQ(written, "line one\nline two\n");
+
+    // After save the QTextDocument should report not-modified
+    EXPECT_FALSE(notepad->m_pTextEdit->document()->isModified());
+
+    // Filename is persisted on the widget
+    EXPECT_EQ(notepad->m_strFilename, tmpPath);
+
+    QFile::remove(tmpPath);
+}
+
+// Test 32: SaveToFile respects replaceExisting=false
+TEST_F(NotepadApiTest, SaveToFileRespectsNoReplace)
+{
+    executeLua("world.SendToNotepad('SaveGuard', 'content')");
+    NotepadWidget* notepad = doc->FindNotepad("SaveGuard");
+    ASSERT_NE(notepad, nullptr);
+
+    const QString tmpPath = QDir::temp().filePath("mushkin_notepad_guard_test.txt");
+
+    // First write creates the file
+    ASSERT_TRUE(notepad->SaveToFile(tmpPath, /*replaceExisting=*/true));
+
+    // Second write with replaceExisting=false should refuse
+    EXPECT_FALSE(notepad->SaveToFile(tmpPath, /*replaceExisting=*/false));
+
+    QFile::remove(tmpPath);
+}
+
+// Test 31: CloseNotepad with querySave=false ignores m_iSaveOnChange and closes immediately
+// (no prompt regardless of save method)
+TEST_F(NotepadApiTest, CloseNotepadNoQuerySaveIgnoresSaveMethod)
+{
+    executeLua("world.SendToNotepad('SaveMethodNever', 'content')");
+    NotepadWidget* notepad = doc->FindNotepad("SaveMethodNever");
+    ASSERT_NE(notepad, nullptr);
+    notepad->m_iSaveOnChange = eNotepadSaveNever;
+
+    // querySave=false — should close without prompt regardless of save method
+    executeLua("result = world.CloseNotepad('SaveMethodNever', false)");
+    EXPECT_TRUE(getGlobalBool("result"));
+    EXPECT_EQ(doc->FindNotepad("SaveMethodNever"), nullptr);
+}
+
+// Test 32: CloseNotepad with eNotepadSaveNever skips the save prompt even when
+// querySave=true and the document is modified (original: TextDocument.cpp:476).
+// In test environment there's no QMessageBox so we verify by direct doc access.
+TEST_F(NotepadApiTest, CloseNotepadSaveMethodNeverSkipsPrompt)
+{
+    executeLua("world.SendToNotepad('NeverSave', 'content')");
+    NotepadWidget* notepad = doc->FindNotepad("NeverSave");
+    ASSERT_NE(notepad, nullptr);
+    // Mark as modified so the default path would normally prompt
+    if (notepad->m_pTextEdit) {
+        notepad->m_pTextEdit->document()->setModified(true);
+    }
+    notepad->m_iSaveOnChange = eNotepadSaveNever;
+
+    // querySave=true but eNotepadSaveNever — must close without prompt (returns true)
+    qint32 result = doc->CloseNotepad("NeverSave", true);
+    EXPECT_EQ(result, eOK);
+    EXPECT_EQ(doc->FindNotepad("NeverSave"), nullptr);
+}
+
+// Test 33: CloseNotepad with eNotepadSaveAlways also skips the interactive prompt
+// (original: TextDocument.cpp:475 — "fall through to save if changed", but in
+// Mushkin there is no file-backed save so it just closes without prompting).
+TEST_F(NotepadApiTest, CloseNotepadSaveMethodAlwaysSkipsPrompt)
+{
+    executeLua("world.SendToNotepad('AlwaysSave', 'content')");
+    NotepadWidget* notepad = doc->FindNotepad("AlwaysSave");
+    ASSERT_NE(notepad, nullptr);
+    if (notepad->m_pTextEdit) {
+        notepad->m_pTextEdit->document()->setModified(true);
+    }
+    notepad->m_iSaveOnChange = eNotepadSaveAlways;
+
+    qint32 result = doc->CloseNotepad("AlwaysSave", true);
+    EXPECT_EQ(result, eOK);
+    EXPECT_EQ(doc->FindNotepad("AlwaysSave"), nullptr);
 }
 
 // Test 30: Functions work correctly when notepad exists

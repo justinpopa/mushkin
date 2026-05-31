@@ -106,6 +106,60 @@ TEST_F(XmlSerializationTest, IsArchiveXMLDetectsUTF8BOM)
     file.close();
 }
 
+// M106: isspace() parity — \v and \f before XML content must be skipped
+TEST_F(XmlSerializationTest, IsArchiveXMLSkipsVerticalTabBeforeTag)
+{
+    QTemporaryFile tmpFile;
+    ASSERT_TRUE(tmpFile.open()) << "Failed to open temporary file";
+    // \v (vertical tab, 0x0B) before XML — original uses isspace() which covers \v and \f
+    tmpFile.write("\v<muclient></muclient>");
+    tmpFile.close();
+
+    QFile file(tmpFile.fileName());
+    ASSERT_TRUE(file.open(QIODevice::ReadOnly)) << "Failed to open file for reading";
+    EXPECT_TRUE(XmlSerialization::IsArchiveXML(file))
+        << "Should skip \\v (vertical tab) before XML tag (M106: isspace parity)";
+    file.close();
+}
+
+TEST_F(XmlSerializationTest, IsArchiveXMLSkipsFormFeedBeforeTag)
+{
+    QTemporaryFile tmpFile;
+    ASSERT_TRUE(tmpFile.open()) << "Failed to open temporary file";
+    // \f (form feed, 0x0C) before XML — original uses isspace() which covers \v and \f
+    tmpFile.write("\f<muclient></muclient>");
+    tmpFile.close();
+
+    QFile file(tmpFile.fileName());
+    ASSERT_TRUE(file.open(QIODevice::ReadOnly)) << "Failed to open file for reading";
+    EXPECT_TRUE(XmlSerialization::IsArchiveXML(file))
+        << "Should skip \\f (form feed) before XML tag (M106: isspace parity)";
+    file.close();
+}
+
+// M152: tooltipSettingsChanged emitted during LoadWorldXML so tooltip timing is applied on load
+TEST_F(XmlSerializationTest, LoadWorldXMLEmitsTooltipSettingsChanged)
+{
+    auto doc = std::make_unique<WorldDocument>();
+    doc->m_mush_name = "Tooltip Test World";
+
+    QString filename = generateTempFilename("tooltip_signal");
+    ASSERT_TRUE(XmlSerialization::SaveWorldXML(doc.get(), filename)) << "SaveWorldXML failed";
+
+    auto doc2 = std::make_unique<WorldDocument>();
+    bool signalFired = false;
+    QObject::connect(doc2.get(), &WorldDocument::tooltipSettingsChanged, doc2.get(),
+                     [&signalFired]() { signalFired = true; });
+
+    ASSERT_TRUE(XmlSerialization::LoadWorldXML(doc2.get(), filename)) << "LoadWorldXML failed";
+
+    EXPECT_TRUE(signalFired)
+        << "tooltipSettingsChanged must be emitted during LoadWorldXML so tooltip "
+           "timing is applied after load (M152: SetOptionItem bDoSpecial=true parity)";
+
+    cleanupSaveFiles(filename);
+}
+
 // Tests for SaveWorldXML and LoadWorldXML round-trip
 
 TEST_F(XmlSerializationTest, BasicWorldPropertiesRoundTrip)
@@ -554,4 +608,142 @@ TEST_F(XmlSerializationTest, ReloadDefaultsSkippedWhenFlagDisabled)
     opts.setDefaultTriggersFile(savedPath);
     cleanupSaveFiles(filename);
     QFile::remove(defaultsPath);
+}
+
+// ---------------------------------------------------------------------------
+// Tests for WorldDocument::reloadDefaults() (File > Reload Defaults menu action).
+// Original: CMUSHclientDoc::OnFileReloaddefaults (methods_defaults.cpp:115-170).
+// Targets M26 / M29: the reload must honor each world's per-set m_bUseDefault*
+// opt-in flag (loading nothing and NOT flipping the flag when a set is opted
+// out), and must re-apply input/output fonts when their flags are set.
+// ---------------------------------------------------------------------------
+
+TEST_F(XmlSerializationTest, ReloadDefaultsLoadsTriggersWhenFlagEnabled)
+{
+    auto& opts = GlobalOptions::instance();
+    const QString savedPath = opts.defaultTriggersFile();
+
+    QString defaultsPath = writeDefaultTriggersFile("reload_trig", "Reload pattern");
+    opts.setDefaultTriggersFile(defaultsPath);
+
+    auto doc = std::make_unique<WorldDocument>();
+    doc->m_bUseDefaultTriggers = true;
+
+    const int imported = doc->reloadDefaults();
+
+    EXPECT_GT(imported, 0) << "At least one trigger should be imported";
+    Trigger* loaded = doc->getTrigger("reload_trig");
+    ASSERT_NE(loaded, nullptr) << "Default trigger should be loaded when flag is enabled";
+    EXPECT_EQ(loaded->trigger, "Reload pattern");
+    // Flag must be left untouched (still enabled).
+    EXPECT_TRUE(doc->m_bUseDefaultTriggers);
+
+    opts.setDefaultTriggersFile(savedPath);
+    QFile::remove(defaultsPath);
+}
+
+TEST_F(XmlSerializationTest, ReloadDefaultsSkipsTriggersWhenFlagDisabled)
+{
+    auto& opts = GlobalOptions::instance();
+    const QString savedPath = opts.defaultTriggersFile();
+
+    QString defaultsPath = writeDefaultTriggersFile("skip_trig", "Skip pattern");
+    opts.setDefaultTriggersFile(defaultsPath);
+
+    auto doc = std::make_unique<WorldDocument>();
+    doc->m_bUseDefaultTriggers = false; // opted out
+
+    const int imported = doc->reloadDefaults();
+
+    EXPECT_EQ(imported, 0) << "Nothing should be imported when the flag is disabled";
+    EXPECT_EQ(doc->getTrigger("skip_trig"), nullptr)
+        << "Default trigger must not be loaded when flag is off";
+    // reloadDefaults must NOT flip the opt-out flag to true (original never sets it).
+    EXPECT_FALSE(doc->m_bUseDefaultTriggers)
+        << "reloadDefaults must not turn the use-default flag on";
+
+    opts.setDefaultTriggersFile(savedPath);
+    QFile::remove(defaultsPath);
+}
+
+TEST_F(XmlSerializationTest, ReloadDefaultsAppliesInputFontWhenFlagEnabled)
+{
+    auto& opts = GlobalOptions::instance();
+    const QString savedFont = opts.defaultInputFont();
+    const int savedHeight = opts.defaultInputFontHeight();
+
+    opts.setDefaultInputFont("Comic Sans MS");
+    opts.setDefaultInputFontHeight(17);
+
+    auto doc = std::make_unique<WorldDocument>();
+    doc->m_bUseDefaultInputFont = true;
+    doc->m_input.font_name = "Old Font";
+    doc->m_input.font_height = 9;
+
+    int inputSignals = 0;
+    QObject::connect(doc.get(), &WorldDocument::inputSettingsChanged,
+                     [&inputSignals]() { ++inputSignals; });
+
+    doc->reloadDefaults();
+
+    EXPECT_EQ(doc->m_input.font_name, "Comic Sans MS")
+        << "Input font name should be reloaded from defaults";
+    EXPECT_EQ(doc->m_input.font_height, 17) << "Input font height should be reloaded";
+    EXPECT_EQ(inputSignals, 1) << "inputSettingsChanged must fire to refresh the view";
+
+    opts.setDefaultInputFont(savedFont);
+    opts.setDefaultInputFontHeight(savedHeight);
+}
+
+TEST_F(XmlSerializationTest, ReloadDefaultsSkipsInputFontWhenFlagDisabled)
+{
+    auto& opts = GlobalOptions::instance();
+    const QString savedFont = opts.defaultInputFont();
+
+    opts.setDefaultInputFont("Comic Sans MS");
+
+    auto doc = std::make_unique<WorldDocument>();
+    doc->m_bUseDefaultInputFont = false; // opted out
+    doc->m_input.font_name = "Keep This Font";
+
+    int inputSignals = 0;
+    QObject::connect(doc.get(), &WorldDocument::inputSettingsChanged,
+                     [&inputSignals]() { ++inputSignals; });
+
+    doc->reloadDefaults();
+
+    EXPECT_EQ(doc->m_input.font_name, "Keep This Font")
+        << "Input font must be untouched when the flag is off";
+    EXPECT_EQ(inputSignals, 0) << "inputSettingsChanged must not fire when flag is off";
+
+    opts.setDefaultInputFont(savedFont);
+}
+
+TEST_F(XmlSerializationTest, ReloadDefaultsAppliesOutputFontWhenFlagEnabled)
+{
+    auto& opts = GlobalOptions::instance();
+    const QString savedFont = opts.defaultOutputFont();
+    const int savedHeight = opts.defaultOutputFontHeight();
+
+    opts.setDefaultOutputFont("Lucida Console");
+    opts.setDefaultOutputFontHeight(14);
+
+    auto doc = std::make_unique<WorldDocument>();
+    doc->m_bUseDefaultOutputFont = 1;
+    doc->m_output.font_name = "Old Output Font";
+    doc->m_output.font_height = 8;
+
+    int outputSignals = 0;
+    QObject::connect(doc.get(), &WorldDocument::outputSettingsChanged,
+                     [&outputSignals]() { ++outputSignals; });
+
+    doc->reloadDefaults();
+
+    EXPECT_EQ(doc->m_output.font_name, "Lucida Console")
+        << "Output font name should be reloaded from defaults";
+    EXPECT_EQ(doc->m_output.font_height, 14) << "Output font height should be reloaded";
+    EXPECT_EQ(outputSignals, 1) << "outputSettingsChanged must fire to refresh the view";
+
+    opts.setDefaultOutputFont(savedFont);
+    opts.setDefaultOutputFontHeight(savedHeight);
 }

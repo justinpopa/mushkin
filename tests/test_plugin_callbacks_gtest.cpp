@@ -343,3 +343,210 @@ TEST_F(PluginCallbacksTest, SendToAllPluginCallbacks_IntIntString_BatchesNotes)
         << "Note from int+int+string callback should be deferred to the outstanding queue";
     EXPECT_FALSE(doc->m_bNotesNotWantedNow) << "flag must be reset to false after the call";
 }
+
+// ===========================================================================
+// PluginListChanged batching parity (M190).
+//
+// The Plugin Management dialog's Add/Remove/Reinstall handlers load/unload a
+// batch of plugins and must fire OnPluginListChanged exactly ONCE after the
+// whole batch, matching original PluginsDlg.cpp OnAddPlugin:382,
+// OnDeletePlugin:434, OnReload:543. The WorldDocument primitives support this
+// via the suppressListChanged flag on LoadPlugin/UnloadPlugin plus an explicit
+// PluginListChanged() call. The tests below pin that contract: a batch of
+// suppressed loads followed by one PluginListChanged() notifies an observer
+// plugin once, whereas an unsuppressed load notifies per-plugin.
+// ===========================================================================
+
+// Helper: build a plugin XML that counts OnPluginListChanged invocations into a
+// uniquely-named Lua global so the observer survives the batch operations.
+static QString makeObserverPluginXml(const QString& id, const QString& counterGlobal)
+{
+    return QString(R"(<?xml version="1.0"?>
+<!DOCTYPE muclient>
+<muclient>
+<plugin name="Observer %1" author="Test" id="%2" language="Lua"
+        purpose="count list-changed" version="1.0" save_state="n">
+<script>
+<![CDATA[
+%3 = 0
+function OnPluginListChanged()
+  %3 = %3 + 1
+end
+]]>
+</script>
+</plugin>
+</muclient>
+)")
+        .arg(id, id, counterGlobal);
+}
+
+static Plugin* loadPluginFromString(WorldDocument* doc, const QString& xml, bool suppress)
+{
+    QTemporaryFile f;
+    f.setFileTemplate("observer-plugin-XXXXXX.xml");
+    if (!f.open()) {
+        return nullptr;
+    }
+    f.write(xml.toUtf8());
+    f.flush();
+    QString err;
+    return doc->LoadPlugin(f.fileName(), err, suppress);
+}
+
+// Test 15: a suppressed batch + one explicit PluginListChanged() notifies once.
+TEST_F(PluginCallbacksTest, PluginListChanged_BatchedLoad_NotifiesOnce)
+{
+    // Install an observer plugin (not suppressed — it isn't part of the batch).
+    Plugin* observer = loadPluginFromString(
+        doc.get(),
+        makeObserverPluginXml("{aaaaaaaa-0000-0000-0000-000000000001}", "list_changed_count"),
+        /*suppress=*/false);
+    ASSERT_NE(observer, nullptr);
+    lua_State* obsL = observer->m_ScriptEngine->L;
+
+    // Reset the counter after install-time notifications settle.
+    lua_pushinteger(obsL, 0);
+    lua_setglobal(obsL, "list_changed_count");
+
+    // Simulate the dialog's Add handler: load a batch with suppression...
+    for (int i = 2; i <= 4; ++i) {
+        Plugin* p = loadPluginFromString(
+            doc.get(),
+            makeObserverPluginXml(QString("{bbbbbbbb-0000-0000-0000-00000000000%1}").arg(i),
+                                  QString("ignored_%1").arg(i)),
+            /*suppress=*/true);
+        ASSERT_NE(p, nullptr) << "batch plugin " << i << " failed to load";
+    }
+
+    // ...then fire the single batched notification.
+    doc->PluginListChanged();
+
+    lua_getglobal(obsL, "list_changed_count");
+    int count = lua_tointeger(obsL, -1);
+    lua_pop(obsL, 1);
+
+    EXPECT_EQ(count, 1) << "Batched load must notify OnPluginListChanged exactly once, not "
+                           "once per plugin";
+}
+
+// ===========================================================================
+// SendToFirstPluginCallbacks fall-through on error (H10).
+//
+// Original plugins.cpp:1380: after executing the callback, the loop checks
+// callinfo._dispid_info.isvalid(). If the callback errored, the dispid is
+// set to DISPID_UNKNOWN and isvalid() returns false — the loop falls through
+// to the next plugin instead of stopping. Mushkin mirrors this by re-checking
+// hasCallback() after execution: if the callback cleared its own dispid entry
+// (error path in plugin.cpp:346), iteration continues to the next plugin.
+// ===========================================================================
+
+// Helper: build a plugin XML where OnPluginTrace errors at runtime.
+static QString makeErroringTracePlugin(const QString& id)
+{
+    return QString(R"(<?xml version="1.0"?>
+<!DOCTYPE muclient>
+<muclient>
+<plugin name="ErrorTrace %1" author="Test" id="%2" language="Lua"
+        purpose="erroring trace" version="1.0" save_state="n">
+<script>
+<![CDATA[
+function OnPluginTrace(msg)
+  -- deliberate runtime error: call an undefined global
+  return undefined_function_that_does_not_exist()
+end
+]]>
+</script>
+</plugin>
+</muclient>
+)")
+        .arg(id, id);
+}
+
+// Helper: build a plugin XML where OnPluginTrace succeeds and records the call.
+static QString makeWorkingTracePlugin(const QString& id, const QString& flagGlobal)
+{
+    return QString(R"(<?xml version="1.0"?>
+<!DOCTYPE muclient>
+<muclient>
+<plugin name="WorkTrace %1" author="Test" id="%2" language="Lua"
+        purpose="working trace" version="1.0" save_state="n">
+<script>
+<![CDATA[
+%3 = false
+function OnPluginTrace(msg)
+  %3 = true
+  return true
+end
+]]>
+</script>
+</plugin>
+</muclient>
+)")
+        .arg(id, id, flagGlobal);
+}
+
+// Test 17: SendToFirstPluginCallbacks falls through to the next plugin when
+// the first plugin's callback errors at runtime (H10).
+TEST_F(PluginCallbacksTest, SendToFirstPluginCallbacks_FallsThroughOnCallbackError)
+{
+    // Load a plugin whose OnPluginTrace will error at runtime.
+    Plugin* errorPlugin = loadPluginFromString(
+        doc.get(), makeErroringTracePlugin("{eeeeeeee-0000-0000-0000-000000000001}"),
+        /*suppress=*/true);
+    ASSERT_NE(errorPlugin, nullptr) << "erroring trace plugin failed to load";
+
+    // Load a second plugin whose OnPluginTrace works correctly.
+    Plugin* workPlugin = loadPluginFromString(
+        doc.get(),
+        makeWorkingTracePlugin("{ffffffff-0000-0000-0000-000000000001}", "trace_handled"),
+        /*suppress=*/true);
+    ASSERT_NE(workPlugin, nullptr) << "working trace plugin failed to load";
+    lua_State* workL = workPlugin->m_ScriptEngine->L;
+
+    // Confirm the working plugin's flag starts false.
+    lua_getglobal(workL, "trace_handled");
+    bool handledBefore = lua_toboolean(workL, -1);
+    lua_pop(workL, 1);
+    EXPECT_FALSE(handledBefore);
+
+    // Fire the callback; the first plugin will error, the second should handle it.
+    bool result = doc->SendToFirstPluginCallbacks(ON_PLUGIN_TRACE, "test trace message");
+
+    EXPECT_TRUE(result) << "SendToFirstPluginCallbacks should return true (second plugin handled)";
+
+    lua_getglobal(workL, "trace_handled");
+    bool handledAfter = lua_toboolean(workL, -1);
+    lua_pop(workL, 1);
+    EXPECT_TRUE(handledAfter)
+        << "Second plugin's OnPluginTrace must run when first plugin's callback errors (H10)";
+}
+
+// Test 16: without suppression each load notifies the observer (the deviating
+// behavior). Confirms the suppress flag is what makes batching possible.
+TEST_F(PluginCallbacksTest, PluginListChanged_UnsuppressedLoad_NotifiesPerPlugin)
+{
+    Plugin* observer = loadPluginFromString(
+        doc.get(),
+        makeObserverPluginXml("{cccccccc-0000-0000-0000-000000000001}", "per_plugin_count"),
+        /*suppress=*/false);
+    ASSERT_NE(observer, nullptr);
+    lua_State* obsL = observer->m_ScriptEngine->L;
+
+    lua_pushinteger(obsL, 0);
+    lua_setglobal(obsL, "per_plugin_count");
+
+    for (int i = 2; i <= 4; ++i) {
+        Plugin* p = loadPluginFromString(
+            doc.get(),
+            makeObserverPluginXml(QString("{dddddddd-0000-0000-0000-00000000000%1}").arg(i),
+                                  QString("ignored2_%1").arg(i)),
+            /*suppress=*/false);
+        ASSERT_NE(p, nullptr) << "plugin " << i << " failed to load";
+    }
+
+    lua_getglobal(obsL, "per_plugin_count");
+    int count = lua_tointeger(obsL, -1);
+    lua_pop(obsL, 1);
+
+    EXPECT_EQ(count, 3) << "Each unsuppressed load should notify the observer once";
+}
