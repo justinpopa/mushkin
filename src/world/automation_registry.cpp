@@ -413,6 +413,20 @@ static bool matchTriggerWithRepeat(Trigger* trigger, const QString& text, Line* 
             }
             trigger->wildcards[i] = captured;
         }
+        // Populate named wildcards for regexp repeat triggers (M3: parity with non-repeat path)
+        if (trigger->use_regexp) {
+            trigger->namedWildcards.clear();
+            const QStringList namedGroups = re.namedCaptureGroups();
+            for (const QString& groupName : namedGroups) {
+                if (!groupName.isEmpty()) {
+                    QString captured = match.captured(groupName);
+                    if (trigger->lowercase_wildcard) {
+                        captured = captured.toLower();
+                    }
+                    trigger->namedWildcards[groupName] = captured;
+                }
+            }
+        }
         ctx->executeTrigger(trigger, line, text);
         anyMatch = true;
         offset = match.capturedEnd();
@@ -528,13 +542,16 @@ void AutomationRegistry::evaluateTriggers(Line* line)
             if (!oneShotToDelete.isEmpty()) {
                 plugin->m_TriggerMap.erase(oneShotToDelete);
                 plugin->m_triggersNeedSorting = true;
+                oneShotToDelete.clear();
             }
-            // Value 1 = stop this phase only; value 2 = stop all phases
+            // Value 2 = stop all phases (eStopEvaluatingTriggersInAllPlugins)
             if (m_ctx.stopTriggerEvaluation() >= 2) {
                 m_ctx.setCurrentPlugin(savedPlugin);
                 return;
             }
-            break; // Stop this phase, continue to next
+            // Value 0 or 1 = stop this plugin's sequence only; continue to next plugin
+            // (original: m_iStopTriggerEvaluation reset at top of each iteration, loop
+            //  condition only exits for eStopEvaluatingTriggersInAllPlugins)
         }
     }
 
@@ -590,12 +607,13 @@ void AutomationRegistry::evaluateTriggers(Line* line)
             if (!oneShotToDelete.isEmpty()) {
                 plugin->m_TriggerMap.erase(oneShotToDelete);
                 plugin->m_triggersNeedSorting = true;
+                oneShotToDelete.clear();
             }
+            // Value 2 = stop all phases; value 0/1 = stop this plugin only, continue to next
             if (m_ctx.stopTriggerEvaluation() >= 2) {
                 m_ctx.setCurrentPlugin(savedPlugin);
                 return;
             }
-            break;
         }
     }
 
@@ -767,8 +785,17 @@ void AutomationRegistry::resetOneTimer(Timer* timer)
 
 void AutomationRegistry::resetAllTimers()
 {
+    // Reset main world timers
     for (auto& [name, timer] : m_TimerMap) {
         resetOneTimer(timer.get());
+    }
+    // Reset plugin timers (original: timers.cpp:361-368 iterates plugins)
+    for (const auto& plugin : m_ctx.pluginList()) {
+        if (plugin && plugin->m_bEnabled) {
+            for (auto& [name, timer] : plugin->m_TimerMap) {
+                resetOneTimer(timer.get());
+            }
+        }
     }
 }
 
