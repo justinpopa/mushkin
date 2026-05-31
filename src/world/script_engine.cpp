@@ -965,13 +965,13 @@ return re
     }
 
     // 10. Sandbox: disable dangerous functions (original: DisableDLLs in lua_methods.cpp:7676-7742)
+    // Note: package.loadlib and C library loaders are conditioned on enablePackageLibrary()
+    // matching original's m_bEnablePackageLibrary check (lua_methods.cpp:7678).
     const char* sandbox_code = R"(
-        -- Replace os.exit with error (original raises luaL_error)
-        os.exit = function() error("os.exit not implemented in Mushkin") end
-        -- Replace io.popen with error (prevents shell command execution)
-        io.popen = function() error("io.popen not implemented in Mushkin") end
-        -- Remove package.loadlib (prevents loading arbitrary native DLLs)
-        package.loadlib = nil
+        -- Replace os.exit with error (original raises luaL_error: lua_methods.cpp:7668)
+        os.exit = function() error("'os.exit' not implemented in MUSHclient") end
+        -- Replace io.popen with error (original raises luaL_error: lua_methods.cpp:7673)
+        io.popen = function() error("'io.popen' not implemented in MUSHclient") end
         -- Remove C library loaders from package.loaders (keep preload + Lua file searcher)
         -- Language modules (MoonScript, YueScript, etc.) insert their own searchers,
         -- pushing the standard Lua file searcher to a higher index. We remove all
@@ -982,7 +982,8 @@ return re
                 table.remove(package.loaders, i)
             end
         end
-        -- Replace debug.debug with error (prevents interactive debugging)
+        -- Replace debug.debug with error (original opens a CDebugLuaDlg modal dialog,
+        -- which has no Qt equivalent; raise an error as the fallback behavior)
         if debug then
             debug.debug = function() error("debug.debug not implemented in Mushkin") end
         end
@@ -992,22 +993,43 @@ return re
         lua_pop(L, 1);
     }
 
-    // 10b. Restore standard searchers and add backslash normalizer
+    // 10b. Conditionally remove package.loadlib and C library loaders
+    // (original: lua_methods.cpp:7678-7703 — only when !m_bEnablePackageLibrary)
+    {
+        GlobalOptions& opts = GlobalOptions::instance();
+        if (!opts.enablePackageLibrary()) {
+            lua_getglobal(L, "package");
+            if (lua_istable(L, -1)) {
+                // package.loadlib = nil (lua_methods.cpp:7686-7687)
+                lua_pushnil(L);
+                lua_setfield(L, -2, "loadlib");
+            }
+            lua_pop(L, 1); // pop package
+        }
+    }
+
+    // 10c. Restore standard searchers and add backslash normalizer
     // After the sandbox stripped package.loaders to just {preload}, rebuild it
     // WITHOUT nil holes (ipairs stops at first nil):
     //   [1] preload searcher     (already there)
     //   [2] Lua file searcher    (saved in registry at step 2b)
-    //   [3] C library searcher   (saved in registry at step 2b, for bundled .so modules)
-    //   [4] all-in-one searcher  (for submodules like ssl.core → ssl.so + luaopen_ssl_core)
+    // When enablePackageLibrary() is true, also restore:
+    //   [3] C library searcher   (lua_methods.cpp:7699-7701: only kept when enabled)
+    //   [4] all-in-one searcher  (lua_methods.cpp:7695-7697: only kept when enabled)
     lua_getglobal(L, "package");
     lua_getfield(L, -1, "loaders");
     lua_getfield(L, LUA_REGISTRYINDEX, "mushclient.lua_searcher");
     lua_rawseti(L, -2, 2); // package.loaders[2] = Lua file searcher
-    lua_getfield(L, LUA_REGISTRYINDEX, "mushclient.c_searcher");
-    lua_rawseti(L, -2, 3); // package.loaders[3] = C library searcher
-    lua_getfield(L, LUA_REGISTRYINDEX, "mushclient.allinone_searcher");
-    lua_rawseti(L, -2, 4); // package.loaders[4] = all-in-one searcher
-    lua_pop(L, 2);         // pop loaders + package
+    {
+        GlobalOptions& opts = GlobalOptions::instance();
+        if (opts.enablePackageLibrary()) {
+            lua_getfield(L, LUA_REGISTRYINDEX, "mushclient.c_searcher");
+            lua_rawseti(L, -2, 3); // package.loaders[3] = C library searcher
+            lua_getfield(L, LUA_REGISTRYINDEX, "mushclient.allinone_searcher");
+            lua_rawseti(L, -2, 4); // package.loaders[4] = all-in-one searcher
+        }
+    }
+    lua_pop(L, 2); // pop loaders + package
 
     // Then insert backslash normalizer at [2], shifting others to [3], [4], [5]:
     //   [1] preload, [2] normalizer, [3] Lua, [4] C library, [5] all-in-one
@@ -1030,17 +1052,15 @@ return re
 
     // 11. Execute global sandbox/init script (original: lua_scripting.cpp:222-226)
     // This runs the user's Lua initialization script from global preferences
-    // (accessible via "Edit > Global Preferences > Lua" in the original)
+    // (accessible via "Edit > Global Preferences > Lua" in the original).
+    // Uses parseLua() so errors are user-visible (luaError → ColourNote) and timing is
+    // tracked in m_iScriptTimeTaken — matching original's ParseLua() call (lua_scripting.cpp:224).
     {
         GlobalOptions& opts = GlobalOptions::instance();
         QString luaScript = opts.luaScript();
         if (!luaScript.isEmpty()) {
             m_doc->m_iCurrentActionSource = ActionSource::eLuaSandbox;
-            QByteArray scriptUtf8 = luaScript.toUtf8();
-            if (luaL_dostring(L, scriptUtf8.constData()) != 0) {
-                qWarning() << "Sandbox script error:" << lua_tostring(L, -1);
-                lua_pop(L, 1);
-            }
+            parseLua(luaScript, "Sandbox");
             m_doc->m_iCurrentActionSource = ActionSource::eUnknownActionSource;
         }
     }
