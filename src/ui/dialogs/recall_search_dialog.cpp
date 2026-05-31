@@ -126,13 +126,26 @@ void RecallSearchDialog::loadSettings()
         }
     }
 
-    // Load last search options
+    // Match-case and regex are not document-backed in the original (they live in the
+    // transient find info); persist them globally for convenience.
     m_matchCaseCheck->setChecked(db.getPreferenceInt("RecallMatchCase", 0) != 0);
     m_useRegexCheck->setChecked(db.getPreferenceInt("RecallUseRegex", 0) != 0);
-    m_includeOutputCheck->setChecked(db.getPreferenceInt("RecallIncludeOutput", 1) != 0);
-    m_includeCommandsCheck->setChecked(db.getPreferenceInt("RecallIncludeCommands", 0) != 0);
-    m_includeNotesCheck->setChecked(db.getPreferenceInt("RecallIncludeNotes", 0) != 0);
-    m_linePreambleEdit->setText(db.getPreference("RecallLinePreamble", ""));
+
+    // Line-type flags and the recall preamble are per-world document state in the
+    // original (CMUSHclientDoc::m_bRecallCommands/Output/Notes, m_strRecallLinePreamble;
+    // see doc.cpp:4930-4933). Seed the dialog from the document so each world keeps
+    // its own settings; fall back to global preferences only when no document is set.
+    if (m_doc) {
+        m_includeOutputCheck->setChecked(m_doc->m_bRecallOutput);
+        m_includeCommandsCheck->setChecked(m_doc->m_bRecallCommands);
+        m_includeNotesCheck->setChecked(m_doc->m_bRecallNotes);
+        m_linePreambleEdit->setText(m_doc->m_output.recall_line_preamble);
+    } else {
+        m_includeOutputCheck->setChecked(db.getPreferenceInt("RecallIncludeOutput", 1) != 0);
+        m_includeCommandsCheck->setChecked(db.getPreferenceInt("RecallIncludeCommands", 0) != 0);
+        m_includeNotesCheck->setChecked(db.getPreferenceInt("RecallIncludeNotes", 0) != 0);
+        m_linePreambleEdit->setText(db.getPreference("RecallLinePreamble", ""));
+    }
 }
 
 void RecallSearchDialog::saveSettings()
@@ -146,13 +159,20 @@ void RecallSearchDialog::saveSettings()
     QString historyStr = m_searchHistory.join('\n');
     db.setPreference("RecallHistory", historyStr);
 
-    // Save search options
+    // Match-case and regex are global conveniences (not document-backed).
     db.setPreferenceInt("RecallMatchCase", m_matchCaseCheck->isChecked() ? 1 : 0);
     db.setPreferenceInt("RecallUseRegex", m_useRegexCheck->isChecked() ? 1 : 0);
-    db.setPreferenceInt("RecallIncludeOutput", m_includeOutputCheck->isChecked() ? 1 : 0);
-    db.setPreferenceInt("RecallIncludeCommands", m_includeCommandsCheck->isChecked() ? 1 : 0);
-    db.setPreferenceInt("RecallIncludeNotes", m_includeNotesCheck->isChecked() ? 1 : 0);
-    db.setPreference("RecallLinePreamble", m_linePreambleEdit->text());
+
+    // The line-type flags and recall preamble belong to the world document and are
+    // written back there in onOkClicked() (matching the original, which only commits
+    // them on IDOK). When there is no document, keep persisting the globals so the
+    // documentless path retains its previous behavior.
+    if (!m_doc) {
+        db.setPreferenceInt("RecallIncludeOutput", m_includeOutputCheck->isChecked() ? 1 : 0);
+        db.setPreferenceInt("RecallIncludeCommands", m_includeCommandsCheck->isChecked() ? 1 : 0);
+        db.setPreferenceInt("RecallIncludeNotes", m_includeNotesCheck->isChecked() ? 1 : 0);
+        db.setPreference("RecallLinePreamble", m_linePreambleEdit->text());
+    }
 }
 
 void RecallSearchDialog::onOkClicked()
@@ -192,6 +212,20 @@ void RecallSearchDialog::onOkClicked()
     m_includeNotes = m_includeNotesCheck->isChecked();
     m_lineCount = m_lineCountSpin->value();
     m_linePreamble = m_linePreambleEdit->text();
+
+    // Commit per-world recall state back to the document, matching the original
+    // (doc.cpp:4941-4949): line-type flags are stored on the document, and changing
+    // the recall preamble marks the document modified.
+    if (m_doc) {
+        m_doc->m_bRecallCommands = m_includeCommands;
+        m_doc->m_bRecallOutput = m_includeOutput;
+        m_doc->m_bRecallNotes = m_includeNotes;
+
+        if (m_doc->m_output.recall_line_preamble != m_linePreamble) {
+            m_doc->m_output.recall_line_preamble = m_linePreamble;
+            m_doc->setModified(true);
+        }
+    }
 
     accept();
 }

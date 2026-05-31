@@ -664,6 +664,22 @@ gtest_discover_tests(test-world-properties-dialog-gtest
     DISCOVERY_TIMEOUT 30
 )
 
+# Recall search dialog parity test (line-type flags + preamble are per-document)
+add_executable(test-recall-search-dialog-gtest
+    test_recall_search_dialog_gtest.cpp
+)
+
+target_link_libraries(test-recall-search-dialog-gtest PRIVATE
+    test_main_gui
+    Qt6::Gui
+    Qt6::Widgets
+    ui
+)
+
+gtest_discover_tests(test-recall-search-dialog-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
 # XML roundtrip test
 add_executable(test-xml-roundtrip-gtest
     test_xml_roundtrip_gtest.cpp
