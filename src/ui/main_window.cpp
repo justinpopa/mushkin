@@ -4394,8 +4394,9 @@ void MainWindow::stopSound()
         return;
     }
 
-    // Stop all sounds for this world (buffer 0 = all)
-    worldWidget->document()->StopSound(0);
+    // "Stop sound playing" menu — original OnDisplayStopsoundplaying calls CancelSound,
+    // which fires OnPluginPlaySound (plugins may suppress) before stopping all buffers.
+    worldWidget->document()->CancelSound();
 }
 
 void MainWindow::toggleCommandEcho()

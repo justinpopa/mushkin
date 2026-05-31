@@ -718,6 +718,23 @@ gtest_discover_tests(test-sound-api-gtest
     DISCOVERY_TIMEOUT 30
 )
 
+# StopSound vs CancelSound parity test (group 4, H8)
+add_executable(test-sound-cancel-gtest
+    test_sound_cancel_gtest.cpp
+)
+
+target_link_libraries(test-sound-cancel-gtest PRIVATE
+    test_main_core
+    Qt6::Gui
+    Qt6::Widgets
+    Qt6::Multimedia
+    ui
+)
+
+gtest_discover_tests(test-sound-cancel-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
 # Unique ID API test
 add_executable(test-unique-id-api-gtest
     test_unique_id_api_gtest.cpp

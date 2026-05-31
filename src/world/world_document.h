@@ -1126,7 +1126,8 @@ class WorldDocument : public QObject, public IWorldContext {
     bool m_bPluginProcessingCommand;
     bool m_bPluginProcessingSend;
     bool m_bPluginProcessingSent;
-    bool m_bInPlaySoundFilePlugin = false; // Recursion guard for OnPluginPlaySound
+    bool m_bInPlaySoundFilePlugin = false; // Recursion guard for OnPluginPlaySound (PlaySoundFile)
+    bool m_bInCancelSoundFilePlugin = false; // Recursion guard for OnPluginPlaySound (CancelSound)
     QString m_strLastCommandSent;
     qint32 m_iLastCommandCount;
     qint32 m_iExecutionDepth;
@@ -1895,6 +1896,7 @@ class WorldDocument : public QObject, public IWorldContext {
     // callers in world_trigger_execution.cpp, telnet_parser.cpp, and Lua API bindings.
     qint32 PlaySound(qint16 buffer, const QString& filename, bool loop, double volume, double pan);
     qint32 StopSound(qint16 buffer);
+    void CancelSound();
     bool PlaySoundFile(const QString& filename);
     qint32 GetSoundStatus(qint16 buffer);
     void PlayMSPSound(const QString& filename, const QString& url, bool loop, double volume,
