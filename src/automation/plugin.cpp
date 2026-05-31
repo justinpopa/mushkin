@@ -695,36 +695,11 @@ std::expected<void, QString> Plugin::SaveState()
         xml.writeEndElement(); // variables
     }
 
-    // Write arrays section
-    if (!m_Arrays.isEmpty()) {
-        xml.writeStartElement("arrays");
-
-        // Sort array names for consistent output
-        QStringList arrayNames = m_Arrays.keys();
-        arrayNames.sort();
-
-        for (const QString& arrayName : arrayNames) {
-            const QMap<QString, QString>& arrayMap = m_Arrays[arrayName];
-
-            xml.writeStartElement("array");
-            xml.writeAttribute("name", arrayName);
-
-            // Sort keys within each array
-            QStringList itemKeys = arrayMap.keys();
-            itemKeys.sort();
-
-            for (const QString& itemKey : itemKeys) {
-                xml.writeStartElement("item");
-                xml.writeAttribute("key", itemKey);
-                xml.writeCharacters(arrayMap[itemKey]);
-                xml.writeEndElement(); // item
-            }
-
-            xml.writeEndElement(); // array
-        }
-
-        xml.writeEndElement(); // arrays
-    }
+    // Original MUSHclient saves only <variables> to the plugin state file
+    // (plugins.cpp:809 -> Save_World_XML with XML_VARIABLES only). Plugin
+    // arrays (m_Arrays) are in-memory scripting state that the original
+    // discards on unload and never persists. We deliberately do NOT write an
+    // <arrays> section here to preserve byte-for-byte state-file parity.
 
     xml.writeEndElement(); // muclient
     xml.writeEndDocument();
