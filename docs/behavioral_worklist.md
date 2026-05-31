@@ -17,7 +17,7 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 - [x] H7: plugins — `OnPluginPacketReceived` is read-only (original allows plugin modification chain). Original: `doc.cpp:1768-1775`. Mushkin: `world_document.cpp:779`
 - [x] H8: plugins — `OnPluginPlaySound` never fired. Original: `doc.cpp` sound path. Mushkin: `sound_manager.cpp`
 - [~] H9: plugins — All 7 MXP callbacks missing (known gap, deferred with MXP). Mushkin: `mxp_engine.cpp`
-- [x] H10: plugins — `SendToFirstPluginCallbacks` stops on return-true instead of first-callback-defined. Original: `plugins.cpp:1380-1385`. Mushkin: `world_document_plugins.cpp:833`
+- [x] H10: plugins — `SendToFirstPluginCallbacks` stops on return-true instead of first-callback-defined. Original: `plugins.cpp:1380-1385`. Mushkin: `world_document_plugins.cpp:833` (existence-check fix correct; but see L117 — residual error-path fall-through gap found by cross-family re-verification)
 - [x] H11: output — Deferred note queue missing (notes during `m_bNotesNotWantedNow` silently dropped). Original: `methods_noting.cpp:49-71`. Mushkin: `output_formatter.cpp:47-50`
 - [x] H12: global-prefs — AutoLogWorld append mode wrong (uses setting instead of hardcoded true). Original: `doc.cpp:6668`. Mushkin: `connection_manager.cpp:151`
 - [x] H13: global-prefs — Directory resolution uses `AppPaths::getAppDirectory()` instead of CWD at startup. Original: `Utilities.cpp:2483`. Mushkin: `global_options.cpp`
@@ -695,3 +695,10 @@ Machine-readable worklist for automated fix loop. Items from `behavioral_audit_2
 
 ### HIGH
 - [x] H123: enums -- Systematic audit complete: all enum/constant values match original. ActionSource was the only mismatch (already fixed).: compare ALL enum/constant numeric values in Mushkin against original doc.h/OtherTypes.h/errors.h. ActionSource was completely wrong (invented values). Other enums may have the same problem. Check: SendTo, error codes, connect phases, MXP modes, colour types, line flags, style flags, telnet states.
+
+## v3 Audit: Cross-family re-verification (2026-05-30)
+
+Re-verified fixed HIGH items via the `parity-sweep` workflow (deepseek-v4-pro finder + xiaomi/mimo antagonist). The gemini single-pass and a manual Anthropic (Opus) review both reported H10 as a false positive; the cross-family finder surfaced a residual error-path deviation that both missed. Verified against original source before logging.
+
+### LOW
+- [ ] L117: plugins -- `SendToFirstPluginCallbacks` error-path fall-through. When a plugin's callback EXISTS but throws a Lua runtime error, the original invalidates the dispid (`ExecuteLua` sets the `DISPID&` to `DISPID_UNKNOWN` on error, `scripting.h:71`) so its post-execution `isvalid()` gate (`plugins.cpp:1380`) fails and the loop continues to the NEXT plugin. Mushkin uses a pre-execution `hasCallback()` check and returns `true` unconditionally after `ExecutePluginScript`, so an errored callback still stops iteration. Impact: on a callback Lua error, Mushkin suppresses subsequent/fallback handling (trace output, notepad dump, sound) even though no plugin actually handled it. Only triggers in an already-broken (callback-errored) state — hence LOW. Original: `reference/mushclient-original/plugins.cpp:1376-1384` + `scripting/lua_scripting.cpp:445`. Mushkin: `src/world/world_document_plugins.cpp:881-888`.

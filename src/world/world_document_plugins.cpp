@@ -876,8 +876,16 @@ bool WorldDocument::SendToFirstPluginCallbacks(const QString& callbackName, cons
 
         m_CurrentPlugin = plugin.get();
 
-        // Original plugins.cpp:1380 — stops on the first plugin that HAS the callback
-        // defined (isvalid), regardless of what the callback returns.
+        // Original plugins.cpp:1376-1384 — stops on the first plugin whose callback
+        // exists AND runs without error. The original re-checks isvalid() *after*
+        // executing: ExecuteLua sets the dispid reference to DISPID_UNKNOWN on a Lua
+        // error (scripting.h:71), so an errored callback fails the post-check and the
+        // loop falls through to the next plugin.
+        //
+        // KNOWN DEVIATION (worklist L117): we check hasCallback() *before* executing and
+        // return true unconditionally below, so a callback that errors still stops
+        // iteration instead of falling through. Low impact (only when a callback is in an
+        // already-broken error state); not yet fixed.
         if (!plugin->hasCallback(callbackName)) {
             continue;
         }
