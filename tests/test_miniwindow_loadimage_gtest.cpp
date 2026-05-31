@@ -263,10 +263,6 @@ TEST_F(WindowAddHotspotValidationTest, CallbackWithSpaceRejected)
 // Original: miniwindow.cpp:1736-1748
 // ---------------------------------------------------------------------------
 class WindowAddHotspotReplaceMouseStateTest : public WorldDocumentTest {
-// Parity regressions for f021 deviations
-// ---------------------------------------------------------------------------
-
-class MiniWindowParityTest : public WorldDocumentTest {
   protected:
     void SetUp() override
     {
@@ -322,6 +318,17 @@ TEST_F(WindowAddHotspotReplaceMouseStateTest, ReplaceHotspotClearsMouseDownState
 
     EXPECT_TRUE(win->mouseDownHotspot.isEmpty())
         << "mouseDownHotspot must be cleared when its hotspot is replaced";
+}
+
+// ---------------------------------------------------------------------------
+// Parity regressions for f021 deviations
+// ---------------------------------------------------------------------------
+class MiniWindowParityTest : public WorldDocumentTest {
+  protected:
+    void SetUp() override
+    {
+        WorldDocumentTest::SetUp();
+        win = std::make_unique<MiniWindow>(doc.get());
         // Create a 100x100 window
         win->Resize(100, 100, 0x00000000);
     }

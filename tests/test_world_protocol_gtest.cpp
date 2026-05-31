@@ -608,6 +608,8 @@ TEST_F(WorldProtocolTest, LastFlushTime_ValidAtConstruction)
 {
     EXPECT_TRUE(doc->m_LastFlushTime.isValid())
         << "m_LastFlushTime must be valid at construction (original doc_construct.cpp:207)";
+}
+
 // ========== Category 16: H46 — MXP secure-once mode cancelled on non-tag character ==========
 // Original: doc.cpp:1997-2001 — when MXP is active and a non-'<' character arrives,
 // secure-once mode must be reverted to the previous mode immediately (the "opening tag

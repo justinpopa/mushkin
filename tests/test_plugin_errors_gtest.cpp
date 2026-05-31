@@ -327,6 +327,8 @@ TEST_F(PluginErrorTest, SaveState_bScriptedBypassesSaveStateFlag)
     EXPECT_TRUE(resultScripted.has_value()) << "SaveState(true) should succeed";
     EXPECT_TRUE(QFile::exists(stateFilePath))
         << "State file MUST be written when bScripted=true regardless of m_bSaveState (H122)";
+}
+
 // Test 13: LoadPlugin - Script parse error must not leave plugin in list (M14)
 //
 // Original xml_load_world.cpp:559 inserts plugin ONLY after script parsing

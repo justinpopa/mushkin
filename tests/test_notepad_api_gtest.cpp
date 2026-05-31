@@ -449,6 +449,8 @@ TEST_F(NotepadApiTest, SaveToFileRespectsNoReplace)
     EXPECT_FALSE(notepad->SaveToFile(tmpPath, /*replaceExisting=*/false));
 
     QFile::remove(tmpPath);
+}
+
 // Test 31: CloseNotepad with querySave=false ignores m_iSaveOnChange and closes immediately
 // (no prompt regardless of save method)
 TEST_F(NotepadApiTest, CloseNotepadNoQuerySaveIgnoresSaveMethod)

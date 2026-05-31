@@ -1103,6 +1103,16 @@ add_executable(test-accelerator-manager-gtest
 )
 
 target_link_libraries(test-accelerator-manager-gtest PRIVATE
+    test_main_core
+    Qt6::Gui
+    Qt6::Widgets
+    ui
+)
+
+gtest_discover_tests(test-accelerator-manager-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
 # ConnectionManager behavioral parity test
 add_executable(test-connection-manager-gtest
     test_connection_manager_gtest.cpp
@@ -1115,7 +1125,10 @@ target_link_libraries(test-connection-manager-gtest PRIVATE
     ui
 )
 
-gtest_discover_tests(test-accelerator-manager-gtest
+gtest_discover_tests(test-connection-manager-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
 # Blend modes parity test (H30)
 add_executable(test-blend-modes-gtest
     test_blend_modes_gtest.cpp
@@ -1127,6 +1140,5 @@ target_link_libraries(test-blend-modes-gtest PRIVATE
 )
 
 gtest_discover_tests(test-blend-modes-gtest
-gtest_discover_tests(test-connection-manager-gtest
     DISCOVERY_TIMEOUT 30
 )

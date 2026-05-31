@@ -342,6 +342,8 @@ TEST_F(LuaApiTest, GetMappingStringParenthesisesMultiCharSingle)
     doc->m_mapList = QStringList{"n", "ne", "n", "n"};
     executeLua("map_mixed = world.GetMappingString()");
     EXPECT_EQ(getGlobalString("map_mixed"), "n (ne) 2n ") << "Mixed run: 'n (ne) 2n '";
+}
+
 // Fixture that extends ConnectedWorldTest with an open preferences database.
 // GetGlobalOption queries the DB, so tests for it need the DB open.
 class LuaApiWithDbTest : public ConnectedWorldTest {
@@ -394,6 +396,8 @@ TEST_F(LuaApiWithDbTest, GetGlobalOptionUnknownNameReturnsNil)
     lua_pop(L, 1);
 
     EXPECT_TRUE(isNil) << "GetGlobalOption must return nil for an unknown option name";
+}
+
 // Test 17: SetBackgroundImage — mode is required (not optional)
 // Original lua_methods.cpp:4943 uses my_checknumber(L, 2) which throws a Lua error if absent.
 TEST_F(LuaApiTest, SetBackgroundImageModeRequired)
@@ -436,7 +440,10 @@ TEST_F(LuaApiTest, SetBackgroundImageOldImageClearedBeforeValidation)
     // the old image name must have been cleared first.
     EXPECT_TRUE(doc->m_strBackgroundImageName.isEmpty())
         << "Old background image name must be cleared even when new filename is invalid";
-// M65/M66: AcceleratorList returns nil (not {}) when no script/plugin accelerators are registered
+}
+
+// M65/M66: AcceleratorList returns nil (not {}) when no script/plugin accelerators are
+// registered
 TEST_F(LuaApiTest, AcceleratorListEmptyReturnsNil)
 {
     // With no accelerators at all, AcceleratorList() must return nil, not an empty table.

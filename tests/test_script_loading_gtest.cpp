@@ -835,6 +835,8 @@ TEST_F(ScriptLoadingTest, IoPopenRaisesError)
         << "io.popen error message should mention io.popen: " << msg.toStdString();
     EXPECT_TRUE(msg.contains("MUSHclient"))
         << "io.popen error message should mention MUSHclient: " << msg.toStdString();
+}
+
 // ========== GetNestedFunction parity tests (H115) ==========
 // Verify that dotted names where an intermediate node is a function (not a table)
 // are correctly rejected — matches original Utilities.cpp:1734 guard

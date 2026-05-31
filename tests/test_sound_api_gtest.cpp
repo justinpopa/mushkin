@@ -178,6 +178,8 @@ TEST_F(SoundApiTest, PlaySoundMemoryExists)
     lua_getglobal(L, "result");
     EXPECT_TRUE(lua_toboolean(L, -1)) << "world.PlaySoundMemory should be a function";
     lua_pop(L, 1);
+}
+
 // H83/M50: Out-of-range volume resets to 0 (full volume), not clamped.
 // Original: methods_sounds.cpp:72-73 — if (Volume > 0 || Volume < (-100.0)) Volume = 0.0;
 // Verify that out-of-range volume does NOT cause an early rejection.  We use a
