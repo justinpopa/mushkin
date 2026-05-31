@@ -30,7 +30,7 @@ QRgb ColourNameToRGB(const QString& name)
         return static_cast<QRgb>(-1);
     }
 
-    QString lowerName = name.toLower();
+    QString lowerName = name.trimmed().toLower();
 
     // Standard X11/HTML color names - stored in BGR format for MUSHclient compatibility
     static const QMap<QString, quint32> colorMap = {
@@ -191,23 +191,21 @@ QRgb ColourNameToRGB(const QString& name)
         return colorMap[lowerName];
     }
 
-    // Try parsing as hex number (e.g., "#FF0000" or "0xFF0000" or "FF0000")
-    // Hex strings use HTML/CSS RGB format (#RRGGBB), need to convert to BGR
-    QString hexStr = lowerName;
-    if (hexStr.startsWith("#")) {
-        hexStr = hexStr.mid(1);
-    } else if (hexStr.startsWith("0x")) {
-        hexStr = hexStr.mid(2);
-    }
-
-    bool ok;
-    quint32 rgb = hexStr.toUInt(&ok, 16);
-    if (ok) {
-        // Convert from RGB (0x00RRGGBB) to BGR (0x00BBGGRR)
-        int r = (rgb >> 16) & 0xFF;
-        int g = (rgb >> 8) & 0xFF;
-        int b = rgb & 0xFF;
-        return BGR(r, g, b);
+    // Try parsing as hex number — original SetColour only enters the hex-parsing
+    // branch when the first character is '#' (mxputils.cpp:312). '0x'-prefixed
+    // strings and bare hex strings are NOT accepted; they fall through to the
+    // unknown-name path and return the error sentinel.
+    if (lowerName.startsWith("#")) {
+        QString hexStr = lowerName.mid(1);
+        bool ok;
+        quint32 rgb = hexStr.toUInt(&ok, 16);
+        if (ok) {
+            // Convert from RGB (0x00RRGGBB) to BGR (0x00BBGGRR)
+            int r = (rgb >> 16) & 0xFF;
+            int g = (rgb >> 8) & 0xFF;
+            int b = rgb & 0xFF;
+            return BGR(r, g, b);
+        }
     }
 
     // Original returns -1 (0xFFFFFFFF) for unknown color names

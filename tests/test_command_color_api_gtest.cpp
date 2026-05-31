@@ -270,11 +270,38 @@ TEST_F(CommandColorAPITest, ColourNameToRGBKnownReturnsPositiveBGR)
     EXPECT_EQ(callColourNameToRGB(L, "white"), 0x00FFFFFF);
 }
 
-// Hex strings resolve to positive BGR values too (never the -1 sentinel).
-TEST_F(CommandColorAPITest, ColourNameToRGBHexReturnsPositive)
+// '#'-prefixed hex strings resolve to positive BGR values (never the -1 sentinel).
+// Original SetColour only enters the hex-parsing branch when first char is '#'.
+TEST_F(CommandColorAPITest, ColourNameToRGBHashPrefixParsed)
 {
     // "#0000FF" (HTML blue, RGB) => BGR(0,0,255) => 0x00FF0000
     EXPECT_EQ(callColourNameToRGB(L, "#0000FF"), 0x00FF0000);
+    // "#FF0000" (HTML red, RGB) => BGR(255,0,0) => 0x000000FF
+    EXPECT_EQ(callColourNameToRGB(L, "#FF0000"), 0x000000FF);
+}
+
+// '0x'-prefixed hex strings are NOT valid color notation in the original;
+// they fall through to the unknown-name path and return -1.
+TEST_F(CommandColorAPITest, ColourNameToRGB0xPrefixReturnsMinusOne)
+{
+    EXPECT_EQ(callColourNameToRGB(L, "0xFF0000"), -1);
+    EXPECT_EQ(callColourNameToRGB(L, "0x0000ff"), -1);
+}
+
+// Bare hex strings (no prefix) are not valid; original rejects them too.
+TEST_F(CommandColorAPITest, ColourNameToRGBBareHexReturnsMinusOne)
+{
+    EXPECT_EQ(callColourNameToRGB(L, "ff0000"), -1);
+    EXPECT_EQ(callColourNameToRGB(L, "FF0000"), -1);
+}
+
+// Leading/trailing whitespace must be trimmed before lookup, matching the
+// original TrimLeft/TrimRight calls in SetColour (mxputils.cpp:304-306).
+TEST_F(CommandColorAPITest, ColourNameToRGBTrimsWhitespace)
+{
+    // " red " with surrounding spaces should resolve the same as "red"
+    EXPECT_EQ(callColourNameToRGB(L, " red "), callColourNameToRGB(L, "red"));
+    EXPECT_EQ(callColourNameToRGB(L, "\t blue \t"), callColourNameToRGB(L, "blue"));
 }
 
 // ========== Utility Function Tests ==========
