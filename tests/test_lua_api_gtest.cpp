@@ -393,4 +393,46 @@ TEST_F(LuaApiWithDbTest, GetGlobalOptionUnknownNameReturnsNil)
     lua_pop(L, 1);
 
     EXPECT_TRUE(isNil) << "GetGlobalOption must return nil for an unknown option name";
+// Test 17: SetBackgroundImage — mode is required (not optional)
+// Original lua_methods.cpp:4943 uses my_checknumber(L, 2) which throws a Lua error if absent.
+TEST_F(LuaApiTest, SetBackgroundImageModeRequired)
+{
+    // Calling without mode argument should cause a Lua error (missing required arg).
+    ASSERT_EQ(luaL_loadstring(L, "world.SetBackgroundImage('')"), 0) << "Code should compile";
+    int result = lua_pcall(L, 0, 0, 0);
+    EXPECT_NE(result, 0) << "SetBackgroundImage with missing mode should raise a Lua error";
+    lua_pop(L, lua_gettop(L)); // clear any error string
+}
+
+// Test 18: SetBackgroundImage — clearing with empty filename does NOT store mode
+// Original methods_output.cpp:505-506: returns eOK on empty filename without setting
+// m_iBackgroundMode (the mode field is only set on successful image load).
+TEST_F(LuaApiTest, SetBackgroundImageClearDoesNotStoreMode)
+{
+    // Pre-set mode to a known value so we can detect if it was overwritten.
+    doc->m_iBackgroundMode = 7;
+
+    executeLua("world.SetBackgroundImage('', 3)");
+
+    EXPECT_EQ(doc->m_iBackgroundMode, 7)
+        << "Clearing the image (empty filename) must not update m_iBackgroundMode";
+    EXPECT_TRUE(doc->m_strBackgroundImageName.isEmpty())
+        << "Background image name should be cleared";
+}
+
+// Test 19: SetBackgroundImage — old image always cleared before validation
+// Original methods_output.cpp:492-497: existing bitmap deleted and name emptied before
+// any filename checks, so an invalid new filename still clears the old image.
+TEST_F(LuaApiTest, SetBackgroundImageOldImageClearedBeforeValidation)
+{
+    // Start with a non-empty image name to simulate a previously loaded image.
+    doc->m_strBackgroundImageName = "/some/previous/image.bmp";
+
+    // Pass a filename that is too short (triggers eBadParameter validation).
+    executeLua("world.SetBackgroundImage('x.bmp', 0)"); // too short to be valid
+
+    // Even though the call failed (bad filename — only 5 chars, missing directory),
+    // the old image name must have been cleared first.
+    EXPECT_TRUE(doc->m_strBackgroundImageName.isEmpty())
+        << "Old background image name must be cleared even when new filename is invalid";
 }

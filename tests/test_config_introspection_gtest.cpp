@@ -116,3 +116,58 @@ TEST_F(ConfigIntrospectionTest, CaseInsensitiveMatching)
     EXPECT_EQ(upperPort, lowerPort)
         << "GetCurrentValue should match option names case-insensitively";
 }
+
+// Test 11: GetInfo(212) respects line_spacing override when non-zero
+// Original doc.cpp:3253-3256: m_FontHeight = iLineSpacing when non-zero.
+// Only tests the override path here — the font-metrics fallback (line_spacing == 0)
+// requires a QApplication and belongs in a GUI test suite.
+TEST_F(ConfigIntrospectionTest, GetInfo212RespectsLineSpacing)
+{
+    // Set a line_spacing override and verify GetInfo(212) returns it exactly.
+    doc->m_display.line_spacing = 20;
+    executeLua("h_override = world.GetInfo(212)");
+    double hOverride = getGlobalNumber("h_override");
+    EXPECT_EQ(hOverride, 20.0)
+        << "GetInfo(212) must return line_spacing when non-zero (original: doc.cpp:3253-3254)";
+}
+
+// Test 12: GetInfo(241) respects line_spacing override when non-zero
+// GetInfo(241) is the same metric as GetInfo(212) and must follow the same override.
+// Only tests the override path — font-metrics fallback needs a QApplication.
+TEST_F(ConfigIntrospectionTest, GetInfo241RespectsLineSpacing)
+{
+    doc->m_display.line_spacing = 25;
+    executeLua("h241 = world.GetInfo(241)");
+    double h241 = getGlobalNumber("h241");
+    EXPECT_EQ(h241, 25.0)
+        << "GetInfo(241) must return line_spacing when non-zero (mirrors GetInfo(212))";
+}
+
+// Test 13: SetOption("max_output_lines") trims buffer AND refreshes view
+// Original doc.cpp:4161-4171: FixUpOutputBuffer() calls addedstuff() on each view.
+// In Mushkin, trimLineBuffer() + linesAdded() signal must both fire.
+// max_output_lines minimum is 200 (config_options.cpp), so use 300 → 200.
+TEST_F(ConfigIntrospectionTest, SetOptionMaxOutputLinesTrimsThenSignals)
+{
+    // Start with max_output_lines at 300 so we can legally lower it.
+    doc->m_display.max_lines = 300;
+
+    // Populate 250 lines (exceeds the 200 we'll set below).
+    for (int i = 0; i < 250; ++i) {
+        auto line = std::make_unique<Line>(i, 80, 0, qRgb(192, 192, 192), qRgb(0, 0, 0), true);
+        doc->m_lineList.push_back(std::move(line));
+    }
+    ASSERT_EQ(static_cast<int>(doc->m_lineList.size()), 250);
+
+    // Track linesAdded signal emissions via a local counter.
+    int signalCount = 0;
+    QObject::connect(doc.get(), &WorldDocument::linesAdded, [&signalCount]() { ++signalCount; });
+
+    // Reduce max_output_lines to 200 (valid minimum) via SetOption — should trim and signal.
+    executeLua("world.SetOption('max_output_lines', 200)");
+
+    EXPECT_LE(static_cast<int>(doc->m_lineList.size()), 200)
+        << "Buffer should be trimmed to at most max_output_lines lines";
+    EXPECT_GT(signalCount, 0)
+        << "linesAdded must be emitted after buffer trim so view refreshes (H96)";
+}
