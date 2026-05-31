@@ -1083,5 +1083,16 @@ target_link_libraries(test-accelerator-manager-gtest PRIVATE
 )
 
 gtest_discover_tests(test-accelerator-manager-gtest
+# Blend modes parity test (H30)
+add_executable(test-blend-modes-gtest
+    test_blend_modes_gtest.cpp
+)
+
+target_link_libraries(test-blend-modes-gtest PRIVATE
+    test_main_core
+    Qt6::Core
+)
+
+gtest_discover_tests(test-blend-modes-gtest
     DISCOVERY_TIMEOUT 30
 )
