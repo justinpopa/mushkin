@@ -1584,6 +1584,13 @@ class WorldDocument : public QObject, public IWorldContext {
     // NOTE: onWorldConnect() and onWorldDisconnect() moved to ConnectionManager (private).
     // They are called from ConnectionManager::onConnect() and onConnectionDisconnect().
 
+    // ========== World-level Lua callbacks ==========
+    // Original: OpenSession() fires OnWorldOpen (doc.cpp:902-913);
+    // CSendView::OnActivateView fires OnWorldGetFocus/OnWorldLoseFocus (sendvw.cpp:941-978).
+    void onWorldOpen();      // Fire OnWorldOpen Lua handler after world load
+    void onWorldGetFocus();  // Fire OnWorldGetFocus Lua handler when world gains focus
+    void onWorldLoseFocus(); // Fire OnWorldLoseFocus Lua handler when world loses focus
+
     // ========== Trigger and Alias Management ==========
     // Forwarding wrappers — implementation delegates to m_automationRegistry.
     [[nodiscard]] std::expected<void, WorldError> addTrigger(const QString& name,

@@ -2646,6 +2646,111 @@ void WorldDocument::loadScriptFile()
 }
 
 /**
+ * onWorldOpen — call the Lua OnWorldOpen handler if registered.
+ *
+ * Original: CMUSHclientDoc::OpenSession() (doc.cpp:902-913). Fired once after the
+ * world's script file has been loaded so the handler function is defined.
+ */
+void WorldDocument::onWorldOpen()
+{
+    if (!m_ScriptEngine) {
+        return;
+    }
+
+    if (m_dispidWorldOpen == 0) {
+        m_dispidWorldOpen = m_ScriptEngine->getLuaDispid("OnWorldOpen");
+    }
+
+    if (m_dispidWorldOpen == DISPID_UNKNOWN) {
+        return;
+    }
+
+    QList<double> nparams;
+    QList<QString> sparams;
+    qint32 invocation_count = 0;
+    bool result = false;
+
+    bool error = m_ScriptEngine->executeLua(m_dispidWorldOpen, "OnWorldOpen",
+                                            ActionSource::eWorldAction, "world", "world open",
+                                            nparams, sparams, invocation_count, &result);
+    if (error) {
+        qCDebug(lcWorld) << "Error calling OnWorldOpen callback";
+    } else {
+        qCDebug(lcWorld) << "OnWorldOpen callback executed successfully";
+    }
+}
+
+/**
+ * onWorldGetFocus — call the Lua OnWorldGetFocus handler if registered.
+ *
+ * Original: CSendView::OnActivateView() (sendvw.cpp:941-947), fired when the world's
+ * command view gains focus.
+ */
+void WorldDocument::onWorldGetFocus()
+{
+    if (!m_ScriptEngine) {
+        return;
+    }
+
+    if (m_dispidWorldGetFocus == 0) {
+        m_dispidWorldGetFocus = m_ScriptEngine->getLuaDispid("OnWorldGetFocus");
+    }
+
+    if (m_dispidWorldGetFocus == DISPID_UNKNOWN) {
+        return;
+    }
+
+    QList<double> nparams;
+    QList<QString> sparams;
+    qint32 invocation_count = 0;
+    bool result = false;
+
+    bool error = m_ScriptEngine->executeLua(m_dispidWorldGetFocus, "OnWorldGetFocus",
+                                            ActionSource::eWorldAction, "world", "world get focus",
+                                            nparams, sparams, invocation_count, &result);
+    if (error) {
+        qCDebug(lcWorld) << "Error calling OnWorldGetFocus callback";
+    } else {
+        qCDebug(lcWorld) << "OnWorldGetFocus callback executed successfully";
+    }
+}
+
+/**
+ * onWorldLoseFocus — call the Lua OnWorldLoseFocus handler if registered.
+ *
+ * Original: CSendView::OnActivateView() (sendvw.cpp:972-978), fired when the world's
+ * command view loses focus.
+ */
+void WorldDocument::onWorldLoseFocus()
+{
+    if (!m_ScriptEngine) {
+        return;
+    }
+
+    if (m_dispidWorldLoseFocus == 0) {
+        m_dispidWorldLoseFocus = m_ScriptEngine->getLuaDispid("OnWorldLoseFocus");
+    }
+
+    if (m_dispidWorldLoseFocus == DISPID_UNKNOWN) {
+        return;
+    }
+
+    QList<double> nparams;
+    QList<QString> sparams;
+    qint32 invocation_count = 0;
+    bool result = false;
+
+    bool error = m_ScriptEngine->executeLua(m_dispidWorldLoseFocus, "OnWorldLoseFocus",
+                                            ActionSource::eWorldAction, "world", "world lose focus",
+                                            nparams, sparams, invocation_count, &result);
+    if (error) {
+        qCDebug(lcWorld) << "Error calling OnWorldLoseFocus callback";
+    } else {
+        qCDebug(lcWorld) << "OnWorldLoseFocus callback executed successfully";
+    }
+}
+
+/**
  * setupScriptFileWatcher - Set up file watcher for script file changes
  *
  * Creates or updates the QFileSystemWatcher to monitor the script file.

@@ -5500,6 +5500,12 @@ void MainWindow::updateStatusIndicators()
         }
         disconnect(m_trackedWorld, &WorldWidget::connectedChanged, this,
                    &MainWindow::onConnectionStateChanged);
+
+        // Fire OnWorldLoseFocus on the world that is losing focus.
+        // Original: CSendView::OnActivateView (sendvw.cpp:972-978).
+        if (WorldDocument* doc = m_trackedWorld->document()) {
+            doc->onWorldLoseFocus();
+        }
     }
 
     // Connect to new world's signals
@@ -5510,6 +5516,12 @@ void MainWindow::updateStatusIndicators()
         }
         connect(worldWidget, &WorldWidget::connectedChanged, this,
                 &MainWindow::onConnectionStateChanged);
+
+        // Fire OnWorldGetFocus on the world that is gaining focus.
+        // Original: CSendView::OnActivateView (sendvw.cpp:941-947).
+        if (WorldDocument* doc = worldWidget->document()) {
+            doc->onWorldGetFocus();
+        }
     }
 
     m_trackedWorld = worldWidget;
