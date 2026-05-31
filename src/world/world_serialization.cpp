@@ -375,12 +375,10 @@ void WorldDocument::loadTriggersFromXml(QXmlStreamReader& xml, Plugin* plugin)
 
             // Add to plugin or world collections based on context
             if (plugin) {
-                // Add to plugin's collections
-                trigger->internal_name =
-                    trigger->label.isEmpty()
-                        ? QString("trigger_%1_%2").arg(triggerCount).arg(qHash(trigger->trigger))
-                        : trigger->label;
-
+                // Add to plugin's collections. internal_name was already computed
+                // above (lowercased for labeled triggers, matching original
+                // xml_load_world.cpp:1314) — do not recompute it here, which would
+                // re-introduce the original-case label and undo the H65 fix.
                 QString triggerName = trigger->internal_name;
 
                 // Skip name-based duplicates
