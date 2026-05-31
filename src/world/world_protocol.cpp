@@ -158,6 +158,16 @@ void WorldDocument::ProcessIncomingByte(unsigned char c)
                 m_mxpEngine->m_strMXPstring.clear();
                 phase = Phase::HAVE_MXP_ENTITY;
             } else if (c == '\n') {
+                // Original: doc.cpp:2071-2076 — at end of line, close any open MXP
+                // tags and revert to the default line-mode. flags is always 0 on the
+                // socket path (no NOTE_OR_COMMAND), so the original guard reduces to
+                // MXP active and not in Pueblo mode.
+                if (isMXPActive() && !isPuebloActive()) {
+                    if (!MXP_Open()) {
+                        MXP_CloseOpenTags(); // close all open tags
+                    }
+                    MXP_mode_change(-1); // switch to default mode
+                }
                 StartNewLine(true, 0);
             } else if (c == '\r') {
                 // Carriage return without LF - ignore
@@ -286,6 +296,13 @@ void WorldDocument::SendPacket(std::span<const unsigned char> data)
     }
 
     m_connectionManager->m_iOutputPacketCount++;
+
+    // Original: doc.cpp:5593-5594 — dump outgoing packet hex when packet debug is on.
+    if (m_bDebugIncomingPackets) {
+        debugPacketData("Sent ", reinterpret_cast<const char*>(data.data()),
+                        static_cast<int>(data.size()), m_connectionManager->m_iOutputPacketCount);
+    }
+
     m_connectionManager->m_nBytesOut += static_cast<qint64>(data.size());
 
     // Ignore send errors — callers don't check return value for protocol packets

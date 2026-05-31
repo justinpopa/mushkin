@@ -1455,6 +1455,10 @@ class WorldDocument : public QObject, public IWorldContext {
     {
         m_mxpEngine->CleanupMXP();
     }
+    void MXP_CloseOpenTags(bool closeAll = false)
+    {
+        m_mxpEngine->MXP_CloseOpenTags(closeAll);
+    }
     bool MXP_Open() const
     {
         return m_mxpEngine->MXP_Open();
