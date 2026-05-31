@@ -4,6 +4,7 @@
 #include "logging.h"
 #include "mxp_script_routines_dialog.h"
 #include "network/ssh_host_key_manager.h"
+#include "world/view_interfaces.h"
 #include <QCheckBox>
 #include <QColor>
 #include <QColorDialog>
@@ -12,6 +13,7 @@
 #include <QDialogButtonBox>
 #include <QFileDialog>
 #include <QFontDialog>
+#include <QFontMetrics>
 #include <QFormLayout>
 #include <QGridLayout>
 #include <QGroupBox>
@@ -238,7 +240,23 @@ void WorldPropertiesDialog::setupOutputTab()
     m_wrapColumnSpin = new QSpinBox();
     m_wrapColumnSpin->setRange(20, 500);
     m_wrapColumnSpin->setSuffix(" chars");
-    displayForm->addRow("Wrap column:", m_wrapColumnSpin);
+
+    // "Adjust Width" / "Adjust to Width" buttons carried over from the original
+    // CPrefsP14 (IDC_ADJUST_WIDTH / IDC_ADJUST_TO_WIDTH). The first sets the wrap
+    // column from the output window's current pixel width; the second resizes the
+    // output window to fit the chosen wrap column.
+    QHBoxLayout* wrapColumnLayout = new QHBoxLayout();
+    wrapColumnLayout->addWidget(m_wrapColumnSpin);
+    m_adjustWidthButton = new QPushButton("Adjust Width");
+    connect(m_adjustWidthButton, &QPushButton::clicked, this,
+            &WorldPropertiesDialog::onAdjustWidthClicked);
+    wrapColumnLayout->addWidget(m_adjustWidthButton);
+    m_adjustToWidthButton = new QPushButton("Adjust to Width");
+    connect(m_adjustToWidthButton, &QPushButton::clicked, this,
+            &WorldPropertiesDialog::onAdjustToWidthClicked);
+    wrapColumnLayout->addWidget(m_adjustToWidthButton);
+    wrapColumnLayout->addStretch();
+    displayForm->addRow("Wrap column:", wrapColumnLayout);
 
     m_maxLinesSpin = new QSpinBox();
     m_maxLinesSpin->setRange(200, 500000);
@@ -1129,6 +1147,13 @@ void WorldPropertiesDialog::applySettings()
     if (m_doc) {
         emit m_doc->outputSettingsChanged();
 
+        // Refresh input-view word-wrap. The original committed the new wrap column and
+        // then called FixInputWrap() unconditionally (configuration.cpp:1373), which
+        // re-runs CSendView::UpdateWrap — the input edit's wrap margin is derived from
+        // m_nWrapColumn (sendvw.cpp:3029). InputView::applyInputSettings(), driven by
+        // inputSettingsChanged, re-applies the input wrap mode here.
+        emit m_doc->inputSettingsChanged();
+
         // Reconcile the script engine if the script file or enabled flag changed
         // (original CMUSHclientDoc::SavePrefsP17: disable old engine, recreate if
         // enabled, reload script, rediscover entry points).
@@ -1290,6 +1315,67 @@ void WorldPropertiesDialog::onOutputFontButtonClicked()
         m_outputFontLabel->setText(QString("%1, %2pt").arg(font.family()).arg(font.pointSize()));
         qCDebug(lcDialog) << "Font changed to:" << font.family() << font.pointSize();
     }
+}
+
+int WorldPropertiesDialog::computeAdjustedWrapColumn(int viewWidth, int pixelOffset,
+                                                     int avgCharWidth)
+{
+    // Original CPrefsP14::OnAdjustWidth (prefspropertypages.cpp:5937-5943):
+    //   iWidth = (outputWindowWidth - pixelOffset) / averageCharWidth, clamped [20, MAX].
+    // MAX_LINE_WIDTH lives in config_options.cpp (not the header); inline the value.
+    constexpr int kMaxLineWidth = 32000;
+    if (avgCharWidth <= 0)
+        return 20;
+    int column = (viewWidth - pixelOffset) / avgCharWidth;
+    if (column < 20)
+        column = 20;
+    if (column > kMaxLineWidth)
+        column = kMaxLineWidth;
+    return column;
+}
+
+void WorldPropertiesDialog::onAdjustWidthClicked()
+{
+    // Mirror CPrefsP14::OnAdjustWidth: size the wrap column to the first/active output
+    // window using the chosen output font's average character width.
+    if (!m_doc)
+        return;
+    IOutputView* view = m_doc->activeOutputView();
+    if (!view)
+        return;
+
+    const int avgCharWidth = QFontMetrics(m_outputFont).averageCharWidth();
+    const int column =
+        computeAdjustedWrapColumn(view->viewWidth(), m_doc->m_display.pixel_offset, avgCharWidth);
+    m_wrapColumnSpin->setValue(column);
+}
+
+void WorldPropertiesDialog::onAdjustToWidthClicked()
+{
+    // Mirror CPrefsP14::OnAdjustToWidth: resize the output window so it is exactly wide
+    // enough for the current wrap column. The original resizes the MDI child frame; here
+    // we resize the output view's top-level window, adjusting only its width.
+    if (!m_doc)
+        return;
+    IOutputView* view = m_doc->activeOutputView();
+    if (!view)
+        return;
+
+    int column = m_wrapColumnSpin->value();
+    if (column < 20)
+        column = 20;
+
+    const int avgCharWidth = QFontMetrics(m_outputFont).averageCharWidth();
+    QWidget* parent = view->parentWindow();
+    QWidget* window = parent ? parent->window() : nullptr;
+    if (!window || avgCharWidth <= 0)
+        return;
+
+    // Extra chrome (frame/scrollbar) is the difference between the window's current width
+    // and the output view's drawable width — analogous to the original's system-metric sum.
+    const int chrome = window->width() - view->viewWidth();
+    const int newWidth = (avgCharWidth * column) + m_doc->m_display.pixel_offset + chrome;
+    window->resize(newWidth, window->height());
 }
 
 void WorldPropertiesDialog::onColorButtonClicked()

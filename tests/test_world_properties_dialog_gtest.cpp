@@ -202,6 +202,36 @@ class WorldPropertiesDialogParityTest : public ::testing::Test {
     {
         return dlg->m_mxpScriptsButton != nullptr;
     }
+
+    // M149: applySettings must refresh the input view's wrap (original FixInputWrap()).
+    void applySettings()
+    {
+        dlg->applySettings();
+    }
+
+    // M78: Adjust Width / Adjust to Width buttons (original IDC_ADJUST_WIDTH /
+    // IDC_ADJUST_TO_WIDTH).
+    bool hasAdjustWidthButton() const
+    {
+        return dlg->m_adjustWidthButton != nullptr;
+    }
+    bool hasAdjustToWidthButton() const
+    {
+        return dlg->m_adjustToWidthButton != nullptr;
+    }
+    void setWrapColumn(int n)
+    {
+        dlg->m_wrapColumnSpin->setValue(n);
+    }
+    int wrapColumnValue() const
+    {
+        return dlg->m_wrapColumnSpin->value();
+    }
+    static int computeAdjustedWrapColumn(int viewWidth, int pixelOffset, int avgCharWidth)
+    {
+        return WorldPropertiesDialog::computeAdjustedWrapColumn(viewWidth, pixelOffset,
+                                                                avgCharWidth);
+    }
 };
 
 // loadSettings() must populate the "Character name" field from m_name (player
@@ -502,4 +532,47 @@ TEST_F(WorldPropertiesDialogParityTest, MaxLinesMemoryWarningPredicate)
 
     // A zero RAM reading (query failed) suppresses the warning.
     EXPECT_FALSE(maxLinesWarningNeeded(1000, 30'000'000, 0));
+}
+
+// M149: applySettings() must emit inputSettingsChanged so the input view re-applies its
+// word-wrap, mirroring the original's unconditional FixInputWrap() call after committing
+// the wrap column (configuration.cpp:1373).
+TEST_F(WorldPropertiesDialogParityTest, ApplyRefreshesInputWrap)
+{
+    makeDialog();
+    loadSettings();
+
+    int emissions = 0;
+    QObject::connect(doc.get(), &WorldDocument::inputSettingsChanged,
+                     [&emissions]() { ++emissions; });
+
+    applySettings();
+
+    EXPECT_GE(emissions, 1);
+}
+
+// M78: the Adjust Width / Adjust to Width buttons (IDC_ADJUST_WIDTH / IDC_ADJUST_TO_WIDTH)
+// must exist on the dialog.
+TEST_F(WorldPropertiesDialogParityTest, AdjustWidthButtonsPresent)
+{
+    makeDialog();
+    EXPECT_TRUE(hasAdjustWidthButton());
+    EXPECT_TRUE(hasAdjustToWidthButton());
+}
+
+// M78: computeAdjustedWrapColumn mirrors CPrefsP14::OnAdjustWidth
+// (prefspropertypages.cpp:5937-5943): column = (width - offset) / avgCharWidth, clamped.
+TEST_F(WorldPropertiesDialogParityTest, AdjustWidthComputation)
+{
+    // 800px window, 1px offset, 8px char => (800-1)/8 = 99 columns.
+    EXPECT_EQ(computeAdjustedWrapColumn(800, 1, 8), 99);
+
+    // Clamps to the minimum of 20 when the window is tiny.
+    EXPECT_EQ(computeAdjustedWrapColumn(80, 1, 8), 20);
+
+    // A zero (or negative) average char width is degenerate => minimum, no divide-by-zero.
+    EXPECT_EQ(computeAdjustedWrapColumn(800, 1, 0), 20);
+
+    // Clamps to MAX_LINE_WIDTH (32000) for absurd widths.
+    EXPECT_EQ(computeAdjustedWrapColumn(1'000'000, 0, 1), 32000);
 }

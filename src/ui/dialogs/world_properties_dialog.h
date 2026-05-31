@@ -79,6 +79,20 @@ class WorldPropertiesDialog : public QDialog {
      */
     void onInputFontButtonClicked();
 
+    /**
+     * "Adjust Width" clicked - set the wrap column from the output window's
+     * current pixel width (original CPrefsP14::OnAdjustWidth,
+     * prefspropertypages.cpp:5893-5952).
+     */
+    void onAdjustWidthClicked();
+
+    /**
+     * "Adjust to Width" clicked - resize the output window so it is exactly wide
+     * enough for the current wrap column (original CPrefsP14::OnAdjustToWidth,
+     * prefspropertypages.cpp:8571-8623).
+     */
+    void onAdjustToWidthClicked();
+
   private:
     // Setup methods (to be implemented in later tasks)
     void setupUi();
@@ -117,6 +131,12 @@ class WorldPropertiesDialog : public QDialog {
     // Returns the machine's total physical RAM in bytes (0 if it cannot be queried).
     static quint64 totalPhysicalMemoryBytes();
 
+    // Pure computation mirroring CPrefsP14::OnAdjustWidth (prefspropertypages.cpp:5937-5943):
+    // wrap column = (output window pixel width − pixel offset) / average character width,
+    // clamped to [20, MAX_LINE_WIDTH]. Kept pure so it can be exercised in tests without a
+    // live output view. avgCharWidth <= 0 yields the minimum (20) to avoid divide-by-zero.
+    static int computeAdjustedWrapColumn(int viewWidth, int pixelOffset, int avgCharWidth);
+
     // Validate UI fields before applying. Returns false (and shows a message box)
     // if a required field is invalid; mirrors original DDX/DDV validation.
     bool validateSettings();
@@ -151,6 +171,8 @@ class WorldPropertiesDialog : public QDialog {
     // Display options
     QCheckBox* m_wrapCheck;
     QSpinBox* m_wrapColumnSpin;
+    QPushButton* m_adjustWidthButton;   // sets wrap column from output window width
+    QPushButton* m_adjustToWidthButton; // resizes output window to fit wrap column
     QSpinBox* m_maxLinesSpin;
     QCheckBox* m_utf8Check;
     QCheckBox* m_nawsCheck;
