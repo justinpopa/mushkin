@@ -699,6 +699,8 @@ void WorldDocument::SendToAllPluginCallbacks(const QString& callbackName)
 {
     Plugin* savedPlugin = m_CurrentPlugin;
 
+    m_bNotesNotWantedNow = true; // batch up Note/Tell calls
+
     for (const auto& plugin : m_PluginList) {
         if (!plugin || !plugin->m_bEnabled) {
             continue;
@@ -709,6 +711,7 @@ void WorldDocument::SendToAllPluginCallbacks(const QString& callbackName)
     }
 
     m_CurrentPlugin = savedPlugin;
+    m_bNotesNotWantedNow = false;
 }
 
 /**
@@ -730,6 +733,8 @@ bool WorldDocument::SendToAllPluginCallbacks(const QString& callbackName, const 
     Plugin* savedPlugin = m_CurrentPlugin;
     bool result = true;
 
+    m_bNotesNotWantedNow = true; // batch up Note/Tell calls
+
     for (const auto& plugin : m_PluginList) {
         if (!plugin || !plugin->m_bEnabled) {
             continue;
@@ -747,6 +752,7 @@ bool WorldDocument::SendToAllPluginCallbacks(const QString& callbackName, const 
     }
 
     m_CurrentPlugin = savedPlugin;
+    m_bNotesNotWantedNow = false;
     return result;
 }
 
@@ -796,6 +802,8 @@ bool WorldDocument::SendToAllPluginCallbacks(const QString& callbackName, qint32
     Plugin* savedPlugin = m_CurrentPlugin;
     bool result = false;
 
+    m_bNotesNotWantedNow = true; // batch up Note/Tell calls
+
     for (const auto& plugin : m_PluginList) {
         if (!plugin || !plugin->m_bEnabled) {
             continue;
@@ -813,6 +821,7 @@ bool WorldDocument::SendToAllPluginCallbacks(const QString& callbackName, qint32
     }
 
     m_CurrentPlugin = savedPlugin;
+    m_bNotesNotWantedNow = false;
     return result;
 }
 
@@ -835,6 +844,8 @@ bool WorldDocument::SendToAllPluginCallbacks(const QString& callbackName, qint32
     Plugin* savedPlugin = m_CurrentPlugin;
     bool result = true;
 
+    m_bNotesNotWantedNow = true; // batch up Note/Tell calls
+
     for (const auto& plugin : m_PluginList) {
         if (!plugin || !plugin->m_bEnabled) {
             continue;
@@ -849,6 +860,7 @@ bool WorldDocument::SendToAllPluginCallbacks(const QString& callbackName, qint32
     }
 
     m_CurrentPlugin = savedPlugin;
+    m_bNotesNotWantedNow = false;
     return result;
 }
 

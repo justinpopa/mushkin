@@ -50,6 +50,7 @@ callback_args = {}
 function OnPluginInstall()
   callback_count = callback_count + 1
   callback_args.install = "called"
+  Note("note from OnPluginInstall")
   return true
 end
 
@@ -64,6 +65,7 @@ end
 function OnPluginSend(text)
   callback_count = callback_count + 1
   callback_args.send = text
+  Note("note from OnPluginSend")
   return false  -- Stop propagation
 end
 
@@ -72,6 +74,7 @@ function OnPluginTelnetOption(option, text)
   callback_count = callback_count + 1
   callback_args.telnet_option = option
   callback_args.telnet_text = text
+  Note("note from OnPluginTelnetOption")
   return true
 end
 
@@ -81,6 +84,7 @@ function OnPluginTelnetSubnegotiation(option, suboption, data)
   callback_args.telnet_subneg_option = option
   callback_args.telnet_subneg_suboption = suboption
   callback_args.telnet_subneg_data = data
+  Note("note from OnPluginTelnetSubnegotiation")
   return true
 end
 ]]>
@@ -276,4 +280,66 @@ TEST_F(PluginCallbacksTest, ExecutePluginScript_NonExistentCallback)
     doc->m_CurrentPlugin = nullptr;
 
     EXPECT_TRUE(result) << "Non-existent callback should return true (default = continue)";
+}
+
+// ===========================================================================
+// Deferred-note batching (m_bNotesNotWantedNow) parity tests.
+//
+// Original plugins.cpp sets m_bNotesNotWantedNow=true before the plugin loop
+// and false after, in ALL six SendToAllPluginCallbacks overloads. While the
+// flag is set, Note()/Tell() issued from a callback are queued in
+// m_OutstandingLines instead of being written straight to the output window
+// (output_formatter.cpp:48,99). These overloads do NOT drain the queue
+// themselves (the caller does via OutputOutstandingLines()), so a note issued
+// from a callback must still be present in m_OutstandingLines after the call
+// returns. Before the fix, four overloads never set the flag, so the note was
+// emitted immediately and the queue stayed empty.
+// ===========================================================================
+
+// Test 11: no-args overload batches notes issued from the callback
+TEST_F(PluginCallbacksTest, SendToAllPluginCallbacks_NoArgs_BatchesNotes)
+{
+    doc->m_OutstandingLines.clear();
+
+    doc->SendToAllPluginCallbacks(ON_PLUGIN_INSTALL);
+
+    EXPECT_FALSE(doc->m_OutstandingLines.empty())
+        << "Note from no-args callback should be deferred to the outstanding queue";
+    EXPECT_FALSE(doc->m_bNotesNotWantedNow) << "flag must be reset to false after the call";
+}
+
+// Test 12: string+bool overload batches notes issued from the callback
+TEST_F(PluginCallbacksTest, SendToAllPluginCallbacks_StringBool_BatchesNotes)
+{
+    doc->m_OutstandingLines.clear();
+
+    doc->SendToAllPluginCallbacks(ON_PLUGIN_SEND, "test command", true);
+
+    EXPECT_FALSE(doc->m_OutstandingLines.empty())
+        << "Note from string+bool callback should be deferred to the outstanding queue";
+    EXPECT_FALSE(doc->m_bNotesNotWantedNow) << "flag must be reset to false after the call";
+}
+
+// Test 13: int+string+bool overload batches notes issued from the callback
+TEST_F(PluginCallbacksTest, SendToAllPluginCallbacks_IntStringBool_BatchesNotes)
+{
+    doc->m_OutstandingLines.clear();
+
+    doc->SendToAllPluginCallbacks(ON_PLUGIN_TELNET_OPTION, 24, "terminal-type", false);
+
+    EXPECT_FALSE(doc->m_OutstandingLines.empty())
+        << "Note from int+string callback should be deferred to the outstanding queue";
+    EXPECT_FALSE(doc->m_bNotesNotWantedNow) << "flag must be reset to false after the call";
+}
+
+// Test 14: int+int+string overload batches notes issued from the callback
+TEST_F(PluginCallbacksTest, SendToAllPluginCallbacks_IntIntString_BatchesNotes)
+{
+    doc->m_OutstandingLines.clear();
+
+    doc->SendToAllPluginCallbacks(ON_PLUGIN_TELNET_SUBNEGOTIATION, 86, 1, "compress-data");
+
+    EXPECT_FALSE(doc->m_OutstandingLines.empty())
+        << "Note from int+int+string callback should be deferred to the outstanding queue";
+    EXPECT_FALSE(doc->m_bNotesNotWantedNow) << "flag must be reset to false after the call";
 }
