@@ -291,3 +291,33 @@ TEST_F(LuaApiTest, ObjectNamesKeyedLowerCase)
     EXPECT_TRUE(triggerMap.find("mytrigger") == triggerMap.end())
         << "Trigger should be gone after case-insensitive delete";
 }
+
+// Test 17: world.GetMappingString() wraps multi-char directions in parentheses
+// regardless of run count — single-occurrence "ne" must produce "(ne) " not "ne ".
+// This matches the original MUSHclient OUTPUT_PREVIOUS_ONE macro (Mapping.cpp:284-287)
+// which wraps strLastDir before checking iCount.
+TEST_F(LuaApiTest, GetMappingStringParenthesisesMultiCharSingle)
+{
+    // Single "ne" — should be wrapped: "(ne) "
+    doc->m_mapList = QStringList{"ne"};
+    executeLua("map_single_ne = world.GetMappingString()");
+    EXPECT_EQ(getGlobalString("map_single_ne"), "(ne) ")
+        << "Single 'ne' should be parenthesized: '(ne) '";
+
+    // Two consecutive "sw" — should be "2(sw) "
+    doc->m_mapList = QStringList{"sw", "sw"};
+    executeLua("map_two_sw = world.GetMappingString()");
+    EXPECT_EQ(getGlobalString("map_two_sw"), "2(sw) ")
+        << "Two 'sw' entries should produce '2(sw) '";
+
+    // Single single-char direction "n" — no parentheses
+    doc->m_mapList = QStringList{"n"};
+    executeLua("map_single_n = world.GetMappingString()");
+    EXPECT_EQ(getGlobalString("map_single_n"), "n ")
+        << "Single 'n' should not be parenthesized: 'n '";
+
+    // Mixed: one "n", one "ne", two "n"
+    doc->m_mapList = QStringList{"n", "ne", "n", "n"};
+    executeLua("map_mixed = world.GetMappingString()");
+    EXPECT_EQ(getGlobalString("map_mixed"), "n (ne) 2n ") << "Mixed run: 'n (ne) 2n '";
+}
