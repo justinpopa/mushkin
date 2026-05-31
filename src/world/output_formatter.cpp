@@ -16,12 +16,37 @@ OutputFormatter::OutputFormatter(WorldDocument& doc) : m_doc(doc)
 {
 }
 
+// Resolve effective note fore/back colors from the current document state.
+// In RGB mode, returns the stored RGB values directly.
+// In palette mode (m_bNotesInRGB == false), resolves through note_text_colour:
+//   - SAMECOLOUR (65535): uses custom_text/back[15] when m_bCustom16isDefaultColour,
+//                         otherwise normal_colour[ANSI_WHITE/BLACK].
+//   - Valid index 0..MAX_CUSTOM-1: uses custom_text/back[index].
+//   - Out-of-range: falls back to white on black.
+// Mirrors the original CMUSHclientDoc::Tell() palette resolution path
+// (methods_noting.cpp:60-67 for outstanding-lines, :100-128 for the inline path).
+static std::pair<QRgb, QRgb> resolveNoteColors(const WorldDocument& doc)
+{
+    if (doc.m_bNotesInRGB) {
+        return {doc.m_iNoteColourFore, doc.m_iNoteColourBack};
+    }
+    constexpr quint16 SAMECOLOUR = 65535;
+    quint16 idx = doc.m_colors.note_text_colour;
+    if (idx == SAMECOLOUR) {
+        if (doc.m_bCustom16isDefaultColour) {
+            return {doc.m_colors.custom_text[15], doc.m_colors.custom_back[15]};
+        }
+        return {doc.m_colors.normal_colour[ANSI_WHITE], doc.m_colors.normal_colour[ANSI_BLACK]};
+    }
+    if (idx < MAX_CUSTOM) {
+        return {doc.m_colors.custom_text[idx], doc.m_colors.custom_back[idx]};
+    }
+    return {qRgb(255, 255, 255), qRgb(0, 0, 0)};
+}
+
 void OutputFormatter::note(const QString& text)
 {
-    // Use default note colors (or white on black if not set) - BGR format
-    QRgb foreColor = m_doc.m_bNotesInRGB ? m_doc.m_iNoteColourFore : BGR(255, 255, 255);
-    QRgb backColor = m_doc.m_bNotesInRGB ? m_doc.m_iNoteColourBack : BGR(0, 0, 0);
-
+    auto [foreColor, backColor] = resolveNoteColors(m_doc);
     colourNote(foreColor, backColor, text);
 }
 
