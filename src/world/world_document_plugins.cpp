@@ -626,7 +626,7 @@ bool WorldDocument::EnablePlugin(const QString& pluginID, bool enabled)
  * @param pluginID Plugin GUID
  * @return true on success, false if plugin not found or currently executing
  */
-bool WorldDocument::UnloadPlugin(const QString& pluginID)
+bool WorldDocument::UnloadPlugin(const QString& pluginID, bool suppressListChanged)
 {
     Plugin* plugin = FindPluginByID(pluginID);
     if (!plugin) {
@@ -650,8 +650,10 @@ bool WorldDocument::UnloadPlugin(const QString& pluginID)
         m_PluginList.erase(it); // OnPluginClose called in destructor
     }
 
-    // Notify other plugins
-    PluginListChanged();
+    // Notify other plugins (unless caller will batch the notification, e.g. ReloadPlugin)
+    if (!suppressListChanged) {
+        PluginListChanged();
+    }
 
     return true;
 }
@@ -699,6 +701,8 @@ void WorldDocument::SendToAllPluginCallbacks(const QString& callbackName)
 {
     Plugin* savedPlugin = m_CurrentPlugin;
 
+    m_bNotesNotWantedNow = true; // batch up Note/Tell calls
+
     for (const auto& plugin : m_PluginList) {
         if (!plugin || !plugin->m_bEnabled) {
             continue;
@@ -709,6 +713,7 @@ void WorldDocument::SendToAllPluginCallbacks(const QString& callbackName)
     }
 
     m_CurrentPlugin = savedPlugin;
+    m_bNotesNotWantedNow = false;
 }
 
 /**
@@ -730,6 +735,8 @@ bool WorldDocument::SendToAllPluginCallbacks(const QString& callbackName, const 
     Plugin* savedPlugin = m_CurrentPlugin;
     bool result = true;
 
+    m_bNotesNotWantedNow = true; // batch up Note/Tell calls
+
     for (const auto& plugin : m_PluginList) {
         if (!plugin || !plugin->m_bEnabled) {
             continue;
@@ -747,6 +754,7 @@ bool WorldDocument::SendToAllPluginCallbacks(const QString& callbackName, const 
     }
 
     m_CurrentPlugin = savedPlugin;
+    m_bNotesNotWantedNow = false;
     return result;
 }
 
@@ -796,6 +804,8 @@ bool WorldDocument::SendToAllPluginCallbacks(const QString& callbackName, qint32
     Plugin* savedPlugin = m_CurrentPlugin;
     bool result = false;
 
+    m_bNotesNotWantedNow = true; // batch up Note/Tell calls
+
     for (const auto& plugin : m_PluginList) {
         if (!plugin || !plugin->m_bEnabled) {
             continue;
@@ -813,6 +823,7 @@ bool WorldDocument::SendToAllPluginCallbacks(const QString& callbackName, qint32
     }
 
     m_CurrentPlugin = savedPlugin;
+    m_bNotesNotWantedNow = false;
     return result;
 }
 
@@ -835,6 +846,8 @@ bool WorldDocument::SendToAllPluginCallbacks(const QString& callbackName, qint32
     Plugin* savedPlugin = m_CurrentPlugin;
     bool result = true;
 
+    m_bNotesNotWantedNow = true; // batch up Note/Tell calls
+
     for (const auto& plugin : m_PluginList) {
         if (!plugin || !plugin->m_bEnabled) {
             continue;
@@ -849,6 +862,7 @@ bool WorldDocument::SendToAllPluginCallbacks(const QString& callbackName, qint32
     }
 
     m_CurrentPlugin = savedPlugin;
+    m_bNotesNotWantedNow = false;
     return result;
 }
 

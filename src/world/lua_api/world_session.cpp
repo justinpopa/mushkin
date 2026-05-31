@@ -38,8 +38,11 @@ int L_Execute(lua_State* L)
 
     // ON_PLUGIN_COMMAND is now fired per stacked sub-command inside Execute(),
     // matching original methods_commands.cpp:362 behavior.
-    pDoc->Execute(str, true, false); // allowScriptPrefix=true, addHistory=false
-    lua_pushinteger(L, eOK);
+    // Push Execute()'s long return code so the depth guard (eCommandsNestedTooDeeply)
+    // and world-closed (eWorldClosed) cases reach the Lua caller, matching original
+    // lua_methods.cpp:2269.
+    long result = pDoc->Execute(str, true, false); // allowScriptPrefix=true, addHistory=false
+    lua_pushinteger(L, result);
     return 1;
 }
 

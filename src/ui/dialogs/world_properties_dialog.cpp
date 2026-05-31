@@ -640,7 +640,7 @@ void WorldPropertiesDialog::loadSettings()
     // Connection tab
     m_serverEdit->setText(m_doc->m_server);
     m_portSpin->setValue(m_doc->m_port);
-    m_nameEdit->setText(m_doc->m_mush_name);
+    m_nameEdit->setText(m_doc->m_name);
     m_passwordEdit->setText(m_doc->m_password);
     int connectIdx = m_connectMethodCombo->findData(m_doc->m_connect_now);
     if (connectIdx >= 0)
@@ -789,7 +789,7 @@ void WorldPropertiesDialog::saveSettings()
     // Connection tab
     m_doc->m_server = m_serverEdit->text();
     m_doc->m_port = m_portSpin->value();
-    m_doc->m_mush_name = m_nameEdit->text();
+    m_doc->m_name = m_nameEdit->text();
     m_doc->m_password = m_passwordEdit->text();
     m_doc->m_connect_now = m_connectMethodCombo->currentData().toInt();
     m_doc->m_connect_text = m_connectTextEdit->toPlainText();

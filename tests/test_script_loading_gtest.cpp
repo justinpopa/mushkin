@@ -591,3 +591,136 @@ TEST_F(ScriptLoadingTest, MoonScriptErrorHandling)
         doc->m_ScriptEngine->transpileMoonScript(invalidMoon, "Invalid MoonScript");
     EXPECT_TRUE(transpiled.isEmpty()) << "Invalid MoonScript should return empty string";
 }
+
+// ========== World-level Lua callback dispatch (M75) ==========
+// Verifies OnWorldOpen / OnWorldGetFocus / OnWorldLoseFocus are actually invoked at runtime.
+// Original: OpenSession (doc.cpp:902-913), CSendView::OnActivateView (sendvw.cpp:941-978).
+
+// Helper: read an integer global, leaving the stack clean.
+static int readIntGlobal(lua_State* L, const char* name)
+{
+    lua_getglobal(L, name);
+    int value = lua_isnumber(L, -1) ? static_cast<int>(lua_tointeger(L, -1)) : -1;
+    lua_pop(L, 1);
+    return value;
+}
+
+// Test 31: onWorldOpen() invokes the registered OnWorldOpen handler
+TEST_F(ScriptLoadingTest, OnWorldOpenInvokesHandler)
+{
+    resetLuaState();
+
+    QString code = R"(
+        world_open_count = 0
+        function OnWorldOpen()
+            world_open_count = world_open_count + 1
+        end
+    )";
+    ASSERT_FALSE(doc->m_ScriptEngine->parseLua(code, "OnWorldOpen handler"));
+
+    lua_State* L = doc->m_ScriptEngine->L;
+    EXPECT_EQ(readIntGlobal(L, "world_open_count"), 0) << "Handler not yet fired";
+
+    doc->onWorldOpen();
+    EXPECT_EQ(readIntGlobal(L, "world_open_count"), 1) << "OnWorldOpen should fire exactly once";
+}
+
+// Test 32: onWorldGetFocus() invokes the registered OnWorldGetFocus handler
+TEST_F(ScriptLoadingTest, OnWorldGetFocusInvokesHandler)
+{
+    resetLuaState();
+
+    QString code = R"(
+        world_focus_count = 0
+        function OnWorldGetFocus()
+            world_focus_count = world_focus_count + 1
+        end
+    )";
+    ASSERT_FALSE(doc->m_ScriptEngine->parseLua(code, "OnWorldGetFocus handler"));
+
+    lua_State* L = doc->m_ScriptEngine->L;
+    doc->onWorldGetFocus();
+    EXPECT_EQ(readIntGlobal(L, "world_focus_count"), 1) << "OnWorldGetFocus should fire";
+}
+
+// Test 33: onWorldLoseFocus() invokes the registered OnWorldLoseFocus handler
+TEST_F(ScriptLoadingTest, OnWorldLoseFocusInvokesHandler)
+{
+    resetLuaState();
+
+    QString code = R"(
+        world_lose_count = 0
+        function OnWorldLoseFocus()
+            world_lose_count = world_lose_count + 1
+        end
+    )";
+    ASSERT_FALSE(doc->m_ScriptEngine->parseLua(code, "OnWorldLoseFocus handler"));
+
+    lua_State* L = doc->m_ScriptEngine->L;
+    doc->onWorldLoseFocus();
+    EXPECT_EQ(readIntGlobal(L, "world_lose_count"), 1) << "OnWorldLoseFocus should fire";
+}
+
+// Test 34: callbacks are no-ops (no crash) when no handler is registered
+TEST_F(ScriptLoadingTest, WorldCallbacksNoOpWhenUnregistered)
+{
+    resetLuaState();
+
+    // No OnWorldOpen/GetFocus/LoseFocus defined — dispid lookup must yield DISPID_UNKNOWN
+    // and the calls must not throw or leave the Lua stack dirty.
+    EXPECT_NO_THROW(doc->onWorldOpen());
+    EXPECT_NO_THROW(doc->onWorldGetFocus());
+    EXPECT_NO_THROW(doc->onWorldLoseFocus());
+
+    lua_State* L = doc->m_ScriptEngine->L;
+    EXPECT_EQ(lua_gettop(L), 0) << "Lua stack should be clean after unregistered callbacks";
+}
+
+// Test 35: onWorldClose() invokes the handler named by on_world_close (M75)
+// Original: SaveModified() runs the close script via m_strWorldClose (doc.cpp:4374-4390).
+TEST_F(ScriptLoadingTest, OnWorldCloseInvokesHandler)
+{
+    resetLuaState();
+
+    QString code = R"(
+        world_close_count = 0
+        function OnWorldClose()
+            world_close_count = world_close_count + 1
+        end
+    )";
+    ASSERT_FALSE(doc->m_ScriptEngine->parseLua(code, "OnWorldClose handler"));
+
+    // The handler name is the configurable on_world_close setting (matches original).
+    doc->m_scripting.on_world_close = "OnWorldClose";
+
+    lua_State* L = doc->m_ScriptEngine->L;
+    EXPECT_EQ(readIntGlobal(L, "world_close_count"), 0) << "Handler not yet fired";
+
+    doc->onWorldClose();
+    EXPECT_EQ(readIntGlobal(L, "world_close_count"), 1) << "OnWorldClose should fire exactly once";
+}
+
+// Test 36: onWorldClose() is a no-op when on_world_close is unset (M75)
+// Original: SeeIfHandlerCanExecute("") never reaches a meaningful ExecuteScript.
+TEST_F(ScriptLoadingTest, OnWorldCloseNoOpWhenNameEmpty)
+{
+    resetLuaState();
+
+    QString code = R"(
+        world_close_count = 0
+        function OnWorldClose()
+            world_close_count = world_close_count + 1
+        end
+    )";
+    ASSERT_FALSE(doc->m_ScriptEngine->parseLua(code, "OnWorldClose handler"));
+
+    // No handler name configured — the close callback must not fire.
+    doc->m_scripting.on_world_close = QString();
+    doc->m_dispidWorldClose = 0;
+
+    lua_State* L = doc->m_ScriptEngine->L;
+    EXPECT_NO_THROW(doc->onWorldClose());
+    EXPECT_EQ(readIntGlobal(L, "world_close_count"), 0)
+        << "OnWorldClose must not fire when no handler name is configured";
+    EXPECT_EQ(lua_gettop(L), 0) << "Lua stack should be clean";
+}

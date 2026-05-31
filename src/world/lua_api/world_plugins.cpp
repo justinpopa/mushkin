@@ -676,16 +676,21 @@ int L_ReloadPlugin(lua_State* L)
     // Save plugin filepath before unloading
     QString filepath = plugin->m_strSource;
 
-    // Unload plugin (use actual ID, not input which might be a name)
-    if (!pDoc->UnloadPlugin(plugin->m_strID)) {
+    // Unload plugin (use actual ID, not input which might be a name).
+    // Suppress the list-changed notification: the original ReloadPlugin fires
+    // PluginListChanged exactly once, after the reload completes, so observers
+    // never see the intermediate (plugin-removed) state.
+    if (!pDoc->UnloadPlugin(plugin->m_strID, /*suppressListChanged=*/true)) {
         return luaReturnError(L, eProblemsLoadingPlugin);
     }
 
-    // Reload it
+    // Reload it (also suppressed; we fire the single notification below)
     QString errorMsg;
-    Plugin* newPlugin = pDoc->LoadPlugin(filepath, errorMsg);
+    Plugin* newPlugin = pDoc->LoadPlugin(filepath, errorMsg, /*suppressListChanged=*/true);
 
     if (newPlugin) {
+        // Original fires PluginListChanged once, only on successful reload.
+        pDoc->PluginListChanged();
         lua_pushnumber(L, eOK);
     } else {
         lua_pushnumber(L, ePluginFileNotFound);

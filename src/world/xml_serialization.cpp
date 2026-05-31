@@ -22,7 +22,9 @@
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
 #include <algorithm> // for std::sort, std::transform
+#include <array>
 #include <string>
+#include <tuple>
 
 namespace {
 
@@ -914,11 +916,61 @@ bool LoadWorldXML(WorldDocument* doc, const QString& filename)
     // Notify all plugins once after batch loading (original: xml_load_world.cpp:473-474)
     doc->PluginListChanged();
 
-    // Mark world as loaded (original: xml_load_world.cpp sets m_bLoaded)
-    doc->m_bLoaded = true;
+    // If defaults are wanted, overwrite what we loaded with them.
+    // Original: CMUSHclientDoc::Serialize calls OnFileReloaddefaults after
+    // Serialize_World_XML on load (serialize.cpp:72).
+    ReloadDefaults(doc);
 
     qCDebug(lcWorld) << "LoadWorldXML: successfully loaded from" << filename;
     return true;
+}
+
+// ============================================================================
+// RELOAD DEFAULT FILES (flag-checked)
+// ============================================================================
+//
+// Original: CMUSHclientDoc::OnFileReloaddefaults (scripting/methods/methods_defaults.cpp),
+// called from CMUSHclientDoc::Serialize after loading a world file (serialize.cpp:72).
+// For each set type, only reloads the configured default file when the matching
+// m_bUseDefault* flag is set AND the path is non-empty.
+int ReloadDefaults(WorldDocument* doc)
+{
+    if (!doc) {
+        qWarning() << "ReloadDefaults: null document";
+        return 0;
+    }
+
+    const auto& opts = GlobalOptions::instance();
+
+    // (flag, configured-path, single-type import flag) — order matches the original.
+    const std::array<std::tuple<bool, QString, int>, 4> defaultSets = {{
+        {doc->m_bUseDefaultTriggers, opts.defaultTriggersFile(), XML_TRIGGERS},
+        {doc->m_bUseDefaultAliases, opts.defaultAliasesFile(), XML_ALIASES},
+        {doc->m_bUseDefaultTimers, opts.defaultTimersFile(), XML_TIMERS},
+        {doc->m_bUseDefaultMacros, opts.defaultMacrosFile(), XML_MACROS},
+    }};
+
+    int totalImported = 0;
+
+    for (const auto& [useDefault, path, flag] : defaultSets) {
+        if (!useDefault || path.isEmpty())
+            continue;
+
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            qCWarning(lcWorld) << "ReloadDefaults: could not open default file" << path;
+            continue;
+        }
+
+        int imported = ImportXML(doc, QString::fromUtf8(file.readAll()), flag);
+        if (imported > 0)
+            totalImported += imported;
+    }
+
+    if (totalImported > 0)
+        qCDebug(lcWorld) << "ReloadDefaults: reapplied" << totalImported << "default item(s)";
+
+    return totalImported;
 }
 
 // ============================================================================

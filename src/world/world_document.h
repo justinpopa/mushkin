@@ -150,8 +150,16 @@ enum {
     eConnectTypeMax // must be last
 };
 
-// MXP usage values
-enum class MXPMode : quint16 { eMXP_Off, eMXP_Query, eMXP_On };
+// MXP usage values (see m_iUseMXP). Numeric values MUST match the original
+// MUSHclient enum in doc.h (eOnCommandMXP=0, eQueryMXP=1, eUseMXP=2, eNoMXP=3)
+// so that the "use_mxp" world-file value and Lua GetOption/SetOption stay
+// cross-compatible.
+enum class MXPMode : quint16 {
+    eMXP_On = 0,     // eOnCommandMXP: turn on after IAC SB MXP IAC SE (default)
+    eMXP_Query = 1,  // eQueryMXP: turn on after option query
+    eMXP_Always = 2, // eUseMXP: always on (activated at connect)
+    eMXP_Off = 3,    // eNoMXP: always off
+};
 
 // Connection phase values (doc.h)
 // These are now inline constexpr aliases to connection_manager.h constants.
@@ -811,7 +819,7 @@ class WorldDocument : public QObject, public IWorldContext {
         // Logging flags
         bool log_html = false;          // convert HTML sequences?
         bool log_input = false;         // log player input?
-        bool log_output = false;        // log MUD output?
+        bool log_output = true;         // log MUD output? (original default: true)
         bool log_notes = false;         // log notes?
         bool log_in_colour = false;     // HTML logging in colour?
         bool log_raw = false;           // log raw input from MUD?
@@ -1118,7 +1126,8 @@ class WorldDocument : public QObject, public IWorldContext {
     bool m_bPluginProcessingCommand;
     bool m_bPluginProcessingSend;
     bool m_bPluginProcessingSent;
-    bool m_bInPlaySoundFilePlugin = false; // Recursion guard for OnPluginPlaySound
+    bool m_bInPlaySoundFilePlugin = false; // Recursion guard for OnPluginPlaySound (PlaySoundFile)
+    bool m_bInCancelSoundFilePlugin = false; // Recursion guard for OnPluginPlaySound (CancelSound)
     QString m_strLastCommandSent;
     qint32 m_iLastCommandCount;
     qint32 m_iExecutionDepth;
@@ -1446,6 +1455,10 @@ class WorldDocument : public QObject, public IWorldContext {
     {
         m_mxpEngine->CleanupMXP();
     }
+    void MXP_CloseOpenTags(bool closeAll = false)
+    {
+        m_mxpEngine->MXP_CloseOpenTags(closeAll);
+    }
     bool MXP_Open() const
     {
         return m_mxpEngine->MXP_Open();
@@ -1575,6 +1588,14 @@ class WorldDocument : public QObject, public IWorldContext {
 
     // NOTE: onWorldConnect() and onWorldDisconnect() moved to ConnectionManager (private).
     // They are called from ConnectionManager::onConnect() and onConnectionDisconnect().
+
+    // ========== World-level Lua callbacks ==========
+    // Original: OpenSession() fires OnWorldOpen (doc.cpp:902-913);
+    // CSendView::OnActivateView fires OnWorldGetFocus/OnWorldLoseFocus (sendvw.cpp:941-978).
+    void onWorldOpen();      // Fire OnWorldOpen Lua handler after world load
+    void onWorldClose();     // Fire OnWorldClose Lua handler before world close
+    void onWorldGetFocus();  // Fire OnWorldGetFocus Lua handler when world gains focus
+    void onWorldLoseFocus(); // Fire OnWorldLoseFocus Lua handler when world loses focus
 
     // ========== Trigger and Alias Management ==========
     // Forwarding wrappers — implementation delegates to m_automationRegistry.
@@ -1797,7 +1818,9 @@ class WorldDocument : public QObject, public IWorldContext {
                        ProgressCallback progressCallback = nullptr);
 
     // ========== Command Stacking ==========
-    void
+    // Returns an error code (eOK, eCommandsNestedTooDeeply, ...) matching the original
+    // CMUSHclientDoc::Execute long return value, which world.Execute pushes to Lua.
+    long
     Execute(const QString& command, bool allowScriptPrefix = true, bool addHistory = true,
             const QString& originalCommand = QString()); // Process command with stacking support
     bool checkConnected(); // Prompt to reconnect if disconnected (original: doc.cpp:5158)
@@ -1821,8 +1844,9 @@ class WorldDocument : public QObject, public IWorldContext {
     Plugin* FindPluginByName(const QString& pluginName);   // Find plugin by name
     Plugin* FindPluginByFilePath(const QString& filepath); // Find plugin by source file path
     Plugin* LoadPlugin(const QString& filepath, QString& errorMsg,
-                       bool suppressListChanged = false);     // Load plugin from XML file
-    bool UnloadPlugin(const QString& pluginID);               // Unload and delete plugin
+                       bool suppressListChanged = false); // Load plugin from XML file
+    bool UnloadPlugin(const QString& pluginID,
+                      bool suppressListChanged = false);      // Unload and delete plugin
     bool EnablePlugin(const QString& pluginID, bool enabled); // Enable/disable plugin
     void PluginListChanged();                                 // Notify plugins that list changed
     Plugin* getPlugin(const QString& pluginID); // Get plugin by ID (alias for FindPluginByID)
@@ -1880,6 +1904,7 @@ class WorldDocument : public QObject, public IWorldContext {
     // callers in world_trigger_execution.cpp, telnet_parser.cpp, and Lua API bindings.
     qint32 PlaySound(qint16 buffer, const QString& filename, bool loop, double volume, double pan);
     qint32 StopSound(qint16 buffer);
+    void CancelSound();
     bool PlaySoundFile(const QString& filename);
     qint32 GetSoundStatus(qint16 buffer);
     void PlayMSPSound(const QString& filename, const QString& url, bool loop, double volume,

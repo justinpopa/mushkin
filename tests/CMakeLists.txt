@@ -630,6 +630,22 @@ gtest_discover_tests(test-options-tables-gtest
     DISCOVERY_TIMEOUT 30
 )
 
+# World properties dialog parity test (Character name field binds to m_name)
+add_executable(test-world-properties-dialog-gtest
+    test_world_properties_dialog_gtest.cpp
+)
+
+target_link_libraries(test-world-properties-dialog-gtest PRIVATE
+    test_main_gui
+    Qt6::Gui
+    Qt6::Widgets
+    ui
+)
+
+gtest_discover_tests(test-world-properties-dialog-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
 # XML roundtrip test
 add_executable(test-xml-roundtrip-gtest
     test_xml_roundtrip_gtest.cpp
@@ -643,6 +659,20 @@ target_link_libraries(test-xml-roundtrip-gtest PRIVATE
 )
 
 gtest_discover_tests(test-xml-roundtrip-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
+# Miniwindow LoadImage parity test (GoogleTest)
+add_executable(test-miniwindow-loadimage-gtest
+    test_miniwindow_loadimage_gtest.cpp
+)
+
+target_link_libraries(test-miniwindow-loadimage-gtest PRIVATE
+    test_main_gui
+    ui
+)
+
+gtest_discover_tests(test-miniwindow-loadimage-gtest
     DISCOVERY_TIMEOUT 30
 )
 
@@ -715,6 +745,23 @@ target_link_libraries(test-sound-api-gtest PRIVATE
 )
 
 gtest_discover_tests(test-sound-api-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
+# StopSound vs CancelSound parity test (group 4, H8)
+add_executable(test-sound-cancel-gtest
+    test_sound_cancel_gtest.cpp
+)
+
+target_link_libraries(test-sound-cancel-gtest PRIVATE
+    test_main_core
+    Qt6::Gui
+    Qt6::Widgets
+    Qt6::Multimedia
+    ui
+)
+
+gtest_discover_tests(test-sound-cancel-gtest
     DISCOVERY_TIMEOUT 30
 )
 

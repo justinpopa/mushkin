@@ -238,6 +238,45 @@ TEST_F(CommandColorAPITest, SetCustomColourNameNoChangeIfSame)
     EXPECT_FALSE(doc->m_bModified);
 }
 
+// ========== ColourNameToRGB Tests ==========
+
+// Helper: call ColourNameToRGB(name) and return the lua_Integer it pushed.
+static lua_Integer callColourNameToRGB(lua_State* L, const char* name)
+{
+    lua_getglobal(L, "ColourNameToRGB");
+    lua_pushstring(L, name);
+    EXPECT_EQ(lua_pcall(L, 1, 1, 0), 0)
+        << "ColourNameToRGB error: " << (lua_isstring(L, -1) ? lua_tostring(L, -1) : "");
+    lua_Integer result = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+    return result;
+}
+
+// Unknown color names must return -1 (matches original methods_colours.cpp:31-32),
+// NOT 4294967295 (0xFFFFFFFF reinterpreted as unsigned on 64-bit). Plugins do
+// `if ColourNameToRGB(x) == -1 then ...` and rely on the signed sentinel.
+TEST_F(CommandColorAPITest, ColourNameToRGBUnknownReturnsMinusOne)
+{
+    EXPECT_EQ(callColourNameToRGB(L, "not_a_real_colour"), -1);
+}
+
+// Valid named colors must return their positive BGR value, unchanged by the
+// sign-extension fix (top byte is zero, so they stay positive).
+TEST_F(CommandColorAPITest, ColourNameToRGBKnownReturnsPositiveBGR)
+{
+    // red => BGR(255,0,0) => 0x000000FF
+    EXPECT_EQ(callColourNameToRGB(L, "red"), 0x000000FF);
+    // white => BGR(255,255,255) => 0x00FFFFFF, the largest valid value
+    EXPECT_EQ(callColourNameToRGB(L, "white"), 0x00FFFFFF);
+}
+
+// Hex strings resolve to positive BGR values too (never the -1 sentinel).
+TEST_F(CommandColorAPITest, ColourNameToRGBHexReturnsPositive)
+{
+    // "#0000FF" (HTML blue, RGB) => BGR(0,0,255) => 0x00FF0000
+    EXPECT_EQ(callColourNameToRGB(L, "#0000FF"), 0x00FF0000);
+}
+
 // ========== Utility Function Tests ==========
 
 // Test GetUdpPort (deprecated, always returns 0)
@@ -246,4 +285,33 @@ TEST_F(CommandColorAPITest, GetUdpPort)
     callLuaTest("test_get_udp_port");
 
     // No C++ side effects to verify (function always returns 0)
+}
+
+// ========== Font Metric GetInfo Tests ==========
+
+// world.GetInfo() font metrics are derived from the active font on demand, not
+// from a 0-initialized member that is never updated. Original returns
+// tm.tmAveCharWidth / tm.tmHeight (doc.cpp:3258/3323/3324); Mushkin computes
+// these from QFontMetrics. These cases require a GUI app (QFontMetrics needs
+// QGuiApplication), which this binary provides via test_main_gui.
+TEST_F(CommandColorAPITest, GetInfoFontMetricsNonZero)
+{
+    executeLua("output_width = world.GetInfo(213)"); // output font width
+    executeLua("input_height = world.GetInfo(214)"); // input font height
+    executeLua("input_width = world.GetInfo(215)");  // input font width
+    executeLua("avg_width = world.GetInfo(240)");    // average char width
+
+    int outputWidth = getGlobalInt("output_width");
+    int inputHeight = getGlobalInt("input_height");
+    int inputWidth = getGlobalInt("input_width");
+    int avgWidth = getGlobalInt("avg_width");
+
+    EXPECT_GT(outputWidth, 0) << "GetInfo(213) output font width must be non-zero";
+    EXPECT_GT(inputHeight, 0) << "GetInfo(214) input font height must be non-zero";
+    EXPECT_GT(inputWidth, 0) << "GetInfo(215) input font width must be non-zero";
+    EXPECT_GT(avgWidth, 0) << "GetInfo(240) average char width must be non-zero";
+
+    // GetInfo(240) average char width mirrors GetInfo(213) output font width.
+    EXPECT_EQ(avgWidth, outputWidth)
+        << "GetInfo(240) must equal GetInfo(213) (both are output tm.tmAveCharWidth)";
 }

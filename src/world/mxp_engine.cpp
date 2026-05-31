@@ -23,6 +23,24 @@
 #include <QRegularExpression>
 #include <memory>
 
+namespace {
+
+// Validate an MXP name: must start with a letter, then letters/digits/_/-/. only.
+// Mirrors IsValidName in the original (mxp/mxputils.cpp:402).
+bool mxpIsValidName(const QString& str)
+{
+    if (str.isEmpty() || !str.at(0).isLetter())
+        return false;
+    for (const QChar c : str) {
+        if (c.isLetterOrNumber() || c == '_' || c == '-' || c == '.')
+            continue;
+        return false;
+    }
+    return true;
+}
+
+} // namespace
+
 // ========================================================================
 // Constructor / Destructor
 // ========================================================================
@@ -1251,8 +1269,10 @@ void MXPEngine::MXP_StartTag(const QString& tagString)
 
     tagName = tagName.toLower(); // Case-insensitive
 
-    // Check if current mode is secure
-    bool bSecure = (m_iMXP_mode == eMXP_secure || m_iMXP_mode == eMXP_perm_secure);
+    // Capture secure mode BEFORE restoring (original: mxpStart.cpp:31 — bool bSecure =
+    // MXP_Secure() which is true for eMXP_secure, eMXP_secure_once, and eMXP_perm_secure;
+    // MXP_Restore_Mode() then cancels secure_once afterward on line 34).
+    bool bSecure = MXP_Secure();
 
     // Restore mode (cancel secure-once) — original: MXP_Restore_Mode in mxpMode.cpp
     if (m_iMXP_mode == eMXP_secure_once) {
@@ -1405,8 +1425,10 @@ void MXPEngine::MXP_StartTag(const QString& tagString)
  */
 void MXPEngine::MXP_EndTag(const QString& tagString)
 {
-    // Check if current mode is secure
-    bool bSecure = (m_iMXP_mode == eMXP_secure || m_iMXP_mode == eMXP_perm_secure);
+    // Capture secure mode BEFORE restoring (original: mxpEnd.cpp:24 — bool bSecure =
+    // MXP_Secure() which is true for eMXP_secure, eMXP_secure_once, and eMXP_perm_secure;
+    // MXP_Restore_Mode() then cancels secure_once afterward on line 26).
+    bool bSecure = MXP_Secure();
 
     // Restore mode (cancel secure-once) — original: MXP_Restore_Mode in mxpMode.cpp
     if (m_iMXP_mode == eMXP_secure_once) {
@@ -2220,9 +2242,11 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
         // ========== SERVER COMMANDS ==========
         case MXP_ACTION_VERSION: {
             // Send client version to server (original: mxpOpenAtomic.cpp:288-304)
-            // Format: ESC[1z<VERSION MXP="0.4" CLIENT=Mushkin VERSION="x.y.z" REGISTERED=YES>\r\n
+            // Format: ESC[1z<VERSION MXP="0.5" CLIENT=Mushkin VERSION="x.y.z" REGISTERED=YES>\r\n
+            // MXP protocol version is 0.5 (original: mxpOpenAtomic.cpp:20 #define MXP_VERSION
+            // "0.5")
             QString versionResponse =
-                QString("\x1B[1z<VERSION MXP=\"0.4\" CLIENT=Mushkin VERSION=\"%1\" "
+                QString("\x1B[1z<VERSION MXP=\"0.5\" CLIENT=Mushkin VERSION=\"%1\" "
                         "REGISTERED=YES>\r\n")
                     .arg(QCoreApplication::applicationVersion());
             QByteArray data = versionResponse.toUtf8();
@@ -2396,12 +2420,19 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
                     argValue = argValue.toLower();
 
                     const QStringList parts = argValue.split('.', Qt::SkipEmptyParts);
+                    // Original (mxpOpenAtomic.cpp:368-374): >2 components is an invalid
+                    // argument — MXP_error then plain return, so NO <SUPPORTS> reply is sent.
                     if (parts.isEmpty() || parts.size() > 2) {
                         qCWarning(lcMXP) << "Invalid <support> argument:" << argValue;
-                        continue;
+                        return;
                     }
 
                     const QString tagName = parts[0];
+                    // Original (mxpOpenAtomic.cpp:380-386): invalid tag name -> return (no reply).
+                    if (!mxpIsValidName(tagName)) {
+                        qCWarning(lcMXP) << "Invalid <support> argument:" << tagName;
+                        return;
+                    }
                     auto it = m_atomicElementMap.find(tagName);
                     if (it == m_atomicElementMap.end() || (it->second->iFlags & TAG_NOT_IMP)) {
                         // Tag unknown or not supported
@@ -2424,6 +2455,12 @@ void MXPEngine::MXP_ExecuteAction(AtomicElement* elem, MXPArgumentList& args)
                             supports += QString("+%1.%2 ").arg(tagName, attr.trimmed());
                         }
                     } else {
+                        // Original (mxpOpenAtomic.cpp:428-434): invalid subtag name -> return
+                        // (no reply).
+                        if (!mxpIsValidName(subtag)) {
+                            qCWarning(lcMXP) << "Invalid <support> argument:" << subtag;
+                            return;
+                        }
                         // Specific sub-attribute lookup (original: 437-449)
                         bool found = false;
                         for (const QString& attr : subAttrs) {
