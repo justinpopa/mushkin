@@ -724,6 +724,19 @@ gtest_discover_tests(test-miniwindow-loadimage-gtest
     DISCOVERY_TIMEOUT 30
 )
 
+add_executable(test-miniwindow-lifecycle-gtest
+    test_miniwindow_lifecycle_gtest.cpp
+)
+
+target_link_libraries(test-miniwindow-lifecycle-gtest PRIVATE
+    test_main_gui
+    ui
+)
+
+gtest_discover_tests(test-miniwindow-lifecycle-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
 # Miniwindow creation test (non-GoogleTest, uses Qt6::Test)
 add_executable(test-miniwindow-creation
     test_miniwindow_creation.cpp
