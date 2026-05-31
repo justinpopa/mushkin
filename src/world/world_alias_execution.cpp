@@ -15,6 +15,7 @@
 #include "script_engine.h"
 #include "world_document.h"
 #include <QDebug>
+#include <QElapsedTimer>
 
 #include "logging.h"
 
@@ -49,14 +50,15 @@ void WorldDocument::executeAlias(Alias* alias, const QString& command)
         m_bOmitFromCommandHistory = true;
     }
 
+    // Insert display-line boundary for ALL matched aliases (original: evaluate.cpp:878-879).
+    // Forces a line change so that subsequent note/output style is on a fresh COMMENT line,
+    // not appended to the tail of a previous MUD output line.
+    if (m_currentLine && (m_currentLine->flags & NOTE_OR_COMMAND) != COMMENT) {
+        StartNewLine(true, COMMENT);
+    }
+
     // Echo the alias/command?
     if (alias->echo_alias) {
-        // Insert display-line boundary if current line is MUD output (original:
-        // evaluate.cpp:878-879) Prevents style bleeding from previous MUD output into echoed
-        // command
-        if (m_currentLine && (m_currentLine->flags & NOTE_OR_COMMAND) != COMMENT) {
-            StartNewLine(true, COMMENT);
-        }
         // Echo as USER_INPUT (original: evaluate.cpp:887-889)
         QByteArray utf8 = command.toUtf8();
         AddToLine(utf8.constData(), utf8.length());
@@ -96,13 +98,10 @@ void WorldDocument::executeAlias(Alias* alias, const QString& command)
         executeAliasScript(alias, command);
     }
 
-    // Add to command history (unless omitted)
-    if (!alias->omit_from_command_history) {
-        // addToCommandHistory() handles duplicate filtering
-        // Note: We're passing the original command, not the alias contents
-        // This matches original MUSHclient behavior
-        addToCommandHistory(command);
-    }
+    // History is added by Execute() after the full alias cycle (original: sendvw.cpp:713-714).
+    // The omit_from_command_history flag is already propagated to m_bOmitFromCommandHistory
+    // above; Execute() checks that flag before calling addToCommandHistory.
+    // Do NOT call addToCommandHistory here — it would add a duplicate entry.
 
     qCDebug(lcWorld) << "Alias executed:" << alias->label << "matched:" << alias->matched
                      << "times";
@@ -243,8 +242,20 @@ void WorldDocument::executeAliasScript(Alias* alias, const QString& command)
     quint16 oldNoteStyle = m_iNoteStyle;
     m_iNoteStyle = 0; // NORMAL
 
+    // M89: Track script timing (original: lua_scripting.cpp:642-648 via ExecuteLua).
+    // ExecuteLua tracks m_iScriptTimeTaken for both doc and current plugin.
+    QElapsedTimer scriptTimer;
+    scriptTimer.start();
+
     // Call function with 3 parameters (name, line, wildcards)
     int error = lua_pcall(L, 3, 0, 0);
+
+    // M89: Accumulate script timing (original: lua_scripting.cpp:642-648)
+    qint64 elapsed = scriptTimer.nsecsElapsed();
+    m_iScriptTimeTaken += elapsed;
+    if (m_CurrentPlugin) {
+        m_CurrentPlugin->m_iScriptTimeTaken += elapsed;
+    }
 
     // Restore action source and note style
     m_iCurrentActionSource = oldActionSource;
