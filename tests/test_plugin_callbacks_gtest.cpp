@@ -343,3 +343,118 @@ TEST_F(PluginCallbacksTest, SendToAllPluginCallbacks_IntIntString_BatchesNotes)
         << "Note from int+int+string callback should be deferred to the outstanding queue";
     EXPECT_FALSE(doc->m_bNotesNotWantedNow) << "flag must be reset to false after the call";
 }
+
+// ===========================================================================
+// PluginListChanged batching parity (M190).
+//
+// The Plugin Management dialog's Add/Remove/Reinstall handlers load/unload a
+// batch of plugins and must fire OnPluginListChanged exactly ONCE after the
+// whole batch, matching original PluginsDlg.cpp OnAddPlugin:382,
+// OnDeletePlugin:434, OnReload:543. The WorldDocument primitives support this
+// via the suppressListChanged flag on LoadPlugin/UnloadPlugin plus an explicit
+// PluginListChanged() call. The tests below pin that contract: a batch of
+// suppressed loads followed by one PluginListChanged() notifies an observer
+// plugin once, whereas an unsuppressed load notifies per-plugin.
+// ===========================================================================
+
+// Helper: build a plugin XML that counts OnPluginListChanged invocations into a
+// uniquely-named Lua global so the observer survives the batch operations.
+static QString makeObserverPluginXml(const QString& id, const QString& counterGlobal)
+{
+    return QString(R"(<?xml version="1.0"?>
+<!DOCTYPE muclient>
+<muclient>
+<plugin name="Observer %1" author="Test" id="%2" language="Lua"
+        purpose="count list-changed" version="1.0" save_state="n">
+<script>
+<![CDATA[
+%3 = 0
+function OnPluginListChanged()
+  %3 = %3 + 1
+end
+]]>
+</script>
+</plugin>
+</muclient>
+)")
+        .arg(id, id, counterGlobal);
+}
+
+static Plugin* loadPluginFromString(WorldDocument* doc, const QString& xml, bool suppress)
+{
+    QTemporaryFile f;
+    f.setFileTemplate("observer-plugin-XXXXXX.xml");
+    if (!f.open()) {
+        return nullptr;
+    }
+    f.write(xml.toUtf8());
+    f.flush();
+    QString err;
+    return doc->LoadPlugin(f.fileName(), err, suppress);
+}
+
+// Test 15: a suppressed batch + one explicit PluginListChanged() notifies once.
+TEST_F(PluginCallbacksTest, PluginListChanged_BatchedLoad_NotifiesOnce)
+{
+    // Install an observer plugin (not suppressed — it isn't part of the batch).
+    Plugin* observer = loadPluginFromString(
+        doc.get(),
+        makeObserverPluginXml("{aaaaaaaa-0000-0000-0000-000000000001}", "list_changed_count"),
+        /*suppress=*/false);
+    ASSERT_NE(observer, nullptr);
+    lua_State* obsL = observer->m_ScriptEngine->L;
+
+    // Reset the counter after install-time notifications settle.
+    lua_pushinteger(obsL, 0);
+    lua_setglobal(obsL, "list_changed_count");
+
+    // Simulate the dialog's Add handler: load a batch with suppression...
+    for (int i = 2; i <= 4; ++i) {
+        Plugin* p = loadPluginFromString(
+            doc.get(),
+            makeObserverPluginXml(QString("{bbbbbbbb-0000-0000-0000-00000000000%1}").arg(i),
+                                  QString("ignored_%1").arg(i)),
+            /*suppress=*/true);
+        ASSERT_NE(p, nullptr) << "batch plugin " << i << " failed to load";
+    }
+
+    // ...then fire the single batched notification.
+    doc->PluginListChanged();
+
+    lua_getglobal(obsL, "list_changed_count");
+    int count = lua_tointeger(obsL, -1);
+    lua_pop(obsL, 1);
+
+    EXPECT_EQ(count, 1) << "Batched load must notify OnPluginListChanged exactly once, not "
+                           "once per plugin";
+}
+
+// Test 16: without suppression each load notifies the observer (the deviating
+// behavior). Confirms the suppress flag is what makes batching possible.
+TEST_F(PluginCallbacksTest, PluginListChanged_UnsuppressedLoad_NotifiesPerPlugin)
+{
+    Plugin* observer = loadPluginFromString(
+        doc.get(),
+        makeObserverPluginXml("{cccccccc-0000-0000-0000-000000000001}", "per_plugin_count"),
+        /*suppress=*/false);
+    ASSERT_NE(observer, nullptr);
+    lua_State* obsL = observer->m_ScriptEngine->L;
+
+    lua_pushinteger(obsL, 0);
+    lua_setglobal(obsL, "per_plugin_count");
+
+    for (int i = 2; i <= 4; ++i) {
+        Plugin* p = loadPluginFromString(
+            doc.get(),
+            makeObserverPluginXml(QString("{dddddddd-0000-0000-0000-00000000000%1}").arg(i),
+                                  QString("ignored2_%1").arg(i)),
+            /*suppress=*/false);
+        ASSERT_NE(p, nullptr) << "plugin " << i << " failed to load";
+    }
+
+    lua_getglobal(obsL, "per_plugin_count");
+    int count = lua_tointeger(obsL, -1);
+    lua_pop(obsL, 1);
+
+    EXPECT_EQ(count, 3) << "Each unsuppressed load should notify the observer once";
+}
