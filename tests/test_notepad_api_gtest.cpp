@@ -155,11 +155,12 @@ TEST_F(NotepadApiTest, GetNotepadListReturnsAllTitles)
     EXPECT_EQ(getGlobalNumber("count"), 3);
 }
 
-// Test 12: NotepadFont returns false if not found
+// Test 12: NotepadFont returns eNoSuchNotepad if not found
 TEST_F(NotepadApiTest, NotepadFontFailsIfNotExists)
 {
     executeLua("result = world.NotepadFont('NoSuchNotepad', 'Courier', 12, 0, 0)");
-    EXPECT_FALSE(getGlobalBool("result"));
+    // Original returns numeric error code (eNoSuchNotepad = 30075)
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), eNoSuchNotepad);
 }
 
 // Test 13: NotepadFont sets font successfully
@@ -167,7 +168,8 @@ TEST_F(NotepadApiTest, NotepadFontSetsFont)
 {
     executeLua("world.SendToNotepad('FontTest', 'content')");
     executeLua("result = world.NotepadFont('FontTest', 'Courier New', 14, 1, 0)");
-    EXPECT_TRUE(getGlobalBool("result"));
+    // Original returns eOK (0) on success
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), eOK);
 
     NotepadWidget* notepad = doc->FindNotepad("FontTest");
     ASSERT_NE(notepad, nullptr);
@@ -175,11 +177,12 @@ TEST_F(NotepadApiTest, NotepadFontSetsFont)
     EXPECT_EQ(notepad->m_iFontSize, 14);
 }
 
-// Test 14: NotepadColour returns false if not found
+// Test 14: NotepadColour returns eNoSuchNotepad if not found
 TEST_F(NotepadApiTest, NotepadColourFailsIfNotExists)
 {
     executeLua("result = world.NotepadColour('NoSuchNotepad', 'white', 'black')");
-    EXPECT_FALSE(getGlobalBool("result"));
+    // Original returns numeric error code (eNoSuchNotepad = 30075)
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), eNoSuchNotepad);
 }
 
 // Test 15: NotepadColour sets colors successfully
@@ -187,7 +190,8 @@ TEST_F(NotepadApiTest, NotepadColourSetsColors)
 {
     executeLua("world.SendToNotepad('ColorTest', 'content')");
     executeLua("result = world.NotepadColour('ColorTest', '#FFFFFF', '#000000')");
-    EXPECT_TRUE(getGlobalBool("result"));
+    // Original returns eOK (0) on success
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), eOK);
 
     NotepadWidget* notepad = doc->FindNotepad("ColorTest");
     ASSERT_NE(notepad, nullptr);
@@ -198,18 +202,18 @@ TEST_F(NotepadApiTest, NotepadColourSetsColors)
 // Test 16: NotepadColour returns error for invalid color
 TEST_F(NotepadApiTest, NotepadColourFailsForInvalidColor)
 {
-    // Original returns boolean false for failure
+    // Original returns numeric eInvalidColourName (30077) for bad color name
     executeLua("world.SendToNotepad('InvalidColor', 'content')");
     executeLua("result = world.NotepadColour('InvalidColor', 'notacolor', 'black')");
-    EXPECT_FALSE(getGlobalBool("result"));
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), eInvalidColourName);
 }
 
-// Test 17: NotepadReadOnly returns false if not found
+// Test 17: NotepadReadOnly returns eNoSuchNotepad if not found
 TEST_F(NotepadApiTest, NotepadReadOnlyFailsIfNotExists)
 {
-    // Original returns boolean false for not-found
     executeLua("result = world.NotepadReadOnly('NoSuchNotepad', true)");
-    EXPECT_FALSE(getGlobalBool("result"));
+    // Original returns numeric error code (eNoSuchNotepad = 30075)
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), eNoSuchNotepad);
 }
 
 // Test 18: NotepadReadOnly sets read-only mode
@@ -217,19 +221,44 @@ TEST_F(NotepadApiTest, NotepadReadOnlySetsMode)
 {
     executeLua("world.SendToNotepad('ReadOnly', 'content')");
     executeLua("result = world.NotepadReadOnly('ReadOnly', true)");
-    EXPECT_TRUE(getGlobalBool("result"));
+    // Original returns eOK (0) on success
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), eOK);
 
     NotepadWidget* notepad = doc->FindNotepad("ReadOnly");
     ASSERT_NE(notepad, nullptr);
     EXPECT_TRUE(notepad->m_bReadOnly);
 }
 
+// Test 17b: NotepadReadOnly — nil arg defaults to true (make read-only)
+TEST_F(NotepadApiTest, NotepadReadOnlyNilDefaultsToTrue)
+{
+    executeLua("world.SendToNotepad('RONil', 'content')");
+    // Omitting the second arg: original optboolean(L,2,1) defaults to true
+    executeLua("result = world.NotepadReadOnly('RONil')");
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), eOK);
+    NotepadWidget* notepad = doc->FindNotepad("RONil");
+    ASSERT_NE(notepad, nullptr);
+    EXPECT_TRUE(notepad->m_bReadOnly);
+}
+
+// Test 17c: NotepadReadOnly — numeric arg coerced to boolean
+TEST_F(NotepadApiTest, NotepadReadOnlyNumericArgCoerced)
+{
+    executeLua("world.SendToNotepad('RONum', 'content')");
+    // Passing 0 (numeric) should coerce to false
+    executeLua("result = world.NotepadReadOnly('RONum', 0)");
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), eOK);
+    NotepadWidget* notepad = doc->FindNotepad("RONum");
+    ASSERT_NE(notepad, nullptr);
+    EXPECT_FALSE(notepad->m_bReadOnly);
+}
+
 // Test 19: NotepadSaveMethod returns eNoSuchNotepad if not found
 TEST_F(NotepadApiTest, NotepadSaveMethodFailsIfNotExists)
 {
-    // Original returns boolean false for not-found (not error code)
     executeLua("result = world.NotepadSaveMethod('NoSuchNotepad', 1)");
-    EXPECT_FALSE(getGlobalBool("result"));
+    // Original returns numeric error code (eNoSuchNotepad = 30075)
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), eNoSuchNotepad);
 }
 
 // Test 20: NotepadSaveMethod sets save method
@@ -237,7 +266,8 @@ TEST_F(NotepadApiTest, NotepadSaveMethodSetsSaveMethod)
 {
     executeLua("world.SendToNotepad('SaveMethod', 'content')");
     executeLua("result = world.NotepadSaveMethod('SaveMethod', 2)");
-    EXPECT_TRUE(getGlobalBool("result"));
+    // Original returns eOK (0) on success
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), eOK);
 
     NotepadWidget* notepad = doc->FindNotepad("SaveMethod");
     ASSERT_NE(notepad, nullptr);
@@ -247,19 +277,49 @@ TEST_F(NotepadApiTest, NotepadSaveMethodSetsSaveMethod)
 // Test 21: CloseNotepad returns eNoSuchNotepad if not found
 TEST_F(NotepadApiTest, CloseNotepadFailsIfNotExists)
 {
-    // Original returns boolean false for not-found (not error code)
     executeLua("result = world.CloseNotepad('NoSuchNotepad', false)");
-    EXPECT_FALSE(getGlobalBool("result"));
+    // Original returns numeric error code (eNoSuchNotepad = 30075)
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), eNoSuchNotepad);
 }
 
-// Test 22: CloseNotepad succeeds for existing notepad
+// Test 22: CloseNotepad returns eOK for existing notepad
 TEST_F(NotepadApiTest, CloseNotepadSucceedsForExisting)
 {
     executeLua("world.SendToNotepad('ToClose', 'content')");
     ASSERT_NE(doc->FindNotepad("ToClose"), nullptr);
 
     executeLua("result = world.CloseNotepad('ToClose', false)");
-    EXPECT_TRUE(getGlobalBool("result"));
+    // Original returns eOK (0) on success
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), eOK);
+}
+
+// Test 22b: SaveNotepad numeric replaceExisting arg coerced to bool
+TEST_F(NotepadApiTest, SaveNotepadNumericReplaceArgCoerced)
+{
+    // Passing 1 (numeric) for replaceExisting should coerce to true (original optboolean behavior)
+    // We just verify the call doesn't error — actual file I/O not tested here
+    executeLua("result = world.SaveNotepad('DoesNotExist', '/tmp/test_notepad.txt', 1)");
+    // Should return a numeric error code (eNoSuchNotepad = 30075), not crash
+    EXPECT_EQ(static_cast<int>(getGlobalNumber("result")), eNoSuchNotepad);
+}
+
+// Test 22c: SendToNotepad with boolean arg — concatLuaArgs uses tostring
+TEST_F(NotepadApiTest, SendToNotepadToStringCoercesBoolean)
+{
+    // Original concatArgs calls Lua's tostring, so boolean arg becomes "true"/"false"
+    executeLua("world.SendToNotepad('BoolArg', true)");
+    NotepadWidget* notepad = doc->FindNotepad("BoolArg");
+    ASSERT_NE(notepad, nullptr);
+    EXPECT_EQ(notepad->GetText(), "true");
+}
+
+// Test 22d: AppendToNotepad with nil arg — tostring gives "nil"
+TEST_F(NotepadApiTest, AppendToNotepadToStringCoercesNil)
+{
+    executeLua("world.SendToNotepad('NilArg', nil)");
+    NotepadWidget* notepad = doc->FindNotepad("NilArg");
+    ASSERT_NE(notepad, nullptr);
+    EXPECT_EQ(notepad->GetText(), "nil");
 }
 
 // Test 23: UTF-8 content handling
