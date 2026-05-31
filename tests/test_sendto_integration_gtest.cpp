@@ -91,6 +91,28 @@ TEST_F(SendToIntegrationTest, SendToExecuteTriggersAliases)
 }
 
 /**
+ * Test eSendToExecute does NOT add to command history (M41 parity fix)
+ *
+ * Original: doc.cpp:6321 — Execute(strSendText) called with no addHistory
+ * parameter; history is only added in the UI layer (sendvw.cpp:714) for
+ * user-typed commands. Trigger/alias output re-executed via eSendToExecute
+ * must not pollute command history.
+ */
+TEST_F(SendToIntegrationTest, SendToExecuteDoesNotAddToCommandHistory)
+{
+    // Ensure history starts empty
+    doc->m_commandHistory.clear();
+
+    QString output;
+    // Fire eSendToExecute with a plain string that won't match any alias
+    doc->sendTo(eSendToExecute, "some_command", false, false, "", "", output);
+
+    // The command must NOT have been added to command history
+    EXPECT_TRUE(doc->m_commandHistory.isEmpty())
+        << "eSendToExecute must not add text to command history (original parity)";
+}
+
+/**
  * Test eSendToLogFile - Write to log file
  *
  * This test verifies that SendTo can write to the log file.
