@@ -690,3 +690,58 @@ TEST_F(PluginApiTest, ReloadPlugin)
     EXPECT_EQ(plugin1->m_strName, QString("TestPlugin1"))
         << "Reloaded plugin should have correct name";
 }
+
+// Test 24: world.ReloadPlugin fires OnPluginListChanged exactly once (parity M16)
+//
+// Original CMUSHclientDoc::ReloadPlugin removes+deletes the old plugin silently
+// and calls PluginListChanged() exactly once, after InternalLoadPlugin succeeds.
+// Mushkin previously fired it twice (once in UnloadPlugin, once in LoadPlugin),
+// exposing observers to an intermediate "plugin removed" state.
+TEST_F(PluginApiTest, ReloadPlugin_FiresListChangedOnce)
+{
+    // Observer plugin counts OnPluginListChanged invocations.
+    QString observerScript = R"(
+list_changed_count = 0
+function OnPluginListChanged()
+    list_changed_count = list_changed_count + 1
+end
+)";
+    QString observerPath = tempDir->path() + "/observer.xml";
+    {
+        QFile f(observerPath);
+        ASSERT_TRUE(f.open(QIODevice::WriteOnly | QIODevice::Text));
+        f.write(createTestPluginXML("{CCCC0003-0003-0003-0003-000000000003}", "ObserverPlugin",
+                                    observerScript)
+                    .toUtf8());
+        f.close();
+    }
+
+    QString errorMsg;
+    Plugin* observer = doc->LoadPlugin(observerPath, errorMsg);
+    ASSERT_NE(observer, nullptr) << "Could not load observer: " << errorMsg.toStdString();
+    lua_State* obsL = observer->m_ScriptEngine->L;
+
+    // Reset the counter to ignore the list-changed fired by loading the observer itself.
+    lua_pushnumber(obsL, 0);
+    lua_setglobal(obsL, "list_changed_count");
+
+    // Reload plugin2 from the observer's context (a plugin cannot reload itself,
+    // and the observer must stay loaded so its counter survives the reload).
+    doc->m_CurrentPlugin = observer;
+    lua_getglobal(obsL, "world");
+    lua_getfield(obsL, -1, "ReloadPlugin");
+    lua_pushstring(obsL, plugin2->m_strID.toUtf8().constData());
+    lua_call(obsL, 1, 1);
+    int result = lua_tonumber(obsL, -1);
+    lua_pop(obsL, 1);
+    doc->m_CurrentPlugin = nullptr;
+
+    EXPECT_EQ(result, 0) << "ReloadPlugin should return eOK";
+
+    lua_getglobal(obsL, "list_changed_count");
+    int listChangedCount = lua_tonumber(obsL, -1);
+    lua_pop(obsL, 1);
+
+    EXPECT_EQ(listChangedCount, 1)
+        << "OnPluginListChanged must fire exactly once per ReloadPlugin (was firing twice)";
+}

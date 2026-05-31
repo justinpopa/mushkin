@@ -626,7 +626,7 @@ bool WorldDocument::EnablePlugin(const QString& pluginID, bool enabled)
  * @param pluginID Plugin GUID
  * @return true on success, false if plugin not found or currently executing
  */
-bool WorldDocument::UnloadPlugin(const QString& pluginID)
+bool WorldDocument::UnloadPlugin(const QString& pluginID, bool suppressListChanged)
 {
     Plugin* plugin = FindPluginByID(pluginID);
     if (!plugin) {
@@ -650,8 +650,10 @@ bool WorldDocument::UnloadPlugin(const QString& pluginID)
         m_PluginList.erase(it); // OnPluginClose called in destructor
     }
 
-    // Notify other plugins
-    PluginListChanged();
+    // Notify other plugins (unless caller will batch the notification, e.g. ReloadPlugin)
+    if (!suppressListChanged) {
+        PluginListChanged();
+    }
 
     return true;
 }

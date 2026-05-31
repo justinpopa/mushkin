@@ -1843,8 +1843,9 @@ class WorldDocument : public QObject, public IWorldContext {
     Plugin* FindPluginByName(const QString& pluginName);   // Find plugin by name
     Plugin* FindPluginByFilePath(const QString& filepath); // Find plugin by source file path
     Plugin* LoadPlugin(const QString& filepath, QString& errorMsg,
-                       bool suppressListChanged = false);     // Load plugin from XML file
-    bool UnloadPlugin(const QString& pluginID);               // Unload and delete plugin
+                       bool suppressListChanged = false); // Load plugin from XML file
+    bool UnloadPlugin(const QString& pluginID,
+                      bool suppressListChanged = false);      // Unload and delete plugin
     bool EnablePlugin(const QString& pluginID, bool enabled); // Enable/disable plugin
     void PluginListChanged();                                 // Notify plugins that list changed
     Plugin* getPlugin(const QString& pluginID); // Get plugin by ID (alias for FindPluginByID)
