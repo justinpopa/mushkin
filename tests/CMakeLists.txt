@@ -662,6 +662,20 @@ gtest_discover_tests(test-xml-roundtrip-gtest
     DISCOVERY_TIMEOUT 30
 )
 
+# Miniwindow LoadImage parity test (GoogleTest)
+add_executable(test-miniwindow-loadimage-gtest
+    test_miniwindow_loadimage_gtest.cpp
+)
+
+target_link_libraries(test-miniwindow-loadimage-gtest PRIVATE
+    test_main_gui
+    ui
+)
+
+gtest_discover_tests(test-miniwindow-loadimage-gtest
+    DISCOVERY_TIMEOUT 30
+)
+
 # Miniwindow creation test (non-GoogleTest, uses Qt6::Test)
 add_executable(test-miniwindow-creation
     test_miniwindow_creation.cpp

@@ -6,6 +6,7 @@
 #include <QColor>
 #include <QDateTime>
 #include <QDebug>
+#include <QFileInfo>
 #include <QFontMetrics>
 #include <QImage>
 #include <QPainter>
@@ -1377,7 +1378,9 @@ qint32 MiniWindow::LoadImage(const QString& imageId, const QString& filepath)
     // Load image using Qt (QImage is platform-independent)
     auto img = std::make_unique<QImage>(filepath);
     if (img->isNull()) {
-        return eFileNotFound;
+        // Original (miniwindow.cpp:1097-1100, Utilities.cpp:2976-2977) distinguishes a missing
+        // file (eFileNotFound) from a file that exists but cannot be decoded (eUnableToLoadImage).
+        return QFileInfo::exists(filepath) ? eUnableToLoadImage : eFileNotFound;
     }
 
     // Insert new image (replaces old one if it exists; old unique_ptr automatically deletes)
