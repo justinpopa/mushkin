@@ -95,3 +95,51 @@ TEST_F(MiniWindowLoadImageTest, ValidPngReturnsOk)
     EXPECT_EQ(win->LoadImage("logo", pngPath), eOK);
     EXPECT_NE(win->images.find("logo"), win->images.end()) << "Image should be stored";
 }
+
+// ---------------------------------------------------------------------------
+// L36 parity: setLastMousePosition() increments mouseUpdateCount (WindowInfo code 16)
+// Original: mw->m_last_mouse_update++ at every mouse-position recording site.
+// ---------------------------------------------------------------------------
+class MiniWindowMouseUpdateCountTest : public WorldDocumentTest {
+  protected:
+    void SetUp() override
+    {
+        WorldDocumentTest::SetUp();
+        win = std::make_unique<MiniWindow>(doc.get());
+    }
+    std::unique_ptr<MiniWindow> win;
+};
+
+// Direct assignment to lastMousePosition must NOT increment the counter —
+// only setLastMousePosition() should, matching the original's single increment
+// per event.
+TEST_F(MiniWindowMouseUpdateCountTest, StartsAtZero)
+{
+    EXPECT_EQ(win->mouseUpdateCount, 0);
+}
+
+TEST_F(MiniWindowMouseUpdateCountTest, SetterIncrementsCounter)
+{
+    win->setLastMousePosition(QPoint(10, 20));
+    EXPECT_EQ(win->mouseUpdateCount, 1);
+    EXPECT_EQ(win->getLastMousePosition(), QPoint(10, 20));
+
+    win->setLastMousePosition(QPoint(30, 40));
+    EXPECT_EQ(win->mouseUpdateCount, 2);
+    EXPECT_EQ(win->getLastMousePosition(), QPoint(30, 40));
+}
+
+TEST_F(MiniWindowMouseUpdateCountTest, DirectFieldAssignmentDoesNotIncrement)
+{
+    // Direct write is allowed but should not bump the counter (not the parity path).
+    win->lastMousePosition = QPoint(5, 5);
+    EXPECT_EQ(win->mouseUpdateCount, 0) << "Direct field write must not increment counter";
+}
+
+TEST_F(MiniWindowMouseUpdateCountTest, SetClientMousePositionDoesNotIncrementCounter)
+{
+    // clientMousePosition has its own setter; it never increments mouseUpdateCount.
+    win->setClientMousePosition(QPoint(50, 60));
+    EXPECT_EQ(win->mouseUpdateCount, 0);
+    EXPECT_EQ(win->getClientMousePosition(), QPoint(50, 60));
+}
