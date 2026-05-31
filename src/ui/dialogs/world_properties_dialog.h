@@ -34,6 +34,11 @@ class QGroupBox;
 class WorldPropertiesDialog : public QDialog {
     Q_OBJECT
 
+    // Grants the parity gtest access to private load/save members so it can
+    // verify the "Character name" field binds to m_name (player name), not
+    // m_mush_name (world name). See test_world_properties_dialog_gtest.cpp.
+    friend class WorldPropertiesDialogParityTest;
+
   public:
     /**
      * Constructor
