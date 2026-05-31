@@ -55,8 +55,9 @@ static void luaError(lua_State* L, const QString& event, const QString& procedur
  */
 bool GetNestedFunction(lua_State* L, const QString& sName, bool bRaiseError)
 {
-    // Split name by dots (e.g., "utils.reload" → ["utils", "reload"])
-    QStringList parts = sName.split('.', Qt::SkipEmptyParts);
+    // Split name by dots — preserve empty parts to match original StringToVector behaviour
+    // (e.g. "a..b" yields ["a", "", "b"], not ["a", "b"])
+    QStringList parts = sName.split('.', Qt::KeepEmptyParts);
 
     // Start with global table
     lua_pushvalue(L, LUA_GLOBALSINDEX);
@@ -64,13 +65,15 @@ bool GetNestedFunction(lua_State* L, const QString& sName, bool bRaiseError)
     QString sPrev = "_G";
     QString sItem;
 
-    // Navigate through tables
+    // Navigate through tables, tracking how many parts we actually consumed.
+    // We use an index-based loop so we can detect early exit (iterator != end equivalent).
+    int consumed = 0;
     for (const QString& part : parts) {
         sItem = part;
 
         // Check if current value is a table
         if (!lua_istable(L, -1)) {
-            break; // Not a table, exit loop
+            break; // Not a table, exit loop early
         }
 
         // Get next element from table
@@ -81,13 +84,22 @@ bool GetNestedFunction(lua_State* L, const QString& sName, bool bRaiseError)
         lua_remove(L, -2);
 
         sPrev = part;
+        ++consumed;
     }
 
     // Check if we got a function
     bool bResult = lua_isfunction(L, -1);
 
-    // Handle error cases
-    if (!bResult) {
+    // Handle error cases — matches original:
+    //   if (!bResult || (bResult && iter != v.end()))
+    // The second branch catches "print.blah" where print IS a function but
+    // "blah" was never consumed because print is not a table.
+    if (!bResult || consumed < parts.size()) {
+        if (bResult) {
+            // Function found but not all parts consumed (e.g. "print.blah"):
+            // the item we resolved was sPrev, not sItem.
+            sItem = sPrev;
+        }
         if (bRaiseError) {
             qWarning() << QString("Cannot find the function '%1' - item '%2' is %3")
                               .arg(sName)

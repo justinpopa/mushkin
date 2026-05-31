@@ -14,6 +14,7 @@
 
 #include "../src/automation/script_language.h"
 #include "../src/storage/global_options.h"
+#include "../src/world/script_engine.h"
 #include "fixtures/world_fixtures.h"
 #include <QDir>
 
@@ -834,4 +835,83 @@ TEST_F(ScriptLoadingTest, IoPopenRaisesError)
         << "io.popen error message should mention io.popen: " << msg.toStdString();
     EXPECT_TRUE(msg.contains("MUSHclient"))
         << "io.popen error message should mention MUSHclient: " << msg.toStdString();
+// ========== GetNestedFunction parity tests (H115) ==========
+// Verify that dotted names where an intermediate node is a function (not a table)
+// are correctly rejected — matches original Utilities.cpp:1734 guard
+// (if (!bResult || (bResult && iter != v.end()))).
+
+class GetNestedFunctionTest : public ScriptLoadingTest {};
+
+// Test 37: simple top-level function lookup succeeds
+TEST_F(GetNestedFunctionTest, SimpleGlobalFunctionFound)
+{
+    lua_State* L = doc->m_ScriptEngine->L;
+    lua_settop(L, 0);
+
+    // Define a global function
+    ASSERT_EQ(luaL_dostring(L, "function myFunc() end"), 0);
+    lua_settop(L, 0);
+
+    bool found = GetNestedFunction(L, "myFunc", false);
+    EXPECT_TRUE(found) << "Simple global function should be found";
+    EXPECT_TRUE(lua_isfunction(L, -1)) << "Function should be on the stack";
+    lua_settop(L, 0);
+}
+
+// Test 38: nested function lookup succeeds (e.g. "string.gsub")
+TEST_F(GetNestedFunctionTest, NestedFunctionFound)
+{
+    lua_State* L = doc->m_ScriptEngine->L;
+    lua_settop(L, 0);
+
+    bool found = GetNestedFunction(L, "string.gsub", false);
+    EXPECT_TRUE(found) << "string.gsub should be found";
+    EXPECT_TRUE(lua_isfunction(L, -1)) << "Function should be on the stack";
+    lua_settop(L, 0);
+}
+
+// Test 39: non-existent function returns false (both levels)
+TEST_F(GetNestedFunctionTest, MissingFunctionReturnsFalse)
+{
+    lua_State* L = doc->m_ScriptEngine->L;
+    lua_settop(L, 0);
+
+    bool found = GetNestedFunction(L, "no_such_function_xyz", false);
+    EXPECT_FALSE(found) << "Non-existent function should not be found";
+    lua_settop(L, 0);
+}
+
+// Test 40: "print.blah" — print is a function, not a table; blah is unconsumed.
+// This is the H115 regression: the old code returned true for this input because it
+// found print (a function) but never consumed the "blah" part.  The fix mirrors
+// the original's   if (!bResult || (bResult && iter != v.end()))   guard.
+TEST_F(GetNestedFunctionTest, FunctionFollowedBySubfieldReturnsFalse)
+{
+    lua_State* L = doc->m_ScriptEngine->L;
+    lua_settop(L, 0);
+
+    // "print" is a built-in function, not a table.  "print.blah" must return false.
+    bool found = GetNestedFunction(L, "print.blah", false);
+    EXPECT_FALSE(found) << "print.blah must be rejected: print is a function, not a table";
+    lua_settop(L, 0);
+}
+
+// Test 41: stack is clean after FindLuaFunction (it clears the stack)
+TEST_F(GetNestedFunctionTest, FindLuaFunctionClearsStack)
+{
+    lua_State* L = doc->m_ScriptEngine->L;
+    lua_settop(L, 0);
+
+    FindLuaFunction(L, "print.blah");
+    EXPECT_EQ(lua_gettop(L), 0) << "FindLuaFunction must leave a clean stack";
+}
+
+// Test 42: stack is clean after FindLuaFunction for a valid function
+TEST_F(GetNestedFunctionTest, FindLuaFunctionClearsStackOnSuccess)
+{
+    lua_State* L = doc->m_ScriptEngine->L;
+    lua_settop(L, 0);
+
+    FindLuaFunction(L, "tostring");
+    EXPECT_EQ(lua_gettop(L), 0) << "FindLuaFunction must leave a clean stack even on success";
 }
