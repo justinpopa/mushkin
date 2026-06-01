@@ -22,7 +22,7 @@ A modern MUD client built with Qt. Mushkin is a cross-platform rewrite of [MUSHc
 
 ## Download
 
-Prebuilt, self-contained binaries for macOS, Linux (x86_64), and Windows (x64) are on the [Releases page](https://github.com/justinpopa/mushkin/releases). They bundle everything they need — there are no dependencies to install — so the Linux build runs on any modern distribution (Fedora, Arch, Debian/Ubuntu, …), not just the one it was built on.
+Prebuilt binaries for macOS, Linux (x86_64), and Windows (x64) are on the [Releases page](https://github.com/justinpopa/mushkin/releases). The macOS and Windows builds are self-contained. The Linux build statically links Qt and bundles its non-system libraries (ICU, PCRE, LuaJIT, SQLite, OpenSSL, …), so it runs across distributions — Fedora, Arch, Debian/Ubuntu, … — and needs only a standard desktop environment's shared libraries (X11/Wayland, OpenGL, fontconfig, audio), which any Linux desktop already provides.
 
 ```bash
 # Linux
