@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.5.0](https://github.com/justinpopa/mushkin/compare/v0.4.0...v0.5.0) (2026-06-01)
+
+
+### Features
+
+* behavioral parity with original MUSHclient across all subsystems ([#52](https://github.com/justinpopa/mushkin/issues/52)) ([6b6bfea](https://github.com/justinpopa/mushkin/commit/6b6bfea03048dde24631c9059faaabc8edf10ed7))
+
+
+### Bug Fixes
+
+* 18 MUSHclient behavioral-parity corrections across subsystems ([#54](https://github.com/justinpopa/mushkin/issues/54)) ([2743e47](https://github.com/justinpopa/mushkin/commit/2743e4713b85dbb63be67a0e13bbeff19b4f3b25))
+* make the Linux static build produce a working desktop binary ([#60](https://github.com/justinpopa/mushkin/issues/60)) ([9deb5b3](https://github.com/justinpopa/mushkin/commit/9deb5b3e009e455ad203cdfc8fa1a745f9062ad8))
+* make the macOS and Windows release builds work in CI ([#61](https://github.com/justinpopa/mushkin/issues/61)) ([386c0d5](https://github.com/justinpopa/mushkin/commit/386c0d521999c978923282cb85e885f87602f369))
+* medium/low behavioral-parity deviations across world engine, Lua API, MXP, miniwindows ([#55](https://github.com/justinpopa/mushkin/issues/55)) ([d36f025](https://github.com/justinpopa/mushkin/commit/d36f0253e08824fdd4dcfe10152d5d1f5c070a63))
+
 ## [0.4.0](https://github.com/justinpopa/mushkin/compare/v0.3.0...v0.4.0) (2026-03-03)
 
 
