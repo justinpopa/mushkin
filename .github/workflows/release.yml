@@ -223,7 +223,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: C:/Users/runneradmin/AppData/Local/mushkin/Qt-static
-          key: qt-static-6.9.3-windows-x64-v7
+          # v8: rebuild static Qt without the mysql/psql/odbc SQL drivers. The
+          # runner ships PostgreSQL, so Qt auto-built QPSQL and the binary
+          # imported libpq.dll (not shipped) → fails to launch. The app uses
+          # only SQLite.
+          key: qt-static-6.9.3-windows-x64-v8
 
       - name: Build Static Binary
         run: |

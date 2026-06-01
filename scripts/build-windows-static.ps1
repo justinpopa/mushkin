@@ -144,6 +144,7 @@ function Build-StaticQt {
         -skip qtdeclarative -skip qtquick3d `
         -nomake examples -nomake tests `
         -no-pch `
+        -no-feature-sql-mysql -no-feature-sql-psql -no-feature-sql-odbc `
         -- -DSQLite3_ROOT="$vcpkgInstalled" -DFEATURE_system_sqlite=ON -DCMAKE_OBJECT_PATH_MAX=350 `
         -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl
 
