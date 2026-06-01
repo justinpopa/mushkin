@@ -58,6 +58,14 @@ jobs:
           brew install cmake ninja llvm pcre luajit sqlite openssl libssh aqtinstall
           brew link --overwrite certifi aqtinstall 2>/dev/null || true
 
+      - name: Select full Xcode
+        run: |
+          # build-macos-static.sh requires full Xcode (Metal framework headers for
+          # the static Qt build); the runner defaults xcode-select to the Command
+          # Line Tools, which fails its prerequisite check.
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          xcodebuild -version
+
       - name: Cache Qt Static
         id: cache-qt
         uses: actions/cache@v4
