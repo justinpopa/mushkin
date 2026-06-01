@@ -116,7 +116,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/mushkin/Qt-static
-          key: qt-static-6.9.3-linux-x64-v4
+          # v5: rebuild static Qt with xcb enabled (-feature-xcb); the v4 cache
+          # was built without the xcb platform plugin → eglfs-only binary.
+          key: qt-static-6.9.3-linux-x64-v5
 
       - name: Build Static Binary
         run: ./scripts/build-linux-static.sh

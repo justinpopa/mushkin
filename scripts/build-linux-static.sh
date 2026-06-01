@@ -150,7 +150,8 @@ build_static_qt() {
         -submodules qtbase,qtmultimedia,qtsvg,qtshadertools \
         -skip qtdeclarative -skip qtquick3d \
         -nomake examples -nomake tests \
-        -no-pch
+        -no-pch \
+        -feature-xcb
 
     # Build & install
     cmake --build . --parallel "$NUM_CORES"
@@ -197,9 +198,21 @@ bundle_dylibs() {
     local lib_dir="$BUILD_DIR/lib"
     mkdir -p "$lib_dir"
 
-    # Whitelist of libraries to bundle (these are the non-system deps)
+    # Whitelist of libraries to bundle (these are the non-system deps).
+    #
+    # ICU is version-pinned: the binary links libicu*.so.<N> for the exact ICU
+    # major it was built against (74 on Ubuntu 24.04). Other distros ship a
+    # different ICU major (e.g. Fedora 44 = 77), so without bundling these the
+    # app fails to start with "libicuuc.so.74: cannot open shared object file".
+    # libpcre2-16 (Qt's UTF-16 regex) is also not always present on minimal
+    # systems. Do NOT bundle libpcre2-8: glib/selinux link it system-wide and a
+    # shadowed copy triggers "no version information available".
     local whitelist=(
         "libpcre.so"
+        "libpcre2-16.so"
+        "libicui18n.so"
+        "libicuuc.so"
+        "libicudata.so"
         "libluajit-5.1.so"
         "libsqlite3.so"
         "libssl.so"
