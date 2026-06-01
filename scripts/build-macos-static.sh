@@ -146,7 +146,8 @@ build_static_qt() {
         -submodules qtbase,qtmultimedia,qtsvg,qtshadertools \
         -skip qtdeclarative -skip qtquick3d \
         -nomake examples -nomake tests \
-        -no-pch
+        -no-pch \
+        -no-feature-sql-mysql -no-feature-sql-psql -no-feature-sql-odbc
 
     # Build & install
     cmake --build . --parallel "$NUM_CORES"
