@@ -183,7 +183,8 @@ function Build-Mushkin {
         -DCMAKE_TOOLCHAIN_FILE="$vcpkgToolchain" `
         -DVCPKG_TARGET_TRIPLET=x64-windows `
         -DCMAKE_C_COMPILER=clang-cl `
-        -DCMAKE_CXX_COMPILER=clang-cl
+        -DCMAKE_CXX_COMPILER=clang-cl `
+        -DCMAKE_CXX_EXTENSIONS=OFF
 
     if ($LASTEXITCODE -ne 0) { throw "CMake configure failed" }
 
