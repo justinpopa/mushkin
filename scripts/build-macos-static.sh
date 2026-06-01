@@ -285,6 +285,18 @@ bundle_dylibs() {
         install_name_tool -change "$ref" "@rpath/$ref_name" "$binary" 2>/dev/null || true
     done
 
+    # Point @rpath at the bundled Frameworks. The references above are now
+    # @rpath/<dylib>, but the only LC_RPATH entries baked in by the build are the
+    # CI cache dir and Homebrew paths, which don't exist on a user's machine — so
+    # the app aborts at launch with "Library not loaded: @rpath/libsqlite3...".
+    # Drop those build-time rpaths and add the bundle's Frameworks dir. Must run
+    # before codesign, since install_name_tool invalidates the signature.
+    echo_info "Fixing main binary rpath..."
+    for rp in $(otool -l "$binary" | awk '/LC_RPATH/{f=1} f&&/path /{print $2; f=0}'); do
+        install_name_tool -delete_rpath "$rp" "$binary" 2>/dev/null || true
+    done
+    install_name_tool -add_rpath "@executable_path/../Frameworks" "$binary" 2>/dev/null || true
+
     # Fix Lua .so modules in Contents/MacOS/lib/
     echo_info "Fixing Lua module references..."
     if [ -d "$lib_dir" ]; then
