@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.1](https://github.com/justinpopa/mushkin/compare/v0.5.0...v0.5.1) (2026-06-01)
+
+
+### Bug Fixes
+
+* add Frameworks rpath to the macOS app so bundled dylibs load ([#62](https://github.com/justinpopa/mushkin/issues/62)) ([b0b38ec](https://github.com/justinpopa/mushkin/commit/b0b38ec92acb378907bf3451a0f5f9ce3bc276c4))
+* disable unused mysql/psql/odbc Qt SQL drivers in the Windows build ([#64](https://github.com/justinpopa/mushkin/issues/64)) ([8df1e4c](https://github.com/justinpopa/mushkin/commit/8df1e4ce0a682c89cb8f40c886bc137c599f1021))
+
 ## [0.5.0](https://github.com/justinpopa/mushkin/compare/v0.4.0...v0.5.0) (2026-06-01)
 
 
