@@ -12,6 +12,8 @@
 #       libxcb-keysyms1-dev libxcb-shape0-dev libxcb-xfixes0-dev \
 #       libxcb-sync-dev libxcb-randr0-dev libxcb-render-util0-dev \
 #       libxcb-image0-dev libxcb-glx0-dev libxcb-shm0-dev \
+#       libxcb-render0-dev libxcb-util-dev libxcb-xinerama0-dev libxcb-xkb-dev \
+#       libxkbcommon-x11-dev \
 #       libfontconfig1-dev libfreetype6-dev libx11-dev libx11-xcb-dev \
 #       libxext-dev libxfixes-dev libxi-dev libxrender-dev \
 #       libatspi2.0-dev libglib2.0-dev

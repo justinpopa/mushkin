@@ -104,6 +104,8 @@ jobs:
             libxcb-keysyms1-dev libxcb-shape0-dev libxcb-xfixes0-dev \
             libxcb-sync-dev libxcb-randr0-dev libxcb-render-util0-dev \
             libxcb-image0-dev libxcb-glx0-dev libxcb-shm0-dev \
+            libxcb-render0-dev libxcb-util-dev libxcb-xinerama0-dev libxcb-xkb-dev \
+            libxkbcommon-x11-dev \
             libfontconfig1-dev libfreetype6-dev libx11-dev libx11-xcb-dev \
             libxext-dev libxfixes-dev libxi-dev libxrender-dev \
             libatspi2.0-dev libglib2.0-dev \
@@ -116,9 +118,10 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/mushkin/Qt-static
-          # v5: rebuild static Qt with xcb enabled (-feature-xcb); the v4 cache
-          # was built without the xcb platform plugin → eglfs-only binary.
-          key: qt-static-6.9.3-linux-x64-v5
+          # v6: rebuild static Qt with xcb enabled (-feature-xcb). v4 had no xcb
+          # plugin (eglfs-only binary); v5 failed configure (missing xcb syslibs
+          # incl. xkbcommon-x11) and may have cached a partial tree, so bump again.
+          key: qt-static-6.9.3-linux-x64-v6
 
       - name: Build Static Binary
         run: ./scripts/build-linux-static.sh
