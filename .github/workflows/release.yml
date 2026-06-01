@@ -104,10 +104,20 @@ jobs:
             libxcb-keysyms1-dev libxcb-shape0-dev libxcb-xfixes0-dev \
             libxcb-sync-dev libxcb-randr0-dev libxcb-render-util0-dev \
             libxcb-image0-dev libxcb-glx0-dev libxcb-shm0-dev \
+            libxcb-render0-dev libxcb-util-dev libxcb-xinerama0-dev libxcb-xkb-dev \
+            libxkbcommon-x11-dev \
             libfontconfig1-dev libfreetype6-dev libx11-dev libx11-xcb-dev \
             libxext-dev libxfixes-dev libxi-dev libxrender-dev \
             libatspi2.0-dev libglib2.0-dev \
             libpulse-dev libasound2-dev libpipewire-0.3-dev
+          # Clang 22 for C++26 — build-linux-static.sh selects it via find_clang();
+          # without a clang-19..22 present it falls back to gcc, which cannot
+          # configure the C++26 project (Qt's FindWrapAtomic try_compile fails).
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
+          echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-22 main" | \
+            sudo tee /etc/apt/sources.list.d/llvm.list
+          sudo apt-get update
+          sudo apt-get install -y clang-22
           python3 -m pip install --break-system-packages aqtinstall
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
@@ -116,7 +126,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/mushkin/Qt-static
-          key: qt-static-6.9.3-linux-x64-v4
+          # v7: static Qt with xcb enabled and the mysql/psql/odbc SQL drivers
+          # disabled. v4 had no xcb (eglfs-only); v6 built xcb but auto-linked the
+          # MySQL/Postgres driver plugins, adding hard libmysqlclient/libpq deps
+          # Fedora doesn't ship. Bump to discard the v6 tree.
+          key: qt-static-6.9.3-linux-x64-v7
 
       - name: Build Static Binary
         run: ./scripts/build-linux-static.sh
