@@ -20,6 +20,21 @@ A modern MUD client built with Qt. Mushkin is a cross-platform rewrite of [MUSHc
 
 **Beta** - Core functionality is working across all three platforms. The Lua API is near-complete and tested against MUSHclient for behavioral parity. Many MUSHclient plugins work out of the box.
 
+## Download
+
+Prebuilt, self-contained binaries for macOS, Linux (x86_64), and Windows (x64) are on the [Releases page](https://github.com/justinpopa/mushkin/releases). They bundle everything they need — there are no dependencies to install — so the Linux build runs on any modern distribution (Fedora, Arch, Debian/Ubuntu, …), not just the one it was built on.
+
+```bash
+# Linux
+tar -xzf mushkin-*-linux-x64.tar.gz
+./mushkin/mushkin
+```
+
+- **Windows:** extract the `.zip` and run `mushkin.exe`.
+- **macOS:** extract the `.zip`, then right-click `mushkin.app` → **Open** on first launch (to bypass Gatekeeper).
+
+Prefer to compile it yourself? See [Building](#building) below.
+
 ## Requirements
 
 - **Clang 19+** (22 recommended for full C++26 support)
@@ -91,6 +106,39 @@ cmake --build build --parallel
 export QT_QPA_PLATFORM=xcb  # or wayland
 ./build/bin/mushkin
 ```
+
+### Linux (Fedora)
+
+```bash
+# Toolchain & dependencies
+sudo dnf install -y \
+    clang cmake ninja-build gcc-c++ python3-pip \
+    mesa-libGL-devel libxkbcommon-devel \
+    libxcb-devel xcb-util-cursor-devel xcb-util-keysyms-devel xcb-util-wm-devel \
+    luajit-devel pcre-devel sqlite-devel \
+    openssl-devel zlib-devel libssh-devel \
+    pulseaudio-libs-devel alsa-lib-devel pipewire-devel
+
+# Qt
+pip3 install aqtinstall
+aqt install-qt linux desktop 6.9.3 linux_gcc_64 -m qtmultimedia --outputdir ~/Qt
+
+# Clone and build
+git clone https://github.com/justinpopa/mushkin.git
+cd mushkin
+
+cmake -B build -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_C_COMPILER=clang \
+    -DCMAKE_CXX_COMPILER=clang++
+cmake --build build --parallel
+
+# Run
+export QT_QPA_PLATFORM=xcb  # or wayland
+./build/bin/mushkin
+```
+
+> **Note:** the `rex` Lua regex module links against PCRE1 (`pcre-devel`), which ships on current Fedora releases but has been removed from **Rawhide**. On Rawhide, use the prebuilt binary from the [Releases page](https://github.com/justinpopa/mushkin/releases) (it bundles PCRE), or build PCRE 8.x from source first.
 
 ### Windows
 
