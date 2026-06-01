@@ -126,10 +126,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/mushkin/Qt-static
-          # v6: rebuild static Qt with xcb enabled (-feature-xcb). v4 had no xcb
-          # plugin (eglfs-only binary); v5 failed configure (missing xcb syslibs
-          # incl. xkbcommon-x11) and may have cached a partial tree, so bump again.
-          key: qt-static-6.9.3-linux-x64-v6
+          # v7: static Qt with xcb enabled and the mysql/psql/odbc SQL drivers
+          # disabled. v4 had no xcb (eglfs-only); v6 built xcb but auto-linked the
+          # MySQL/Postgres driver plugins, adding hard libmysqlclient/libpq deps
+          # Fedora doesn't ship. Bump to discard the v6 tree.
+          key: qt-static-6.9.3-linux-x64-v7
 
       - name: Build Static Binary
         run: ./scripts/build-linux-static.sh

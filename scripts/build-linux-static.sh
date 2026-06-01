@@ -153,7 +153,8 @@ build_static_qt() {
         -skip qtdeclarative -skip qtquick3d \
         -nomake examples -nomake tests \
         -no-pch \
-        -feature-xcb
+        -feature-xcb \
+        -no-feature-sql-mysql -no-feature-sql-psql -no-feature-sql-odbc
 
     # Build & install
     cmake --build . --parallel "$NUM_CORES"
