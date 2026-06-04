@@ -35,8 +35,8 @@ aqt install-qt mac desktop 6.9.3 -m qtmultimedia --outputdir ~/Qt
 
 # Clone and build
 git clone https://github.com/justinpopa/mushkin.git
-git submodule update --init --recursive
 cd mushkin
+git submodule update --init --recursive
 
 LLVM_PREFIX=$(brew --prefix llvm)
 cmake -B build -G Ninja \
@@ -75,8 +75,8 @@ aqt install-qt linux desktop 6.9.3 linux_gcc_64 -m qtmultimedia --outputdir ~/Qt
 
 # Clone and build
 git clone https://github.com/justinpopa/mushkin.git
-git submodule update --init --recursive
 cd mushkin
+git submodule update --init --recursive
 
 cmake -B build -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
@@ -107,8 +107,8 @@ C:\vcpkg\vcpkg install pcre:x64-windows luajit:x64-windows sqlite3:x64-windows `
 
 # Clone and build
 git clone https://github.com/justinpopa/mushkin.git
-git submodule update --init --recursive
 cd mushkin
+git submodule update --init --recursive
 
 cmake -B build -G Ninja `
     -DCMAKE_BUILD_TYPE=Release `
@@ -143,6 +143,7 @@ Mushkin uses portable relative paths like the original MUSHclient. All data dire
 - `./logs/` - Log files
 
 **Settings storage:**
+
 - macOS: `~/Library/Preferences/com.Gammon.MUSHclient.plist`
 - Linux: `~/.config/Gammon/MUSHclient.conf`
 - Windows: Registry `HKEY_CURRENT_USER\Software\Gammon\MUSHclient`
@@ -150,6 +151,7 @@ Mushkin uses portable relative paths like the original MUSHclient. All data dire
 ## Plugin Compatibility
 
 Mushkin aims for behavioral parity with MUSHclient's Lua API. Most plugins work without modification, including:
+
 - Miniwindow-based UIs (Aardwolf plugins, etc.)
 - GMCP/MSDP handlers
 - Trigger/alias/timer systems
@@ -162,6 +164,7 @@ The 4 unported functions are zChat-related (deprecated protocol, won't-implement
 ## Contributing
 
 Contributions are welcome! Please:
+
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
